@@ -60,13 +60,14 @@ services:
         max_attempts: 5
         window: 60s
 
-      # ⚠️ named volume 은 **노드 로컬**이다. 멀티 노드 환경에서 재배치되면
-      #    빈 볼륨을 새로 만들어 데이터가 초기화된다. 참고 프로젝트에서 실제로
-      #    발생한 사고이며, `node.role == manager` 만으로는 여러 노드가 허용되어 막히지 않았다.
-      #    현재는 단일 노드라 위험이 없지만, 노드가 늘어나면 아래 제약을 활성화한다.
-      # placement:
-      #   constraints:
-      #     - node.labels.nerd_redis == 1
+      # ⚠️ named volume 은 **노드 로컬**이다. 재배치되면 빈 볼륨을 새로 만들어
+      #    데이터가 초기화된다. 참고 프로젝트에서 실제로 발생한 사고이며,
+      #    `node.role == manager` 만으로는 여러 노드가 허용되어 막히지 않았다.
+      #    그래서 노드가 하나뿐인 지금부터 라벨로 못박는다 — 나중에 노드가 늘어난
+      #    뒤에 붙이면 이미 데이터가 옮겨간 상태일 수 있다.
+      placement:
+        constraints:
+          - node.labels.prod_nerd_redis == 1
 
 volumes:
   redis-data:

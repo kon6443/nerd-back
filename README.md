@@ -312,6 +312,7 @@ pnpm ci:all              # + 스텁 검사 + E2E (PR 전 필수)
 | 컨테이너 포트 | **5501** (호스트 publish 없음) |
 | 이미지 | 멀티스테이지 빌드, `linux/arm64` 단독 |
 | 네트워크 | 기존 overlay 네트워크에 `external: true`로 참여 |
+| 노드 배치 | 라벨 제약 — 앱 `prod_nerd_back=1` · Redis `prod_nerd_redis=1` (규칙: `prod_<프로젝트>_<역할>`) |
 | 리버스 프록시 | Caddy — 사이트 블록에서 `reverse_proxy tasks.prod_nerd_back:5501` |
 
 서비스 DNS 는 **`<스택명>_<서비스명>`** 이다. 앱과 Redis 를 **별도 스택**으로 두어
