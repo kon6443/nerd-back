@@ -36,6 +36,7 @@
 | 로그 마스킹 | Pino **내장 `redact`** | 참고 A는 재귀 함수로 페이로드 전체를 순회한다. 큰 응답을 다루는 우리에겐 비용이 크다. 키 목록만 승계 |
 | 배포 | Docker **Swarm stack** `prod_nerd`, 서비스 `back` → DNS **`prod_nerd_back`**, **replicas 3**. GitHub Environment **`PROD`** 로 시크릿 격리 | 서비스 DNS 는 `<스택>_<서비스>` 다. 스택을 `prod_nerd_back` 으로 두면 DNS 가 `prod_nerd_back_back` 이 된다 |
 | Redis 운영 | **전용 인스턴스 · 독립 스택** `prod_nerd_cache` → DNS `prod_nerd_cache_redis`, 전용 워크플로 `deploy-redis.yml` | 배포 수명주기를 끊는다. 같은 스택이면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고 앱까지 재배포된다 |
+| 노드 배치 | 라벨 제약 — 앱 `prod_nerd_back=1` · Redis `prod_nerd_redis=1` | 규칙은 **`prod_<프로젝트>_<역할>`**. 기존 노드가 이미 `prod_nest`(백) / `prod_next`(프론트)로 역할을 분리해 라벨링하고 있으므로 그대로 따른다. 프론트가 추가되면 `prod_nerd_front=1` 로 대칭이 유지되고, 라벨명이 서비스 DNS 와 1:1 로 맞아 스택 파일과 `docker ps` 필터가 같은 이름을 쓴다. `infra_redis` 는 **공유** Redis 를 뜻하므로 우리 전용 Redis 에 붙이면 의미가 어긋난다. 앱도 핀해야 하는 이유는 스모크 테스트가 매니저 노드에서 `docker ps` 로 컨테이너를 찾기 때문 |
 | Redis 정책 | `appendonly yes` · `maxmemory 128mb` · **`volatile-lru`** · `order: stop-first` | `allkeys-lru` 는 TTL 없는 키까지 evict 한다. named volume 은 동시 접근이 안 되므로 `start-first` 금지 |
 | 날짜·시간 | **UTC 저장 · 표시 시점에만 변환** · API 응답은 ISO 8601 Z | 로컬 타임존 의존 메서드를 eslint `no-restricted-syntax` 로 **차단**했다 (↓ 날짜·시간 정책) |
 | 리버스 프록시 | 기존 Caddy에 **사이트 블록 추가** → `reverse_proxy tasks.prod_nerd_back:<port>` | 블록 단위 독립이라 기존 사이트 무영향 |
