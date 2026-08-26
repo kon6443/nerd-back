@@ -1,10 +1,10 @@
 # 코드 패턴 (SSOT)
 
-> 최종 확인일: 2026-08-26 · 근거: `src` 전체 **21개 `.ts`**(spec 3개 포함) + `test` 실측. 각 규약에 사용 카운트를 병기한다.
+> 최종 확인일: 2026-08-26 · 근거: `src` 전체 **25개 `.ts`**(spec 5개 포함) + `test` 실측. 각 규약에 사용 카운트를 병기한다.
 > **용도**: 새 코드를 "이 프로젝트 모양"으로 쓰기 위한 규약. 신규 모듈·API·테스트 작성 **전에** 해당 섹션을 확인한다.
 > **경계**: 여기는 *코드를 어떻게 쓰는가*. 금지·함정은 [`../../CLAUDE.md`](../../CLAUDE.md), 사실·사용법은 [`../../README.md`](../../README.md), 작업 방식의 교훈은 [`../lessons.md`](../lessons.md).
 
-규모 참고: 컨트롤러 1 · 모듈 4 · Port 1 · 도메인 에러 정의 4 · 단위 spec 3 · E2E spec 1.
+규모 참고: 컨트롤러 1 · 모듈 4 · Port 1 · 도메인 에러 정의 4 · 단위 spec 5 · E2E spec 2.
 현재 Phase 1(뼈대) 완료 상태이며 도메인 모듈은 없다.
 
 ---
@@ -87,7 +87,16 @@ transformOptions: { enableImplicitConversion: true }
 - `x-request-id` 헤더가 있으면 승계, 없으면 생성.
 - 🚫 **외부 API 요청·응답 본문을 로그에 남기지 않는다.** 토큰 수·모델명·소요시간만 남긴다. 로그 수집 스택이 공유 자원이고 인제스트 한도가 낮다.
 - 🚫 **고카디널리티 값을 로그 레이블로 승격하지 않는다.** `userId` `requestId` `url` 은 본문 필드로만.
-- 헬스체크·docs 경로는 `autoLogging.ignore` 대상 (`LOG_IGNORED_PATHS`).
+- 헬스체크·docs 경로는 `autoLogging.ignore` 대상 (`LOG_IGNORED_PATHS`). 실측: liveness 20회 → 로그 **0줄**.
+- 🚫 **재시도하는 외부 의존의 이벤트 핸들러에서 바로 로그를 찍지 않는다.** `createLogThrottle`
+  (`@common/utils/log-throttle`)로 감싼다 — 첫 발생은 즉시, 이후는 1분 간격 + 억제 건수 보고.
+  ioredis 는 끊긴 동안 약 2초마다 `error` 를 내므로 그대로 찍으면 **트래픽 0에서도** 쌓인다
+  (실측: 유휴 60초 → 29줄, 레플리카 3개 하루 125,280줄 → 수정 후 1줄/분).
+- 🚫 **로그를 추가하기 전에 라이브러리가 같은 이벤트를 이미 찍는지 확인한다.**
+  readiness 실패는 Terminus 가 `error` 로 상세를 남기므로 우리 필터는 `debug` 로 낮췄다
+  (실측: 요청당 2줄 → 1줄).
+- 검증 방법: 컨테이너를 띄우고 **요청 0건으로 60초 유휴** 후 로그 증가량을 센다.
+  "요청당 몇 줄"만 보면 배경 노이즈를 놓친다.
 
 ## 6. 레이트리밋 — Redis 스토리지 필수, fail-open
 
@@ -95,7 +104,12 @@ transformOptions: { enableImplicitConversion: true }
 - **스토리지는 Redis.** 레플리카가 3개라 메모리 스토리지는 실효 한도가 3배가 된다.
 - `CustomThrottlerGuard` 가 두 가지를 바꾼다: 429 를 우리 에러 형식으로 던지고, **스토리지 장애 시 fail-open** 한다.
 - ⚠️ fail-open 은 **레이트리밋에만** 적용한다. 비용이 걸린 카운터(외부 API 예산 등)는 **fail-closed** 여야 한다 — 셀 수 없으면 쓰지 않는다.
-- 헬스체크 컨트롤러는 `@SkipThrottle()`. 폴링이 자기 자신을 막지 않게 한다.
+- 스로틀 제외는 **`@SkipThrottle(SKIP_ALL_THROTTLERS)`** 로 쓴다.
+  🚫 **인자 없는 `@SkipThrottle()` 은 동작하지 않는다.** 기본값 `{ default: true }` 가
+  우리 throttler 이름(`short`·`long`)과 매칭되지 않아 스로틀이 그대로 적용된다
+  (실측: health 5회 → 스토리지 접근 10회). `test/throttle-skip.e2e-spec.ts` 가 이 동작을 고정한다.
+- ⚠️ 레이트리밋이 닿지 않는 경로가 둘 있다 — **Swagger**(express 미들웨어로 마운트되어 가드 밖)와
+  **매칭되지 않는 404 경로**(라우트 핸들러가 없어 가드가 실행되지 않음). 둘 다 실측 확인했고 백로그에 있다.
 
 ## 7. 헬스체크 — liveness / readiness 분리
 
@@ -138,7 +152,7 @@ transformOptions: { enableImplicitConversion: true }
 - [ ] 응답을 `{ code, data, message }` 리터럴로 반환하는가? (§2)
 - [ ] 상태코드가 정석 REST 인가? 생성 201, 본문 없음 204 (§2)
 - [ ] Swagger: `@ApiOperation` + 응답 DTO + 공통 에러 데코레이터 (§2)
-- [ ] 폴링되는 경로면 `@SkipThrottle()` + `LOG_IGNORED_PATHS` (§5, §6)
+- [ ] 폴링되는 경로면 `@SkipThrottle(SKIP_ALL_THROTTLERS)` + `LOG_IGNORED_PATHS` (§5, §6)
 
 **외부 시스템 연동 추가**
 - [ ] Port 인터페이스 + DI 토큰을 먼저 만들었는가? (§1)

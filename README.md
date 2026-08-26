@@ -235,6 +235,23 @@ Redis 가 떠 있지 않아도 앱은 기동하고 HTTP 는 응답한다. 레이
 
 DB 관련 변수는 DB 확정 후 추가한다.
 
+### 배포 환경의 env 파일
+
+서버상의 env 파일은 **저장소에 두지 않고** 배포 시 `env_file` 로 주입한다. 경로는
+GitHub Environment 시크릿 `ENV_FILE_PATH` 가 가리키므로 저장소에는 절대 경로가 없다.
+
+환경이 늘어날 수 있으므로 파일명과 디렉터리에 환경을 명시한다.
+
+| 대상 | 규칙 | 예시 |
+|---|---|---|
+| env 파일 | `<프로젝트>.<환경>.env` | `nerd.prod.env` · `nerd.qa.env` |
+| stack 디렉터리 | `.../<프로젝트>/<환경>/` | `.../nerd/prod/` |
+| Swarm 스택 이름 | `<환경>_<프로젝트>` | `prod_nerd` · `prod_nerd_cache` |
+| GitHub Environment | 대문자 환경명 | `PROD` |
+
+한 디렉터리에 여러 환경의 파일이 섞여도 구분되고, 기존에 있던 다른 프로젝트의
+`.env` 와도 이름이 겹치지 않는다.
+
 ---
 
 ## 주요 명령어
@@ -289,26 +306,31 @@ pnpm ci:all              # + 스텁 검사 + E2E (PR 전 필수)
 | 항목 | 값 |
 |---|---|
 | 오케스트레이터 | Docker Swarm (stack) |
-| 스택명 | `prod_nerd` |
-| 서비스 DNS | `prod_nerd_back` (앱) · `prod_nerd_redis` (Redis) |
+| 스택 | `prod_nerd`(앱) · `prod_nerd_cache`(Redis) — **독립 배포** |
+| 서비스 DNS | `prod_nerd_back`(앱) · `prod_nerd_cache_redis`(Redis) |
 | 레플리카 | **3** |
 | 컨테이너 포트 | **5501** (호스트 publish 없음) |
 | 이미지 | 멀티스테이지 빌드, `linux/arm64` 단독 |
 | 네트워크 | 기존 overlay 네트워크에 `external: true`로 참여 |
 | 리버스 프록시 | Caddy — 사이트 블록에서 `reverse_proxy tasks.prod_nerd_back:5501` |
 
-서비스 DNS 는 **`<스택명>_<서비스명>`** 이다. 스택 `prod_nerd` + 서비스 `back` → `prod_nerd_back`.
-앱과 Redis 는 파일을 분리하되 **같은 스택 이름으로 함께 배포**한다. 한쪽 파일만 넘기면
-다른 서비스가 스택에서 제거되므로 항상 두 개를 함께 넘긴다.
+서비스 DNS 는 **`<스택명>_<서비스명>`** 이다. 앱과 Redis 를 **별도 스택**으로 두어
+배포 수명주기를 끊는다 — 각자 바뀐 것만 배포된다.
 
 ```bash
-docker stack deploy \
-  -c infra/docker-stack.app.yml \
-  -c infra/docker-stack.redis.yml \
-  prod_nerd
+docker stack deploy -c infra/docker-stack.app.yml   prod_nerd
+docker stack deploy -c infra/docker-stack.redis.yml prod_nerd_cache
 ```
 
-Swarm 은 스펙이 바뀐 서비스만 갱신하므로 앱만 배포해도 Redis 는 재시작되지 않는다.
+| 변경한 것 | 도는 워크플로 | 이미지 빌드 | 앱 재배포 | Redis 재시작 |
+|---|---|:-:|:-:|:-:|
+| `src/**`, `Dockerfile`, 의존성 | `deploy.yml` | O | O | X |
+| `infra/docker-stack.app.yml` | `deploy.yml` | O | O | X |
+| `infra/docker-stack.redis.yml` | `deploy-redis.yml` | X | X | O |
+| 문서·태스크 파일만 | (없음) | X | X | X |
+
+같은 스택에 두면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고,
+결과적으로 앱까지 재배포된다. 그래서 스택을 분리했다.
 
 호스트로 포트를 publish하지 않는다. Caddy가 같은 overlay 안에 있어 서비스 DNS로 바로 닿는다. publish하면 도메인을 우회한 직접 접근 경로가 열리고 포트 충돌 위험이 생긴다.
 

@@ -34,8 +34,8 @@
 | API prefix | `/api/v1` | |
 | 포트 | **5501** (컨테이너 내부). 호스트 publish 없음 | Caddy가 같은 overlay에서 `tasks.prod_nerd_back:5501`로 접근. publish하면 도메인 우회 경로가 열리고 포트 충돌 위험이 생긴다 |
 | 로그 마스킹 | Pino **내장 `redact`** | 참고 A는 재귀 함수로 페이로드 전체를 순회한다. 큰 응답을 다루는 우리에겐 비용이 크다. 키 목록만 승계 |
-| 배포 | Docker **Swarm stack** `prod_nerd`, 서비스 `back` → DNS **`prod_nerd_back`**, **replicas 3** | 서비스 DNS 는 `<스택>_<서비스>` 다. 스택을 `prod_nerd_back` 으로 두면 DNS 가 `prod_nerd_back_back` 이 된다 |
-| Redis 운영 | **전용 인스턴스** — 같은 스택의 별도 서비스 `redis` → DNS `prod_nerd_redis` | 파일은 분리(`docker-stack.redis.yml`)하되 스택 이름을 공유해 DNS 를 깔끔하게 유지. Swarm 은 스펙이 바뀐 서비스만 갱신하므로 앱 배포가 Redis 를 재시작하지 않는다 |
+| 배포 | Docker **Swarm stack** `prod_nerd`, 서비스 `back` → DNS **`prod_nerd_back`**, **replicas 3**. GitHub Environment **`PROD`** 로 시크릿 격리 | 서비스 DNS 는 `<스택>_<서비스>` 다. 스택을 `prod_nerd_back` 으로 두면 DNS 가 `prod_nerd_back_back` 이 된다 |
+| Redis 운영 | **전용 인스턴스 · 독립 스택** `prod_nerd_cache` → DNS `prod_nerd_cache_redis`, 전용 워크플로 `deploy-redis.yml` | 배포 수명주기를 끊는다. 같은 스택이면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고 앱까지 재배포된다 |
 | Redis 정책 | `appendonly yes` · `maxmemory 128mb` · **`volatile-lru`** · `order: stop-first` | `allkeys-lru` 는 TTL 없는 키까지 evict 한다. named volume 은 동시 접근이 안 되므로 `start-first` 금지 |
 | 날짜·시간 | **UTC 저장 · 표시 시점에만 변환** · API 응답은 ISO 8601 Z | 로컬 타임존 의존 메서드를 eslint `no-restricted-syntax` 로 **차단**했다 (↓ 날짜·시간 정책) |
 | 리버스 프록시 | 기존 Caddy에 **사이트 블록 추가** → `reverse_proxy tasks.prod_nerd_back:<port>` | 블록 단위 독립이라 기존 사이트 무영향 |
@@ -61,7 +61,7 @@
 | DB 세션 타임존·컬럼 타입 | DB 확정 후 | 앱 레벨 정책은 확정됨. DB별 적용 방법만 남았다 (↓ 날짜·시간 정책) |
 | 마이그레이션 멱등 가드 문법 | DB 확정 후 | 시스템 카탈로그 조회 문법이 DB별로 다름 |
 | 커넥션 풀 크기 | DB 확정 후 | 세션 한도 ÷ 레플리카 3 (↓ 주의 사항 #2) |
-| 로그 본문 정책 | **보류** | 프롬프트 본문 제외 · 토큰 수·모델명·소요시간만 남기는 규칙을 별도로 확정 |
+| LLM 로그 본문 정책 | **보류** | 프롬프트 본문 제외 · 토큰 수·모델명·소요시간만 남기는 규칙. 노이즈 억제(`createLogThrottle`)와 중복 기록 방지는 Phase 1 에서 확정됨 |
 | Prometheus 연결 | **후순위** | `/metrics` 노출과 스크레이프 설정은 뼈대 완료 후 |
 | 인증 | **보류** | 주제 확정 후. 지금은 `common/guards/` 자리와 `@CurrentUser()` 데코레이터만 |
 | WebSocket | 보류 | 필요해지면 Redis 어댑터 필수 (레플리카 3개) |
@@ -171,6 +171,26 @@ nerd-back/
 | PostgreSQL | `timestamptz` | 커넥션에 `timezone=UTC` | `timestamp`(without tz)를 쓰면 오프셋 정보가 사라진다 |
 | MySQL | `DATETIME(3)` 에 UTC 저장 | 드라이버 `timezone: 'Z'` | **`TIMESTAMP` 타입을 피한다** — 세션 TZ 기준으로 저장·조회 시 자동 변환되어 환경마다 값이 달라진다 |
 | Oracle | `TIMESTAMP WITH TIME ZONE` | 컨테이너 `TZ=UTC` 에 맞춤 | `ORA_SDTZ` 설정 금지(드라이버가 로컬 TZ 로 저장). `FROM_TZ()` 에 리전명(`'UTC'`) 대신 오프셋(`'+00:00'`) — ORA-01805 |
+
+### 환경 이름 규칙과 환경 추가 절차
+
+현재는 `PROD` 하나지만 늘어날 수 있으므로 이름에 환경을 명시한다.
+
+| 대상 | 규칙 | 현재 값 |
+|---|---|---|
+| Swarm 스택 | `<환경>_<프로젝트>` | `prod_nerd` (앱) · `prod_nerd_cache` (Redis) |
+| 서비스 DNS | `<스택>_<서비스>` | `prod_nerd_back` · `prod_nerd_cache_redis` |
+| 서버 env 파일 | `<프로젝트>.<환경>.env` | `nerd.prod.env` |
+| 서버 stack 디렉터리 | `.../<프로젝트>/<환경>/` | `.../nerd/prod/` |
+| GitHub Environment | 대문자 환경명 | `PROD` |
+
+**환경을 추가할 때** (예: QA)
+
+1. GitHub 에 Environment `QA` 생성 후 같은 이름의 시크릿 9개를 그 환경 값으로 등록
+2. 서버에 `nerd.qa.env` 와 stack 디렉터리 생성
+3. 워크플로를 복제하거나 `workflow_dispatch` 입력으로 환경을 받게 바꾼다
+   — **스택 이름이 워크플로에 하드코딩되어 있다.** 지금은 환경이 하나뿐이라
+   명시적인 편이 읽기 쉬워 그대로 두었다. 두 번째 환경이 생기는 시점에 파라미터화한다.
 
 ### Path Aliases
 
@@ -369,7 +389,8 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 
 | 항목 | 값 |
 |---|---|
-| 이미지·스택 이름 | `prod_nerd_back` |
+| 이미지 이름 | `prod_nerd_back` |
+| 스택 이름 | `prod_nerd`(앱) · `prod_nerd_cache`(Redis) |
 | 빌드 플랫폼 | `linux/arm64` **단독** (단일 ARM64 노드 — amd64는 낭비) |
 | 러너 | 저장소가 public이면 arm64 러너로 네이티브 빌드 (QEMU 에뮬레이션 대비 크게 빠름). private이면 기본 러너 + QEMU |
 | 서버상 stack YAML 경로 | 기존 파일과 겹치지 않는 별도 경로 |
@@ -394,7 +415,7 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 ### Step 10 — 배포
 
 - `Dockerfile` — 멀티스테이지, **ARM64 타깃**. 베이스 이미지 arm64 지원을 먼저 확인
-- `infra/docker-stack.app.yml` — 서비스명 `prod_nerd_back`, `replicas: 3`, 메모리 한도 지정, `restart_policy: on-failure`
+- `infra/docker-stack.app.yml` — 서비스 키 `back`(스택 `prod_nerd` → DNS `prod_nerd_back`), `replicas: 3`, 메모리 한도, `restart_policy: on-failure`
 - `healthcheck`는 **liveness 경로만** 찌른다 (Step 6)
 - 롤링 업데이트: `update_config` → `order: start-first`, `parallelism: 1`, `failure_action: rollback`, `max_failure_ratio: 0`. `rollback_config`도 함께 정의
 - `TASK_SLOT: "{{.Task.Slot}}"` 주입 — 스케줄러 가드용 (지금은 미사용, 자리만)
@@ -516,9 +537,11 @@ Step 5 — Redis + 레이트리밋
   [x] redis.module.ts (lazyConnect, enableOfflineQueue false, 실패해도 기동)
   [x] Throttler Redis 스토리지 (초당 5 + 분당 60)
   [x] CustomThrottlerGuard — 429 를 우리 형식으로, 스토리지 장애 시 fail-open
-  [ ] ⚠️ Swagger 경로는 레이트리밋 밖에 있다 — SwaggerModule 은 express 미들웨어로
-        마운트되므로 Nest 가드가 적용되지 않는다. 전 환경 노출이므로 별도 미들웨어 필요.
-        → 후속 태스크로 분리
+  [x] 헬스체크 @SkipThrottle(SKIP_ALL_THROTTLERS) — 인자 없는 형태는 동작하지 않음 (실측)
+  [ ] ⚠️ 레이트리밋이 닿지 않는 경로 2종 — 후속 태스크로 분리
+        · Swagger: SwaggerModule 은 express 미들웨어로 마운트되어 Nest 가드가 적용되지 않는다
+        · 매칭되지 않는 경로(404): 라우트 핸들러가 없어 가드가 실행되지 않는다 (실측 확인)
+        전 환경 노출이므로 별도 미들웨어 필요
 
 Step 6 — 헬스체크 ✅
   [x] GET /api/v1/health — liveness, 외부 의존 검사 없음
@@ -554,7 +577,7 @@ Step 9 — CI/CD ✅
 Step 10 — 배포
   [x] Dockerfile 멀티스테이지 ARM64 + COPY 목록 주석 + 비특권 사용자
   [x] scripts/healthcheck.mjs (slim 이미지에 curl 없음)
-  [x] docker-stack.app.yml (prod_nerd_back, replicas 3, 메모리 한도)
+  [x] docker-stack.app.yml (스택 prod_nerd / 서비스 back, replicas 3, 메모리 한도)
   [x] healthcheck → liveness 경로만, HEALTHCHECK 는 stack 한 곳에서만 정의
   [x] update_config start-first / parallelism 1 / rollback / max_failure_ratio 0
   [x] rollback_config 정의

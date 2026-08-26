@@ -88,7 +88,9 @@
 3. **`tsconfig.json` paths 와 `jest.config.js` moduleNameMapper 는 세트다** — 한쪽만 고치면 해당 alias 를 쓰는 테스트만 조용히 깨진다.
 4. **`reflect-metadata` 는 테스트에서도 필요하다** — `main.ts` 에서만 import 하면 spec 이 `Reflect.getMetadata is not a function` 으로 터진다. jest `setupFiles` 에 들어 있다.
 5. **에러 경로 테스트는 status·code 를 정확히 고정한다** — 느슨하게 받으면 그 차이가 곧 방어의 유무일 때 테스트가 조용히 무력해진다.
-6. **HEALTHCHECK 은 stack YAML 한 곳에만** — Dockerfile 에도 두면 stack 이 덮어써서 어느 쪽이 동작하는지 헷갈린다.
+6. **부팅 시 `LegacyRouteConverter: Unsupported route path: "/api/v1/*"` 경고 2줄은 무해하다** — `setGlobalPrefix` + `app.use()` 조합에서 Nest 11 이 Express 5 의 구 와일드카드 문법으로 등록하며 내는 경고다. 실측으로 helmet 헤더 6종·gzip·Swagger CSP 제외가 모두 정상 적용됨을 확인했다. **쫓지 말 것.**
+7. **로그를 추가할 때 발생 빈도를 먼저 재라** — 재시도하는 외부 의존의 이벤트 핸들러는 트래픽 0에서도 로그를 쌓는다. `createLogThrottle` 로 감싸고, 요청 0건 유휴 60초 측정으로 검증한다.
+8. **HEALTHCHECK 은 stack YAML 한 곳에만** — Dockerfile 에도 두면 stack 이 덮어써서 어느 쪽이 동작하는지 헷갈린다.
 
 ## Git & 커밋 컨벤션
 
