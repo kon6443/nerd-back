@@ -1,7 +1,7 @@
 # Task Tracker: 백엔드 뼈대 구축
 
 > 작성일: 2026-08-26
-> 상태: **계획 확정 · 구현 미착수**
+> 상태: **Phase 1 구현 완료 (2026-08-26)** — 배포 실행과 Caddy 등록은 사용자 작업으로 남음. Phase 2(DB 계층) 미착수.
 > 범위: 주제와 무관하게 확정 가능한 뼈대만. 도메인 모듈은 주제 확정 후 별도 태스크.
 > 원칙: 이 문서가 뼈대 관련 **결정의 SSOT**다. 결정이 바뀌면 코드보다 이 문서를 먼저 고친다.
 
@@ -34,7 +34,10 @@
 | API prefix | `/api/v1` | |
 | 포트 | **5501** (컨테이너 내부). 호스트 publish 없음 | Caddy가 같은 overlay에서 `tasks.prod_nerd_back:5501`로 접근. publish하면 도메인 우회 경로가 열리고 포트 충돌 위험이 생긴다 |
 | 로그 마스킹 | Pino **내장 `redact`** | 참고 A는 재귀 함수로 페이로드 전체를 순회한다. 큰 응답을 다루는 우리에겐 비용이 크다. 키 목록만 승계 |
-| 배포 | Docker **Swarm stack**, 서비스명 `prod_nerd_back`, **replicas 3** | 단일 노드에서도 롤링 업데이트로 무중단 배포 확보 |
+| 배포 | Docker **Swarm stack** `prod_nerd`, 서비스 `back` → DNS **`prod_nerd_back`**, **replicas 3**. GitHub Environment **`PROD`** 로 시크릿 격리 | 서비스 DNS 는 `<스택>_<서비스>` 다. 스택을 `prod_nerd_back` 으로 두면 DNS 가 `prod_nerd_back_back` 이 된다 |
+| Redis 운영 | **전용 인스턴스 · 독립 스택** `prod_nerd_cache` → DNS `prod_nerd_cache_redis`, 전용 워크플로 `deploy-redis.yml` | 배포 수명주기를 끊는다. 같은 스택이면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고 앱까지 재배포된다 |
+| Redis 정책 | `appendonly yes` · `maxmemory 128mb` · **`volatile-lru`** · `order: stop-first` | `allkeys-lru` 는 TTL 없는 키까지 evict 한다. named volume 은 동시 접근이 안 되므로 `start-first` 금지 |
+| 날짜·시간 | **UTC 저장 · 표시 시점에만 변환** · API 응답은 ISO 8601 Z | 로컬 타임존 의존 메서드를 eslint `no-restricted-syntax` 로 **차단**했다 (↓ 날짜·시간 정책) |
 | 리버스 프록시 | 기존 Caddy에 **사이트 블록 추가** → `reverse_proxy tasks.prod_nerd_back:<port>` | 블록 단위 독립이라 기존 사이트 무영향 |
 | 로그 수집 | 기존 파이프라인 **자동 수집** (앱 작업 0) | 수집 에이전트가 global 모드로 전 컨테이너를 자동 발견 |
 | 패키지 매니저 | pnpm | 참고 A·B 공통 |
@@ -55,10 +58,10 @@
 | DB 계층 패키지 일괄 | DB 확정 후 | `@nestjs/typeorm` `typeorm` `typeorm-transactional` + 드라이버를 **한 번에** 설치. 미리 깔아두지 않는다 |
 | readiness 인디케이터 | Redis·DB 도입 시 | liveness는 Phase 1에서 완성, readiness는 의존이 생길 때 채운다 |
 | 엔티티 컬럼 타입·네이밍 규칙 | DB 확정 후 | DB별 타입 매핑과 대소문자 관례가 다름 |
-| 날짜·시간 정책 (UTC 저장 여부) | DB 확정 후 | 참고 A·B가 서로 다른 정책이라 승계 대상 없음 |
+| DB 세션 타임존·컬럼 타입 | DB 확정 후 | 앱 레벨 정책은 확정됨. DB별 적용 방법만 남았다 (↓ 날짜·시간 정책) |
 | 마이그레이션 멱등 가드 문법 | DB 확정 후 | 시스템 카탈로그 조회 문법이 DB별로 다름 |
 | 커넥션 풀 크기 | DB 확정 후 | 세션 한도 ÷ 레플리카 3 (↓ 주의 사항 #2) |
-| 로그 본문 정책 | **보류** | 프롬프트 본문 제외 · 토큰 수·모델명·소요시간만 남기는 규칙을 별도로 확정 |
+| LLM 로그 본문 정책 | **보류** | 프롬프트 본문 제외 · 토큰 수·모델명·소요시간만 남기는 규칙. 노이즈 억제(`createLogThrottle`)와 중복 기록 방지는 Phase 1 에서 확정됨 |
 | Prometheus 연결 | **후순위** | `/metrics` 노출과 스크레이프 설정은 뼈대 완료 후 |
 | 인증 | **보류** | 주제 확정 후. 지금은 `common/guards/` 자리와 `@CurrentUser()` 데코레이터만 |
 | WebSocket | 보류 | 필요해지면 Redis 어댑터 필수 (레플리카 3개) |
@@ -113,7 +116,7 @@ nerd-back/
 │   │   ├── pipes/             global-validation-pipe.ts
 │   │   ├── port/              llm.port.ts  (인터페이스 + DI 토큰)
 │   │   ├── redis/             redis.module.ts
-│   │   ├── utils/
+│   │   ├── utils/             date.utils.ts
 │   │   └── __spec__/          mock-repository.ts
 │   ├── config/                env.validation.ts, database.config.ts, app.config.ts
 │   ├── entities/
@@ -129,7 +132,7 @@ nerd-back/
 │   ├── conventions/           code-patterns.md
 │   ├── playbooks/
 │   └── tasks/                 (본 문서)
-├── infra/                     docker-stack.app.yml
+├── infra/                     docker-stack.app.yml, docker-stack.redis.yml
 ├── migrations/
 ├── CLAUDE.md
 ├── Dockerfile
@@ -145,6 +148,50 @@ nerd-back/
 
 🚫 **Swarm healthcheck에 외부 의존을 넣지 않는다.** DB나 Redis가 흔들릴 때 컨테이너가 unhealthy로 판정되어 재시작 루프에 빠지고, 롤링 업데이트가 `failure_action: rollback`으로 되돌아간다. **앱은 멀쩡한데 배포가 막히는 경로다.**
 
+### 날짜·시간 정책
+
+**UTC 저장, 표시 시점에만 변환.** 저장·비교·연산은 전부 UTC 로 하고, 사람이 읽는 문자열이 필요한 순간에만 타임존을 명시해 변환한다. API 응답은 ISO 8601 `Z` suffix 로 보내고 오프셋을 붙이지 않는다 — 받는 쪽이 변환한다.
+
+| 레이어 | 적용 | 상태 |
+|---|---|---|
+| 앱 코드 | `@common/utils/date.utils` 헬퍼만 사용 (`nowUtc` `toIsoUtc` `dateKeyInTimeZone` `formatInTimeZone`) | ✅ |
+| 린트 | 로컬 TZ 의존 메서드(`getHours` `toLocaleString` `getTimezoneOffset` 등 18종)를 `no-restricted-syntax` 로 **error** | ✅ 위반 2건 잡히는 것 실측 확인 |
+| 컨테이너 | `Dockerfile` 에 `ENV TZ=UTC` | ✅ |
+| 테스트 | `test/setup/setup-tz.ts` 가 `process.env.TZ = 'UTC'` 고정 | ✅ |
+| DB | 세션 타임존과 컬럼 타입 | 🚧 DB 확정 후 |
+
+린트로 막는 것이 핵심이다. 규약을 문서에만 적어두면 개발자 노트북(KST)·CI 러너(UTC)·컨테이너(UTC)가 서로 다른 답을 내는 코드가 들어온다. 지금은 날짜 코드가 없어 **위반 0건 상태에서 규칙을 켤 수 있는 유일한 시점**이다.
+
+`dateKeyInTimeZone(date, timeZone)` 이 타임존을 **인자로 강제**하는 이유: 일별 카운터(예: API 예산)의 "오늘"이 어느 타임존이냐가 집계 결과를 바꾼다. 한국 사용자 기준이면 KST 로 리셋해야 한다.
+
+#### DB 확정 시 채울 항목
+
+| DB | 컬럼 타입 | 세션 타임존 | 함정 |
+|---|---|---|---|
+| PostgreSQL | `timestamptz` | 커넥션에 `timezone=UTC` | `timestamp`(without tz)를 쓰면 오프셋 정보가 사라진다 |
+| MySQL | `DATETIME(3)` 에 UTC 저장 | 드라이버 `timezone: 'Z'` | **`TIMESTAMP` 타입을 피한다** — 세션 TZ 기준으로 저장·조회 시 자동 변환되어 환경마다 값이 달라진다 |
+| Oracle | `TIMESTAMP WITH TIME ZONE` | 컨테이너 `TZ=UTC` 에 맞춤 | `ORA_SDTZ` 설정 금지(드라이버가 로컬 TZ 로 저장). `FROM_TZ()` 에 리전명(`'UTC'`) 대신 오프셋(`'+00:00'`) — ORA-01805 |
+
+### 환경 이름 규칙과 환경 추가 절차
+
+현재는 `PROD` 하나지만 늘어날 수 있으므로 이름에 환경을 명시한다.
+
+| 대상 | 규칙 | 현재 값 |
+|---|---|---|
+| Swarm 스택 | `<환경>_<프로젝트>` | `prod_nerd` (앱) · `prod_nerd_cache` (Redis) |
+| 서비스 DNS | `<스택>_<서비스>` | `prod_nerd_back` · `prod_nerd_cache_redis` |
+| 서버 env 파일 | `<프로젝트>.<환경>.env` | `nerd.prod.env` |
+| 서버 stack 디렉터리 | `.../<프로젝트>/<환경>/` | `.../nerd/prod/` |
+| GitHub Environment | 대문자 환경명 | `PROD` |
+
+**환경을 추가할 때** (예: QA)
+
+1. GitHub 에 Environment `QA` 생성 후 같은 이름의 시크릿 9개를 그 환경 값으로 등록
+2. 서버에 `nerd.qa.env` 와 stack 디렉터리 생성
+3. 워크플로를 복제하거나 `workflow_dispatch` 입력으로 환경을 받게 바꾼다
+   — **스택 이름이 워크플로에 하드코딩되어 있다.** 지금은 환경이 하나뿐이라
+   명시적인 편이 읽기 쉬워 그대로 두었다. 두 번째 환경이 생기는 시점에 파라미터화한다.
+
 ### Path Aliases
 
 ```
@@ -157,7 +204,7 @@ nerd-back/
 
 ---
 
-## 📦 패키지 (설치 예정 — 아직 미설치)
+## 📦 패키지 (Phase 1 설치 완료)
 
 **런타임**
 
@@ -175,7 +222,9 @@ nerd-back/
 
 **개발**
 
-`@nestjs/cli` `@nestjs/testing` `jest` `ts-jest` `supertest` `pino-pretty` `eslint` `typescript-eslint` `eslint-config-prettier` `eslint-plugin-prettier` `prettier` `typescript` `@faker-js/faker` `rosie` `@types/*`
+`@nestjs/cli` `@nestjs/testing` `jest` `ts-jest` `supertest` `pino-pretty` `eslint` `typescript-eslint` `eslint-config-prettier` `eslint-plugin-prettier` `prettier` `typescript` `@types/*`
+
+**보류**: `@faker-js/faker` `rosie` (엔티티 팩토리는 Phase 2)
 
 **보류**: `@willsoto/nestjs-prometheus` `prom-client` (Prometheus 후순위), `@nestjs/jwt` (인증 보류)
 
@@ -340,7 +389,8 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 
 | 항목 | 값 |
 |---|---|
-| 이미지·스택 이름 | `prod_nerd_back` |
+| 이미지 이름 | `prod_nerd_back` |
+| 스택 이름 | `prod_nerd`(앱) · `prod_nerd_cache`(Redis) |
 | 빌드 플랫폼 | `linux/arm64` **단독** (단일 ARM64 노드 — amd64는 낭비) |
 | 러너 | 저장소가 public이면 arm64 러너로 네이티브 빌드 (QEMU 에뮬레이션 대비 크게 빠름). private이면 기본 러너 + QEMU |
 | 서버상 stack YAML 경로 | 기존 파일과 겹치지 않는 별도 경로 |
@@ -365,7 +415,7 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 ### Step 10 — 배포
 
 - `Dockerfile` — 멀티스테이지, **ARM64 타깃**. 베이스 이미지 arm64 지원을 먼저 확인
-- `infra/docker-stack.app.yml` — 서비스명 `prod_nerd_back`, `replicas: 3`, 메모리 한도 지정, `restart_policy: on-failure`
+- `infra/docker-stack.app.yml` — 서비스 키 `back`(스택 `prod_nerd` → DNS `prod_nerd_back`), `replicas: 3`, 메모리 한도, `restart_policy: on-failure`
 - `healthcheck`는 **liveness 경로만** 찌른다 (Step 6)
 - 롤링 업데이트: `update_config` → `order: start-first`, `parallelism: 1`, `failure_action: rollback`, `max_failure_ratio: 0`. `rollback_config`도 함께 정의
 - `TASK_SLOT: "{{.Task.Slot}}"` 주입 — 스케줄러 가드용 (지금은 미사용, 자리만)
@@ -450,97 +500,105 @@ caddy validate && caddy reload
 
 ## ✅ 실행 체크리스트
 
+**Phase 1 — 구현 완료 (2026-08-26).** `pnpm ci:all` 통과: lint 0건 · 스텁 0건 · 단위 22 · E2E 5 · 빌드 성공.
+
 ```
-Step 1 — 프로젝트 초기화
-  [ ] 수동 스캐폴딩 (nest new 미사용)
-  [ ] tsconfig path alias 5종 + build/runtime 분리, include에 테스트 포함
-  [ ] ESLint — no-explicit-any / no-floating-promises / no-misused-promises = error ⭐
-  [ ] ESLint 대상에 테스트 코드 포함
-  [ ] jest — restoreMocks: true, 커버리지 분모에서 spec 제외 ⭐
-  [ ] jest moduleNameMapper ↔ tsconfig paths 1:1 확인
-  [ ] package.json 스크립트 (ci:core / ci:all / check:stubs 포함)
-  [ ] 베이스 이미지 ARM64 지원 확인
+Step 1 — 프로젝트 초기화 ✅
+  [x] 수동 스캐폴딩 (nest new 미사용)
+  [x] tsconfig path alias 5종 + build/runtime 분리, include 에 테스트 포함
+  [x] ESLint — no-explicit-any / no-floating-promises / no-misused-promises = error
+  [x] ESLint 대상에 테스트 코드 포함
+  [x] jest — restoreMocks: true, 커버리지 분모에서 spec 제외
+  [x] jest moduleNameMapper ↔ tsconfig paths 1:1 확인
+  [x] package.json 스크립트 (ci:core / ci:all / check:stubs 포함)
+  [~] 베이스 이미지 ARM64 지원 — CI 의 ARM64 빌드 job 으로 검증 예정 (로컬 docker build 미실행)
 
-Step 2 — 설정 계층
-  [ ] @nestjs/config 전역
-  [ ] env.validation.ts — 누락 시 기동 실패
-  [ ] .env.example (실제 .env 커밋 금지 확인)
+Step 2 — 설정 계층 ✅
+  [x] @nestjs/config 전역
+  [x] env.validation.ts — 누락 시 기동 실패 (spec 6건으로 고정)
+  [x] .env.example
 
-Step 3 — 로깅
-  [ ] logger.module.ts (로컬 pretty / 배포 JSON stdout)
-  [ ] redact 목록 적용
-  [ ] serializers (req·res·err)
-  [ ] /health, /docs 로그 제외
-  [ ] 외부 API 본문 미기록 규칙 명문화
+Step 3 — 로깅 ✅
+  [x] logger.module.ts (로컬 pretty / 배포 JSON stdout)
+  [x] Pino 내장 redact 적용 (재귀 함수 미사용)
+  [x] serializers (req·res·err)
+  [x] health / health/ready / docs 로그 제외
+  [x] x-request-id 승계
+  [x] 외부 API 본문 미기록 규칙 명문화 (CLAUDE.md Never 표 + code-patterns §5)
 
-Step 4 — 공통 응답·에러
-  [ ] api-response.dto.ts (Swagger 명세 전용)
-  [ ] define-domain-error.ts
-  [ ] http-exception.filter.ts (3단 분기, 500 이상만 스택)
-  [ ] global-validation-pipe.ts (프로덕션·E2E 공유)
-  [ ] 공통 에러 응답 Swagger 데코레이터
+Step 4 — 공통 응답·에러 ✅
+  [x] api-response.dto.ts (Swagger 명세 전용)
+  [x] define-domain-error.ts
+  [x] http-exception.filter.ts — 4단 분기 (헬스체크 페이로드 통과 포함)
+  [x] global-validation-pipe.ts (프로덕션·E2E 공유)
+  [x] 공통 에러 응답 Swagger 데코레이터
 
 Step 5 — Redis + 레이트리밋
-  [ ] redis.module.ts (lazyConnect, 실패해도 기동)
-  [ ] Throttler Redis 스토리지 (초당 + 분당 2단)
-  [ ] Swagger 경로 포함 확인
+  [x] redis.module.ts (lazyConnect, enableOfflineQueue false, 실패해도 기동)
+  [x] Throttler Redis 스토리지 (초당 5 + 분당 60)
+  [x] CustomThrottlerGuard — 429 를 우리 형식으로, 스토리지 장애 시 fail-open
+  [x] 헬스체크 @SkipThrottle(SKIP_ALL_THROTTLERS) — 인자 없는 형태는 동작하지 않음 (실측)
+  [ ] ⚠️ 레이트리밋이 닿지 않는 경로 2종 — 후속 태스크로 분리
+        · Swagger: SwaggerModule 은 express 미들웨어로 마운트되어 Nest 가드가 적용되지 않는다
+        · 매칭되지 않는 경로(404): 라우트 핸들러가 없어 가드가 실행되지 않는다 (실측 확인)
+        전 환경 노출이므로 별도 미들웨어 필요
 
-Step 6 — 헬스체크
-  [ ] GET /api/v1/health — liveness, 외부 의존 검사 없음 ⭐
-  [ ] GET /api/v1/health/ready — readiness, 인디케이터는 의존 생길 때
-  [ ] Swarm healthcheck·Caddy가 liveness만 보게 구성
-  [ ] 두 경로 모두 autoLogging.ignore
+Step 6 — 헬스체크 ✅
+  [x] GET /api/v1/health — liveness, 외부 의존 검사 없음
+  [x] GET /api/v1/health/ready — readiness (Redis)
+  [x] Swarm healthcheck 가 liveness 만 보게 구성
+  [x] 두 경로 모두 autoLogging.ignore
+  [x] "Redis 가 죽어도 liveness 는 200" E2E 로 고정
 
-Step 7 — Port 골격
-  [ ] llm.port.ts (인터페이스 + Symbol 토큰)
-  [ ] 서비스가 SDK를 직접 들지 않는다는 규약 문서화
+Step 7 — Port 골격 ✅
+  [x] llm.port.ts (인터페이스 + Symbol 토큰 + usage 계측 필드)
+  [x] 서비스가 SDK 를 직접 들지 않는다는 규약 문서화
 
 Step 8 — 테스트 기반
-  [ ] jest 설정 + setup-tz.ts
-  [ ] mock-repository.ts 헬퍼
-  [ ] entity.factory.ts (rosie + faker, 고정 시각)
-  [ ] e2e-app.ts (AppModule import 금지)
+  [x] jest 설정 + setup-tz.ts + reflect-metadata setupFiles
+  [x] e2e-app.ts (AppModule import 금지, 프로덕션과 같은 파이프·필터)
+  [~] mock-repository.ts → Phase 2 (TypeORM 타입 필요)
+  [~] entity.factory.ts → Phase 2 (엔티티 필요)
   [~] forbid-db.ts → Phase 2 (차단 대상 드라이버 확정 후)
 
-Step 9 — CI/CD
-  [ ] paths 화이트리스트 트리거 (paths-ignore 사용 금지)
-  [ ] 배포 전 ci:core 게이트 ⭐ (참고 A에 없는 것)
-  [ ] PR ci:all
-  [ ] buildx 캐시 (cache-from/to) ⭐
-  [ ] 이미지 태그 = 커밋 short SHA
-  [ ] linux/arm64 단독 빌드 + --provenance=false --sbom=false
-  [ ] 러너 선택 (public → arm64 네이티브 / private → QEMU)
-  [ ] GitHub Secrets 6개 등록 또는 기존 재사용 확인
-  [ ] rsync → docker stack deploy --detach=false (동기 대기)
-  [ ] 배포 후 liveness 폴링 스모크 테스트 ⭐
-  [ ] SSH 임시 키 정리 if: always() 또는 SSH 액션으로 통일
+Step 9 — CI/CD ✅
+  [x] paths 화이트리스트 트리거
+  [x] 배포 전 ci:all 게이트 (별도 job — 실패 시 build 미시작)
+  [x] PR 용 ci.yml + ARM64 빌드 검증 job
+  [x] buildx 캐시 (type=gha)
+  [x] 이미지 태그 = 커밋 short SHA
+  [x] linux/arm64 단독 + provenance/sbom 비활성
+  [x] concurrency group 으로 배포 직렬화
+  [x] scp/ssh 액션 사용 → 임시 키 파일 없음
+  [x] 배포 후 liveness 폴링 스모크 테스트
+  [ ] GitHub Secrets 등록 (사용자 작업 — 8개)
+  [ ] 러너 선택 확정 (public 이면 arm64 네이티브로 전환)
 
 Step 10 — 배포
-  [ ] Dockerfile 멀티스테이지 ARM64 (베이스 이미지 arm64 지원 확인)
-  [ ] docker-stack.app.yml (prod_nerd_back, replicas 3, 메모리 한도)
-  [ ] healthcheck → liveness 경로만
-  [ ] update_config: start-first / parallelism 1 / failure_action rollback / max_failure_ratio 0
-  [ ] rollback_config 정의
-  [ ] TASK_SLOT 주입 (지금은 미사용, 자리만)
-  [ ] 컨테이너 포트 5501, ports: 미선언 (호스트 publish 없음)
-  [ ] 기존 overlay 네트워크 external 참여 (이름은 서버에서 확인)
-  [ ] 새 도메인 A 레코드 → 인스턴스
-  [ ] Caddy 사이트 블록 추가 (validate → reload, 커밋 금지)
-  [ ] 배포 중 liveness 1초 폴링 → 5xx·끊김 0건 실측 ⭐ (Phase 1 완료 조건)
+  [x] Dockerfile 멀티스테이지 ARM64 + COPY 목록 주석 + 비특권 사용자
+  [x] scripts/healthcheck.mjs (slim 이미지에 curl 없음)
+  [x] docker-stack.app.yml (스택 prod_nerd / 서비스 back, replicas 3, 메모리 한도)
+  [x] healthcheck → liveness 경로만, HEALTHCHECK 는 stack 한 곳에서만 정의
+  [x] update_config start-first / parallelism 1 / rollback / max_failure_ratio 0
+  [x] rollback_config 정의
+  [x] TASK_SLOT 주입
+  [x] 컨테이너 포트 5501, ports 미선언 (호스트 publish 없음)
+  [x] overlay 네트워크를 환경변수로 주입 (저장소에 이름 미기재)
+  [ ] 새 도메인 A 레코드 → 인스턴스 (사용자 작업)
+  [ ] Caddy 사이트 블록 추가 (사용자 작업 — validate → reload, 커밋 금지)
+  [ ] 배포 중 liveness 1초 폴링 → 5xx·끊김 0건 실측 ⭐ (Phase 1 최종 완료 조건)
 
 Step 11 — 문서 · AI 워크플로
-  [ ] CLAUDE.md (라우팅 표 / Never·Ask / Pitfalls / DoD / 커밋)
-  [ ] docs/conventions/code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
-  [ ] docs/lessons.md (4필드 포맷) + "로컬 빌드 ≠ Docker 빌드" 초기 등재 ⭐
-  [ ] docs/playbooks/ 스켈레톤 (승격 판정 규칙 포함)
-  [x] README.md (스택 / API 규약 / 로깅 / 명령어 / 배포 구성) — 2026-08-26
-  [ ] .claude/settings.json 권한 3단 + 권한 파일 자체 deny (사용자 등록)
-  [ ] PreCompact 핸드오프 훅 (trap exit 0, 마스킹) (사용자 등록)
-  [ ] 리뷰 커맨드
+  [x] CLAUDE.md (라우팅 표 / Never·Ask / Pitfalls / DoD / 커밋)
+  [x] docs/conventions/code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
+  [x] docs/lessons.md — 2건 등재 (전역 필터가 헬스체크 덮어씀 / 로컬 빌드 ≠ 컨테이너 빌드)
+  [x] README.md (스택 / API 규약 / 로깅 / 명령어 / 배포 구성)
+  [x] .claude/settings.json 권한 3단 + 권한 파일 자체 deny
+  [x] .claude/commands/review.md (플로우 기반 QA 절차)
+  [ ] docs/playbooks/ — 결함 2회째 발생 시 생성 (현재 승격 대기 0건)
+  [ ] PreCompact 핸드오프 훅 (사용자 등록 — settings.json 이 AI 쓰기 deny 대상)
   [~] PreToolUse 연관 규약 주입 훅 → 프론트 저장소 생성 후
 ```
-
----
 
 ## ⚠️ 위험도 요약
 

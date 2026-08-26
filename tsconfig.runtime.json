@@ -1,0 +1,15 @@
+{
+  // 런타임 path alias 해석용. 컴파일에는 쓰이지 않는다.
+  // dist 기준 경로로 매핑해야 tsconfig-paths 가 빌드 산출물에서 alias 를 찾을 수 있다.
+  // TS_NODE_PROJECT 로 이 파일을 지정한 뒤 `node -r tsconfig-paths/register` 로 실행한다.
+  "compilerOptions": {
+    "baseUrl": "./dist",
+    "paths": {
+      "@/*": ["*"],
+      "@common/*": ["common/*"],
+      "@config/*": ["config/*"],
+      "@entities/*": ["entities/*"],
+      "@modules/*": ["modules/*"]
+    }
+  }
+}

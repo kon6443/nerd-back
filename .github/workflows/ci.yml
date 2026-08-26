@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      # main 푸시는 deploy 워크플로가 같은 검증을 먼저 돌리므로 중복 실행하지 않는다.
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # 스텁 검사와 E2E 까지 포함한 전체 검증.
+      - run: pnpm run ci:all
+
+      # ARM64 로 실제 빌드되는지 확인한다. 배포 노드가 ARM64 이므로
+      # 여기서 걸러내지 않으면 배포 단계에서야 드러난다.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: ARM64 이미지 빌드 검증
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: false
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
