@@ -28,7 +28,7 @@ function createHost(): CapturedResponse {
   const host = {
     switchToHttp: () => ({
       getResponse: () => ({ status }),
-      getRequest: () => ({ method: 'GET', originalUrl: '/api/v1/sample' }),
+      getRequest: () => ({ method: 'GET', originalUrl: '/api/v2/sample' }),
     }),
   } as unknown as ArgumentsHost;
 

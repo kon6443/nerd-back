@@ -11,7 +11,9 @@
 import { get } from 'node:http';
 
 const PORT = Number(process.env.PORT ?? 5501);
-const PATH = '/api/v1/health';
+// ⚠️ @common/constants/app.constants 의 HEALTH_PATH 와 같아야 한다.
+//    app.constants.spec.ts 가 이 파일을 읽어 두 값을 대조한다.
+const PATH = '/api/v2/health';
 const TIMEOUT_MS = 4000;
 
 const request = get({ host: '127.0.0.1', port: PORT, path: PATH, timeout: TIMEOUT_MS }, (res) => {

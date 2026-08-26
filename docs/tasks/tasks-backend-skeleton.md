@@ -1,7 +1,7 @@
 # Task Tracker: 백엔드 뼈대 구축
 
 > 작성일: 2026-08-26
-> 상태: **Phase 1 구현 완료 (2026-08-26)** — 배포 실행과 Caddy 등록은 사용자 작업으로 남음. Phase 2(DB 계층) 미착수.
+> 상태: **Phase 1 배포 성공 (2026-08-26)** — 무중단 롤링 업데이트 실측만 남음. Phase 2(DB 계층) 미착수.
 > 범위: 주제와 무관하게 확정 가능한 뼈대만. 도메인 모듈은 주제 확정 후 별도 태스크.
 > 원칙: 이 문서가 뼈대 관련 **결정의 SSOT**다. 결정이 바뀌면 코드보다 이 문서를 먼저 고친다.
 
@@ -30,9 +30,10 @@
 | Redis | **포함** | 레이트리밋 스토리지 + 예산 가드레일 카운터. 레플리카 3개 전제에서 필수 |
 | 레이트리밋 | Throttler + **Redis 스토리지** | 메모리 스토리지는 레플리카 3개에서 실효 한도가 3배가 된다 |
 | 헬스체크 | `@nestjs/terminus` — **liveness / readiness 분리** | Swarm healthcheck가 외부 의존을 검사하면 DB·Redis 장애가 재시작 루프와 배포 롤백을 유발한다 (↓ 아키텍처 · 헬스체크) |
-| Swagger | **전 환경 노출** (`/api/v1/docs`) | 상용 환경 하나뿐. 심사위원이 API 설계를 직접 볼 수 있어 이점도 있음 |
-| API prefix | `/api/v1` | |
+| Swagger | **전 환경 노출** (`/api/v2/docs`) | 상용 환경 하나뿐. 심사위원이 API 설계를 직접 볼 수 있어 이점도 있음 |
+| API prefix | `/api/v2` | 임시로 이웃 프로젝트와 도메인을 공유하므로 **경로 네임스페이스가 겹치지 않아야** 한다. 이웃이 `/api/v1` 을 쓰고 있어 v2 를 택했다 — "v1 의 다음 버전"이라는 뜻이 아니다. 전용 도메인으로 분리하면 재검토한다. 값은 `API_PREFIX` 한 곳에만 있고 나머지 경로는 전부 파생된다 |
 | 포트 | **5501** (컨테이너 내부). 호스트 publish 없음 | Caddy가 같은 overlay에서 `tasks.prod_nerd_back:5501`로 접근. publish하면 도메인 우회 경로가 열리고 포트 충돌 위험이 생긴다 |
+| 소스맵 | `sourceMap: true` 유지 + 런타임 `--enable-source-maps` | tsconfig 가 이미 `.js.map` 을 만드는데 플래그 없이는 Node 가 쓰지 않는다(실측: dist 236K 중 map 80K 사장). 지우는 대신 켜서 500 에러 스택이 `src/*.ts` 줄번호를 가리키게 했다 — 전역 필터가 500 에 스택을 남기므로 직접적인 이득 |
 | 로그 마스킹 | Pino **내장 `redact`** | 참고 A는 재귀 함수로 페이로드 전체를 순회한다. 큰 응답을 다루는 우리에겐 비용이 크다. 키 목록만 승계 |
 | 배포 | Docker **Swarm stack** `prod_nerd`, 서비스 `back` → DNS **`prod_nerd_back`**, **replicas 3**. GitHub Environment **`PROD`** 로 시크릿 격리 | 서비스 DNS 는 `<스택>_<서비스>` 다. 스택을 `prod_nerd_back` 으로 두면 DNS 가 `prod_nerd_back_back` 이 된다 |
 | Redis 운영 | **전용 인스턴스 · 독립 스택** `prod_nerd_cache` → DNS `prod_nerd_cache_redis`, 전용 워크플로 `deploy-redis.yml` | 배포 수명주기를 끊는다. 같은 스택이면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고 앱까지 재배포된다 |
@@ -144,8 +145,8 @@ nerd-back/
 
 | 엔드포인트 | 검사 대상 | 쓰는 곳 |
 |---|---|---|
-| `GET /api/v1/health` | **프로세스만.** 외부 의존 검사 없음 | Swarm `healthcheck`, Caddy 업스트림 판정 |
-| `GET /api/v1/health/ready` | Redis·DB 등 (의존이 생길 때 추가) | 진단·수동 확인 |
+| `GET /api/v2/health` | **프로세스만.** 외부 의존 검사 없음 | Swarm `healthcheck`, Caddy 업스트림 판정 |
+| `GET /api/v2/health/ready` | Redis·DB 등 (의존이 생길 때 추가) | 진단·수동 확인 |
 
 🚫 **Swarm healthcheck에 외부 의존을 넣지 않는다.** DB나 Redis가 흔들릴 때 컨테이너가 unhealthy로 판정되어 재시작 루프에 빠지고, 롤링 업데이트가 `failure_action: rollback`으로 되돌아간다. **앱은 멀쩡한데 배포가 막히는 경로다.**
 
@@ -329,7 +330,7 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 - 로컬은 `pino-pretty`, 배포는 **JSON stdout** (기존 수집 파이프라인이 그대로 먹는 형식)
 - `redact`: `req.headers.authorization` `req.headers.cookie` `*.password` `*.token` `*.access_token` `*.refresh_token`
 - `serializers`: `req`(method·url) `res`(statusCode) `err`
-- `autoLogging.ignore`: `/api/v1/health` `/api/v1/health/ready` `/api/v1/docs`
+- `autoLogging.ignore`: `/api/v2/health` `/api/v2/health/ready` `/api/v2/docs`
 - 레벨: 배포 `info`, 로컬 `debug`
 - 요청 ID: `x-request-id` 헤더가 있으면 승계, 없으면 생성 (참고 A에서 가져옴 — Caddy가 주입할 수 있다)
 - 🚫 재귀 마스킹 함수를 만들지 않는다 — 참고 A는 serializer에서 페이로드 전체를 순회한다. 큰 응답을 다루는 우리에겐 매 로그마다 비용이 붙는다. Pino 내장 `redact`(컴파일됨) + "큰 본문은 로그에 안 넣는다" 규칙으로 막는다
@@ -354,7 +355,7 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 
 ### Step 6 — 헬스체크
 
-- `modules/health/` — `GET /api/v1/health`(liveness) + `GET /api/v1/health/ready`(readiness)
+- `modules/health/` — `GET /api/v2/health`(liveness) + `GET /api/v2/health/ready`(readiness)
 - liveness는 **외부 의존 검사 없음.** Terminus 체크 배열을 비우고 프로세스 생존만 응답한다
 - readiness는 자리만 만들고, Redis·DB 인디케이터는 그 의존이 생길 때 꽂는다
 - Swarm `healthcheck`와 Caddy 업스트림 판정은 **liveness만** 본다
@@ -545,8 +546,8 @@ Step 5 — Redis + 레이트리밋
         전 환경 노출이므로 별도 미들웨어 필요
 
 Step 6 — 헬스체크 ✅
-  [x] GET /api/v1/health — liveness, 외부 의존 검사 없음
-  [x] GET /api/v1/health/ready — readiness (Redis)
+  [x] GET /api/v2/health — liveness, 외부 의존 검사 없음
+  [x] GET /api/v2/health/ready — readiness (Redis)
   [x] Swarm healthcheck 가 liveness 만 보게 구성
   [x] 두 경로 모두 autoLogging.ignore
   [x] "Redis 가 죽어도 liveness 는 200" E2E 로 고정
@@ -585,6 +586,12 @@ Step 10 — 배포
   [x] TASK_SLOT 주입
   [x] 컨테이너 포트 5501, ports 미선언 (호스트 publish 없음)
   [x] overlay 네트워크를 환경변수로 주입 (저장소에 이름 미기재)
+  [x] fs-01 노드 라벨 부여 (prod_nerd_back=1 · prod_nerd_redis=1)
+  [x] 첫 배포 성공 — 실측 (2026-08-26)
+        · prod_nerd_back 3/3, 세 태스크 모두 (healthy)
+        · prod_nerd_cache_redis 1/1
+        · liveness exit=0 · readiness 200 redis:up
+        · readiness 200 이 곧 REDIS_HOST 의 overlay DNS 해석 성공 증거
   [ ] 새 도메인 A 레코드 → 인스턴스 (사용자 작업)
   [ ] Caddy 사이트 블록 추가 (사용자 작업 — validate → reload, 커밋 금지)
   [ ] 배포 중 liveness 1초 폴링 → 5xx·끊김 0건 실측 ⭐ (Phase 1 최종 완료 조건)

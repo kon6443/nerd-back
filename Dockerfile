@@ -55,4 +55,9 @@ EXPOSE 5501
 #    헬스체크는 infra/docker-stack.app.yml 한 곳에서만 정의한다.
 
 ENV TS_NODE_PROJECT=/app/tsconfig.runtime.json
-CMD ["node", "-r", "tsconfig-paths/register", "dist/main.js"]
+
+# --enable-source-maps: tsconfig 가 .js.map 을 이미 만들고 있는데 Node 는 이 플래그 없이는
+# 쓰지 않는다(실측: dist 236K 중 map 80K 가 사장). 켜두면 500 에러 스택이
+# dist/*.js 줄번호 대신 src/*.ts 줄번호를 가리켜 원인 추적이 빨라진다.
+# 전역 예외 필터가 500 에 스택을 남기므로 직접적인 이득이다.
+CMD ["node", "--enable-source-maps", "-r", "tsconfig-paths/register", "dist/main.js"]

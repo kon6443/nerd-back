@@ -95,6 +95,9 @@ transformOptions: { enableImplicitConversion: true }
 - 🚫 **로그를 추가하기 전에 라이브러리가 같은 이벤트를 이미 찍는지 확인한다.**
   readiness 실패는 Terminus 가 `error` 로 상세를 남기므로 우리 필터는 `debug` 로 낮췄다
   (실측: 요청당 2줄 → 1줄).
+- 🚫 **`dist` 의 `.js.map` 을 "안 쓰이는 파일"로 보고 지우지 않는다.** 런타임 CMD 에
+  `--enable-source-maps` 가 켜져 있어 500 에러 스택이 `src/*.ts` 줄번호를 가리킨다.
+  `sourceMap` 을 끄면 스택이 `dist/*.js` 로 돌아가 원인 추적이 느려진다.
 - 검증 방법: 컨테이너를 띄우고 **요청 0건으로 60초 유휴** 후 로그 증가량을 센다.
   "요청당 몇 줄"만 보면 배경 노이즈를 놓친다.
 
@@ -115,8 +118,8 @@ transformOptions: { enableImplicitConversion: true }
 
 | 경로 | 검사 | 쓰는 곳 |
 |---|---|---|
-| `/api/v1/health` | 프로세스만 | Swarm healthcheck, 리버스 프록시 |
-| `/api/v1/health/ready` | Redis 등 외부 의존 | 진단·수동 확인 |
+| `/api/v2/health` | 프로세스만 | Swarm healthcheck, 리버스 프록시 |
+| `/api/v2/health/ready` | Redis 등 외부 의존 | 진단·수동 확인 |
 
 🚫 **liveness 에 외부 의존을 넣지 않는다.** 넣으면 의존 장애가 컨테이너를 unhealthy 로 만들어 재시작 루프에 빠지고 롤링 업데이트가 롤백된다. 앱은 멀쩡한데 배포가 막힌다. 이 동작은 E2E 로 고정되어 있다 (`Redis 가 죽어도 200 이다`).
 
