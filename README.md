@@ -148,7 +148,7 @@ Pino(`nestjs-pino`)를 쓴다.
 - **마스킹**: Pino 내장 `redact` 사용. 대상은 `authorization` `cookie` `password` `token` `access_token` `refresh_token` `secret` `apikey` `credentials`.
 - **serializers**: `req`(method·url) · `res`(statusCode) · `err`.
 - **요청 ID**: `x-request-id` 헤더가 있으면 승계, 없으면 생성.
-- **제외 경로**: `/api/v1/health`, `/api/v1/health/ready`, `/api/v1/docs` — 30초 간격 폴링이 로그를 채운다.
+- **제외 경로**: `/api/v2/health`, `/api/v2/health/ready`, `/api/v2/docs` — 30초 간격 폴링이 로그를 채운다.
 
 ### 지켜야 할 두 가지
 
@@ -183,8 +183,8 @@ DB 세션 타임존과 컬럼 타입은 DB 확정 후 정한다 — DB별 적용
 
 | 엔드포인트 | 검사 대상 | 쓰는 곳 |
 |---|---|---|
-| `GET /api/v1/health` | **프로세스만** (외부 의존 검사 없음) | Swarm healthcheck, 리버스 프록시 업스트림 판정 |
-| `GET /api/v1/health/ready` | Redis·DB 등 (의존이 생길 때 추가) | 진단·수동 확인 |
+| `GET /api/v2/health` | **프로세스만** (외부 의존 검사 없음) | Swarm healthcheck, 리버스 프록시 업스트림 판정 |
+| `GET /api/v2/health/ready` | Redis·DB 등 (의존이 생길 때 추가) | 진단·수동 확인 |
 
 **Swarm healthcheck에 외부 의존을 넣지 않는다.** DB나 Redis가 흔들릴 때 컨테이너가 unhealthy로 판정되면 재시작 루프에 빠지고 롤링 업데이트가 롤백된다. 앱은 멀쩡한데 배포가 막히는 경로다.
 
@@ -202,10 +202,10 @@ DB 세션 타임존과 컬럼 타입은 DB 확정 후 정한다 — DB별 적용
 
 ```bash
 pnpm install
-pnpm dev            # http://localhost:5501/api/v1
+pnpm dev            # http://localhost:5501/api/v2
 ```
 
-Swagger: `http://localhost:5501/api/v1/docs`
+Swagger: `http://localhost:5501/api/v2/docs`
 
 ### 로컬 Redis
 
