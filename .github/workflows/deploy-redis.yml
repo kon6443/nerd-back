@@ -1,0 +1,75 @@
+name: Deploy Redis
+
+# Redis 스택은 앱과 **독립적으로** 배포된다.
+# 이 워크플로는 Redis 설정 파일이 바뀔 때만 돈다 — 이미지 빌드도, 앱 재배포도 하지 않는다.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/docker-stack.redis.yml'
+      - '.github/workflows/deploy-redis.yml'
+  workflow_dispatch:
+
+# 같은 스택에 동시에 배포가 겹치지 않게 줄을 세운다.
+concurrency:
+  group: deploy-redis
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: PROD
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: stack YAML 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          source: infra/docker-stack.redis.yml
+          target: ${{ secrets.DEPLOY_STACK_DIR }}
+          strip_components: 1
+
+      - name: 스택 배포 (수렴까지 동기 대기)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          envs: OVERLAY_NETWORK,STACK_DIR
+          script: |
+            set -e
+            docker stack deploy --detach=false \
+              -c "$STACK_DIR/docker-stack.redis.yml" prod_nerd_cache
+            docker stack services prod_nerd_cache
+        env:
+          OVERLAY_NETWORK: ${{ secrets.OVERLAY_NETWORK }}
+          STACK_DIR: ${{ secrets.DEPLOY_STACK_DIR }}
+
+      # ⚠️ Redis 는 named volume 때문에 stop-first 로 교체된다.
+      #    즉 재시작 순간 짧은 공백이 있다. 앱은 그 동안 레이트리밋만 축소 모드로 돌아간다
+      #    (fail-open) — HTTP 는 계속 응답한다.
+      #
+      #    overlay attachable 여부에 의존하지 않도록 떠 있는 태스크 안에서 확인한다.
+      - name: 스모크 테스트 (PING)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          script: |
+            set -e
+            for i in $(seq 1 20); do
+              cid=$(docker ps -q --filter "name=prod_nerd_cache_redis" | head -1)
+              if [ -n "$cid" ] && docker exec "$cid" redis-cli ping 2>/dev/null | grep -q PONG; then
+                echo "PONG 확인 (시도 $i)"
+                exit 0
+              fi
+              sleep 3
+            done
+            echo "PING 실패 — 배포를 실패로 처리한다"
+            docker service ps prod_nerd_cache_redis --no-trunc
+            exit 1

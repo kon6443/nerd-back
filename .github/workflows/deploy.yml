@@ -17,8 +17,9 @@ on:
       - 'tsconfig*.json'
       - 'jest.config.js'
       - 'infra/docker-stack.app.yml'
-      - 'infra/docker-stack.redis.yml'
       - '.github/workflows/deploy.yml'
+  # 코드 변경 없이 현재 main 을 다시 배포할 때 쓴다.
+  workflow_dispatch:
 
 # 배포가 겹치면 Swarm 수렴 중에 다음 배포가 끼어든다. 앞선 실행을 취소하지 않고 줄을 세운다.
 concurrency:
@@ -42,7 +43,7 @@ jobs:
   deploy:
     needs: verify
     runs-on: ubuntu-latest
-    environment: prod
+    environment: PROD
     steps:
       - uses: actions/checkout@v4
 
@@ -77,26 +78,24 @@ jobs:
       - name: stack YAML 전송
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "infra/docker-stack.app.yml,infra/docker-stack.redis.yml"
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          source: infra/docker-stack.app.yml
           target: ${{ secrets.DEPLOY_STACK_DIR }}
           strip_components: 1
 
       - name: 스택 배포 (수렴까지 동기 대기)
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
           envs: REGISTRY_URL,IMAGE_TAG,OVERLAY_NETWORK,ENV_FILE_PATH,STACK_DIR
           script: |
             set -e
             docker stack deploy --detach=false --with-registry-auth \
-              -c "$STACK_DIR/docker-stack.app.yml" \
-              -c "$STACK_DIR/docker-stack.redis.yml" \
-              prod_nerd
+              -c "$STACK_DIR/docker-stack.app.yml" prod_nerd
             docker stack services prod_nerd
         env:
           REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
@@ -107,18 +106,21 @@ jobs:
 
       # 수렴 명령이 성공해도 앱이 실제로 응답하는지는 별개다.
       # 여기까지 통과해야 배포가 끝난 것으로 본다.
+      #
+      # ⚠️ `docker run --network <overlay>` 를 쓰지 않는다. Swarm overlay 는 기본적으로
+      #    attachable 이 아니어서 임시 컨테이너를 붙일 수 없다(생성 시 --attachable 필요).
+      #    이미 떠 있는 태스크 안에서 확인하면 네트워크 설정에 의존하지 않는다.
       - name: 스모크 테스트 (liveness 폴링)
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
           script: |
             set -e
             for i in $(seq 1 20); do
-              if docker run --rm --network "${{ secrets.OVERLAY_NETWORK }}" \
-                   curlimages/curl:latest -fsS \
-                   "http://tasks.prod_nerd_back:5501/api/v1/health" > /dev/null 2>&1; then
+              cid=$(docker ps -q --filter "name=prod_nerd_back" | head -1)
+              if [ -n "$cid" ] && docker exec "$cid" node scripts/healthcheck.mjs; then
                 echo "liveness 200 확인 (시도 $i)"
                 exit 0
               fi
@@ -126,4 +128,5 @@ jobs:
             done
             echo "liveness 확인 실패 — 배포를 실패로 처리한다"
             docker service ps prod_nerd_back --no-trunc
+            docker service logs --tail 50 prod_nerd_back || true
             exit 1

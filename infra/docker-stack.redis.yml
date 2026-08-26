@@ -1,14 +1,13 @@
-# 이 프로젝트 전용 Redis.
+# 이 프로젝트 전용 Redis. **앱과 독립된 스택**이다.
 #
-# 앱 스택(`docker-stack.app.yml`)과 **같은 스택 이름**으로 배포한다:
-#   docker stack deploy -c docker-stack.app.yml -c docker-stack.redis.yml prod_nerd
+#   docker stack deploy -c docker-stack.redis.yml prod_nerd_cache
 #
-# 같은 스택에 두는 이유는 서비스 DNS 이름이 `<스택>_<서비스>` 라서다.
-# 스택 `prod_nerd` + 서비스 `redis` → `prod_nerd_redis` 로 깔끔하게 잡힌다.
-# Swarm 은 스펙이 바뀐 서비스만 갱신하므로, 앱만 배포해도 Redis 는 재시작되지 않는다.
+# 스택을 분리하는 이유는 **배포 수명주기를 끊기 위해서**다.
+# 같은 스택에 두면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고,
+# 결과적으로 앱까지 재배포된다. 분리하면 각자 바뀐 것만 배포된다.
 #
-# ⚠️ 두 파일을 항상 함께 넘겨야 한다. 앱 파일만으로 배포하면
-#    스택에서 redis 서비스가 **제거된다.**
+# 서비스 DNS = `<스택>_<서비스>` → **`prod_nerd_cache_redis`**
+# 앱은 REDIS_HOST 로 이 이름을 받는다 (서버 .env).
 
 services:
   redis:
