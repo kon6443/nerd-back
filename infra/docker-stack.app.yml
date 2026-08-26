@@ -1,5 +1,13 @@
+# 앱 스택. Redis 스택과 **같은 스택 이름**으로 함께 배포한다:
+#   docker stack deploy -c docker-stack.app.yml -c docker-stack.redis.yml prod_nerd
+#
+# 서비스 DNS 는 `<스택>_<서비스>` 다. 스택 `prod_nerd` + 서비스 `back`
+# → `prod_nerd_back` 이 되어 리버스 프록시가 tasks.prod_nerd_back:5501 로 접근한다.
+#
+# ⚠️ 두 파일을 항상 함께 넘긴다. 한쪽만으로 배포하면 다른 서비스가 스택에서 제거된다.
+
 services:
-  app:
+  back:
     image: ${REGISTRY_URL}/prod_nerd_back:${IMAGE_TAG}
 
     # 기존 overlay 네트워크에 참여한다. 리버스 프록시가 같은 망에서

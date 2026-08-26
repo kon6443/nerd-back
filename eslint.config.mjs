@@ -31,9 +31,29 @@ export default tseslint.config(
 
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
 
+      // 로컬 타임존에 의존하는 Date 메서드를 막는다.
+      // 개발자 노트북(KST)·CI 러너(UTC)·컨테이너(UTC)가 서로 다른 답을 내므로
+      // "로컬에서만 깨지는" 버그가 생긴다. 규칙을 문서에 적어두면 지켜지지 않는다.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'CallExpression > MemberExpression[property.name=/^(getFullYear|getMonth|getDate|getDay|getHours|getMinutes|getSeconds|getMilliseconds|setFullYear|setMonth|setDate|setHours|setMinutes|setSeconds|setMilliseconds|getTimezoneOffset|toLocaleString|toLocaleDateString|toLocaleTimeString)$/]',
+          message:
+            '로컬 타임존에 의존한다. @common/utils/date.utils 의 헬퍼를 쓰거나 getUTC*/toISOString 을 쓴다. 불가피하면 eslint-disable + 사유 주석.',
+        },
+      ],
+
       // 완화
       '@typescript-eslint/no-empty-function': 'off',
       '@typescript-eslint/no-inferrable-types': 'off',
+    },
+  },
+  {
+    // date.utils 는 위 메서드를 감싸는 곳이므로 예외다. 테스트는 고정 시각을 다루므로 허용한다.
+    files: ['src/common/utils/date.utils.ts', '**/*.spec.ts', 'test/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
     },
   },
 );

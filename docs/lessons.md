@@ -7,6 +7,13 @@
 
 ---
 
+## 2026-08-26 — Swarm 서비스 DNS 이름을 스택 이름과 혼동했다
+
+- **실패 양상**: 스택을 `prod_nerd_back`, 서비스를 `app` 으로 정의해 실제 서비스 DNS 가 `prod_nerd_back_app` 이 되는데, 배포 스모크 테스트와 리버스 프록시 설정은 `prod_nerd_back` 을 가리키고 있었다. 배포하면 스모크 테스트가 무조건 실패하고, 프록시는 업스트림을 못 찾는다.
+- **탐지 신호**: 코드·설정 어디에도 에러가 없다. **배포해 봐야 드러나는** 종류다. 발견은 Redis 서비스를 추가하려고 이름 구조를 다시 따져보다 나왔다.
+- **근본 원인**: Swarm 서비스 DNS 는 **`<스택명>_<서비스명>`** 이다. 원하는 이름을 스택 이름에 넣으면 서비스 키가 뒤에 한 번 더 붙는다. compose 파일만 보면 서비스 키가 `app` 이라 최종 이름이 눈에 보이지 않는다.
+- **예방 규칙**: 스택·서비스 이름을 정할 때 **최종 DNS 이름을 먼저 적고** 거기서 역산한다. 지금은 스택 `prod_nerd` + 서비스 `back` → `prod_nerd_back`, 서비스 `redis` → `prod_nerd_redis` 로 잡았다. 이름을 참조하는 곳(스모크 테스트·프록시 설정·`docker service ps`)은 한 군데서 정의한 값을 쓰도록 문서에 명시한다.
+
 ## 2026-08-26 — 전역 에러 필터가 헬스체크 진단 결과를 덮어썼다
 
 - **실패 양상**: readiness E2E 가 `details.redis.status = 'down'` 을 기대했는데 응답이 `{ code: 'SERVICE_UNAVAILABLE', message: 'Service Unavailable Exception', timestamp }` 로 왔다. 어느 의존이 왜 죽었는지가 통째로 사라졌다.

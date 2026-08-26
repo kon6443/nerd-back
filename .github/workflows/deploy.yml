@@ -17,6 +17,7 @@ on:
       - 'tsconfig*.json'
       - 'jest.config.js'
       - 'infra/docker-stack.app.yml'
+      - 'infra/docker-stack.redis.yml'
       - '.github/workflows/deploy.yml'
 
 # 배포가 겹치면 Swarm 수렴 중에 다음 배포가 끼어든다. 앞선 실행을 취소하지 않고 줄을 세운다.
@@ -79,7 +80,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: infra/docker-stack.app.yml
+          source: "infra/docker-stack.app.yml,infra/docker-stack.redis.yml"
           target: ${{ secrets.DEPLOY_STACK_DIR }}
           strip_components: 1
 
@@ -93,8 +94,10 @@ jobs:
           script: |
             set -e
             docker stack deploy --detach=false --with-registry-auth \
-              -c "$STACK_DIR/docker-stack.app.yml" prod_nerd_back
-            docker stack services prod_nerd_back
+              -c "$STACK_DIR/docker-stack.app.yml" \
+              -c "$STACK_DIR/docker-stack.redis.yml" \
+              prod_nerd
+            docker stack services prod_nerd
         env:
           REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
           IMAGE_TAG: ${{ steps.meta.outputs.tag }}
@@ -122,5 +125,5 @@ jobs:
               sleep 3
             done
             echo "liveness 확인 실패 — 배포를 실패로 처리한다"
-            docker service ps prod_nerd_back_app --no-trunc
+            docker service ps prod_nerd_back --no-trunc
             exit 1

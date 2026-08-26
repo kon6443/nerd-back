@@ -34,7 +34,10 @@
 | API prefix | `/api/v1` | |
 | 포트 | **5501** (컨테이너 내부). 호스트 publish 없음 | Caddy가 같은 overlay에서 `tasks.prod_nerd_back:5501`로 접근. publish하면 도메인 우회 경로가 열리고 포트 충돌 위험이 생긴다 |
 | 로그 마스킹 | Pino **내장 `redact`** | 참고 A는 재귀 함수로 페이로드 전체를 순회한다. 큰 응답을 다루는 우리에겐 비용이 크다. 키 목록만 승계 |
-| 배포 | Docker **Swarm stack**, 서비스명 `prod_nerd_back`, **replicas 3** | 단일 노드에서도 롤링 업데이트로 무중단 배포 확보 |
+| 배포 | Docker **Swarm stack** `prod_nerd`, 서비스 `back` → DNS **`prod_nerd_back`**, **replicas 3** | 서비스 DNS 는 `<스택>_<서비스>` 다. 스택을 `prod_nerd_back` 으로 두면 DNS 가 `prod_nerd_back_back` 이 된다 |
+| Redis 운영 | **전용 인스턴스** — 같은 스택의 별도 서비스 `redis` → DNS `prod_nerd_redis` | 파일은 분리(`docker-stack.redis.yml`)하되 스택 이름을 공유해 DNS 를 깔끔하게 유지. Swarm 은 스펙이 바뀐 서비스만 갱신하므로 앱 배포가 Redis 를 재시작하지 않는다 |
+| Redis 정책 | `appendonly yes` · `maxmemory 128mb` · **`volatile-lru`** · `order: stop-first` | `allkeys-lru` 는 TTL 없는 키까지 evict 한다. named volume 은 동시 접근이 안 되므로 `start-first` 금지 |
+| 날짜·시간 | **UTC 저장 · 표시 시점에만 변환** · API 응답은 ISO 8601 Z | 로컬 타임존 의존 메서드를 eslint `no-restricted-syntax` 로 **차단**했다 (↓ 날짜·시간 정책) |
 | 리버스 프록시 | 기존 Caddy에 **사이트 블록 추가** → `reverse_proxy tasks.prod_nerd_back:<port>` | 블록 단위 독립이라 기존 사이트 무영향 |
 | 로그 수집 | 기존 파이프라인 **자동 수집** (앱 작업 0) | 수집 에이전트가 global 모드로 전 컨테이너를 자동 발견 |
 | 패키지 매니저 | pnpm | 참고 A·B 공통 |
@@ -55,7 +58,7 @@
 | DB 계층 패키지 일괄 | DB 확정 후 | `@nestjs/typeorm` `typeorm` `typeorm-transactional` + 드라이버를 **한 번에** 설치. 미리 깔아두지 않는다 |
 | readiness 인디케이터 | Redis·DB 도입 시 | liveness는 Phase 1에서 완성, readiness는 의존이 생길 때 채운다 |
 | 엔티티 컬럼 타입·네이밍 규칙 | DB 확정 후 | DB별 타입 매핑과 대소문자 관례가 다름 |
-| 날짜·시간 정책 (UTC 저장 여부) | DB 확정 후 | 참고 A·B가 서로 다른 정책이라 승계 대상 없음 |
+| DB 세션 타임존·컬럼 타입 | DB 확정 후 | 앱 레벨 정책은 확정됨. DB별 적용 방법만 남았다 (↓ 날짜·시간 정책) |
 | 마이그레이션 멱등 가드 문법 | DB 확정 후 | 시스템 카탈로그 조회 문법이 DB별로 다름 |
 | 커넥션 풀 크기 | DB 확정 후 | 세션 한도 ÷ 레플리카 3 (↓ 주의 사항 #2) |
 | 로그 본문 정책 | **보류** | 프롬프트 본문 제외 · 토큰 수·모델명·소요시간만 남기는 규칙을 별도로 확정 |
@@ -113,7 +116,7 @@ nerd-back/
 │   │   ├── pipes/             global-validation-pipe.ts
 │   │   ├── port/              llm.port.ts  (인터페이스 + DI 토큰)
 │   │   ├── redis/             redis.module.ts
-│   │   ├── utils/
+│   │   ├── utils/             date.utils.ts
 │   │   └── __spec__/          mock-repository.ts
 │   ├── config/                env.validation.ts, database.config.ts, app.config.ts
 │   ├── entities/
@@ -129,7 +132,7 @@ nerd-back/
 │   ├── conventions/           code-patterns.md
 │   ├── playbooks/
 │   └── tasks/                 (본 문서)
-├── infra/                     docker-stack.app.yml
+├── infra/                     docker-stack.app.yml, docker-stack.redis.yml
 ├── migrations/
 ├── CLAUDE.md
 ├── Dockerfile
@@ -144,6 +147,30 @@ nerd-back/
 | `GET /api/v1/health/ready` | Redis·DB 등 (의존이 생길 때 추가) | 진단·수동 확인 |
 
 🚫 **Swarm healthcheck에 외부 의존을 넣지 않는다.** DB나 Redis가 흔들릴 때 컨테이너가 unhealthy로 판정되어 재시작 루프에 빠지고, 롤링 업데이트가 `failure_action: rollback`으로 되돌아간다. **앱은 멀쩡한데 배포가 막히는 경로다.**
+
+### 날짜·시간 정책
+
+**UTC 저장, 표시 시점에만 변환.** 저장·비교·연산은 전부 UTC 로 하고, 사람이 읽는 문자열이 필요한 순간에만 타임존을 명시해 변환한다. API 응답은 ISO 8601 `Z` suffix 로 보내고 오프셋을 붙이지 않는다 — 받는 쪽이 변환한다.
+
+| 레이어 | 적용 | 상태 |
+|---|---|---|
+| 앱 코드 | `@common/utils/date.utils` 헬퍼만 사용 (`nowUtc` `toIsoUtc` `dateKeyInTimeZone` `formatInTimeZone`) | ✅ |
+| 린트 | 로컬 TZ 의존 메서드(`getHours` `toLocaleString` `getTimezoneOffset` 등 18종)를 `no-restricted-syntax` 로 **error** | ✅ 위반 2건 잡히는 것 실측 확인 |
+| 컨테이너 | `Dockerfile` 에 `ENV TZ=UTC` | ✅ |
+| 테스트 | `test/setup/setup-tz.ts` 가 `process.env.TZ = 'UTC'` 고정 | ✅ |
+| DB | 세션 타임존과 컬럼 타입 | 🚧 DB 확정 후 |
+
+린트로 막는 것이 핵심이다. 규약을 문서에만 적어두면 개발자 노트북(KST)·CI 러너(UTC)·컨테이너(UTC)가 서로 다른 답을 내는 코드가 들어온다. 지금은 날짜 코드가 없어 **위반 0건 상태에서 규칙을 켤 수 있는 유일한 시점**이다.
+
+`dateKeyInTimeZone(date, timeZone)` 이 타임존을 **인자로 강제**하는 이유: 일별 카운터(예: API 예산)의 "오늘"이 어느 타임존이냐가 집계 결과를 바꾼다. 한국 사용자 기준이면 KST 로 리셋해야 한다.
+
+#### DB 확정 시 채울 항목
+
+| DB | 컬럼 타입 | 세션 타임존 | 함정 |
+|---|---|---|---|
+| PostgreSQL | `timestamptz` | 커넥션에 `timezone=UTC` | `timestamp`(without tz)를 쓰면 오프셋 정보가 사라진다 |
+| MySQL | `DATETIME(3)` 에 UTC 저장 | 드라이버 `timezone: 'Z'` | **`TIMESTAMP` 타입을 피한다** — 세션 TZ 기준으로 저장·조회 시 자동 변환되어 환경마다 값이 달라진다 |
+| Oracle | `TIMESTAMP WITH TIME ZONE` | 컨테이너 `TZ=UTC` 에 맞춤 | `ORA_SDTZ` 설정 금지(드라이버가 로컬 TZ 로 저장). `FROM_TZ()` 에 리전명(`'UTC'`) 대신 오프셋(`'+00:00'`) — ORA-01805 |
 
 ### Path Aliases
 
