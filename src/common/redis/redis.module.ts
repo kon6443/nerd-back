@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
+import { createLogThrottle } from '../utils/log-throttle';
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
 
@@ -42,10 +43,25 @@ export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
         });
 
         // 에러 핸들러를 붙이지 않으면 ioredis 의 error 이벤트가 unhandled 로 프로세스를 죽인다.
+        //
+        // ⚠️ 여기서 매 이벤트를 그대로 찍으면 안 된다. ioredis 는 끊긴 동안 약 2초 간격으로
+        //    재연결을 시도하므로 **트래픽이 0이어도 로그가 쌓인다.**
+        //    실측: 요청 0건 · 60초 유휴 → 29줄. 레플리카 3개면 하루 125,280줄.
+        //    첫 발생은 즉시 알리고, 이후는 1분 간격으로 억제 건수와 함께 보고한다.
+        const errorLog = createLogThrottle(60_000);
+
         client.on('error', (error: Error) => {
-          logger.warn(`Redis 오류 — 부가 기능만 축소된다: ${error.message}`);
+          const { log, suppressed } = errorLog.consume(Date.now());
+          if (!log) return;
+          const omitted = suppressed > 0 ? ` (직전 1분간 동일 오류 ${suppressed}건 생략)` : '';
+          logger.warn(`Redis 오류 — 부가 기능만 축소된다: ${error.message}${omitted}`);
         });
-        client.on('ready', () => logger.log('Redis 연결됨'));
+
+        client.on('ready', () => {
+          const held = errorLog.pending();
+          logger.log(held > 0 ? `Redis 연결 복구 (생략된 오류 ${held}건)` : 'Redis 연결됨');
+          errorLog.reset();
+        });
 
         // 연결 실패가 부팅을 막지 않도록 프로미스를 여기서 흡수한다.
         client.connect().catch((error: Error) => {

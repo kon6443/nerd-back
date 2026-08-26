@@ -75,7 +75,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const where = `${request.method} ${request.originalUrl ?? request.url}`;
 
     if (resolved.passthrough) {
-      this.logger.warn(`${where} → ${resolved.status} ${resolved.label}`);
+      // ⚠️ warn 으로 남기지 않는다. Terminus 가 이미 실패 상세를 error 레벨로 찍고,
+      //    pino 의 req serializer 가 그 줄에 경로를 붙여준다. 여기서 또 찍으면
+      //    **같은 이벤트가 2줄**이 된다 (실측: readiness 5회 → 10줄).
+      //    진단이 필요할 때만 보이도록 debug 로 낮춘다.
+      this.logger.debug(`${where} → ${resolved.status} ${resolved.label}`);
       response.status(resolved.status).json(resolved.body);
       return;
     }

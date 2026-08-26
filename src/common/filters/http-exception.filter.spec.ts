@@ -125,6 +125,18 @@ describe('HttpExceptionFilter', () => {
       expect(json.mock.calls[0][0]).not.toHaveProperty('timestamp');
     });
 
+    it('통과 케이스는 warn 으로 찍지 않는다 — Terminus 가 이미 error 로 남긴다 ⭐', () => {
+      const warnSpy = jest.spyOn(Logger.prototype, 'warn');
+      const { host } = createHost();
+
+      filter.catch(
+        new ServiceUnavailableException({ status: 'error', details: { redis: { status: 'down' } } }),
+        host,
+      );
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
     it('status 만 있고 details 가 없으면 통과시키지 않는다', () => {
       const { host, json } = createHost();
 
