@@ -1,7 +1,7 @@
 # Task Tracker: 백엔드 뼈대 구축
 
 > 작성일: 2026-08-26
-> 상태: **계획 확정 · 구현 미착수**
+> 상태: **Phase 1 구현 완료 (2026-08-26)** — 배포 실행과 Caddy 등록은 사용자 작업으로 남음. Phase 2(DB 계층) 미착수.
 > 범위: 주제와 무관하게 확정 가능한 뼈대만. 도메인 모듈은 주제 확정 후 별도 태스크.
 > 원칙: 이 문서가 뼈대 관련 **결정의 SSOT**다. 결정이 바뀌면 코드보다 이 문서를 먼저 고친다.
 
@@ -157,7 +157,7 @@ nerd-back/
 
 ---
 
-## 📦 패키지 (설치 예정 — 아직 미설치)
+## 📦 패키지 (Phase 1 설치 완료)
 
 **런타임**
 
@@ -175,7 +175,9 @@ nerd-back/
 
 **개발**
 
-`@nestjs/cli` `@nestjs/testing` `jest` `ts-jest` `supertest` `pino-pretty` `eslint` `typescript-eslint` `eslint-config-prettier` `eslint-plugin-prettier` `prettier` `typescript` `@faker-js/faker` `rosie` `@types/*`
+`@nestjs/cli` `@nestjs/testing` `jest` `ts-jest` `supertest` `pino-pretty` `eslint` `typescript-eslint` `eslint-config-prettier` `eslint-plugin-prettier` `prettier` `typescript` `@types/*`
+
+**보류**: `@faker-js/faker` `rosie` (엔티티 팩토리는 Phase 2)
 
 **보류**: `@willsoto/nestjs-prometheus` `prom-client` (Prometheus 후순위), `@nestjs/jwt` (인증 보류)
 
@@ -450,97 +452,103 @@ caddy validate && caddy reload
 
 ## ✅ 실행 체크리스트
 
+**Phase 1 — 구현 완료 (2026-08-26).** `pnpm ci:all` 통과: lint 0건 · 스텁 0건 · 단위 22 · E2E 5 · 빌드 성공.
+
 ```
-Step 1 — 프로젝트 초기화
-  [ ] 수동 스캐폴딩 (nest new 미사용)
-  [ ] tsconfig path alias 5종 + build/runtime 분리, include에 테스트 포함
-  [ ] ESLint — no-explicit-any / no-floating-promises / no-misused-promises = error ⭐
-  [ ] ESLint 대상에 테스트 코드 포함
-  [ ] jest — restoreMocks: true, 커버리지 분모에서 spec 제외 ⭐
-  [ ] jest moduleNameMapper ↔ tsconfig paths 1:1 확인
-  [ ] package.json 스크립트 (ci:core / ci:all / check:stubs 포함)
-  [ ] 베이스 이미지 ARM64 지원 확인
+Step 1 — 프로젝트 초기화 ✅
+  [x] 수동 스캐폴딩 (nest new 미사용)
+  [x] tsconfig path alias 5종 + build/runtime 분리, include 에 테스트 포함
+  [x] ESLint — no-explicit-any / no-floating-promises / no-misused-promises = error
+  [x] ESLint 대상에 테스트 코드 포함
+  [x] jest — restoreMocks: true, 커버리지 분모에서 spec 제외
+  [x] jest moduleNameMapper ↔ tsconfig paths 1:1 확인
+  [x] package.json 스크립트 (ci:core / ci:all / check:stubs 포함)
+  [~] 베이스 이미지 ARM64 지원 — CI 의 ARM64 빌드 job 으로 검증 예정 (로컬 docker build 미실행)
 
-Step 2 — 설정 계층
-  [ ] @nestjs/config 전역
-  [ ] env.validation.ts — 누락 시 기동 실패
-  [ ] .env.example (실제 .env 커밋 금지 확인)
+Step 2 — 설정 계층 ✅
+  [x] @nestjs/config 전역
+  [x] env.validation.ts — 누락 시 기동 실패 (spec 6건으로 고정)
+  [x] .env.example
 
-Step 3 — 로깅
-  [ ] logger.module.ts (로컬 pretty / 배포 JSON stdout)
-  [ ] redact 목록 적용
-  [ ] serializers (req·res·err)
-  [ ] /health, /docs 로그 제외
-  [ ] 외부 API 본문 미기록 규칙 명문화
+Step 3 — 로깅 ✅
+  [x] logger.module.ts (로컬 pretty / 배포 JSON stdout)
+  [x] Pino 내장 redact 적용 (재귀 함수 미사용)
+  [x] serializers (req·res·err)
+  [x] health / health/ready / docs 로그 제외
+  [x] x-request-id 승계
+  [x] 외부 API 본문 미기록 규칙 명문화 (CLAUDE.md Never 표 + code-patterns §5)
 
-Step 4 — 공통 응답·에러
-  [ ] api-response.dto.ts (Swagger 명세 전용)
-  [ ] define-domain-error.ts
-  [ ] http-exception.filter.ts (3단 분기, 500 이상만 스택)
-  [ ] global-validation-pipe.ts (프로덕션·E2E 공유)
-  [ ] 공통 에러 응답 Swagger 데코레이터
+Step 4 — 공통 응답·에러 ✅
+  [x] api-response.dto.ts (Swagger 명세 전용)
+  [x] define-domain-error.ts
+  [x] http-exception.filter.ts — 4단 분기 (헬스체크 페이로드 통과 포함)
+  [x] global-validation-pipe.ts (프로덕션·E2E 공유)
+  [x] 공통 에러 응답 Swagger 데코레이터
 
 Step 5 — Redis + 레이트리밋
-  [ ] redis.module.ts (lazyConnect, 실패해도 기동)
-  [ ] Throttler Redis 스토리지 (초당 + 분당 2단)
-  [ ] Swagger 경로 포함 확인
+  [x] redis.module.ts (lazyConnect, enableOfflineQueue false, 실패해도 기동)
+  [x] Throttler Redis 스토리지 (초당 5 + 분당 60)
+  [x] CustomThrottlerGuard — 429 를 우리 형식으로, 스토리지 장애 시 fail-open
+  [ ] ⚠️ Swagger 경로는 레이트리밋 밖에 있다 — SwaggerModule 은 express 미들웨어로
+        마운트되므로 Nest 가드가 적용되지 않는다. 전 환경 노출이므로 별도 미들웨어 필요.
+        → 후속 태스크로 분리
 
-Step 6 — 헬스체크
-  [ ] GET /api/v1/health — liveness, 외부 의존 검사 없음 ⭐
-  [ ] GET /api/v1/health/ready — readiness, 인디케이터는 의존 생길 때
-  [ ] Swarm healthcheck·Caddy가 liveness만 보게 구성
-  [ ] 두 경로 모두 autoLogging.ignore
+Step 6 — 헬스체크 ✅
+  [x] GET /api/v1/health — liveness, 외부 의존 검사 없음
+  [x] GET /api/v1/health/ready — readiness (Redis)
+  [x] Swarm healthcheck 가 liveness 만 보게 구성
+  [x] 두 경로 모두 autoLogging.ignore
+  [x] "Redis 가 죽어도 liveness 는 200" E2E 로 고정
 
-Step 7 — Port 골격
-  [ ] llm.port.ts (인터페이스 + Symbol 토큰)
-  [ ] 서비스가 SDK를 직접 들지 않는다는 규약 문서화
+Step 7 — Port 골격 ✅
+  [x] llm.port.ts (인터페이스 + Symbol 토큰 + usage 계측 필드)
+  [x] 서비스가 SDK 를 직접 들지 않는다는 규약 문서화
 
 Step 8 — 테스트 기반
-  [ ] jest 설정 + setup-tz.ts
-  [ ] mock-repository.ts 헬퍼
-  [ ] entity.factory.ts (rosie + faker, 고정 시각)
-  [ ] e2e-app.ts (AppModule import 금지)
+  [x] jest 설정 + setup-tz.ts + reflect-metadata setupFiles
+  [x] e2e-app.ts (AppModule import 금지, 프로덕션과 같은 파이프·필터)
+  [~] mock-repository.ts → Phase 2 (TypeORM 타입 필요)
+  [~] entity.factory.ts → Phase 2 (엔티티 필요)
   [~] forbid-db.ts → Phase 2 (차단 대상 드라이버 확정 후)
 
-Step 9 — CI/CD
-  [ ] paths 화이트리스트 트리거 (paths-ignore 사용 금지)
-  [ ] 배포 전 ci:core 게이트 ⭐ (참고 A에 없는 것)
-  [ ] PR ci:all
-  [ ] buildx 캐시 (cache-from/to) ⭐
-  [ ] 이미지 태그 = 커밋 short SHA
-  [ ] linux/arm64 단독 빌드 + --provenance=false --sbom=false
-  [ ] 러너 선택 (public → arm64 네이티브 / private → QEMU)
-  [ ] GitHub Secrets 6개 등록 또는 기존 재사용 확인
-  [ ] rsync → docker stack deploy --detach=false (동기 대기)
-  [ ] 배포 후 liveness 폴링 스모크 테스트 ⭐
-  [ ] SSH 임시 키 정리 if: always() 또는 SSH 액션으로 통일
+Step 9 — CI/CD ✅
+  [x] paths 화이트리스트 트리거
+  [x] 배포 전 ci:all 게이트 (별도 job — 실패 시 build 미시작)
+  [x] PR 용 ci.yml + ARM64 빌드 검증 job
+  [x] buildx 캐시 (type=gha)
+  [x] 이미지 태그 = 커밋 short SHA
+  [x] linux/arm64 단독 + provenance/sbom 비활성
+  [x] concurrency group 으로 배포 직렬화
+  [x] scp/ssh 액션 사용 → 임시 키 파일 없음
+  [x] 배포 후 liveness 폴링 스모크 테스트
+  [ ] GitHub Secrets 등록 (사용자 작업 — 8개)
+  [ ] 러너 선택 확정 (public 이면 arm64 네이티브로 전환)
 
 Step 10 — 배포
-  [ ] Dockerfile 멀티스테이지 ARM64 (베이스 이미지 arm64 지원 확인)
-  [ ] docker-stack.app.yml (prod_nerd_back, replicas 3, 메모리 한도)
-  [ ] healthcheck → liveness 경로만
-  [ ] update_config: start-first / parallelism 1 / failure_action rollback / max_failure_ratio 0
-  [ ] rollback_config 정의
-  [ ] TASK_SLOT 주입 (지금은 미사용, 자리만)
-  [ ] 컨테이너 포트 5501, ports: 미선언 (호스트 publish 없음)
-  [ ] 기존 overlay 네트워크 external 참여 (이름은 서버에서 확인)
-  [ ] 새 도메인 A 레코드 → 인스턴스
-  [ ] Caddy 사이트 블록 추가 (validate → reload, 커밋 금지)
-  [ ] 배포 중 liveness 1초 폴링 → 5xx·끊김 0건 실측 ⭐ (Phase 1 완료 조건)
+  [x] Dockerfile 멀티스테이지 ARM64 + COPY 목록 주석 + 비특권 사용자
+  [x] scripts/healthcheck.mjs (slim 이미지에 curl 없음)
+  [x] docker-stack.app.yml (prod_nerd_back, replicas 3, 메모리 한도)
+  [x] healthcheck → liveness 경로만, HEALTHCHECK 는 stack 한 곳에서만 정의
+  [x] update_config start-first / parallelism 1 / rollback / max_failure_ratio 0
+  [x] rollback_config 정의
+  [x] TASK_SLOT 주입
+  [x] 컨테이너 포트 5501, ports 미선언 (호스트 publish 없음)
+  [x] overlay 네트워크를 환경변수로 주입 (저장소에 이름 미기재)
+  [ ] 새 도메인 A 레코드 → 인스턴스 (사용자 작업)
+  [ ] Caddy 사이트 블록 추가 (사용자 작업 — validate → reload, 커밋 금지)
+  [ ] 배포 중 liveness 1초 폴링 → 5xx·끊김 0건 실측 ⭐ (Phase 1 최종 완료 조건)
 
 Step 11 — 문서 · AI 워크플로
-  [ ] CLAUDE.md (라우팅 표 / Never·Ask / Pitfalls / DoD / 커밋)
-  [ ] docs/conventions/code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
-  [ ] docs/lessons.md (4필드 포맷) + "로컬 빌드 ≠ Docker 빌드" 초기 등재 ⭐
-  [ ] docs/playbooks/ 스켈레톤 (승격 판정 규칙 포함)
-  [x] README.md (스택 / API 규약 / 로깅 / 명령어 / 배포 구성) — 2026-08-26
-  [ ] .claude/settings.json 권한 3단 + 권한 파일 자체 deny (사용자 등록)
-  [ ] PreCompact 핸드오프 훅 (trap exit 0, 마스킹) (사용자 등록)
-  [ ] 리뷰 커맨드
+  [x] CLAUDE.md (라우팅 표 / Never·Ask / Pitfalls / DoD / 커밋)
+  [x] docs/conventions/code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
+  [x] docs/lessons.md — 2건 등재 (전역 필터가 헬스체크 덮어씀 / 로컬 빌드 ≠ 컨테이너 빌드)
+  [x] README.md (스택 / API 규약 / 로깅 / 명령어 / 배포 구성)
+  [x] .claude/settings.json 권한 3단 + 권한 파일 자체 deny
+  [x] .claude/commands/review.md (플로우 기반 QA 절차)
+  [ ] docs/playbooks/ — 결함 2회째 발생 시 생성 (현재 승격 대기 0건)
+  [ ] PreCompact 핸드오프 훅 (사용자 등록 — settings.json 이 AI 쓰기 deny 대상)
   [~] PreToolUse 연관 규약 주입 훅 → 프론트 저장소 생성 후
 ```
-
----
 
 ## ⚠️ 위험도 요약
 
