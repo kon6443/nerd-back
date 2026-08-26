@@ -8,12 +8,15 @@ import {
 } from '@nestjs/terminus';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Redis } from 'ioredis';
+import { SKIP_ALL_THROTTLERS } from '@common/constants/throttle.constants';
 import { REDIS_CLIENT } from '@common/redis/redis.module';
 
 @ApiTags('health')
 @Controller('health')
-// 헬스체크는 10~30초 간격으로 폴링된다. 레이트리밋 대상에 넣으면 자기 자신이 막힌다.
-@SkipThrottle()
+// 헬스체크는 10~30초 간격으로 폴링된다. 레이트리밋 대상에 넣으면 자기 자신이 막히고,
+// Redis 가 죽었을 때 폴링마다 fail-open 경고 로그가 쌓여 공유 로그 스택을 먹는다.
+// ⚠️ 인자 없는 @SkipThrottle() 은 동작하지 않는다 — SKIP_ALL_THROTTLERS 주석 참조.
+@SkipThrottle(SKIP_ALL_THROTTLERS)
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
