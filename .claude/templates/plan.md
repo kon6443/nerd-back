@@ -17,7 +17,7 @@
 ## Existing Patterns / Source of Truth
 
 - 참고할 기존 구현:
-- 따를 컨벤션: (`docs/conventions/code-patterns.md` 의 해당 절)
+- 따를 컨벤션: (`.claude/rules/code-patterns.md` 의 해당 절)
 - 충돌 가능성 있는 영역:
 
 ## Design (Minimal Approach + Key Decisions)
