@@ -107,7 +107,7 @@ pnpm ci:all              # + 스텁 검사 + E2E  (PR 전 필수)
 | 파일 | 언제 여는가 |
 |---|---|
 | [`CLAUDE.md`](CLAUDE.md) | 코드를 쓰기 전 — 금지 사항·함정·완료 기준 |
-| [`docs/conventions/code-patterns.md`](docs/conventions/code-patterns.md) | 모듈·API·테스트를 만들 때 |
+| [`.claude/rules/code-patterns.md`](.claude/rules/code-patterns.md) | 모듈·API·테스트를 만들 때 |
 | [`docs/deploy.md`](docs/deploy.md) | 배포하거나 장애를 확인할 때 |
 | [`docs/lessons.md`](docs/lessons.md) | 같은 실수를 반복하지 않으려 할 때 |
 | [`docs/tasks/`](docs/tasks/) | 왜 이렇게 결정됐는지 확인할 때 |

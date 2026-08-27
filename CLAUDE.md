@@ -11,7 +11,7 @@
 |---|---|
 | [`README.md`](README.md) | 사실·사용법 (스택, 실행법, 환경변수, 명령어) |
 | **이 문서** | 규약·금지·함정 (AI 행동 지침) |
-| [`docs/conventions/code-patterns.md`](docs/conventions/code-patterns.md) | 코드 규약 상세 + 실측 카운트 |
+| [`.claude/rules/code-patterns.md`](.claude/rules/code-patterns.md) | 코드 규약 상세 + 실측 카운트 |
 | [`docs/deploy.md`](docs/deploy.md) | 배포 구성·흐름·롤백·리버스 프록시·상태 확인 |
 | [`docs/lessons.md`](docs/lessons.md) | 작업 방식의 누적 교훈 |
 | [`docs/tasks/*.md`](docs/tasks/) | 진행 상황·결정 근거 |
@@ -31,7 +31,7 @@
 
 | 트리거 | 즉시 읽을 파일 |
 |---|---|
-| **모든 `src` 작업** (신규 모듈·API·테스트) | `docs/conventions/code-patterns.md` |
+| **모든 `src` 작업** (신규 모듈·API·테스트) | `.claude/rules/code-patterns.md` — **path-scoped rule 이라 `src`·`test`·`scripts` 의 `.ts` 를 읽는 순간 자동 로드된다.** 이 행은 주입이 안 됐을 때의 폴백이다 |
 | 뼈대·인프라·배포 결정의 근거 확인 | `docs/tasks/tasks-backend-skeleton.md` |
 | 대규모 리팩터링 착수 전 · 사용자 교정 직후 | `docs/lessons.md` (검토 후 새 교훈 append) |
 | **배포·인프라·Swarm·Caddy·롤백** | `docs/deploy.md` |
@@ -91,7 +91,8 @@
 
 ## Key Patterns (요약)
 
-> 코드를 쓰기 전에 상세와 실측 카운트는 [`docs/conventions/code-patterns.md`](docs/conventions/code-patterns.md) 를 읽는다.
+> 상세와 실측 카운트는 [`.claude/rules/code-patterns.md`](.claude/rules/code-patterns.md) 에 있다.
+> **이 6줄이 그 파일과 겹치는 것은 의도된 것이다** — rule 은 `.ts` 를 읽을 때 로드되므로, 설계·계획 단계(코드를 아직 안 만진 시점)에는 이 요약이 유일한 출처다. 지운다면 그 단계가 비게 된다.
 
 - **계층**: Repository 클래스 없음(Service 가 `@InjectRepository` 직접). **외부 시스템은 반드시 Port 경유**
 - **응답**: `{ code, data, message }` 객체 리터럴 직접 반환. 전역 인터셉터 없음. 상태코드는 정석 REST

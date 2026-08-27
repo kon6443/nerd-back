@@ -1,8 +1,16 @@
+---
+paths:
+  - "src/**/*.ts"
+  - "test/**/*.ts"
+  - "scripts/**/*.ts"
+---
+
 # 코드 패턴 (SSOT)
 
+> **이 파일은 위 `paths` 의 파일을 읽는 순간 자동으로 컨텍스트에 로드된다.** 라우팅 표를 기억하는 것에 의존하지 않는다.
 > 최종 확인일: 2026-08-26 · 근거: `src` 전체 **25개 `.ts`**(spec 5개 포함) + `test` 실측. 각 규약에 사용 카운트를 병기한다.
 > **용도**: 새 코드를 "이 프로젝트 모양"으로 쓰기 위한 규약. 신규 모듈·API·테스트 작성 **전에** 해당 섹션을 확인한다.
-> **경계**: 여기는 *코드를 어떻게 쓰는가*. 금지·함정은 [`../../CLAUDE.md`](../../CLAUDE.md), 사실·사용법은 [`../../README.md`](../../README.md), 작업 방식의 교훈은 [`../lessons.md`](../lessons.md).
+> **경계**: 여기는 *코드를 어떻게 쓰는가*. 금지·함정은 [`CLAUDE.md`](../../CLAUDE.md), 사실·사용법은 [`README.md`](../../README.md), 작업 방식의 교훈은 [`docs/lessons.md`](../../docs/lessons.md).
 
 규모 참고: 컨트롤러 1 · 모듈 4 · Port 1 · 도메인 에러 정의 4 · 단위 spec 5 · E2E spec 2.
 현재 Phase 1(뼈대) 완료 상태이며 도메인 모듈은 없다.
@@ -60,7 +68,7 @@ throw new SessionNotFoundErrorResponseDto('만료되었습니다.');   // overri
 - 도메인 에러는 각 모듈의 `dto/*.error.dto.ts` 에, 공통 에러는 `common/dto/common-error.dto.ts` 에 둔다.
 - 전역 `HttpExceptionFilter` 가 **4단 분기**로 통일한다:
   1. `ApiErrorResponseDto` → DTO 의 code·message·details
-  2. **헬스체크 페이로드(`status` + `details` 보유) → 원본 그대로 통과** ([lessons 2026-08-26](../lessons.md) 참조)
+  2. **헬스체크 페이로드(`status` + `details` 보유) → 원본 그대로 통과** ([lessons 2026-08-26](../../docs/lessons.md) 참조)
   3. 일반 `HttpException` → 상태코드를 코드 문자열로 매핑 (429 → `TOO_MANY_REQUESTS`)
   4. 그 외 → `INTERNAL_SERVER_ERROR` + 고정 메시지 (원본 미노출)
 - 응답 바디에 **`statusCode` 필드는 없다.** HTTP 상태와 `code` 로 분기한다.
@@ -161,7 +169,7 @@ dateKeyInTimeZone(nowUtc(), KST);  // '2026-08-27'  ← 일별 집계 키
 - 🚫 `getHours` `toLocaleString` `getTimezoneOffset` 등을 직접 부르지 않는다. **린트가 error 로 막는다** — 개발자 노트북(KST)·CI(UTC)·컨테이너(UTC)가 서로 다른 답을 내기 때문이다.
   - **예외 3곳은 룰이 꺼져 있다** (`eslint.config.mjs` 의 `files` 오버라이드): `src/common/utils/date.utils.ts`(헬퍼 자신) · `**/*.spec.ts` · `test/**/*.ts`. 즉 **spec 에서는 막히지 않는다** — 프로덕션 코드에만 강제된다.
 - `dateKeyInTimeZone` 이 타임존을 **인자로 강제**하는 이유: 일별 카운터의 "오늘"이 어느 타임존이냐가 집계 결과를 바꾼다. 한국 사용자 기준이면 KST 로 리셋해야 한다.
-- DB 세션 타임존·컬럼 타입은 DB 확정 후 정한다. DB별 적용 방법과 함정은 [`../tasks/tasks-backend-skeleton.md`](../tasks/tasks-backend-skeleton.md) 「날짜·시간 정책」.
+- DB 세션 타임존·컬럼 타입은 DB 확정 후 정한다. DB별 적용 방법과 함정은 [`docs/tasks/tasks-backend-skeleton.md`](../../docs/tasks/tasks-backend-skeleton.md) 「날짜·시간 정책」.
 
 ## 11. 타입 — 억제는 도구가 막는다
 

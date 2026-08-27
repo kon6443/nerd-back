@@ -41,6 +41,9 @@
 | 9 | 도입 결정 기록 (이 문서) | B | `docs/tasks/tasks-ai-config.md` |
 | 10 | 계획서·버그리포트 템플릿의 **저장소 이관** | D | `.claude/templates/plan.md` · `bugfix.md` + 라우팅 1행 |
 | 11 | README 문서 표를 **"언제 여는가" 인덱스**로 재정의 + 설정 파일 등재 | — | `README.md` 「문서와 설정」 — 팀 공유 자산 8개 전부 노출 |
+| 12 | 코드 규약을 **path-scoped rule** 로 전환 (자동 로드) | 공식 문서 | `docs/conventions/code-patterns.md` → `.claude/rules/code-patterns.md` + `paths:` frontmatter |
+
+**12의 근거**: 규약 준수가 "내가 라우팅 표를 기억하는가"에 달려 있었다. `paths:` frontmatter 를 달면 `src`·`test`·`scripts` 의 `.ts` 를 읽는 순간 하네스가 자동 주입한다 — 소프트 지시가 기계 강제로 바뀐다. 부수 이득 둘: ① 공식 문서 기준 **path-scoped rule 은 compact 후 다시 로드**되므로 압축에 지시가 소실되지 않는다 ② 문서만 만지는 세션에는 199줄이 아예 들어오지 않아 컨텍스트를 절약한다. 라우팅 표 행은 **주입 실패 시 폴백**으로 남겼다(참고 A 가 훅 주입 행에 같은 문구를 둔 방식).
 
 ### 근거 메모
 

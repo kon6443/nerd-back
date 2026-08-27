@@ -44,7 +44,7 @@
 
 ## 5단계 — 규약 위반 검사
 
-[`docs/conventions/code-patterns.md`](../../docs/conventions/code-patterns.md) 의 신규 기능 체크리스트를 그대로 적용합니다. 특히:
+[`.claude/rules/code-patterns.md`](../rules/code-patterns.md) 의 신규 기능 체크리스트를 그대로 적용합니다. 특히:
 
 - 외부 시스템을 Port 없이 직접 호출하지 않았는지
 - 외부 API 요청·응답 **본문을 로그에 남기지 않았는지**
