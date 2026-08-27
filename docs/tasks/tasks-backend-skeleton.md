@@ -194,15 +194,7 @@ nerd-back/
    — **스택 이름이 워크플로에 하드코딩되어 있다.** 지금은 환경이 하나뿐이라
    명시적인 편이 읽기 쉬워 그대로 두었다. 두 번째 환경이 생기는 시점에 파라미터화한다.
 
-### Path Aliases
-
-```
-@/*         → src/*
-@common/*   → src/common/*
-@config/*   → src/config/*
-@entities/* → src/entities/*
-@modules/*  → src/modules/*
-```
+**Path aliases** — alias→경로 매핑과 `tsconfig.json` ↔ `jest.config.js` 동기화 규칙은 [`../conventions/code-patterns.md`](../conventions/code-patterns.md) §1 이 SSOT다.
 
 ---
 
