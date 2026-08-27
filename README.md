@@ -3,7 +3,7 @@
 NestJS 11 + TypeScript 백엔드.
 
 > **이 문서는 사실과 사용법만 담는다** — 스택, 실행법, 환경 변수, 명령어.
-> 규약·설계·배포 상세는 아래 [문서](#문서)로 분리되어 있다. 같은 내용을 두 곳에 쓰지 않는다.
+> 규약·설계·배포 상세는 아래 [문서와 설정](#문서와-설정)으로 분리되어 있다. 같은 내용을 두 곳에 쓰지 않는다.
 
 **현재 상태**: Phase 1(뼈대) 배포 완료. DB 계층은 미착수.
 
@@ -100,15 +100,21 @@ pnpm ci:all              # + 스텁 검사 + E2E  (PR 전 필수)
 
 ---
 
-## 문서
+## 문서와 설정
 
-| 문서 | 담당 |
+**담당 범위**는 [`CLAUDE.md`](CLAUDE.md) 문서 경계표가 정의한다. 여기는 **언제 무엇을 여는지**만 안내한다.
+
+| 파일 | 언제 여는가 |
 |---|---|
-| [`CLAUDE.md`](CLAUDE.md) | 규약·금지·함정 (AI 행동 지침) |
-| [`docs/conventions/code-patterns.md`](docs/conventions/code-patterns.md) | 계층·응답·에러·검증·로깅·헬스체크·테스트·날짜시간 규약 |
-| [`docs/deploy.md`](docs/deploy.md) | 배포 구성·흐름·롤백·리버스 프록시·상태 확인 |
-| [`docs/lessons.md`](docs/lessons.md) | 작업 방식의 누적 교훈 |
-| [`docs/tasks/`](docs/tasks/) | 진행 상황과 결정 근거 |
+| [`CLAUDE.md`](CLAUDE.md) | 코드를 쓰기 전 — 금지 사항·함정·완료 기준 |
+| [`docs/conventions/code-patterns.md`](docs/conventions/code-patterns.md) | 모듈·API·테스트를 만들 때 |
+| [`docs/deploy.md`](docs/deploy.md) | 배포하거나 장애를 확인할 때 |
+| [`docs/lessons.md`](docs/lessons.md) | 같은 실수를 반복하지 않으려 할 때 |
+| [`docs/tasks/`](docs/tasks/) | 왜 이렇게 결정됐는지 확인할 때 |
+| [`.claude/templates/`](.claude/templates/) | 계획서·버그 리포트를 작성할 때 |
+| [`.claude/commands/`](.claude/commands/) | 쓸 수 있는 슬래시 커맨드를 찾을 때 (`/review`) |
+| [`.claude/hooks/`](.claude/hooks/) | 훅이 무엇을 막고 무엇을 남기는지 확인할 때 |
+| [`.claude/settings.json`](.claude/settings.json) | 권한 정책·훅 등록을 확인할 때 (팀 공유) |
 
 ---
 
