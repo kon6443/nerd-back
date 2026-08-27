@@ -46,7 +46,7 @@
 | 런타임 | Node 22 LTS (ARM64) | |
 | 마이그레이션 | 파일 작성까지만. **실행은 사람이** | 전 환경 동일 DB — 모든 실행이 곧 상용 적용 |
 | 커밋 | `type(scope): 한국어 설명` (Conventional Commits) | 참고 A·B 공통 |
-| 문서 체계 | `CLAUDE.md` + `docs/conventions/` + `docs/playbooks/` + `docs/tasks/` | 참고 A 방식. 같은 내용을 두 곳에 쓰지 않는다 |
+| 문서 체계 | `CLAUDE.md` + `.claude/rules/` + `docs/playbooks/` + `docs/tasks/` | 참고 A 방식. 같은 내용을 두 곳에 쓰지 않는다. **코드 규약은 path-scoped rule 로 자동 로드**한다 (2026-08-27 `docs/conventions/` 에서 이동 — 라우팅 표 준수에 의존하지 않기 위해) |
 
 ---
 
@@ -68,6 +68,20 @@
 | 인증 | **보류** | 주제 확정 후. 지금은 `common/guards/` 자리와 `@CurrentUser()` 데코레이터만 |
 | WebSocket | 보류 | 필요해지면 Redis 어댑터 필수 (레플리카 3개) |
 | LLM 어댑터 구현체 | 보류 | `LlmPort` 인터페이스와 DI 토큰만 먼저 |
+
+### DB 확정 전에 이미 확정된 것 (Phase 2 선행 규약)
+
+DB 종류와 무관하게 성립하는 규약이다. 참고 A·B 에서 **실제로 사고를 낸 항목**만 옮겼다.
+DB 가 확정되면 이 표를 `.claude/rules/code-patterns.md` 로 승격하고, DB 특화 항목(멱등 가드 문법·타입 매핑·커넥션 풀)을 그때 채운다.
+
+| 규약 | 지키지 않았을 때 실제로 일어난 일 |
+|---|---|
+| Entity 수정과 마이그레이션 파일을 **한 커밋에 세트로** 제출한다 | 한쪽만 바뀌어 스키마 드리프트가 남았다 |
+| 마이그레이션은 **1개 = 1목적**, `down()` 필수, 멱등 작성 | **DDL 의 트랜잭션 보호는 DB 마다 다르다.** Oracle 은 자동 커밋, MySQL 은 암묵 커밋이라 중간 실패 시 **부분 적용 상태**로 남는다 — 그 경우 멱등 작성 + 1파일 1목적이 유일한 방어책이다. PostgreSQL 은 DDL 이 트랜잭션 안에서 롤백되므로 이 위험이 낮다. **DB 확정 시 어느 쪽인지 먼저 확인한다** |
+| **민감정보 컬럼은 Entity 에 선언하지 않는다.** 꼭 필요하면 `select: false` | 선언된 컬럼은 모든 `find` 에서 SELECT 되어 응답·로그로 새어나간다 |
+| 문자열 컬럼을 number 타입으로 선언하지 않는다 | 암묵 변환 때문에 **비숫자 값 한 건**에 그 기능 전체가 깨졌다 |
+| Entity 의 `nullable`·`length`·`default` 는 **런타임 효과가 없다** (`synchronize: false` + generate 미사용) | 표기를 제약으로 믿고 입력 검증을 생략하면 사고. 실제 제약은 DB 만 강제한다 |
+| 프로덕션 코드를 바꾸면 그 코드를 검증하는 테스트도 **같은 커밋에서** 갱신한다 | 테스트 대량 실패의 원인이 인프라가 아니라 이것이었다 |
 
 ---
 
@@ -130,10 +144,15 @@ nerd-back/
 ├── test/
 │   ├── helpers/               e2e-app.ts
 │   └── setup/                 forbid-db.ts, setup-tz.ts
-├── docs/
-│   ├── conventions/           code-patterns.md
-│   ├── playbooks/
+├── docs/                      deploy.md, lessons.md
+│   ├── playbooks/             (결함 2회째 발생 시 생성)
 │   └── tasks/                 (본 문서)
+├── .claude/
+│   ├── rules/                 code-patterns.md  ← src·test·scripts 진입 시 자동 로드
+│   ├── commands/              review.md
+│   ├── hooks/                 precompact.sh, check-secrets.sh
+│   ├── templates/             plan.md, bugfix.md
+│   └── settings.json          권한 3단 + 훅 등록
 ├── infra/                     docker-stack.app.yml, docker-stack.redis.yml
 ├── migrations/
 ├── CLAUDE.md
@@ -194,7 +213,7 @@ nerd-back/
    — **스택 이름이 워크플로에 하드코딩되어 있다.** 지금은 환경이 하나뿐이라
    명시적인 편이 읽기 쉬워 그대로 두었다. 두 번째 환경이 생기는 시점에 파라미터화한다.
 
-**Path aliases** — alias→경로 매핑과 `tsconfig.json` ↔ `jest.config.js` 동기화 규칙은 [`../conventions/code-patterns.md`](../conventions/code-patterns.md) §1 이 SSOT다.
+**Path aliases** — alias→경로 매핑과 `tsconfig.json` ↔ `jest.config.js` 동기화 규칙은 [`.claude/rules/code-patterns.md`](../../.claude/rules/code-patterns.md) §1 이 SSOT다.
 
 ---
 
@@ -426,12 +445,12 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 
 - `CLAUDE.md` — 라우팅 표, Never/Ask 경계, Pitfalls, DoD, 커밋 컨벤션
   - ⚠️ 한 줄을 넣기 전에 자문한다: **"이걸 모르면 내가 틀리게 행동하는가?"** 아니면 넣지 않는다. 길어질수록 정작 중요한 금지 규칙의 준수율이 떨어진다 (참고 A lessons에 실제 사례 있음)
-- `docs/conventions/code-patterns.md` — 계층·에러·응답·테스트 규약. **규약마다 실측 카운트와 최종 확인일을 병기**한다
+- `.claude/rules/code-patterns.md` — 계층·에러·응답·테스트 규약. **규약마다 실측 카운트와 최종 확인일을 병기**한다
 - `docs/lessons.md` — **실패 양상 / 탐지 신호 / 근본 원인 / 예방 규칙** 4필드, 최신순 append
   - 초기 등재: **"로컬 빌드 성공 ≠ Docker 빌드 성공"** (성숙도 패턴 §5 — 남의 사고를 미리 등재)
 - `docs/playbooks/` — 반복 결함 클러스터. 판정 규칙: **1회 발생은 승격 대기, 2회째에 클러스터로 승격**
 - `README.md` — 사실·사용법 (스택, 명령어, 환경변수, 배포 구성)
-- 같은 내용을 두 곳에 쓰지 않는다. 진행 상황은 태스크 문서, 사실은 README, 규약은 CLAUDE.md·conventions
+- 같은 내용을 두 곳에 쓰지 않는다. 진행 상황은 태스크 문서, 사실은 README, 규약은 `CLAUDE.md` · `.claude/rules/`
 - 정책을 바꾸는 커밋에서는 **바뀐 용어로 `docs/` 전체를 grep**해 잔존 서술을 같은 커밋에서 갱신한다
 
 **AI 워크플로** (⚠️ 등록은 사용자가 직접 — AI 쓰기 금지 대상)
@@ -593,7 +612,7 @@ Step 11 — 문서 · AI 워크플로
   [x] CLAUDE.md (라우팅 표 / Never·Ask / Pitfalls / DoD / 커밋)
         · 2026-08-27 보강: 글로벌 충돌 시 우선순위(구체적인 쪽이 이김) · 200줄 상한 ·
           문서 분할 임계치 · Never 근거의 유효기간 · DoD 게이트 3분류
-  [x] docs/conventions/code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
+  [x] .claude/rules/code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
   [x] docs/deploy.md — 배포 SSOT 로 분리 (2026-08-27, 213줄 신설 / README 427→117줄)
   [x] docs/lessons.md — 4필드 포맷으로 누적 (2026-08-27 기준 8건)
   [x] README.md (스택 / 실행법 / 환경변수 / 명령어 / "언제 여는가" 인덱스)
@@ -630,7 +649,7 @@ Step 11 — 문서 · AI 워크플로
 
 ## 📚 참고
 
-- 계층·에러·응답·테스트 규약 상세: `docs/conventions/code-patterns.md` (Step 11에서 작성)
+- 계층·에러·응답·테스트 규약 상세: `.claude/rules/code-patterns.md` (Step 11에서 작성)
 - 금지·함정·DoD: `CLAUDE.md` (Step 11에서 작성)
 - 명령어·환경변수·배포 구성: `README.md` (Step 11에서 작성)
 
