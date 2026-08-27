@@ -565,7 +565,8 @@ Step 9 — CI/CD ✅
   [x] concurrency group 으로 배포 직렬화
   [x] scp/ssh 액션 사용 → 임시 키 파일 없음
   [x] 배포 후 liveness 폴링 스모크 테스트
-  [ ] GitHub Secrets 등록 (사용자 작업 — 8개)
+  [x] GitHub Secrets 등록 (8개) — deploy 워크플로 2회 success 로 확인 (2026-08-27)
+        · 시크릿 미등록이면 SSH 단계에서 실패하므로 성공 자체가 증거다
   [ ] 러너 선택 확정 (public 이면 arm64 네이티브로 전환)
 
 Step 10 — 배포
@@ -590,13 +591,19 @@ Step 10 — 배포
 
 Step 11 — 문서 · AI 워크플로
   [x] CLAUDE.md (라우팅 표 / Never·Ask / Pitfalls / DoD / 커밋)
+        · 2026-08-27 보강: 글로벌 충돌 시 우선순위(구체적인 쪽이 이김) · 200줄 상한 ·
+          문서 분할 임계치 · Never 근거의 유효기간 · DoD 게이트 3분류
   [x] docs/conventions/code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
-  [x] docs/lessons.md — 2건 등재 (전역 필터가 헬스체크 덮어씀 / 로컬 빌드 ≠ 컨테이너 빌드)
-  [x] README.md (스택 / API 규약 / 로깅 / 명령어 / 배포 구성)
-  [x] .claude/settings.json 권한 3단 + 권한 파일 자체 deny
-  [x] .claude/commands/review.md (플로우 기반 QA 절차)
+  [x] docs/deploy.md — 배포 SSOT 로 분리 (2026-08-27, 213줄 신설 / README 427→117줄)
+  [x] docs/lessons.md — 4필드 포맷으로 누적 (2026-08-27 기준 8건)
+  [x] README.md (스택 / 실행법 / 환경변수 / 명령어 / "언제 여는가" 인덱스)
+  [x] docs/tasks/tasks-ai-config.md — AI 설정 도입·미도입 결정 기록 (2026-08-27)
+  [x] .claude/settings.json 권한 3단 + 권한 파일 자체 deny + 훅 등록
+  [x] .claude/commands/review.md (플로우 기반 QA 절차 + 측정 함정 3종)
+  [x] .claude/templates/ — plan · bugfix (개인 글로벌은 팀에 전파되지 않아 저장소로 이관)
+  [x] PreCompact 핸드오프 훅 — .claude/hooks/precompact.sh, 사용자 등록 완료 (2026-08-27)
+  [x] UserPromptSubmit 시크릿 차단 훅 — .claude/hooks/check-secrets.sh (2026-08-27)
   [ ] docs/playbooks/ — 결함 2회째 발생 시 생성 (현재 승격 대기 0건)
-  [ ] PreCompact 핸드오프 훅 (사용자 등록 — settings.json 이 AI 쓰기 deny 대상)
   [~] PreToolUse 연관 규약 주입 훅 → 프론트 저장소 생성 후
 ```
 
