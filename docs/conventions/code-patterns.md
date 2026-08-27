@@ -140,7 +140,30 @@ transformOptions: { enableImplicitConversion: true }
 - `restoreMocks: true` 이므로 `afterEach` 복원을 직접 쓰지 않는다.
 - ⚠️ `@Transactional` 롤백은 mock 으로 검증할 수 없다. 다중 테이블 쓰기 경로에 데코레이터가 붙었는지 **리뷰에서 grep 으로 확인**한다.
 
-## 10. 타입 — 억제는 도구가 막는다
+## 10. 날짜·시간 — UTC 저장, 표시 시점에만 변환
+
+저장·비교·연산은 전부 UTC 로 한다. 사람이 읽는 문자열이 필요할 때만 **타임존을 명시해** 변환한다. API 응답은 ISO 8601 `Z` suffix 로 보내고 오프셋을 붙이지 않는다 — 받는 쪽이 변환한다.
+
+| 레이어 | 적용 |
+|---|---|
+| 앱 코드 | `@common/utils/date.utils` 헬퍼만 사용 |
+| 린트 | 로컬 TZ 의존 메서드 **19종**을 `no-restricted-syntax` 로 **error** (2026-08-27 실측) |
+| 컨테이너 | `Dockerfile` 의 `ENV TZ=UTC` |
+| 테스트 | `test/setup/setup-tz.ts` 가 TZ 고정 |
+
+```ts
+import { KST, dateKeyInTimeZone, nowUtc, toIsoUtc } from '@common/utils/date.utils';
+
+toIsoUtc(nowUtc());                // '2026-08-26T15:30:00.000Z'
+dateKeyInTimeZone(nowUtc(), KST);  // '2026-08-27'  ← 일별 집계 키
+```
+
+- 🚫 `getHours` `toLocaleString` `getTimezoneOffset` 등을 직접 부르지 않는다. **린트가 error 로 막는다** — 개발자 노트북(KST)·CI(UTC)·컨테이너(UTC)가 서로 다른 답을 내기 때문이다.
+  - **예외 3곳은 룰이 꺼져 있다** (`eslint.config.mjs` 의 `files` 오버라이드): `src/common/utils/date.utils.ts`(헬퍼 자신) · `**/*.spec.ts` · `test/**/*.ts`. 즉 **spec 에서는 막히지 않는다** — 프로덕션 코드에만 강제된다.
+- `dateKeyInTimeZone` 이 타임존을 **인자로 강제**하는 이유: 일별 카운터의 "오늘"이 어느 타임존이냐가 집계 결과를 바꾼다. 한국 사용자 기준이면 KST 로 리셋해야 한다.
+- DB 세션 타임존·컬럼 타입은 DB 확정 후 정한다. DB별 적용 방법과 함정은 [`../tasks/tasks-backend-skeleton.md`](../tasks/tasks-backend-skeleton.md) 「날짜·시간 정책」.
+
+## 11. 타입 — 억제는 도구가 막는다
 
 - `no-explicit-any`, `no-floating-promises`, `no-misused-promises` 가 **error** 다. 현재 `any` **0건**.
 - 불가피한 경우에만 `eslint-disable-next-line` + **사유 주석**을 남긴다 (현재 **1건** — `CustomThrottlerGuard.getTracker` 가 상위 클래스 시그니처를 따라야 함).
@@ -167,6 +190,10 @@ transformOptions: { enableImplicitConversion: true }
 **전역 장치(필터·인터셉터·가드) 추가·수정**
 - [ ] 이 규칙이 적용되면 **안 되는** 응답을 확인했는가? (§3, lessons)
 - [ ] 통과 케이스를 테스트로 고정했는가?
+
+**날짜·시간 다루는 코드**
+- [ ] `date.utils` 헬퍼를 쓰는가? 로컬 TZ 의존 메서드를 직접 부르지 않는가? (§10)
+- [ ] 일별 집계 키라면 타임존을 명시했는가? (§10)
 
 **빌드 진입 설정 변경** (`tsconfig*.json` · `build` 스크립트 · 엔트리)
 - [ ] 같은 커밋에서 `Dockerfile` 의 `COPY` 목록을 확인했는가? (lessons)
