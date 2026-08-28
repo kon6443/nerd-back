@@ -4,7 +4,10 @@
     "module": "commonjs",
     "lib": ["ES2023"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    // ⚠️ rootDir 은 tsconfig.build.json 에만 둔다.
+    //    이 파일의 include 가 test/ 를 포함하므로, 여기에 rootDir: ./src 가 있으면
+    //    `tsc --noEmit`(전체 타입체크)이 TS6059 "not under rootDir" 로 죽는다.
+    //    emit 을 하는 것은 빌드 설정뿐이므로 rootDir 도 거기에만 있으면 된다.
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
