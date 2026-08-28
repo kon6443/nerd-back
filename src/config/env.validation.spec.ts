@@ -1,4 +1,4 @@
-import { AppEnv, validateEnv } from './env.validation';
+import { AppEnv, isEdgeThrottleEnabled, validateEnv } from './env.validation';
 
 const MINIMAL = {
   ENV: 'LOCAL',
@@ -36,5 +36,34 @@ describe('validateEnv', () => {
 
   it('에러 메시지에 .env.example 안내를 포함한다', () => {
     expect(() => validateEnv({})).toThrow(/\.env\.example/);
+  });
+
+  describe('EDGE_THROTTLE_ENABLED', () => {
+    it('지정하지 않으면 꺼진 상태다 ⭐', () => {
+      // 이 기본값이 "배포·로컬 영향 0" 의 근거다. 켜는 것은 운영이 명시적으로 한다.
+      const result = validateEnv({ ...MINIMAL });
+
+      expect(result.EDGE_THROTTLE_ENABLED).toBe('false');
+      expect(isEdgeThrottleEnabled(result.EDGE_THROTTLE_ENABLED)).toBe(false);
+    });
+
+    it("문자열 'false' 가 truthy 로 뒤집히지 않는다 ⭐", () => {
+      // boolean 으로 선언했다면 enableImplicitConversion 이 'false' 를 true 로 바꿨을 것이다.
+      const result = validateEnv({ ...MINIMAL, EDGE_THROTTLE_ENABLED: 'false' });
+
+      expect(isEdgeThrottleEnabled(result.EDGE_THROTTLE_ENABLED)).toBe(false);
+    });
+
+    it("'true' 면 켜진다", () => {
+      const result = validateEnv({ ...MINIMAL, EDGE_THROTTLE_ENABLED: 'true' });
+
+      expect(isEdgeThrottleEnabled(result.EDGE_THROTTLE_ENABLED)).toBe(true);
+    });
+
+    it('허용 값이 아니면 던진다 — 오타가 조용히 꺼진 상태로 남지 않게', () => {
+      expect(() => validateEnv({ ...MINIMAL, EDGE_THROTTLE_ENABLED: 'yes' })).toThrow(
+        /EDGE_THROTTLE_ENABLED/,
+      );
+    });
   });
 });

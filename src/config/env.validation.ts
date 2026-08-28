@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
 
 export enum AppEnv {
   LOCAL = 'LOCAL',
@@ -44,6 +44,28 @@ export class EnvVariables {
   @IsInt()
   @Min(1)
   TASK_SLOT: number = 1;
+
+  /**
+   * 엣지 백스톱 레이트리밋 활성화. **기본 비활성.**
+   *
+   * Nest 가드가 닿지 않는 경로(Swagger·스펙 JSON·404)를 덮는 기능인데, 모든 요청을 지나가는
+   * 미들웨어이므로 한도를 잘못 잡으면 정상 트래픽이 429 를 받는다. 그래서 코드로 먼저 내리고
+   * **켜는 시점은 운영이 통제**한다 (배포 직후 조치 게이트).
+   *
+   * ⚠️ 타입이 boolean 이 아니라 문자열인 이유: `enableImplicitConversion` 이 켜져 있어
+   *    boolean 으로 선언하면 class-transformer 가 문자열 `'false'` 를 **truthy 로 변환**해
+   *    끈 상태가 켜진 상태로 뒤집힌다. 문자열로 받고 비교하는 쪽이 안전하다.
+   */
+  @IsOptional()
+  @IsIn(['true', 'false'], {
+    message: "EDGE_THROTTLE_ENABLED 는 'true' 또는 'false' 여야 한다.",
+  })
+  EDGE_THROTTLE_ENABLED: string = 'false';
+}
+
+/** 위 플래그가 켜졌는지. 문자열 비교를 한 곳에만 둔다. */
+export function isEdgeThrottleEnabled(value: string | undefined): boolean {
+  return value === 'true';
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvVariables {

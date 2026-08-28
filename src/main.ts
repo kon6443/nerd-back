@@ -3,13 +3,16 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
-import { API_PREFIX, DOCS_PATH } from '@common/constants/app.constants';
+import { API_PREFIX, DOCS_PATH, TRUST_PROXY_HOPS } from '@common/constants/app.constants';
+import { createEdgeThrottle } from '@common/middleware/edge-throttle.middleware';
 import { AppModule } from './app.module';
+import { isEdgeThrottleEnabled } from './config/env.validation';
 
 async function bootstrap(): Promise<void> {
   // bufferLogs — Pino 로거가 준비되기 전의 부팅 로그를 버려지지 않게 모아둔다.
@@ -21,7 +24,8 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix(API_PREFIX);
 
   // 리버스 프록시 뒤에 있으므로 X-Forwarded-* 를 신뢰해야 req.ip 가 실제 클라이언트를 가리킨다.
-  app.set('trust proxy', 1);
+  // 값의 의미와 전제는 TRUST_PROXY_HOPS 가 소유한다 — E2E 도 같은 상수를 쓴다.
+  app.set('trust proxy', TRUST_PROXY_HOPS);
 
   // helmet 의 기본 CSP 는 인라인 스크립트를 막아 Swagger UI 를 깨뜨린다.
   // API 응답(JSON)에는 CSP 가 무의미하므로 문서 경로만 제외하고 적용한다.
@@ -38,6 +42,13 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
 
   const config = app.get(ConfigService);
+
+  // 엣지 백스톱 레이트리밋 — Nest 가드가 닿지 않는 경로(Swagger UI·스펙 JSON·404)를 덮는다.
+  // 기본 비활성이며, 플래그가 꺼져 있으면 미들웨어를 **아예 등록하지 않는다** (요청 경로 무변화).
+  // ⚠️ 아래 SwaggerModule.setup 보다 **위**에 있어야 문서 경로가 덮인다. 순서를 바꾸지 말 것.
+  if (isEdgeThrottleEnabled(config.get<string>('EDGE_THROTTLE_ENABLED'))) {
+    app.use(createEdgeThrottle({ storage: app.get(ThrottlerStorage) }));
+  }
 
   const origins = (config.get<string>('CORS_ORIGINS') ?? '')
     .split(',')
