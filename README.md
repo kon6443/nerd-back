@@ -72,6 +72,7 @@ Redis 가 없어도 앱은 기동하고 HTTP 는 응답한다. 레이트리밋�
 | `CORS_ORIGINS` | 쉼표 구분. 비우면 크로스 오리진 차단 |
 | `REDIS_HOST` `REDIS_PORT` `REDIS_PASSWORD` | Redis 접속 정보 |
 | `TASK_SLOT` | Swarm 이 주입 — 단일 실행 작업 가드용 |
+| `EDGE_THROTTLE_ENABLED` | `true`/`false` (기본 `false`). 켜면 Swagger·404 등 가드 밖 경로를 IP당 분당 300 으로 제한 |
 
 DB 관련 변수는 DB 확정 후 추가한다.
 
@@ -87,12 +88,15 @@ pnpm build
 pnpm start:prod
 
 pnpm lint                # pnpm lint:fix
+pnpm check:types         # 전체 타입 검사 (src + test, 산출물 없이)
 pnpm test                # pnpm test:watch · test:cov
 pnpm test:e2e
 
 pnpm ci:core             # lint → test → build
-pnpm ci:all              # + 스텁 검사 + E2E  (PR 전 필수)
+pnpm ci:all              # + 타입 검사 + 스텁 검사 + E2E  (PR 전 필수)
 ```
+
+`check:types` 는 `tsc --noEmit` 이다. `build` 는 `src` 만, jest 는 로드한 spec 만 검사하므로 **`src` 와 `test` 를 한 번에 보는 수단은 이것뿐이다.**
 
 `check:stubs` 는 `TODO|FIXME|XXX|HACK` 과 `.only(` 잔존을 CI 에서 차단한다. `.only` 가 남으면 나머지 테스트가 조용히 스킵되고 전체 통과로 보인다.
 

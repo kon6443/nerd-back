@@ -159,13 +159,44 @@ require('http').get({host:'127.0.0.1',port:5501,path:'/api/v2/health/ready'},r=>
 
 배포 중 폴링해서 비-200 과 연결 끊김이 **0건**이어야 한다.
 
+**설정은 무중단이 되도록 구성돼 있다** — 2026-08-28 `infra/docker-stack.app.yml` 대조 확인:
+
+| 설정 | 값 | 역할 |
+|---|---|---|
+| `replicas` | 3 | 교체 중에도 나머지가 요청을 받는다 |
+| `order` | `start-first` | 새 태스크를 먼저 띄우고 옛 태스크를 내린다 |
+| `parallelism` | 1 | 한 번에 하나만 교체 → 항상 2/3 가 서비스 중 |
+| `delay` · `monitor` | 5s · 20s | 다음 교체 전에 결과를 지켜본다 |
+| `failure_action` · `max_failure_ratio` | `rollback` · 0 | 하나라도 실패하면 되돌린다 |
+| `healthcheck` | 15s 간격 · 3회 · `start_period` 30s | 준비 안 된 태스크로 트래픽이 가지 않게 한다 |
+
+🚫 **그래도 "무중단 확인됨" 으로 적지 않는다.** 설정이 맞다는 것과 실제로 끊기지 않는다는 것은 다른 사실이다.
+설정만으로는 아래를 알 수 없고, 이 넷은 폴링으로만 확정된다.
+
+- `start_period` 30s + `interval` 15s + `retries` 3 → 새 태스크가 healthy 로 판정되는 시점과 프록시가 업스트림을 다시 보는 시점이 어긋날 수 있다
+- 프록시는 `tasks.<서비스>` DNS 로 붙는다 — Swarm DNS 가 내려가는 태스크를 목록에서 빼는 타이밍과 실제 종료 사이에 공백이 생길 수 있다
+- `enableShutdownHooks()` 가 진행 중인 요청을 실제로 다 마치는지는 재봐야 안다
+- 단일 노드에 replicas 3 이므로 리소스 경합으로 새 태스크 기동이 느려질 수 있다
+
+배포를 시작하기 **직전에** 켠다. 성공은 조용하고 **비정상만 찍히며**, 끝나면 스스로 판정한다 — 200 이 흐르는 화면을 눈으로 세지 않는다.
+
 ```bash
-while true; do
-  printf '%s %s\n' "$(date +%T)" \
-    "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 https://<도메인>/api/v2/health)"
+DUR=180   # 배포 소요 시간보다 넉넉하게 (초)
+URL="https://<도메인>/api/v2/health"
+
+total=0; bad=0; end=$(( $(date +%s) + DUR ))
+while [ "$(date +%s)" -lt "$end" ]; do
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$URL")
+  [ -z "$code" ] && code=000        # 연결 자체가 안 되면 curl 이 000 을 낸다
+  total=$((total+1))
+  [ "$code" = "200" ] || { bad=$((bad+1)); printf '%s %s\n' "$(date +%T)" "$code"; }
   sleep 1
 done
+printf '총 %d건 · 비정상 %d건 — ' "$total" "$bad"
+if [ "$bad" -eq 0 ]; then echo "판정: 무중단"; else echo "판정: 중단 발생"; fi
 ```
+
+**`비정상 0건` 이 Phase 1 의 최종 완료 조건이다.** 결과는 `docs/tasks/tasks-backend-skeleton.md` Step 10 에 기록한다.
 
 ⚠️ 서버에서 `docker exec` 로 폴링하면 `start-first` 교체 시 **대상 컨테이너 자체가 사라져** 실패가 찍힌다. 그건 서비스 중단이 아니다. 서비스 관점으로 보려면 프록시를 거쳐야 한다.
 

@@ -119,8 +119,33 @@ transformOptions: { enableImplicitConversion: true }
   🚫 **인자 없는 `@SkipThrottle()` 은 동작하지 않는다.** 기본값 `{ default: true }` 가
   우리 throttler 이름(`short`·`long`)과 매칭되지 않아 스로틀이 그대로 적용된다
   (실측: health 5회 → 스토리지 접근 10회). `test/throttle-skip.e2e-spec.ts` 가 이 동작을 고정한다.
-- ⚠️ 레이트리밋이 닿지 않는 경로가 둘 있다 — **Swagger**(express 미들웨어로 마운트되어 가드 밖)와
-  **매칭되지 않는 404 경로**(라우트 핸들러가 없어 가드가 실행되지 않음). 둘 다 실측 확인했고 백로그에 있다.
+- **가드가 닿지 않는 경로 3종**은 **엣지 백스톱 미들웨어**가 덮는다 (`common/middleware/edge-throttle.middleware.ts`).
+  `/api/v2/docs`·`/api/v2/docs-json`(SwaggerModule 이 express 미들웨어로 마운트되어 가드 밖) ·
+  **매칭되지 않는 404 경로**(라우트 핸들러가 없어 가드가 실행되지 않음). 2026-08-28 실측 확인
+  (`CountingStorage` 로 스토리지 호출 횟수 계측 — 일반 라우트 2회 vs 3종 전부 0회).
+  - 가드를 **대체하지 않고** 더 느슨한 별도 예산(`THROTTLE_EDGE`, IP당 분당 300)으로 겹친다.
+    예산이 다르므로 이중 계상이 실효 한도를 깎지 않는다.
+  - **코드 기본값 비활성** — `EDGE_THROTTLE_ENABLED=true` 일 때만 등록된다. 모든 요청을 지나는
+    미들웨어라 한도 오설정이 곧 정상 트래픽 429 이기 때문이다. 켜는 시점은 운영이 통제한다.
+  - 🚫 **헬스체크(`/health`·`/health/ready`)는 반드시 제외한다.** 여기 걸리면 Swarm 이
+    unhealthy 로 판정해 재시작 루프에 빠지고 배포가 롤백된다. `test/edge-throttle.e2e-spec.ts` 가 고정한다.
+  - `main.ts` 와 E2E 가 **같은 팩토리**를 호출한다. 한쪽만 배선하면 E2E 가 다른 규칙을 검증한다.
+  - IP 식별은 가드와 **`resolveClientIp` 를 공유**한다. 각자 구현하면 같은 요청이 두 한도에서
+    다른 키로 세어진다.
+- 🚫 **레이트리밋 키로 `X-Forwarded-For` 를 직접 파싱하지 않는다. `req.ip` 를 쓴다.**
+  Caddy 의 `reverse_proxy` 는 XFF 를 덮어쓰지 않고 **append** 하므로, 공격자가 헤더를 보내면
+  `<위조>, <실제IP>` 가 도착한다. **첫 값을 쓰면 공격자가 정한 값**이 되어 헤더만 바꿔가며
+  한도를 무력화할 수 있다. `req.ip` 는 `proxy-addr` 가 오른쪽부터 신뢰 홉만 건너뛰어 계산하므로
+  위조를 무시한다 (실측 2026-08-28: XFF `1.2.3.4, 203.0.113.9` → `req.ip` = `203.0.113.9`).
+  `@nestjs/throttler` 의 기본 `getTracker` 도 `return req.ip` 다 — **기본값을 덮어쓸 때는
+  그 기본값이 왜 그런지 먼저 확인한다.**
+  - 전제: **신뢰 프록시가 정확히 1단**(`app.set('trust proxy', 1)`). CDN 을 앞에 두면 숫자를
+    늘려야 하고, 안 늘리면 스푸핑이 다시 열린다.
+  - **프로덕션과 E2E 가 같은 `trust proxy` 값을 쓴다** (`test/helpers/e2e-app.ts`).
+    미설정 시 `req.ip` 가 `::ffff:127.0.0.1` 로 나와 다른 규칙을 검증하게 된다(실측).
+  - ⚠️ **차단을 미들웨어가 직접 로깅한다.** 실측(2026-08-28): `app.use()` 미들웨어는
+    모듈 미들웨어(pino-http)보다 **먼저** 실행되므로, 여기서 응답을 끝내면 **액세스 로그에
+    아무것도 남지 않는다.** 로그에 경로는 남기고 **IP 는 남기지 않는다**.
 
 ## 7. 헬스체크 — liveness / readiness 분리
 
