@@ -19,8 +19,9 @@
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "check:stubs": "node scripts/check-stubs.mjs",
+    "check:types": "tsc --noEmit",
     "ci:core": "pnpm run lint && pnpm run test && pnpm run build",
-    "ci:all": "pnpm run lint && pnpm run check:stubs && pnpm run test && pnpm run test:e2e && pnpm run build"
+    "ci:all": "pnpm run lint && pnpm run check:types && pnpm run check:stubs && pnpm run test && pnpm run test:e2e && pnpm run build"
   },
   "dependencies": {
     "@nest-lab/throttler-storage-redis": "^1.2.0",

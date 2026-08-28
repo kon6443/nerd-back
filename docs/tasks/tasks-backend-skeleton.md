@@ -29,6 +29,7 @@
 | 로깅 | Pino (`nestjs-pino`) — 로컬 pretty / 배포 JSON stdout, redact, `/health` 제외 | 참고 A·B 공통. 기존 로그 수집 파이프라인이 stdout JSON을 그대로 먹음 |
 | Redis | **포함** | 레이트리밋 스토리지 + 예산 가드레일 카운터. 레플리카 3개 전제에서 필수 |
 | 레이트리밋 | Throttler + **Redis 스토리지** | 메모리 스토리지는 레플리카 3개에서 실효 한도가 3배가 된다 |
+| 가드 밖 경로 | **엣지 백스톱 미들웨어** — `EDGE_THROTTLE_ENABLED` (코드 기본 off) | Nest 가드는 Swagger(express 마운트)·404(핸들러 없음)에 닿지 않는다(2026-08-28 실측). 프록시(Caddy)는 이웃 프로젝트와 공유하고 Caddyfile 을 커밋하지 않으므로 우리 통제 밖이다 → 앱에서 덮는다. 가드를 대체하지 않고 더 느슨한 별도 예산으로 겹친다 |
 | 헬스체크 | `@nestjs/terminus` — **liveness / readiness 분리** | Swarm healthcheck가 외부 의존을 검사하면 DB·Redis 장애가 재시작 루프와 배포 롤백을 유발한다 (↓ 아키텍처 · 헬스체크) |
 | Swagger | **전 환경 노출** (`/api/v2/docs`) | 상용 환경 하나뿐. 심사위원이 API 설계를 직접 볼 수 있어 이점도 있음 |
 | API prefix | `/api/v2` | 임시로 이웃 프로젝트와 도메인을 공유하므로 **경로 네임스페이스가 겹치지 않아야** 한다. 이웃이 `/api/v1` 을 쓰고 있어 v2 를 택했다 — "v1 의 다음 버전"이라는 뜻이 아니다. 전용 도메인으로 분리하면 재검토한다. 값은 `API_PREFIX` 한 곳에만 있고 나머지 경로는 전부 파생된다 |
@@ -129,10 +130,11 @@ nerd-back/
 │   │   ├── filters/           http-exception.filter.ts
 │   │   ├── guards/            (인증 보류 — 자리만)
 │   │   ├── logger/            logger.module.ts
+│   │   ├── middleware/        edge-throttle.middleware.ts  (가드 밖 경로 백스톱)
 │   │   ├── pipes/             global-validation-pipe.ts
 │   │   ├── port/              llm.port.ts  (인터페이스 + DI 토큰)
 │   │   ├── redis/             redis.module.ts
-│   │   ├── utils/             date.utils.ts
+│   │   ├── utils/             date.utils.ts, client-ip.ts, log-throttle.ts
 │   │   └── __spec__/          mock-repository.ts
 │   ├── config/                env.validation.ts, database.config.ts, app.config.ts
 │   ├── entities/
@@ -551,10 +553,28 @@ Step 5 — Redis + 레이트리밋
   [x] Throttler Redis 스토리지 (초당 5 + 분당 60)
   [x] CustomThrottlerGuard — 429 를 우리 형식으로, 스토리지 장애 시 fail-open
   [x] 헬스체크 @SkipThrottle(SKIP_ALL_THROTTLERS) — 인자 없는 형태는 동작하지 않음 (실측)
-  [ ] ⚠️ 레이트리밋이 닿지 않는 경로 2종 — 후속 태스크로 분리
-        · Swagger: SwaggerModule 은 express 미들웨어로 마운트되어 Nest 가드가 적용되지 않는다
-        · 매칭되지 않는 경로(404): 라우트 핸들러가 없어 가드가 실행되지 않는다 (실측 확인)
-        전 환경 노출이므로 별도 미들웨어 필요
+  [x] ⚠️ 레이트리밋이 닿지 않는 경로 **3종** — 엣지 백스톱 구현 (2026-08-28, **코드 기본 off**)
+        · /api/v2/docs       Swagger UI — SwaggerModule 이 express 미들웨어로 마운트되어
+                             Nest 가드(APP_GUARD)가 적용되지 않는다
+        · /api/v2/docs-json  **스펙 전문 덤프** — 같은 이유. 재현에서 새로 발견됐다
+                             (문서가 "2종" 으로 과소 기재돼 있었음)
+        · 매칭되지 않는 경로(404) — 라우트 핸들러가 없어 가드가 실행되지 않는다
+        E2E 재현 — CountingStorage 로 **스토리지 호출 횟수**를 계측했다
+        (429 로 추측하지 않는다. Redis 없이도 판정 가능하다):
+          일반 라우트 = 2회(양성 대조, throttler 2개) / 404·docs·docs-json = **전부 0회**
+        해결: 엣지 백스톱 미들웨어 (common/middleware/edge-throttle.middleware.ts)
+          · 가드를 대체하지 않고 더 느슨한 별도 예산(THROTTLE_EDGE, IP당 분당 300)으로 겹친다
+          · 헬스체크는 제외 — 걸리면 Swarm 이 unhealthy 판정 → 재시작 루프 → 배포 롤백
+          · main.ts 와 E2E 가 같은 팩토리를 호출한다 (ValidationPipe 공유와 같은 이유)
+          · IP 식별은 가드와 resolveClientIp 를 공유한다 (키가 갈리면 한도가 어긋난다)
+          · 스토리지 장애 시 fail-open (레이트리밋이 서비스를 내리지 않는다)
+          · 차단은 미들웨어가 직접 로깅한다 — app.use 미들웨어는 pino-http 보다 먼저
+            실행되므로 액세스 로그에 아무것도 남지 않는다(실측)
+        회귀 고정: test/edge-throttle.e2e-spec.ts 6케이스
+          (404→429 / docs-json→429 / 헬스체크 백스톱 0회 / 차단 로그 / 예산 분리 / fail-open)
+        ⚠️ EDGE_THROTTLE_ENABLED 코드 기본 false — 모든 요청을 지나는 미들웨어라 한도 오설정이
+           곧 정상 트래픽 429 다. 코드로 먼저 내리고 켜는 시점은 운영이 통제한다.
+        [ ] 잔여: 운영 활성화 판단 (사용자 결정 — 2026-08-28 현재 **off 유지**)
 
 Step 6 — 헬스체크 ✅
   [x] GET /api/v2/health — liveness, 외부 의존 검사 없음
@@ -584,6 +604,12 @@ Step 9 — CI/CD ✅
   [x] concurrency group 으로 배포 직렬화
   [x] scp/ssh 액션 사용 → 임시 키 파일 없음
   [x] 배포 후 liveness 폴링 스모크 테스트
+  [x] check:types 게이트 (2026-08-28) — `tsc --noEmit` 을 ci:all 에 연결
+        tsconfig.json 의 rootDir 이 include(test 포함)와 충돌해 TS6059 로 **명령 자체가 실행 불가**
+        였다. rootDir 을 emit 하는 유일한 설정(tsconfig.build.json)으로 옮겨 해소.
+        ⚠️ 검증 공백은 아니었다 — build 가 src, jest 가 로드한 spec 을 각각 타입 검사한다
+        (프로브로 확인: spec 에 타입 오류를 넣으면 suite 가 TS2322 로 실패).
+        없던 것은 "src+test 를 한 번에 보는 수단" 이고, DB 계층에서 타입이 늘 때 필요해진다.
   [x] GitHub Secrets 등록 (8개) — deploy 워크플로 2회 success 로 확인 (2026-08-27)
         · 시크릿 미등록이면 SSH 단계에서 실패하므로 성공 자체가 증거다
   [ ] 러너 선택 확정 (public 이면 arm64 네이티브로 전환)
@@ -598,7 +624,8 @@ Step 10 — 배포
   [x] TASK_SLOT 주입
   [x] 컨테이너 포트 5501, ports 미선언 (호스트 publish 없음)
   [x] overlay 네트워크를 환경변수로 주입 (저장소에 이름 미기재)
-  [x] fs-01 노드 라벨 부여 (prod_nerd_back=1 · prod_nerd_redis=1)
+  [x] 앱 노드에 라벨 부여 (prod_nerd_back=1 · prod_nerd_redis=1)
+        ⚠️ 노드 이름(호스트명)은 저장소에 적지 않는다 — 서버 식별 정보다
   [x] 첫 배포 성공 — 실측 (2026-08-26)
         · prod_nerd_back 3/3, 세 태스크 모두 (healthy)
         · prod_nerd_cache_redis 1/1
@@ -607,6 +634,15 @@ Step 10 — 배포
   [ ] 새 도메인 A 레코드 → 인스턴스 (사용자 작업)
   [ ] Caddy 사이트 블록 추가 (사용자 작업 — validate → reload, 커밋 금지)
   [ ] 배포 중 liveness 1초 폴링 → 5xx·끊김 0건 실측 ⭐ (Phase 1 최종 완료 조건)
+        설정 대조는 **완료** (2026-08-28, infra/docker-stack.app.yml):
+          replicas 3 · order start-first · parallelism 1 · delay 5s · monitor 20s ·
+          failure_action rollback · max_failure_ratio 0 · healthcheck(15s·3회·start_period 30s)
+          → 구성은 무중단이 되도록 돼 있다.
+        🚫 "설정이 맞다" 를 "안 끊긴다" 로 적지 않는다. 설정만으로 알 수 없는 것:
+          healthy 판정 시점 ↔ 프록시 업스트림 갱신 시점의 어긋남 / Swarm DNS 가 내려가는
+          태스크를 빼는 타이밍 공백 / shutdown hook 이 진행 요청을 실제로 마치는지 /
+          단일 노드 replicas 3 의 리소스 경합. 이 넷은 폴링으로만 확정된다.
+        실행 절차: docs/deploy.md 「무중단 배포 실측」 — 자체 집계·판정 스크립트
 
 Step 11 — 문서 · AI 워크플로
   [x] CLAUDE.md (라우팅 표 / Never·Ask / Pitfalls / DoD / 커밋)

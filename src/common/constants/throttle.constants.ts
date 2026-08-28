@@ -11,6 +11,20 @@ export const THROTTLE_SHORT = { name: 'short', ttl: 1_000, limit: 5 } as const;
 export const THROTTLE_LONG = { name: 'long', ttl: 60_000, limit: 60 } as const;
 
 /**
+ * 엣지 백스톱 한도.
+ *
+ * Nest 가드(`APP_GUARD`)가 닿지 않는 경로를 덮는 마지막 그물이다. 실측으로 확인된 사각 3종:
+ * `/api/v2/docs`(Swagger UI) · `/api/v2/docs-json`(스펙 전문) · 매칭되지 않는 경로(404).
+ * 앞의 둘은 SwaggerModule 이 express 미들웨어로 마운트되어, 404 는 라우트 핸들러가 없어서
+ * 가드가 실행되지 않는다.
+ *
+ * ⚠️ `long`(분당 60)보다 **의도적으로 느슨하다.** 가드가 커버하는 경로에서는 long 이 먼저
+ *    걸리므로 이 한도는 사실상 가드 밖 경로에만 작용한다. 정상 트래픽이 여기 닿는다면
+ *    한도가 잘못 잡힌 것이니 값을 올리기 전에 무엇이 그만큼 때리는지 먼저 본다.
+ */
+export const THROTTLE_EDGE = { name: 'edge', ttl: 60_000, limit: 300 } as const;
+
+/**
  * `@SkipThrottle()` 에 넘길 값.
  *
  * ⚠️ **인자 없는 `@SkipThrottle()` 은 우리 설정에서 동작하지 않는다.**

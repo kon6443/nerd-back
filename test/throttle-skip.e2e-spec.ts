@@ -1,11 +1,12 @@
-import { Controller, Get, type INestApplication } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { TerminusModule } from '@nestjs/terminus';
 import { Test } from '@nestjs/testing';
 import { ThrottlerModule, ThrottlerStorage } from '@nestjs/throttler';
 import type { Server } from 'node:http';
 import request from 'supertest';
-import { API_PREFIX, HEALTH_PATH } from '@common/constants/app.constants';
+import { API_PREFIX, HEALTH_PATH, TRUST_PROXY_HOPS } from '@common/constants/app.constants';
 import { THROTTLE_LONG, THROTTLE_SHORT } from '@common/constants/throttle.constants';
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
 import { CustomThrottlerGuard } from '@common/guards/custom-throttler.guard';
@@ -56,7 +57,7 @@ class ControlController {
 }
 
 describe('레이트리밋 제외 (E2E)', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   let storage: CountingStorage;
 
   beforeEach(async () => {
@@ -80,7 +81,9 @@ describe('레이트리밋 제외 (E2E)', () => {
       .useValue(storage)
       .compile();
 
-    app = moduleRef.createNestApplication({ logger: false });
+    app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false });
+    // 프로덕션과 같은 trust proxy — req.ip 로 키를 만들므로 값이 다르면 다른 규칙을 검증한다.
+    app.set('trust proxy', TRUST_PROXY_HOPS);
     app.setGlobalPrefix(API_PREFIX);
     app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();

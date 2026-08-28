@@ -1,7 +1,8 @@
 import type { INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { TerminusModule } from '@nestjs/terminus';
-import { API_PREFIX } from '@common/constants/app.constants';
+import { API_PREFIX, TRUST_PROXY_HOPS } from '@common/constants/app.constants';
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
 import { createGlobalValidationPipe } from '@common/pipes/global-validation-pipe';
 import { REDIS_CLIENT } from '@common/redis/redis.module';
@@ -31,7 +32,11 @@ export async function createE2eApp(options: E2eAppOptions = {}): Promise<INestAp
     providers: [{ provide: REDIS_CLIENT, useValue: { ping } }],
   }).compile();
 
-  const app = moduleRef.createNestApplication({ logger: false });
+  const app = moduleRef.createNestApplication<NestExpressApplication>({ logger: false });
+
+  // 프로덕션과 같은 상수를 쓴다 (근거는 TRUST_PROXY_HOPS 주석).
+  app.set('trust proxy', TRUST_PROXY_HOPS);
+
   app.setGlobalPrefix(API_PREFIX);
   app.useGlobalPipes(createGlobalValidationPipe());
   app.useGlobalFilters(new HttpExceptionFilter());
