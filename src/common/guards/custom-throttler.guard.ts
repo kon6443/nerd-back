@@ -2,6 +2,7 @@ import { ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ApiErrorResponseDto } from '../dto/api-error.dto';
 import { ApiThrottledErrorResponseDto } from '../dto/common-error.dto';
+import { resolveClientIp } from '../utils/client-ip';
 
 /**
  * 전역 레이트리밋 가드.
@@ -40,16 +41,18 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
   }
 
   /**
-   * 식별자. 리버스 프록시 뒤에 있으므로 `X-Forwarded-For` 의 **첫 번째** 값을 쓴다.
-   * 뒤쪽 값은 프록시가 덧붙인 것이라 클라이언트가 아니다.
+   * 식별자. 해석 규칙과 그 근거는 `resolveClientIp` 가 소유한다.
    *
-   * 인증이 도입되면 로그인 사용자는 `user-{id}` 로 바꾼다 (IP 공유 환경에서 서로를 막지 않게).
+   * 지금은 상위 클래스의 기본 구현(`return req.ip`)과 **같은 값**을 반환한다. 그래도 이 우회를
+   * 남겨 두는 이유는 두 가지다.
+   *   1. 엣지 백스톱 미들웨어가 같은 함수를 쓴다 — 각자 구현하면 같은 요청이 두 한도에서
+   *      다른 키로 세어진다.
+   *   2. 인증 도입 시 `user-{id}` 로 바꿀 지점이 한 곳으로 모인다.
+   *
+   * 🚫 여기서 `X-Forwarded-For` 를 직접 파싱하지 않는다 — 스푸핑된다 (`resolveClientIp` 주석).
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- 상위 클래스 시그니처가 Record<string, any> 다
   protected async getTracker(req: Record<string, any>): Promise<string> {
-    const forwarded = req.headers?.['x-forwarded-for'] as string | string[] | undefined;
-    const first = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0];
-    const ip = first?.trim() || (req.ip as string | undefined) || 'unknown';
-    return Promise.resolve(ip);
+    return Promise.resolve(resolveClientIp(req));
   }
 }

@@ -24,5 +24,19 @@ export const DOCS_PATH = `/${API_PREFIX}/docs`;
  */
 export const LOG_IGNORED_PATHS: readonly string[] = [HEALTH_PATH, READY_PATH, DOCS_PATH];
 
+/**
+ * 신뢰할 리버스 프록시 홉 수 (`app.set('trust proxy', ...)`).
+ *
+ * **레이트리밋 키가 이 값에 달려 있다.** `req.ip` 는 이 숫자만큼의 홉을 신뢰해 건너뛰고
+ * 나머지 중 가장 오른쪽 주소를 고른다. 프록시(Caddy)는 `X-Forwarded-For` 를 덮어쓰지 않고
+ * **뒤에 붙이므로**, 이 값이 맞아야 위조된 앞쪽 값을 무시할 수 있다.
+ *
+ * ⚠️ 앞에 CDN 을 추가하면 이 숫자를 늘린다. 안 늘리면 스푸핑이 다시 열린다.
+ * ⚠️ **프로덕션과 모든 E2E 앱이 이 상수를 쓴다.** 한쪽만 다르면 `req.ip` 가 다르게 계산되어
+ *    테스트가 프로덕션과 다른 규칙을 검증한다 (실측: 미설정 시 `::ffff:127.0.0.1`).
+ *    전역 ValidationPipe 를 공유하는 것과 같은 이유다.
+ */
+export const TRUST_PROXY_HOPS = 1;
+
 /** 성공 응답의 code 값. 컨트롤러가 객체 리터럴로 직접 반환한다. */
 export const SUCCESS_CODE = 'SUCCESS';
