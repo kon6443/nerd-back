@@ -1,0 +1,20 @@
+node_modules
+.next
+.git
+.github
+docs
+coverage
+*.md
+
+# ⚠️ 로컬 개발용 env 는 빌드 컨텍스트에 넣지 않는다.
+#    `.env` 는 프로덕션 빌드에서도 로드되므로, 들어가면 상용 번들에 개발 값이 섞인다.
+#    빌드 컨텍스트에 없으면 애초에 로드될 수 없다 — 이것이 실제 방어선이다.
+.env
+.env.*
+# NEXT_PUBLIC_* 전용. next build 가 읽어야 하므로 이것만 통과시킨다.
+!.env.production
+
+.DS_Store
+
+# next typegen 이 빌드 중에 생성한다. 호스트 것을 넣으면 안 된다.
+next-env.d.ts
