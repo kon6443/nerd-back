@@ -34,10 +34,14 @@ Node 22 LTS · pnpm
 
 ```bash
 pnpm install
-pnpm dev
+pnpm dev                  # http://localhost:5502
 ```
 
-⬜ 포트는 **5502**로 정해졌으나 아직 적용되지 않았다. 현재는 Next 기본값 3000으로 뜬다.
+포트는 **5502**다. `PORT` 환경변수로 덮어쓸 수 있다.
+
+```bash
+PORT=5599 pnpm dev        # 5599 로 뜬다
+```
 
 ---
 
@@ -81,16 +85,16 @@ HTTP 서버 부팅이 env 파일 로딩보다 먼저다. `.env`에 `PORT`를 써
 ## 주요 명령어
 
 ```bash
-pnpm dev                 # 개발 서버
-pnpm build               # 프로덕션 빌드
-pnpm start               # 빌드 결과 실행
+pnpm dev                 # 개발 서버 (5502)
+pnpm build               # 프로덕션 빌드 → .next/standalone
+pnpm start               # 빌드 결과 실행 (5502)
 pnpm lint                # eslint
+pnpm check:types         # next typegen && tsc --noEmit
 ```
 
 ⬜ 아래는 CI/CD 구축과 함께 추가된다.
 
 ```bash
-pnpm check:types         # next typegen && tsc --noEmit
 pnpm check:stubs         # TODO/FIXME/.only 잔존 차단
 pnpm ci:core             # lint → check:types → build
 pnpm ci:all              # + check:stubs  (PR 전 필수)

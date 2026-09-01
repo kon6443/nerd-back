@@ -356,17 +356,28 @@ runner  : standalone + public + .next/static 만 COPY. install 없음
 | 항목 | 이유 |
 |---|---|
 | `COPY public ./public` · `COPY .next/static ./.next/static` | **standalone 이 자동 복사하지 않는다.** 빠뜨리면 CSS·이미지·JS 청크가 전부 404 |
-| `outputFileTracingIncludes` 에 `node_modules/sharp` 포함 | `next/image` 사용 중. 네이티브 모듈이 트레이싱에서 누락될 수 있다 (공식 문서의 권장 패턴) |
+| 🚫 `outputFileTracingIncludes` 로 sharp 를 강제 포함하지 **않는다** | 공식 문서 예시(`node_modules/sharp/**/*`)는 **pnpm 에서 아무것도 매칭하지 못한다** — 최상위에 그 경로가 없다. 기본 트레이싱이 이미 담는다 (2026-09-01 실측) |
 | `ENV MALLOC_ARENA_MAX=2` | glibc(`bookworm-slim`) + sharp 메모리 증가 억제 |
 | `USER node` + `COPY --chown=node:node` | 루트로 돌리지 않는다 (백엔드와 동일) |
 | `.dockerignore` 에 `.next` · `node_modules` | 로컬 산출물이 컨텍스트로 들어가면 캐시가 매번 깨진다 |
 | 🚫 `HEALTHCHECK` 을 Dockerfile 에 두지 않음 | stack YAML 한 곳에서만 정의 (백엔드 규약) |
 
-### ARM64 prebuilt 확인 (2026-09-01, `pnpm-lock.yaml` 실측)
+### sharp / ARM64 — 2026-09-01 실측 완료
 
-`@img/sharp-linux-arm64@0.35.4` + `@img/sharp-libvips-linux-arm64@1.3.3` 존재. `node:22-bookworm-slim` 은 glibc 이므로 `-gnu` 계열이 맞는다. `@next/swc-linux-arm64-gnu@16.3.3` 도 존재.
+`pnpm-lock.yaml` 에 `@img/sharp-linux-arm64@0.35.4` + `@img/sharp-libvips-linux-arm64@1.3.3` 이 있다. `node:22-bookworm-slim` 은 glibc 이므로 `-gnu` 계열이 맞고, `@next/swc-linux-arm64-gnu@16.3.3` 도 있다.
 
-⚠️ `pnpm-workspace.yaml` 의 `ignoredBuiltDependencies: [sharp, unrs-resolver]` 로 sharp 의 postinstall 이 실행되지 않는다. sharp 0.33+ 는 prebuilt 를 optional dependency 로 받으므로 **문제 없을 것으로 추정**하나, **컨테이너 빌드에서 실증이 필요하다.**
+**로컬(darwin-arm64)에서 standalone 을 띄워 확정한 것:**
+
+| 확인 | 결과 |
+|---|---|
+| standalone 에 sharp 포함 | ✅ `.pnpm/sharp@0.35.4/…` + `@img/sharp-darwin-arm64` 네이티브 바이너리까지 |
+| `outputFileTracingIncludes` 없이도 | ✅ 포함됨 — **기본 트레이싱이 pnpm 격리 경로를 따라간다** |
+| 래스터 이미지 최적화 | ✅ `/_next/image?url=/probe.png` → **200 `image/png`** |
+| `ignoredBuiltDependencies` 영향 | ✅ 없음 — sharp 0.33+ 는 prebuilt 를 optional dep 로 받아 postinstall 이 필요 없다 |
+
+⚠️ 로컬은 `darwin-arm64`, 컨테이너는 `linux-arm64` 바이너리가 담긴다. **컨테이너 안에서 `pnpm install` 하므로 플랫폼이 자동으로 맞는다** — 다만 Step 3 에서 실제 이미지로 한 번 더 확인한다.
+
+⚠️ SVG 는 최적화 경로를 타지 않는다 (`dangerouslyAllowSVG` 기본 비활성 → 400). 현재 `public/` 이 전부 SVG 라 **평소에는 sharp 가 안 쓰인다** — 래스터 이미지를 추가하는 순간부터 쓰인다.
 
 ---
 
@@ -477,17 +488,32 @@ docker exec "$cid" node scripts/healthcheck.mjs
 
 ### Step 0 — 사전 확인 (구현 전)
 
-- [ ] `pnpm install` 후 `pnpm build` 로 현재 상태 빌드 통과 확인
+- [x] `pnpm install` 후 `pnpm build` 통과 확인 (2026-09-01 — install 6.1초, 빌드 3.3초)
 - [x] 노드 가용 메모리 실측 — available 8.7Gi 확인 (2026-09-01)
 - [x] ARM64 네이티브 러너 — **저장소 public 확인, `ubuntu-24.04-arm` 무료 사용 가능** (2026-09-01)
 - [x] GitHub 시크릿 9개 등록 · 서버 `nerd-front.prod.env` 생성(157B·600) (2026-09-01)
 - [ ] 프론트 도메인의 DNS 가 서버를 가리키는지 확인 (Caddy 인증서 발급 전제)
 
-### Step 1 — 포트·설정
+### Step 1 — 포트·설정 ✅ 완료 (2026-09-01)
 
-- [ ] `package.json` scripts 에 `-p ${PORT:-5502}` 적용
-- [ ] `next.config.ts` — `output: 'standalone'`, `deploymentId`, `outputFileTracingIncludes`
-- [ ] 검증: `PORT=5502 pnpm dev` 로 5502 리슨 확인, `pnpm build` 후 `.next/standalone/server.js` 존재 확인
+- [x] `package.json` scripts 에 `-p ${PORT:-5502}` 적용 (`dev` · `start`) + `check:types` 추가
+- [x] `next.config.ts` — `output: 'standalone'`, `deploymentId`
+- [x] 검증 완료 — 아래
+
+**실측 결과**
+
+| 확인 | 결과 |
+|---|---|
+| `pnpm dev` (PORT 미지정) | **5502** 리슨, 응답 200 |
+| `PORT=5599 pnpm dev` | **5599** 리슨, 응답 200 — 환경변수 오버라이드 동작 |
+| `pnpm build` | Turbopack 3.3초, 성공 |
+| `.next/standalone/server.js` | 생성됨 (7,470 B) |
+| standalone 실기동 (`PORT=5502`) | 페이지 200 · `/next.svg` 200 · CSS 청크 200 · 404 정상 |
+| `public` · `.next/static` | **standalone 에 없음** → Dockerfile 수동 COPY 필요 확정 |
+| sharp | 트레이싱에 이미 포함, 래스터 최적화 200 |
+| `pnpm lint` · `pnpm check:types` | 통과 |
+
+standalone 크기 43M (자산 복사 전).
 
 ### Step 2 — 헬스체크
 
