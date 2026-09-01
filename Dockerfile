@@ -31,8 +31,18 @@ COPY next.config.ts tsconfig.json postcss.config.mjs ./
 COPY app ./app
 COPY public ./public
 
-# 🚧 `.env.production`(NEXT_PUBLIC_* 전용)이 생기면 여기에 COPY 를 추가한다.
-#    없는 파일을 COPY 하면 빌드가 실패하므로 파일을 만드는 커밋에서 함께 넣는다.
+# `.env.production`(NEXT_PUBLIC_* 전용). **와일드카드가 핵심이다** —
+# 매칭이 0개여도 COPY 는 실패하지 않으므로, 파일이 없는 지금도 빌드가 되고
+# 파일이 생기면 Dockerfile 을 고치지 않아도 자동으로 들어온다.
+#
+# 🚫 이 줄을 `COPY .env.production ./` 로 바꾸지 말 것. 파일이 없으면 빌드가 깨진다.
+# 🚫 이 줄을 지우지 말 것. 없으면 `next build` 가 NEXT_PUBLIC_* 를 못 읽어
+#    **빌드는 성공하는데 값만 조용히 빠진다.** 로컬 빌드는 레포 전체가 입력이라
+#    정상 동작해서 차이가 드러나지 않는다 (2026-09-01 실측으로 확인).
+#
+# `.dockerignore` 가 `.env.*` 를 막고 `!.env.production` 만 통과시키므로
+# 이 와일드카드가 로컬 개발용 env 를 함께 끌어오지 않는다.
+COPY .env.production* ./
 
 # 롤링 업데이트 중 구·신 이미지가 공존할 때의 version skew 를 막는다.
 # next.config.ts 의 deploymentId 가 이 값을 읽는다. CI 가 커밋 short SHA 를 준다.
