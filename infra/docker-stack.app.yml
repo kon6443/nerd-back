@@ -1,16 +1,20 @@
 # 앱 스택. Redis(`docker-stack.redis.yml`)와 **독립된 스택**이다.
 #
-#   docker stack deploy -c docker-stack.app.yml prod_nerd
+#   docker stack deploy -c docker-stack.app.yml prod_nerd_back
 #
-# 서비스 DNS 는 `<스택>_<서비스>` 다. 스택 `prod_nerd` + 서비스 `back`
-# → **`prod_nerd_back`**. 리버스 프록시가 tasks.prod_nerd_back:5501 로 접근한다.
+# 서비스 DNS 는 `<스택>_<서비스>` 다. 스택 `prod_nerd_back` + 서비스 `app`
+# → **`prod_nerd_back_app`**. 리버스 프록시가 tasks.prod_nerd_back_app:5501 로 접근한다.
+#
+# 스택 이름을 노드 라벨 키(`prod_nerd_back`)와 **일치**시켰다. 어느 스택이 어느 라벨을
+# 보는지 파일을 열지 않고도 알 수 있다. 이미지 이름은 스택과 별개 네임스페이스라
+# `prod_nerd_back` 을 그대로 쓴다 — 바꾸면 기존 태그 이력이 단절된다.
 
 services:
-  back:
+  app:
     image: ${REGISTRY_URL}/prod_nerd_back:${IMAGE_TAG}
 
     # 기존 overlay 네트워크에 참여한다. 리버스 프록시가 같은 망에서
-    # tasks.prod_nerd_back:5501 로 접근하므로 호스트 포트를 publish 하지 않는다.
+    # tasks.prod_nerd_back_app:5501 로 접근하므로 호스트 포트를 publish 하지 않는다.
     # publish 하면 도메인을 우회한 직접 접근 경로가 열리고 포트 충돌 위험이 생긴다.
     networks:
       - shared

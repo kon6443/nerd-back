@@ -8,6 +8,15 @@
 #
 # 서비스 DNS = `<스택>_<서비스>` → **`prod_nerd_cache_redis`**
 # 앱은 REDIS_HOST 로 이 이름을 받는다 (서버 .env).
+#
+# ⚠️ **이 스택만 이름 규칙의 예외다.**
+#    다른 스택은 「스택 이름 = 노드 라벨 키」이고 서비스 키가 `app` 이다
+#    (prod_nerd_back + app → prod_nerd_back_app · prod_nerd_front + app → prod_nerd_front_app).
+#    여기만 스택 `prod_nerd_cache` / 라벨 `prod_nerd_redis` 로 어긋나 있다.
+#
+#    **일관성을 이유로 스택 이름을 바꾸지 말 것.** 아래 named volume 은 Swarm 에서
+#    `<스택명>_redis-data` 로 만들어진다. 스택 이름을 바꾸면 새 빈 볼륨이 생기고
+#    기존 AOF 데이터에 닿지 않는다 — 옛 볼륨은 고아로 남는다.
 
 services:
   redis:
