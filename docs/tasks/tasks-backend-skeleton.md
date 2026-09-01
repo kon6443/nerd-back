@@ -33,15 +33,15 @@
 | 헬스체크 | `@nestjs/terminus` — **liveness / readiness 분리** | Swarm healthcheck가 외부 의존을 검사하면 DB·Redis 장애가 재시작 루프와 배포 롤백을 유발한다 (↓ 아키텍처 · 헬스체크) |
 | Swagger | **전 환경 노출** (`/api/v2/docs`) | 상용 환경 하나뿐. 심사위원이 API 설계를 직접 볼 수 있어 이점도 있음 |
 | API prefix | `/api/v2` | 임시로 이웃 프로젝트와 도메인을 공유하므로 **경로 네임스페이스가 겹치지 않아야** 한다. 이웃이 `/api/v1` 을 쓰고 있어 v2 를 택했다 — "v1 의 다음 버전"이라는 뜻이 아니다. 전용 도메인으로 분리하면 재검토한다. 값은 `API_PREFIX` 한 곳에만 있고 나머지 경로는 전부 파생된다 |
-| 포트 | **5501** (컨테이너 내부). 호스트 publish 없음 | Caddy가 같은 overlay에서 `tasks.prod_nerd_back:5501`로 접근. publish하면 도메인 우회 경로가 열리고 포트 충돌 위험이 생긴다 |
+| 포트 | **5501** (컨테이너 내부). 호스트 publish 없음 | Caddy가 같은 overlay에서 `tasks.prod_nerd_back_app:5501`로 접근. publish하면 도메인 우회 경로가 열리고 포트 충돌 위험이 생긴다 |
 | 소스맵 | `sourceMap: true` 유지 + 런타임 `--enable-source-maps` | tsconfig 가 이미 `.js.map` 을 만드는데 플래그 없이는 Node 가 쓰지 않는다(실측: dist 236K 중 map 80K 사장). 지우는 대신 켜서 500 에러 스택이 `src/*.ts` 줄번호를 가리키게 했다 — 전역 필터가 500 에 스택을 남기므로 직접적인 이득 |
 | 로그 마스킹 | Pino **내장 `redact`** | 참고 A는 재귀 함수로 페이로드 전체를 순회한다. 큰 응답을 다루는 우리에겐 비용이 크다. 키 목록만 승계 |
-| 배포 | Docker **Swarm stack** `prod_nerd`, 서비스 `back` → DNS **`prod_nerd_back`**, **replicas 3**. GitHub Environment **`PROD`** 로 시크릿 격리 | 서비스 DNS 는 `<스택>_<서비스>` 다. 스택을 `prod_nerd_back` 으로 두면 DNS 가 `prod_nerd_back_back` 이 된다 |
-| Redis 운영 | **전용 인스턴스 · 독립 스택** `prod_nerd_cache` → DNS `prod_nerd_cache_redis`, 전용 워크플로 `deploy-redis.yml` | 배포 수명주기를 끊는다. 같은 스택이면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고 앱까지 재배포된다 |
-| 노드 배치 | 라벨 제약 — 앱 `prod_nerd_back=1` · Redis `prod_nerd_redis=1` | 규칙은 **`prod_<프로젝트>_<역할>`**. 기존 노드가 이미 `prod_nest`(백) / `prod_next`(프론트)로 역할을 분리해 라벨링하고 있으므로 그대로 따른다. 프론트가 추가되면 `prod_nerd_front=1` 로 대칭이 유지되고, 라벨명이 서비스 DNS 와 1:1 로 맞아 스택 파일과 `docker ps` 필터가 같은 이름을 쓴다. `infra_redis` 는 **공유** Redis 를 뜻하므로 우리 전용 Redis 에 붙이면 의미가 어긋난다. 앱도 핀해야 하는 이유는 스모크 테스트가 매니저 노드에서 `docker ps` 로 컨테이너를 찾기 때문 |
+| 배포 | Docker **Swarm stack** `prod_nerd_back`, 서비스 `app` → DNS **`prod_nerd_back_app`**, **replicas 3**. GitHub Environment **`PROD`** 로 시크릿 격리 | 서비스 DNS 는 `<스택>_<서비스>` 다. **2026-09-01 재명명** — 스택 이름을 노드 라벨 키와 일치시키고 서비스 키를 `app` 으로 고정했다. 최초에는 스택 `prod_nerd` + 서비스 `back` 이었고, 프론트가 추가되며 「스택이 어느 라벨을 보는가」를 매번 파일에서 확인해야 하는 문제가 드러났다 (전환 절차: [`tasks-stack-rename.md`](tasks-stack-rename.md)) |
+| Redis 운영 | **전용 인스턴스 · 독립 스택** `prod_nerd_cache` → DNS `prod_nerd_cache_redis`, 전용 워크플로 `deploy-redis.yml` | 배포 수명주기를 끊는다. 같은 스택이면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고 앱까지 재배포된다. ⚠️ **이 스택만 이름 규칙의 예외로 남았다** — named volume 이 스택 이름을 물고 있어 재명명 시 데이터 경계가 이동한다 |
+| 노드 배치 | 라벨 제약 — 앱 `prod_nerd_back=1` · Redis `prod_nerd_redis=1` | 규칙은 **`prod_<프로젝트>_<역할>`**. 기존 노드가 이미 `prod_nest`(백) / `prod_next`(프론트)로 역할을 분리해 라벨링하고 있으므로 그대로 따른다. 프론트가 추가되면 `prod_nerd_front=1` 로 대칭이 유지된다. **2026-09-01 재명명 이후 라벨 키 = 스택 이름**이 되어 어느 스택이 어느 라벨을 보는지 파일을 열지 않고 알 수 있다(서비스 DNS 는 여기에 `_app` 이 붙는다). `infra_redis` 는 **공유** Redis 를 뜻하므로 우리 전용 Redis 에 붙이면 의미가 어긋난다. 앱도 핀해야 하는 이유는 스모크 테스트가 매니저 노드에서 `docker ps` 로 컨테이너를 찾기 때문 |
 | Redis 정책 | `appendonly yes` · `maxmemory 128mb` · **`volatile-lru`** · `order: stop-first` | `allkeys-lru` 는 TTL 없는 키까지 evict 한다. named volume 은 동시 접근이 안 되므로 `start-first` 금지 |
 | 날짜·시간 | **UTC 저장 · 표시 시점에만 변환** · API 응답은 ISO 8601 Z | 로컬 타임존 의존 메서드를 eslint `no-restricted-syntax` 로 **차단**했다 (↓ 날짜·시간 정책) |
-| 리버스 프록시 | 기존 Caddy에 **사이트 블록 추가** → `reverse_proxy tasks.prod_nerd_back:<port>` | 블록 단위 독립이라 기존 사이트 무영향 |
+| 리버스 프록시 | 기존 Caddy에 **사이트 블록 추가** → `reverse_proxy tasks.prod_nerd_back_app:<port>` | 블록 단위 독립이라 기존 사이트 무영향 |
 | 로그 수집 | 기존 파이프라인 **자동 수집** (앱 작업 0) | 수집 에이전트가 global 모드로 전 컨테이너를 자동 발견 |
 | 패키지 매니저 | pnpm | 참고 A·B 공통 |
 | 런타임 | Node 22 LTS (ARM64) | |
@@ -199,12 +199,16 @@ nerd-back/
 
 현재는 `PROD` 하나지만 늘어날 수 있으므로 이름에 환경을 명시한다.
 
+**2026-09-01 재명명됨.** 이름 규칙의 SSOT 는 [`../deploy.md`](../deploy.md) 의 「환경 추가 시」 표다. 아래는 이 프로젝트의 현재 값이다.
+
 | 대상 | 규칙 | 현재 값 |
 |---|---|---|
-| Swarm 스택 | `<환경>_<프로젝트>` | `prod_nerd` (앱) · `prod_nerd_cache` (Redis) |
-| 서비스 DNS | `<스택>_<서비스>` | `prod_nerd_back` · `prod_nerd_cache_redis` |
-| 서버 env 파일 | `<프로젝트>.<환경>.env` | `nerd.prod.env` |
-| 서버 stack 디렉터리 | `.../<프로젝트>/<환경>/` | `.../nerd/prod/` |
+| Swarm 스택 | `<환경>_<프로젝트>_<역할>` — 노드 라벨 키와 동일 | `prod_nerd_back` (앱) · `prod_nerd_cache` (Redis, **예외**) |
+| 서비스 키 | `app` 고정 | |
+| 서비스 DNS | `<스택>_app` | `prod_nerd_back_app` · `prod_nerd_cache_redis` (예외) |
+| 이미지 | 스택과 별개 네임스페이스, 접미사 없음 | `prod_nerd_back:<sha>` |
+| 서버 env 파일 | `<저장소>.<환경>.env` | `nerd-back.prod.env` |
+| 서버 stack 디렉터리 | `.../<저장소>/<환경>/` | `ENV_FILE_PATH`·`DEPLOY_STACK_DIR` 시크릿에 있다 (경로는 저장소에 적지 않는다) |
 | GitHub Environment | 대문자 환경명 | `PROD` |
 
 **환경을 추가할 때** (예: QA)
@@ -405,7 +409,7 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 | 항목 | 값 |
 |---|---|
 | 이미지 이름 | `prod_nerd_back` |
-| 스택 이름 | `prod_nerd`(앱) · `prod_nerd_cache`(Redis) |
+| 스택 이름 | `prod_nerd_back`(앱) · `prod_nerd_cache`(Redis) — Phase 1 당시 `prod_nerd`, 2026-09-01 재명명 |
 | 빌드 플랫폼 | `linux/arm64` **단독** (단일 ARM64 노드 — amd64는 낭비) |
 | 러너 | 저장소가 public이면 arm64 러너로 네이티브 빌드 (QEMU 에뮬레이션 대비 크게 빠름). private이면 기본 러너 + QEMU |
 | 서버상 stack YAML 경로 | 기존 파일과 겹치지 않는 별도 경로 |
@@ -430,12 +434,13 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 ### Step 10 — 배포
 
 - `Dockerfile` — 멀티스테이지, **ARM64 타깃**. 베이스 이미지 arm64 지원을 먼저 확인
-- `infra/docker-stack.app.yml` — 서비스 키 `back`(스택 `prod_nerd` → DNS `prod_nerd_back`), `replicas: 3`, 메모리 한도, `restart_policy: on-failure`
+- `infra/docker-stack.app.yml` — 서비스 키 `app`(스택 `prod_nerd_back` → DNS `prod_nerd_back_app`), `replicas: 3`, 메모리 한도, `restart_policy: on-failure`
+  - ⚠️ Phase 1 당시에는 서비스 키가 `back`, 스택이 `prod_nerd` 였다. 2026-09-01 재명명 ([`tasks-stack-rename.md`](tasks-stack-rename.md)). **아래 「실행 체크리스트」의 완료 기록은 당시 이름 그대로 둔다** — 그때 무엇을 했는지가 사라지면 안 된다
 - `healthcheck`는 **liveness 경로만** 찌른다 (Step 6)
 - 롤링 업데이트: `update_config` → `order: start-first`, `parallelism: 1`, `failure_action: rollback`, `max_failure_ratio: 0`. `rollback_config`도 함께 정의
 - `TASK_SLOT: "{{.Task.Slot}}"` 주입 — 스케줄러 가드용 (지금은 미사용, 자리만)
 - 기존 overlay 네트워크에 `external: true`로 참여 (네트워크 이름은 서버에서 확인 — 문서에 적지 않는다)
-- Caddy 사이트 블록 추가 → `reverse_proxy tasks.prod_nerd_back:<port>`
+- Caddy 사이트 블록 추가 → `reverse_proxy tasks.prod_nerd_back_app:<port>`
   - `tasks.` 접두는 레플리카 IP 전체를 반환 → Caddy가 직접 분배하고 개별 태스크 헬스를 본다
   - 🚫 **Caddyfile은 저장소에 커밋하지 않는다** (도메인·IP 노출)
   - `caddy validate` → `caddy reload`. 새 설정이 유효하지 않으면 Caddy는 기존 설정을 유지하므로 기존 사이트는 영향받지 않는다
@@ -491,7 +496,7 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 8. **Swagger가 전 환경 노출이다** — 명세가 공개되므로 레이트리밋과 예산 가드레일이 반드시 앞단에 있어야 한다.
 9. **Caddyfile·`.env`·시크릿은 저장소에 넣지 않는다** — 커밋 이력에 영구 보존된다.
 10. **안 쓰는 의존성을 미리 깔지 않는다** — TypeORM 본체는 순수 JS라서 미리 설치해도 ARM64 위험이 드러나지 않는다(위험은 전부 드라이버 쪽에 있다). `typeorm-transactional`은 DataSource 없이 `initializeTransactionalContext()`를 부팅 경로에 남길 뿐이다. 이미지 크기와 취약점 스캔 노이즈만 늘어난다.
-11. **호스트 publish를 하지 않는다** — Caddy가 overlay 내부에서 `tasks.prod_nerd_back:5501`로 닿는다. publish하면 도메인을 우회한 직접 접근 경로가 열리고, 기존 스택과 포트가 겹치면 `docker stack deploy`가 실패한다. 디버깅용 호스트 접근이 필요해지면 그때 별도 결정한다.
+11. **호스트 publish를 하지 않는다** — Caddy가 overlay 내부에서 `tasks.prod_nerd_back_app:5501`로 닿는다. publish하면 도메인을 우회한 직접 접근 경로가 열리고, 기존 스택과 포트가 겹치면 `docker stack deploy`가 실패한다. 디버깅용 호스트 접근이 필요해지면 그때 별도 결정한다.
 12. **테스트 없이 배포되지 않게 한다** — 참고 A는 `main` 푸시가 곧 배포인데 검증 워크플로가 없다. 같은 구조를 그대로 베끼면 깨진 코드가 심사 기간에 배포된다. `ci:core`를 배포 전 게이트로 둔다.
 
 ---
@@ -500,10 +505,10 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 
 ```bash
 # 서비스 제거 (기존 스택 다른 서비스에는 영향 없음)
-docker service rm prod_nerd_back
+docker service rm prod_nerd_back_app
 
 # 이전 이미지로 되돌리기
-docker service update --rollback prod_nerd_back
+docker service update --rollback prod_nerd_back_app
 
 # Caddy 사이트 블록 제거 후
 caddy validate && caddy reload

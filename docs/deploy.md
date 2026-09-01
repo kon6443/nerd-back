@@ -11,17 +11,20 @@
 | 항목 | 값 |
 |---|---|
 | 오케스트레이터 | Docker Swarm (stack) |
-| 스택 | `prod_nerd`(앱) · `prod_nerd_cache`(Redis) — **독립 배포** |
-| 서비스 DNS | `prod_nerd_back` · `prod_nerd_cache_redis` |
+| 스택 | `prod_nerd_back`(앱) · `prod_nerd_cache`(Redis) — **독립 배포** |
+| 서비스 DNS | `prod_nerd_back_app` · `prod_nerd_cache_redis` |
 | 레플리카 | 앱 **3** · Redis 1 |
 | 컨테이너 포트 | **5501** — 호스트 publish 없음 |
 | 이미지 | 멀티스테이지, `linux/arm64` 단독, 태그 = 커밋 short SHA |
 | 네트워크 | 기존 overlay 에 `external: true` 로 참여 |
 | 노드 배치 | 라벨 제약 — `prod_nerd_back=1` · `prod_nerd_redis=1` (규칙: `prod_<프로젝트>_<역할>`) |
-| 리버스 프록시 | Caddy → `reverse_proxy http://prod_nerd_back:5501` |
+| 리버스 프록시 | Caddy → `reverse_proxy http://prod_nerd_back_app:5501` |
 | GitHub Environment | `PROD` (시크릿 9개) |
 
 서비스 DNS 는 **`<스택명>_<서비스명>`** 이다. 원하는 이름을 스택 쪽에 넣으면 서비스 키가 뒤에 한 번 더 붙으므로, **최종 DNS 이름을 먼저 적고 역산**한다.
+
+**스택 이름 = 노드 라벨 키**로 맞춰 두었다. 서비스 키는 `app` 으로 고정한다 — 어느 스택이 어느 라벨을 보는지 파일을 열지 않고도 알 수 있다.
+⚠️ **Redis 스택만 예외다** (`prod_nerd_cache` / 라벨 `prod_nerd_redis`). named volume 이 스택 이름을 물고 있어 이름을 바꾸면 데이터 경계가 이동한다 — `infra/docker-stack.redis.yml` 상단 주석 참조. **일관성을 이유로 바꾸지 않는다.**
 
 **호스트로 포트를 publish 하지 않는다.** Caddy 가 같은 overlay 안에 있어 서비스 DNS 로 바로 닿는다. publish 하면 도메인을 우회한 직접 접근 경로가 열리고 기존 스택과 포트가 겹칠 위험도 생긴다.
 
@@ -41,7 +44,7 @@
 두 워크플로의 `paths` 화이트리스트는 **교집합이 0건**이다.
 
 ```bash
-docker stack deploy -c infra/docker-stack.app.yml   prod_nerd
+docker stack deploy -c infra/docker-stack.app.yml   prod_nerd_back
 docker stack deploy -c infra/docker-stack.redis.yml prod_nerd_cache
 ```
 
@@ -84,7 +87,7 @@ healthcheck:     liveness 경로만 (scripts/healthcheck.mjs)
 
 ```caddy
 handle /api/v2/* {
-    reverse_proxy http://prod_nerd_back:5501
+    reverse_proxy http://prod_nerd_back_app:5501
 }
 ```
 
@@ -136,15 +139,16 @@ caddy reload   --config <경로>
 
 ```bash
 # 서비스가 떠 있나
-docker stack services prod_nerd
+docker stack services prod_nerd_back
 docker stack services prod_nerd_cache
 
 # Swarm 이 보는 헬스 (우리 healthcheck.mjs 결과)
-docker ps --filter "name=prod_nerd_back" --format '{{.Names}}\t{{.Status}}'
+# ⚠️ name 필터는 부분 문자열 매칭이다. 최종 DNS 이름(prod_nerd_back_app)을 그대로 쓴다.
+docker ps --filter "name=prod_nerd_back_app" --format '{{.Names}}\t{{.Status}}'
 #   "Up N minutes (healthy)" 가 3줄이면 정상
 
 # liveness — 종료코드만
-cid=$(docker ps -q --filter "name=prod_nerd_back" | head -1)
+cid=$(docker ps -q --filter "name=prod_nerd_back_app" | head -1)
 docker exec "$cid" node scripts/healthcheck.mjs; echo "exit=$?"
 
 # readiness — 응답 본문까지 (Redis 연결 확인)
@@ -205,8 +209,8 @@ if [ "$bad" -eq 0 ]; then echo "판정: 무중단"; else echo "판정: 중단 �
 ## 롤백
 
 ```bash
-docker service update --rollback prod_nerd_back    # 이전 이미지로
-docker service rm prod_nerd_back                   # 서비스 제거
+docker service update --rollback prod_nerd_back_app    # 이전 이미지로
+docker service rm prod_nerd_back_app                   # 서비스 제거
 ```
 
 Caddy 는 블록을 제거한 뒤 `caddy validate && caddy reload`.
@@ -232,13 +236,19 @@ Caddy 는 블록을 제거한 뒤 `caddy validate && caddy reload`.
 ## 환경 추가 시 (예: QA)
 
 1. GitHub Environment `QA` 생성 후 같은 이름의 시크릿 9개를 QA 값으로 등록
-2. 서버에 `nerd.qa.env` 와 stack 디렉터리 생성
+2. 서버에 `nerd-back.qa.env` 와 stack 디렉터리 생성
 3. 워크플로 복제 또는 파라미터화 — **스택 이름이 워크플로에 하드코딩되어 있다.** 환경이 하나뿐이라 명시적인 편이 읽기 쉬워 그대로 뒀고, 두 번째 환경이 생기는 시점에 파라미터화한다
 
-| 대상 | 규칙 |
-|---|---|
-| Swarm 스택 | `<환경>_<프로젝트>` |
-| 서비스 DNS | `<스택>_<서비스>` |
-| 서버 env 파일 | `<프로젝트>.<환경>.env` |
-| 서버 stack 디렉터리 | `.../<프로젝트>/<환경>/` |
-| GitHub Environment | 대문자 환경명 |
+| 대상 | 규칙 | 예 |
+|---|---|---|
+| Swarm 스택 | `<환경>_<프로젝트>_<역할>` — **노드 라벨 키와 동일** | `prod_nerd_back` · `prod_nerd_front` |
+| 서비스 키 | `app` 고정 | |
+| 서비스 DNS | `<스택>_app` | `prod_nerd_back_app` |
+| 이미지 | `<환경>_<프로젝트>_<역할>` — 스택과 별개 네임스페이스, 접미사 없음 | `prod_nerd_back:<sha>` |
+| 서버 env 파일 | `<저장소>.<환경>.env` | `nerd-back.prod.env` |
+| 서버 stack 디렉터리 | `.../<저장소>/<환경>/` — **저장소마다 분리**한다 | 경로는 `DEPLOY_STACK_DIR` 시크릿에 있다 |
+| GitHub Environment | 대문자 환경명 | `PROD` |
+
+🚫 **두 저장소가 같은 stack 디렉터리를 쓰지 않는다.** 올라가는 파일명이 둘 다 `docker-stack.app.yml` 이라 한쪽 배포가 다른 쪽 파일을 덮어쓴다.
+
+⚠️ Redis 스택(`prod_nerd_cache`)만 이 규칙의 예외다 — 위 「구성」절 참조.
