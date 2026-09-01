@@ -90,6 +90,7 @@ pnpm build               # 프로덕션 빌드 → .next/standalone
 pnpm start               # 빌드 결과 실행 (5502)
 pnpm lint                # eslint
 pnpm check:types         # next typegen && tsc --noEmit
+pnpm check:health-path   # 헬스체크 경로 ↔ route handler 대응 검사
 ```
 
 ⬜ 아래는 CI/CD 구축과 함께 추가된다.
@@ -97,8 +98,18 @@ pnpm check:types         # next typegen && tsc --noEmit
 ```bash
 pnpm check:stubs         # TODO/FIXME/.only 잔존 차단
 pnpm ci:core             # lint → check:types → build
-pnpm ci:all              # + check:stubs  (PR 전 필수)
+pnpm ci:all              # + check:stubs + check:health-path  (PR 전 필수)
 ```
+
+### 헬스체크
+
+| 경로 | 검사 | 쓰는 곳 |
+|---|---|---|
+| `/health` | 프로세스만 (liveness) | Swarm healthcheck, 리버스 프록시 |
+
+🚫 **liveness에 외부 의존을 넣지 않는다.** 백엔드 API 같은 것을 검사하면 그쪽 장애가 이 컨테이너를 unhealthy로 만들어 재시작 루프에 빠지고, 배포까지 롤백된다.
+
+⚠️ 경로를 옮기면 `scripts/healthcheck.mjs`의 `PATH`도 함께 바꿔야 한다. App Router는 파일 위치가 곧 URL이라 **두 파일 어디에도 에러가 없어 보이고 배포해 봐야 드러난다.** `pnpm check:health-path`가 이 대응을 고정한다.
 
 ⚠️ `next typegen`이 `tsc --noEmit`보다 **먼저** 실행돼야 한다. Next 16은 라우트 타입을 `.next/types`에 생성하는데, 없으면 타입 검사가 라우트를 검증하지 못한다.
 

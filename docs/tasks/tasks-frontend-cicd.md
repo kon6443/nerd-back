@@ -515,12 +515,31 @@ docker exec "$cid" node scripts/healthcheck.mjs
 
 standalone 크기 43M (자산 복사 전).
 
-### Step 2 — 헬스체크
+### Step 2 — 헬스체크 ✅ 완료 (2026-09-01)
 
-- [ ] `app/health/route.ts` — liveness. 외부 의존을 검사하지 않는다
-- [ ] `scripts/healthcheck.mjs` — 백엔드 것 이식, `PORT` 기본값 5502 · 경로 변경
-- [ ] 경로 상수 불일치 방지 장치 (백엔드의 `app.constants.spec.ts` 대응물)
-- [ ] 검증: `node scripts/healthcheck.mjs` 종료코드 0
+- [x] `app/health/route.ts` — liveness. 외부 의존을 검사하지 않는다
+- [x] `scripts/healthcheck.mjs` — 백엔드 것 이식, `PORT` 기본값 5502 · 경로 `/health`
+- [x] `scripts/check-health-path.mjs` — 경로 불일치 방지 (백엔드 `app.constants.spec.ts` 대응물)
+- [x] 검증 완료 — 아래
+
+**실측 결과**
+
+| 확인 | 결과 |
+|---|---|
+| 빌드 라우트 표기 | **`ƒ /health` (Dynamic)** — `force-dynamic` 적용됨 |
+| 응답 | 200 · `{"status":"ok"}` · `application/json` |
+| 캐시 헤더 | `cache-control: no-store` |
+| `node scripts/healthcheck.mjs` (서버 살아 있음) | 종료코드 **0** |
+| `node scripts/healthcheck.mjs` (서버 내림) | 종료코드 **1** |
+| `check:health-path` 정상 | 통과 |
+| `check:health-path` 경로 깨뜨림 | **exit 1** — 가드가 실제로 잡는다 |
+
+**설계에서 정한 두 가지**
+
+1. **`force-dynamic` 을 붙인다** — route handler 가 정적으로 굳으면 앱이 반쯤 죽어도 캐시된 200 이 나간다. liveness 는 핸들러가 실제로 실행되는 것 자체가 신호다.
+2. **`cache-control: no-store` 를 직접 붙인다** — `force-dynamic` 은 렌더 방식만 정하고 캐시 헤더를 보장하지 않는다 (실측: 명시 전에는 헤더가 **비어 있었다**). 중간 캐시가 이 응답을 보관하면 죽은 인스턴스가 살아 보인다.
+
+**`check-health-path.mjs` 가 필요한 이유** — App Router 는 파일 경로가 곧 URL 이라 `app/health/` 를 옮기면 `healthcheck.mjs` 는 그대로 남아 404 를 받는다. **두 파일 어디에도 에러가 없어 보이고 배포해 봐야 드러난다.** Swarm 이 unhealthy 로 판정하면 재시작 루프 + 배포 롤백이다. `ci:all` 에 넣는다 (Step 5).
 
 ### Step 3 — 컨테이너
 
