@@ -1,6 +1,7 @@
 # Task Tracker: Swarm 스택·서비스 재명명
 
-> **상태**: 설계 완료 · **서버 사전 준비 일부 완료** (메모리 실측 · env 파일 복사) · 저장소 수정 미착수
+> **상태**: **전환 완료 (2026-09-01)** — 새 스택 배포 · Caddy 전환 · 도메인 200 확인.
+> 남은 것: 옛 스택 제거(절차 9) · 옛 디렉터리·env 정리(절차 11).
 > **작성일**: 2026-09-01
 > **용도**: 스택·서비스 이름을 노드 라벨 체계와 1:1 로 맞추는 작업의 **결정·영향 범위·전환 절차**.
 > **경계**: 배포 구성의 정본은 [`../deploy.md`](../deploy.md) 다. 이 문서는 **바꾸는 동안**의 절차를 소유하고, 전환이 끝나면 결과를 `deploy.md` 에 반영한 뒤 이 문서를 아카이브한다.
@@ -246,9 +247,48 @@ Redis      1 ×  64M =  64M      (limits 최악   192M)
 7. **[사용자]** Caddy 업스트림을 `prod_nerd_back_app:5501` 로 변경 → `caddy validate` → `caddy reload`
    - ⚠️ **기존 도메인의 `/api/v2/*` 블록**을 고치는 것이다. 프론트 전용 도메인 블록 신설은 별건이며 `tasks-frontend-cicd.md` 가 소유한다
 8. **[사용자]** 도메인으로 헬스체크 200 확인
-9. **[사용자]** 옛 스택 제거: `docker stack rm prod_nerd`
-10. **[사용자]** `docker stack ls` 로 `prod_nerd` 가 사라졌는지 확인
-11. **[사용자]** 안정화 확인 후 옛 env 파일 제거: `rm nerd.prod.env`
+9. **[사용자]** 옛 스택 제거 — **제거 전에 옛 이미지 태그를 기록한다** (롤백 시 필요)
+
+   ```bash
+   docker service inspect prod_nerd_back \
+     --format '{{.Spec.TaskTemplate.ContainerSpec.Image}}'   # 태그를 메모
+   docker stack rm prod_nerd
+   ```
+
+10. **[사용자]** 확인
+
+    ```bash
+    docker stack ls                                              # prod_nerd 없어야 함
+    docker ps --filter "name=prod_nerd_back" --format '{{.Names}}'
+    #   prod_nerd_back_app.N 3줄만 남아야 한다
+    ```
+
+11. **[사용자]** 안정화(며칠) 후 정리 — **지우지 말고 이름을 바꿔 격리한다.** 되돌리기 쉽고, 남아 있어도 아무 동작에 관여하지 않는다
+
+    ```bash
+    ls -la <옛 stack 디렉터리>          # 내용을 먼저 눈으로 확인
+    mv <옛 stack 디렉터리> <부모>/_deprecated_nerd_20260901
+    mv <env 디렉터리>/nerd.prod.env <env 디렉터리>/_deprecated_nerd.prod.env
+    ```
+
+    한 달 뒤에도 문제가 없으면 그때 완전히 삭제한다.
+
+### 롤백이 필요해지면 (절차 9 이후)
+
+옛 스택은 사라졌지만 **이미지 태그가 불변**이라 재생성할 수 있다. 옛 YAML 과 env 파일을 절차 11까지 남겨두는 이유가 이것이다.
+
+```bash
+cd <옛 stack 디렉터리>
+REGISTRY_URL=… IMAGE_TAG=<메모한 옛 태그> OVERLAY_NETWORK=… ENV_FILE_PATH=… \
+  docker stack deploy -c docker-stack.app.yml prod_nerd
+# 그다음 Caddy 업스트림을 prod_nerd_back:5501 로 되돌린다
+```
+
+더 간단한 방법은 **새 스택에서 이미지만 되돌리는 것**이다. 이름 구조를 유지한 채 코드만 옛 버전으로 간다.
+
+```bash
+docker service update --rollback prod_nerd_back_app
+```
 
 ### B안 — replicas 1 로 검증 후 확대 (참고 — 이번에는 쓰지 않는다)
 
@@ -332,10 +372,25 @@ docker node inspect --pretty <노드명> | sed -n '/Labels/,/^[A-Z]/p'
 - [x] `cp nerd.prod.env nerd-back.prod.env` (2026-09-01 — 113B·권한 600 보존, 원본 유지 확인)
 - [x] `ENV_FILE_PATH` 갱신 (2026-09-01)
 - [x] `DEPLOY_STACK_DIR` 저장소별 분리 + 서버 디렉터리 생성 (2026-09-01, 백엔드·프론트 양쪽)
-- [ ] `docker node update --label-add prod_nerd_front=1 <노드명>`
-- [ ] 전환 절차 5~10 수행
-- [ ] (선택) 전환 중 폴링으로 무중단 실측 — 다운타임 허용이라 필수 아님
+- [ ] `docker node update --label-add prod_nerd_front=1 <노드명>` — **프론트 작업 때 하면 된다.** 이번 재명명에는 불필요
+- [x] 전환 절차 5~10 수행 (2026-09-01) — 옛 스택 제거까지 완료
 - [ ] 안정화 후 정리 (절차 11) — 옛 env 파일 + **옛 stack 디렉터리 `.../infra/nerd/prod/`**
+- [x] Redis 워크플로 확인 (2026-09-01) — YAML 이 새 경로로 이동, **서비스는 5일 전 그대로 Running** (스펙 무변경이라 재시작 없음). 두 워크플로가 1분 차로 병렬 실행됨
+
+### 전환 실측 (2026-09-01)
+
+| 확인 | 결과 |
+|---|---|
+| `docker ps` 헬스 | **3/3 `Up (healthy)`** |
+| `docker service ps` | Running 3개, **ERROR 열 비어 있음** — 재시도 없이 한 번에 수렴 |
+| readiness (컨테이너 내부) | `200 {"status":"ok","redis":{"status":"up"}}` — **새 스택에서도 overlay DNS 해석 성공** |
+| 도메인 경유 liveness | **200** — Caddy 전환 확정 |
+| 이미지 digest | 신·구 **완전히 동일** (`sha256:523b52c6…`) |
+| 옛 스택 제거 후 | `label=com.docker.stack.namespace=prod_nerd` → **0줄**, `=prod_nerd_back` → **3줄 healthy** |
+
+**digest 동일이 이번 전환의 핵심 증거다.** 태그는 달라도 이미지 바이트가 같으므로 재명명이 애플리케이션 코드에 아무 영향을 주지 않았음이 증명된다. 재명명 커밋에 코드가 섞이지 않았다는 뜻이기도 하다.
+
+⚠️ 발견: 주입된 Env 에 **`EDGE_THROTTLE_ENABLED` 가 없다.** `env.validation.ts` 의 기본값 `'false'` 로 채워져 기동·동작에 문제는 없지만, **켜려면 서버 env 파일에 키를 추가**해야 한다.
 
 ### 완료 후
 
@@ -344,9 +399,16 @@ docker node inspect --pretty <노드명> | sed -n '/Labels/,/^[A-Z]/p'
 - [ ] `grep -rn "prod_nerd"` 재실행 — 구 이름 잔존 0건 확인
 - [ ] 배운 것이 있으면 `docs/lessons.md` 에 4필드로 append
 
-### lessons 후보 (전환 완료 시 승격 판단)
+### lessons 승격 완료 (2026-09-01)
 
-- **집계 명령의 제외 방식이 숫자를 조용히 바꾼다** — 이 문서를 검토하다 발견했다. `| grep -v <파일명>` 은 파일이 아니라 **줄 내용**을 거르므로, 그 문자열을 본문에 담은 다른 파일의 줄까지 사라진다. 실제로 파일별 합계는 55인데 총계 명령은 54를 냈고, 그 1건 차이가 **어느 파일이 영향 범위 표에서 통째로 빠졌다는 신호**였다. `lessons.md` 2026-08-27 항목("눈으로 센 숫자는 쓰지 않는다")의 연장인데, **프로그램으로 세도 세는 방법이 틀리면 같은 결과**라는 점이 새롭다. 표를 만들 때는 **파일별 합계와 총계를 서로 다른 명령으로 뽑아 대조**한다 — 두 수가 어긋나면 둘 중 하나가 아니라 **집계 범위 자체**를 의심한다.
+두 건을 [`../lessons.md`](../lessons.md) 에 4필드로 등재했다.
+
+- **`docker ps` 의 `name` 필터는 부분 문자열 매칭이다** — 전환 중 실제로 6줄(신 3 + 구 3)을 반환하는 것을 확인했다. 예방 규칙은 `label=com.docker.stack.namespace=<스택명>`.
+- **프로그램으로 세도 세는 방법이 틀리면 같은 결과다** — 파일별 합계 55 vs 총계 54 의 1 차이가 누락 신호였다.
+
+### 후속 개선 (별건)
+
+- [ ] **`deploy.yml` 스모크 테스트를 라벨 필터로 전환** — 지금은 `--filter "name=prod_nerd_back_app"` 이라 옛 스택이 사라진 현재는 문제없지만, 유사 이름 스택이 생기면 같은 함정이 재현된다. `--filter "label=com.docker.stack.namespace=prod_nerd_back"` 이 정확 일치라 견고하다. 프론트 워크플로를 만들 때 **처음부터 라벨 방식**으로 쓰고, 백엔드도 같은 커밋에서 맞춘다
 
 ---
 
