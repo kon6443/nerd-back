@@ -426,16 +426,18 @@ paths:
 
 `paths-ignore` 를 쓰지 않는다 — 머지 커밋 평가에서 의도 외 트리거가 발생한다 (백엔드 규약).
 
-### 중복 빌드 제거
+### 중복 빌드 — 설계 시 우려했으나 **받아들였다** (2026-09-01 정정)
 
-백엔드는 `verify` job 이 `pnpm build` 를 돌리고 `deploy` job 의 Docker 빌드가 **같은 빌드를 한 번 더** 한다. 프론트는 `next build` 가 훨씬 무거우므로 그대로 두면 손해가 크다.
+설계 단계에서 "`next build` 가 무거우니 `verify` job 에서 빼고 Docker 빌드가 담당하게 하자"고 적었다. **실측하니 전제가 틀렸다.**
 
-```
-verify : lint + check:types           ← 빠르고 빌드를 포함하지 않는다
-deploy : Docker 빌드가 next build 를 담당  ← 빌드 실패는 여기서 배포 실패로 드러난다
-```
+| 측정 | 시간 |
+|---|---|
+| `next build` (초기, Turbopack) | **3.3초** |
+| `next build` (캐시 있음) | **0.55초** |
 
-`ci:core` 스크립트 자체는 로컬·PR 용으로 `lint → check:types → build` 를 유지한다. 워크플로에서만 분리한다.
+3초를 아끼려고 스크립트를 `ci:core`/`ci:all`/`ci:verify` 로 쪼개면 **"어느 것이 무엇을 검사하는가"가 헷갈리는 비용**이 더 크다. 워크플로는 `pnpm run ci:all` 하나를 그대로 호출한다.
+
+⚠️ 이 판단은 **앱이 커지면 뒤집힐 수 있다.** 빌드가 30초를 넘기면 다시 분리를 검토한다.
 
 ### 스크립트 (`package.json`)
 
@@ -635,13 +637,46 @@ standalone 크기 43M (자산 복사 전).
 
 🚫 **`ports:` publish 는 `next-bun` 을 따라가지 않는다.** 그쪽은 호스트 포트를 publish 하지만, 백엔드 규약은 "호스트 publish 없음 — Caddy 가 overlay 내부로 접근"이다. publish 하면 도메인을 우회한 직접 접근 경로가 열린다.
 
-### Step 5 — 워크플로
+### Step 5 — 워크플로 ✅ 완료 (2026-09-01)
 
-- [ ] `.github/workflows/ci.yml`
-- [ ] `.github/workflows/deploy.yml`
-- [ ] `scripts/check-stubs.mjs` 이식 — ⚠️ **`TARGET_DIRS` 를 `['app', 'scripts']` 로, `EXTENSIONS` 에 `.tsx` 추가.** 백엔드 원본은 `['src','test']` + `.ts/.mts/.cts` 라 그대로 쓰면 **프론트 파일을 하나도 검사하지 않는다** (조용히 통과)
-- [ ] GitHub Environment `PROD` 시크릿 9개 — 8개 완료, **`ENV_FILE_PATH` 남음** (사용자 실행)
-- [ ] 서버에 `nerd-front.prod.env` 생성 (주석만 있어도 됨, 권한 600) — **없으면 `docker stack deploy` 가 실패한다**
+- [x] `.github/workflows/ci.yml` — PR·비-main 푸시. `ci:all` + ARM64 이미지 빌드 검증
+- [x] `.github/workflows/deploy.yml` — verify → buildx → push → stack 전송 → deploy → 스모크
+- [x] `scripts/check-stubs.mjs` 이식 (`TARGET_DIRS`·`EXTENSIONS` 수정 + 방어 추가)
+- [x] `ci:core` / `ci:all` 스크립트 정의
+- [x] GitHub Environment `PROD` 시크릿 9개
+- [x] 서버 `nerd-front.prod.env` 생성
+
+**워크플로 구성**
+
+| | ci.yml | deploy.yml |
+|---|---|---|
+| 트리거 | PR · `main` 외 브랜치 push | `main` push(paths 화이트리스트) · `workflow_dispatch` |
+| `runs-on` | **`ubuntu-24.04-arm`** | **`ubuntu-24.04-arm`** |
+| QEMU | **없음** (네이티브 arm64) | **없음** |
+| 검증 | `ci:all` + ARM64 빌드(push 없음) | `verify` job 이 `ci:all` |
+| 시크릿 | 없음 | 9개 (`environment: PROD`) |
+
+**`check-stubs.mjs` 에 백엔드 원본에 없는 방어를 넣었다**
+
+이식하면서 `TARGET_DIRS = ['app','scripts']`, `EXTENSIONS` 에 `.tsx`·`.mjs` 를 추가했다. 원본(`['src','test']` + `.ts/.mts/.cts`)을 그대로 썼다면 **매칭 파일이 0개**가 되어 `통과 (0건)` 을 출력하며 넘어갔을 것이다.
+
+그래서 **검사 대상이 0개면 실패시키는 가드**를 추가했다. 설정이 잘못됐을 때 조용히 통과하는 것이 검사가 없는 것보다 나쁘다.
+
+```
+check:stubs — 검사 대상 파일이 0개다. TARGET_DIRS/EXTENSIONS 설정을 확인하세요.
+```
+
+**3방향 검증 완료**: 정상 통과(6개 파일) · 마커 심으면 검출 · 대상 0개면 exit 1.
+
+⚠️ 이 스크립트는 **자기 문서 주석에 마커를 나열**하고 있어 스스로에게 걸렸다. 해당 줄에 `check-stubs-ignore` 를 붙여 해결했다 — 스크립트가 제공하는 탈출구를 스스로 쓰는 것이 맞다.
+
+**스모크 테스트는 라벨 필터를 쓴다**
+
+```bash
+docker ps -q --filter "label=com.docker.stack.namespace=prod_nerd_front" | head -1
+```
+
+`--filter name=` 은 부분 문자열 매칭이라 이름이 겹치는 다른 스택의 컨테이너까지 잡는다. 백엔드가 재명명 전환 중 실제로 겪은 함정이다(`lessons.md` 2026-09-01). 폴링은 `start_period 60s` 를 감안해 3s × 40 = 120s 로 잡았다.
 
 ### Step 6 — 배포·검증
 

@@ -5,7 +5,7 @@ Next.js 16 + React 19 프론트엔드.
 > **이 문서는 사실과 사용법만 담는다** — 스택, 실행법, 환경 변수, 명령어.
 > 결정의 근거·배포 설계는 [`docs/tasks/`](docs/tasks/)로 분리되어 있다. 같은 내용을 두 곳에 쓰지 않는다.
 
-**현재 상태**: 스켈레톤. CI/CD 구축 진행 중 — 아래 ⬜ 표시는 **아직 적용되지 않은** 항목이다.
+**현재 상태**: CI/CD 구축 완료(Step 1~5). 첫 배포 대기 중.
 
 ---
 
@@ -20,7 +20,7 @@ Next.js 16 + React 19 프론트엔드.
 | 번들러 | Turbopack (Next 16 기본) |
 | 패키지 매니저 | pnpm |
 | 테스트 | **미도입** |
-| 배포 | ⬜ Docker Swarm on ARM64 |
+| 배포 | Docker Swarm on ARM64 (`ubuntu-24.04-arm` 네이티브 빌드) |
 
 ---
 
@@ -53,8 +53,8 @@ PORT=5599 pnpm dev        # 5599 로 뜬다
 |---|---|---|---|
 | `.env.production` | **`NEXT_PUBLIC_*` 만** | 빌드타임 | **커밋한다** |
 | `.env.local` | 로컬 개발용 전부 | 로컬 | ignore |
-| ⬜ stack YAML `environment:` | 비밀 **아닌** 런타임 값 | 런타임 | 커밋한다 |
-| ⬜ 서버 `nerd-front.prod.env` | **민감한** 런타임 값 | 런타임 | 저장소에 두지 않는다 |
+| stack YAML `environment:` | 비밀 **아닌** 런타임 값 | 런타임 | 커밋한다 |
+| 서버 `nerd-front.prod.env` | **민감한** 런타임 값 | 런타임 | 저장소에 두지 않는다 |
 
 ### 🚫 서버 env 파일에 `NEXT_PUBLIC_*`를 넣어도 브라우저에 반영되지 않는다
 
@@ -90,13 +90,9 @@ pnpm build               # 프로덕션 빌드 → .next/standalone
 pnpm start               # 빌드 결과 실행 (5502)
 pnpm lint                # eslint
 pnpm check:types         # next typegen && tsc --noEmit
+pnpm check:stubs         # 스텁 마커·.only 잔존 차단
 pnpm check:health-path   # 헬스체크 경로 ↔ route handler 대응 검사
-```
 
-⬜ 아래는 CI/CD 구축과 함께 추가된다.
-
-```bash
-pnpm check:stubs         # TODO/FIXME/.only 잔존 차단
 pnpm ci:core             # lint → check:types → build
 pnpm ci:all              # + check:stubs + check:health-path  (PR 전 필수)
 ```

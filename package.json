@@ -8,7 +8,10 @@
     "start": "next start -p ${PORT:-5502}",
     "lint": "eslint",
     "check:types": "next typegen && tsc --noEmit",
-    "check:health-path": "node scripts/check-health-path.mjs"
+    "check:stubs": "node scripts/check-stubs.mjs",
+    "check:health-path": "node scripts/check-health-path.mjs",
+    "ci:core": "pnpm run lint && pnpm run check:types && pnpm run build",
+    "ci:all": "pnpm run lint && pnpm run check:types && pnpm run check:stubs && pnpm run check:health-path && pnpm run build"
   },
   "dependencies": {
     "next": "16.3.3",
