@@ -135,7 +135,7 @@ CMD ["node", "server.js"]
 | `PORT` | `5502` | 아니오 |
 | `HOSTNAME` | `0.0.0.0` | 아니오 |
 | `TZ` | `UTC` | 아니오 |
-| `NODE_OPTIONS` | `--max-old-space-size=<limit×0.7>` | 아니오 |
+| `NODE_OPTIONS` | `--max-old-space-size=384` (limits 512M 의 75%) | 아니오 |
 | `MALLOC_ARENA_MAX` | `2` | 아니오 |
 | `BACKEND_INTERNAL_URL` | `http://prod_nerd_back_app:5501` | 아니오 (서버 컴포넌트 전용) |
 | `TASK_SLOT` | `{{.Task.Slot}}` | 아니오 (Swarm 주입, 지금은 자리만) |
@@ -169,6 +169,9 @@ CMD ["node", "server.js"]
 ```
 
 🚫 **이 저장소는 public 이다** (2026-09-01 확인). 이 파일에 비밀을 넣으면 커밋 이력에 영구 보존될 뿐 아니라 **즉시 전 세계에 공개된다.** 되돌리려면 이력 재작성과 자격증명 폐기가 필요하다. 파일 첫 줄에 이 경고를 주석으로 박아 둔다.
+
+🚫 **도메인도 넣지 않는다.** `NEXT_PUBLIC_*` 는 브라우저에 노출되니 "비밀"은 아니지만, 백엔드 `CLAUDE.md` 는 **도메인을 인프라 식별 정보로 분류해 커밋을 금지**한다. 이웃 프로젝트 `next-bun` 이 `.env.build` 에 운영 도메인을 평문 커밋하고 소스에도 fallback 으로 하드코딩한 사례가 있다 — 재현하지 않는다.
+지금은 브라우저가 **상대경로** `/api/v2/*` 를 쓰기로 해서 도메인이 필요한 값 자체가 없다. 필요해지면 CI 시크릿 → build-arg 로 주입한다.
 
 ⚠️ `.dockerignore` 에도 같은 예외가 필요하다. 백엔드는 `.env.*` 제외 + `!.env.example` 구조인데, 프론트는 `!.env.production` 이다.
 
@@ -542,17 +545,67 @@ standalone 크기 43M (자산 복사 전).
 
 **`check-health-path.mjs` 가 필요한 이유** — App Router 는 파일 경로가 곧 URL 이라 `app/api/health/` 를 옮기면 `healthcheck.mjs` 는 그대로 남아 404 를 받는다. **두 파일 어디에도 에러가 없어 보이고 배포해 봐야 드러난다.** Swarm 이 unhealthy 로 판정하면 재시작 루프 + 배포 롤백이다. `ci:all` 에 넣는다 (Step 5).
 
-### Step 3 — 컨테이너
+### Step 3 — 컨테이너 ✅ 완료 (2026-09-01)
 
-- [ ] `Dockerfile` (deps → builder → runner)
-- [ ] `.dockerignore`
-- [ ] 검증: **로컬 ARM64 빌드 + 컨테이너 기동 + 헬스체크 통과 + 페이지 렌더 + 이미지 최적화 동작**
-- [ ] 검증: `docker stats` 로 유휴 RSS 실측 → `limits` 확정 근거
+- [x] `Dockerfile` (deps → builder → runner)
+- [x] `.dockerignore`
+- [x] 로컬 ARM64 빌드 + 컨테이너 실기동 검증
+- [x] `docker stats` 로 메모리 실측 → `limits` 확정
+
+**실측 결과 (`--platform linux/arm64`)**
+
+| 확인 | 결과 |
+|---|---|
+| 이미지 크기 | **303MB** (standalone 레이어 55.5MB · static 769kB · public 3.3kB) |
+| 실행 사용자 | `node` (비루트) |
+| 주입된 env | `PORT=5502` · **`HOSTNAME=0.0.0.0`** · `NODE_ENV=production` · `TZ=UTC` · `MALLOC_ARENA_MAX=2` |
+| **호스트에서 접근** | `/api/health` **200** — `HOSTNAME=0.0.0.0` 실효 확인 |
+| 페이지 · 정적자산 · CSS 청크 · 404 | 200 · 200 · 200 · 404 |
+| `docker exec … node scripts/healthcheck.mjs` | 종료코드 **0** |
+| sharp 네이티브 바이너리 | **`@img/sharp-linux-arm64@0.35.4`** + `libvips-linux-arm64` |
+| 래스터 이미지 최적화 | **200 `image/png`** — 컨테이너에서 sharp 실동작 확인 |
+
+**메모리 실측 → `limits` 근거**
+
+| 상태 | 사용량 |
+|---|---|
+| 유휴 | **47.9 MiB** |
+| 이미지 최적화 요청 후 | 45.3 MiB |
+| 페이지 100회 동시 요청 후 | **43.5 MiB** |
+
+부하를 줘도 늘지 않는다(GC 후 오히려 감소). Next standalone 은 예상보다 훨씬 가볍다.
+
+→ **`reservations: 128M` · `limits: 512M` · `NODE_OPTIONS=--max-old-space-size=384`**
+
+- `reservations` 는 스케줄링 보장이라 실사용(48MiB)의 약 2.7배로 잡는다. 백엔드(192M)보다 낮다 — 실측 근거가 있으므로 맞춘다고 늘리지 않는다
+- `limits` 는 OOM 상한이라 여유를 둔다. **큰 이미지 하나가 sharp 에서 수백 MB 를 순간 할당**할 수 있고, ISR 도입 시 인메모리 캐시 50MB 가 더해진다
+- `--max-old-space-size` 는 limits 의 75%. V8 이 컨테이너 한도를 넘겨 힙을 키우는 것을 막는다
+
+#### 🔍 발견: standalone 은 **기동 시점에** `public/` 을 스캔한다
+
+검증 중 `docker cp` 로 넣은 파일이 **원본 서빙조차 404** 였다. 컨테이너를 재시작하니 200 이 됐다.
+
+- 런타임에 `public/` 에 파일을 추가해도 **서빙되지 않는다**
+- 정적 자산을 볼륨으로 마운트하거나 런타임에 생성하는 설계는 동작하지 않는다
+- 이미지 최적화의 `400 The requested resource isn't a valid image` 도 같은 원인이었다 — sharp 문제가 아니었다
+
+⚠️ 이 사실을 모르면 "sharp 가 컨테이너에서 안 된다"고 오진하기 쉽다. **원본 파일 서빙(`/probe.png`)이 되는지 먼저 확인**하면 원인이 즉시 갈린다.
 
 ### Step 4 — 스택 YAML
 
-- [ ] `infra/docker-stack.app.yml` — replicas 3 · start-first · `stop_grace_period: 30s` · 라벨 제약 · 메모리
-- [ ] 노드 라벨 부여 (사용자 실행)
+- [ ] `infra/docker-stack.app.yml`
+  - `replicas: 3` · `order: start-first` · `parallelism: 1` · `failure_action: rollback` · `max_failure_ratio: 0`
+  - `resources`: **`limits 512M` / `reservations 128M`** (Step 3 실측 근거)
+  - `healthcheck`: `node scripts/healthcheck.mjs` · interval 15s · retries 3 · **`start_period: 60s`**
+  - **`stop_grace_period: 30s`**
+  - `placement`: `node.labels.prod_nerd_front == 1`
+  - `env_file`: `${ENV_FILE_PATH}` · `environment`: 위 런타임 표
+  - 🚫 `ports:` 를 선언하지 않는다 (호스트 publish 없음)
+- [x] 노드 라벨 부여 — `prod_nerd_front=1` (2026-09-01 완료)
+
+**`start_period` 를 백엔드(30s)보다 길게 잡는 이유** — 이웃 프로젝트 `next-bun` 이 60s 를 쓴다. Next 콜드 스타트가 NestJS 보다 길어서, 짧으면 기동 중인 태스크를 unhealthy 로 판정해 **재시작 루프 + 배포 롤백**에 빠진다.
+
+🚫 **`ports:` publish 는 `next-bun` 을 따라가지 않는다.** 그쪽은 `published: 23000` 으로 호스트에 노출하지만, 백엔드 규약은 "호스트 publish 없음 — Caddy 가 overlay 내부로 접근"이다. publish 하면 도메인을 우회한 직접 접근 경로가 열린다.
 
 ### Step 5 — 워크플로
 
@@ -596,6 +649,36 @@ standalone 크기 43M (자산 복사 전).
 | 재명명 전환 중 메모리 2배 | 중간 | 전환 절차를 `tasks-stack-rename.md` 가 소유 |
 
 ---
+
+## 이웃 프로젝트 `next-bun` 대조 (2026-09-01 조사)
+
+같은 노드에 `prod_next` 라벨로 이미 배포 중인 Next 앱이다. 커밋 이력이 **최소 3번의 장애급 시행착오**를 보여준다 — `health check api 추가 → Swarm 마이그레이션 → healthcheck IPv6 버그 → CI 컨버지 대기 추가 → HOSTNAME 바인딩 버그`. 그 값을 문서로 미리 받은 셈이다.
+
+### 우리 설계를 검증해준 것
+
+| 그쪽 커밋 | 우리 대응 |
+|---|---|
+| `fix: Next.js HOSTNAME=0.0.0.0 — standalone server loopback bind 이슈 해결` | Dockerfile `ENV HOSTNAME=0.0.0.0` — 실측으로 실효 확인 |
+| `fix(healthcheck): IPv6 이슈 해결 — 127.0.0.1 + top-level await` | `healthcheck.mjs` 가 `host: '127.0.0.1'` 을 명시 (백엔드에서 이식) |
+| 헬스체크 경로 `/api/health` | 동일 |
+| `runs-on: ubuntu-24.04-arm` | 동일 (Step 5) |
+| `start_period: 60s` | **채택** — 백엔드 30s 를 그대로 쓰지 않는 근거 |
+
+### 우리가 다르게 가는 것
+
+| 항목 | next-bun | 우리 | 왜 |
+|---|---|---|---|
+| CI 검증 게이트 | **없음** (`lint`·`test` 가 있는데 워크플로가 호출 안 함) | `ci:all` | `main` push 가 곧 배포인데 검증이 없으면 깨진 코드가 그대로 나간다 |
+| 배포 후 검증 | replica 수렴만 확인 | 실제 HTTP 스모크 | 컨테이너는 떴는데 앱이 500 인 상황을 못 잡는다 |
+| 컨테이너 사용자 | **root** | `USER node` | 최소 권한 |
+| 메모리 제한 | **없음** (replicas 10 인데) | limits/reservations | 한 서비스의 폭주가 노드 전체에 번진다 |
+| 호스트 publish | `published: 23000` | **없음** | 도메인 우회 경로가 열린다 |
+| 패키지 매니저 | bun + **`pnpm-lock.yaml` 공존** | pnpm 단일 | lockfile 이 둘이면 "로컬 성공 ≠ 컨테이너 성공"이 재현된다 |
+| `.dockerignore` | 2줄 | 충실히 | 빌드 컨텍스트·캐시 히트율 |
+
+### 재현하지 말아야 할 것
+
+- **`.env.build` 를 커밋했고 그 안에 운영 도메인이 평문**이다. `siteConfig.ts` 에도 fallback 으로 하드코딩돼 있다. 우리의 `.env.production` 커밋 결정이 **같은 함정 앞에 있다** → 위 「환경변수」절에 도메인 금지를 명시했다.
 
 ## 📚 참고
 
