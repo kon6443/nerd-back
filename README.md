@@ -69,7 +69,7 @@ Redis 가 없어도 앱은 기동하고 HTTP 는 응답한다. 레이트리밋�
 | `ENV` | `LOCAL` / `PROD` |
 | `PORT` | 기본 5501 |
 | `LOG_LEVEL` | 로컬 `debug`, 배포 `info` |
-| `CORS_ORIGINS` | 쉼표 구분. 비우면 크로스 오리진 차단 |
+| `CORS_ORIGINS` | 쉼표 구분. 비우면 크로스 오리진 차단. 로컬 기본값은 프론트 개발 서버(`http://localhost:5502`) |
 | `REDIS_HOST` `REDIS_PORT` `REDIS_PASSWORD` | Redis 접속 정보 |
 | `TASK_SLOT` | Swarm 이 주입 — 단일 실행 작업 가드용 |
 | `EDGE_THROTTLE_ENABLED` | `true`/`false` (기본 `false`). 켜면 Swagger·404 등 가드 밖 경로를 IP당 분당 300 으로 제한 |
