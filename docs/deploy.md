@@ -57,7 +57,7 @@ docker stack deploy -c infra/docker-stack.redis.yml prod_nerd_cache
 ```
 paths 화이트리스트 트리거
   → ci:all (lint → 스텁 검사 → 단위 → E2E → build)   ← 이 게이트 없이 배포하지 않는다
-  → buildx 빌드 (linux/arm64, gha 캐시, --provenance=false --sbom=false)
+  → buildx 빌드 (네이티브 arm64 러너, gha 캐시, --provenance=false --sbom=false)
   → 레지스트리 push (태그 = 커밋 short SHA)
   → stack YAML 을 매니저로 전송
   → docker stack deploy --detach=false               ← 수렴까지 동기 대기
@@ -68,13 +68,16 @@ paths 화이트리스트 트리거
 - 이미지 태그가 불변이라 어떤 커밋이 떠 있는지 항상 특정된다.
 - `--provenance=false --sbom=false` 가 필요하다. Swarm 의 매니페스트 처리가 attestation 을 삼키지 못한다.
 - 스모크 테스트는 **떠 있는 태스크 안에서** 확인한다. `docker run --network <overlay>` 는 쓰지 않는다 — Swarm overlay 는 기본적으로 attachable 이 아니다.
+- 러너는 **`ubuntu-24.04-arm`(네이티브 arm64)** 다. 저장소가 public 이라 무료이고 QEMU 에뮬레이션 계층이 없다. 🚫 private 으로 바꾸면 이 라벨은 실패한다.
+- 컨테이너를 고를 때는 **스택 네임스페이스 라벨**을 쓴다 — `--filter name=` 은 부분 문자열 매칭이라 이름이 겹치는 다른 스택까지 잡는다 ([lessons 2026-09-01](lessons.md)).
 
 ### 롤링 업데이트
 
 ```
-update_config:   order: start-first · parallelism: 1 · failure_action: rollback · max_failure_ratio: 0
-rollback_config: order: start-first · parallelism: 1
-healthcheck:     liveness 경로만 (scripts/healthcheck.mjs)
+update_config:   order: start-first · parallelism: 1 · delay 5s · monitor 45s · failure_action: rollback · max_failure_ratio: 0
+rollback_config: order: start-first · parallelism: 1 · monitor 10s
+healthcheck:     liveness 경로만 (scripts/healthcheck.mjs) · start_period 30s
+stop_grace_period: 30s
 ```
 
 레플리카 3개를 두는 이유가 이것이다. 단일 노드에서도 **무중단 배포**가 된다.
@@ -143,12 +146,14 @@ docker stack services prod_nerd_back
 docker stack services prod_nerd_cache
 
 # Swarm 이 보는 헬스 (우리 healthcheck.mjs 결과)
-# ⚠️ name 필터는 부분 문자열 매칭이다. 최종 DNS 이름(prod_nerd_back_app)을 그대로 쓴다.
-docker ps --filter "name=prod_nerd_back_app" --format '{{.Names}}\t{{.Status}}'
+# ⚠️ 스택 단위 조회는 **네임스페이스 라벨**로 한다. `name=` 은 부분 문자열 매칭이라
+#    이름이 겹치는 다른 스택의 컨테이너까지 잡는다 (lessons 2026-09-01).
+docker ps --filter "label=com.docker.stack.namespace=prod_nerd_back" \
+  --format '{{.Names}}\t{{.Status}}'
 #   "Up N minutes (healthy)" 가 3줄이면 정상
 
 # liveness — 종료코드만
-cid=$(docker ps -q --filter "name=prod_nerd_back_app" | head -1)
+cid=$(docker ps -q --filter "label=com.docker.stack.namespace=prod_nerd_back" | head -1)
 docker exec "$cid" node scripts/healthcheck.mjs; echo "exit=$?"
 
 # readiness — 응답 본문까지 (Redis 연결 확인)
@@ -170,7 +175,7 @@ require('http').get({host:'127.0.0.1',port:5501,path:'/api/v2/health/ready'},r=>
 | `replicas` | 3 | 교체 중에도 나머지가 요청을 받는다 |
 | `order` | `start-first` | 새 태스크를 먼저 띄우고 옛 태스크를 내린다 |
 | `parallelism` | 1 | 한 번에 하나만 교체 → 항상 2/3 가 서비스 중 |
-| `delay` · `monitor` | 5s · 20s | 다음 교체 전에 결과를 지켜본다 |
+| `delay` · `monitor` | 5s · **45s** | 다음 교체 전에 결과를 지켜본다. ⚠️ **`monitor` 는 `start_period` 보다 길어야 한다** — 짧으면 healthy 판정 전에 다음 교체로 넘어가 무중단 보장이 깨진다 |
 | `failure_action` · `max_failure_ratio` | `rollback` · 0 | 하나라도 실패하면 되돌린다 |
 | `healthcheck` | 15s 간격 · 3회 · `start_period` 30s | 준비 안 된 태스크로 트래픽이 가지 않게 한다 |
 

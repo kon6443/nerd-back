@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     environment: PROD
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +63,8 @@ jobs:
           script: |
             set -e
             for i in $(seq 1 20); do
-              cid=$(docker ps -q --filter "name=prod_nerd_cache_redis" | head -1)
+              cid=$(docker ps -q \
+                --filter "label=com.docker.stack.namespace=prod_nerd_cache" | head -1)
               if [ -n "$cid" ] && docker exec "$cid" redis-cli ping 2>/dev/null | grep -q PONG; then
                 echo "PONG 확인 (시도 $i)"
                 exit 0

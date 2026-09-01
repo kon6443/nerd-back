@@ -27,6 +27,10 @@ services:
       # 여러 레플리카 중 하나만 실행해야 하는 작업의 가드로 쓴다.
       TASK_SLOT: '{{.Task.Slot}}'
 
+    # SIGTERM 후 진행 중인 요청이 끝날 시간을 준다. Swarm 기본은 10s 라
+    # `enableShutdownHooks()` 가 마무리하기 전에 강제 종료될 수 있다.
+    stop_grace_period: 30s
+
     # ⚠️ liveness 경로만 찌른다 (scripts/healthcheck.mjs).
     #    외부 의존을 검사하는 readiness 를 여기에 넣으면 Redis·DB 장애가 컨테이너를
     #    unhealthy 로 만들어 재시작 루프에 빠지고, 아래 failure_action 이 배포를 롤백한다.
@@ -59,7 +63,11 @@ services:
         order: start-first
         parallelism: 1
         delay: 5s
-        monitor: 20s
+        # ⚠️ **start_period(30s)보다 길어야 한다.** 짧으면 새 태스크가 healthy 로
+        #    판정되기 전에 다음 레플리카 교체로 넘어가, start-first 로 확보하려던
+        #    무중단 보장이 실제로는 깨진다. 이전 값 20s 는 이 조건을 어기고 있었고,
+        #    앱 기동이 30s 안에 끝나 우연히 문제가 드러나지 않았을 뿐이다.
+        monitor: 45s
         # 하나라도 실패하면 즉시 되돌린다.
         failure_action: rollback
         max_failure_ratio: 0
