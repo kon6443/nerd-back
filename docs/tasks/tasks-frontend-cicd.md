@@ -605,7 +605,7 @@ standalone 크기 43M (자산 복사 전).
 
 **`start_period` 를 백엔드(30s)보다 길게 잡는 이유** — 이웃 프로젝트 `next-bun` 이 60s 를 쓴다. Next 콜드 스타트가 NestJS 보다 길어서, 짧으면 기동 중인 태스크를 unhealthy 로 판정해 **재시작 루프 + 배포 롤백**에 빠진다.
 
-🚫 **`ports:` publish 는 `next-bun` 을 따라가지 않는다.** 그쪽은 `published: 23000` 으로 호스트에 노출하지만, 백엔드 규약은 "호스트 publish 없음 — Caddy 가 overlay 내부로 접근"이다. publish 하면 도메인을 우회한 직접 접근 경로가 열린다.
+🚫 **`ports:` publish 는 `next-bun` 을 따라가지 않는다.** 그쪽은 호스트 포트를 publish 하지만, 백엔드 규약은 "호스트 publish 없음 — Caddy 가 overlay 내부로 접근"이다. publish 하면 도메인을 우회한 직접 접근 경로가 열린다.
 
 ### Step 5 — 워크플로
 
@@ -672,7 +672,7 @@ standalone 크기 43M (자산 복사 전).
 | 배포 후 검증 | replica 수렴만 확인 | 실제 HTTP 스모크 | 컨테이너는 떴는데 앱이 500 인 상황을 못 잡는다 |
 | 컨테이너 사용자 | **root** | `USER node` | 최소 권한 |
 | 메모리 제한 | **없음** (replicas 10 인데) | limits/reservations | 한 서비스의 폭주가 노드 전체에 번진다 |
-| 호스트 publish | `published: 23000` | **없음** | 도메인 우회 경로가 열린다 |
+| 호스트 publish | **한다** | **없음** | 도메인 우회 경로가 열린다 |
 | 패키지 매니저 | bun + **`pnpm-lock.yaml` 공존** | pnpm 단일 | lockfile 이 둘이면 "로컬 성공 ≠ 컨테이너 성공"이 재현된다 |
 | `.dockerignore` | 2줄 | 충실히 | 빌드 컨텍스트·캐시 히트율 |
 
