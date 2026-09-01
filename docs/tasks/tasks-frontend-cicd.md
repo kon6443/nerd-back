@@ -1,6 +1,6 @@
 # Task Tracker: 프론트엔드 CI/CD 구축
 
-> **상태**: 설계 완료 · 구현 미착수
+> **상태**: Step 1·2 완료 (포트·설정 · 헬스체크) · Step 3(컨테이너)부터 진행 중
 > **작성일**: 2026-09-01
 > **대상 브랜치**: `feat/frontend-skeleton`
 > **용도**: 이 저장소의 CI/CD·컨테이너·배포 구성의 **결정과 근거**. 진행 상황의 정본은 이 파일이다.
@@ -22,7 +22,7 @@
 | 레플리카 | **3** | 백엔드와 동일. 단일 노드 무중단 배포 |
 | 이미지 | 멀티스테이지, `linux/arm64` 단독, 태그 = 커밋 short SHA | 백엔드와 동일 |
 | 배포 전 게이트 | `pnpm ci:core` (lint → typecheck → build) | 프론트는 테스트 프레임워크가 없어 `test` 단계가 공집합 |
-| 헬스체크 | `app/health/route.ts` + `scripts/healthcheck.mjs` | Next 에 기본 헬스 경로가 없다. liveness 만 |
+| 헬스체크 | `app/api/health/route.ts` + `scripts/healthcheck.mjs` | Next 에 기본 헬스 경로가 없다. liveness 만 |
 | 환경변수 관리 | **네 군데로 분리** — `.env.production`(공개·빌드) · `.env.local`(로컬) · stack YAML(공개·런타임) · 서버 env 파일(비밀·런타임) | 값의 **성격**과 **확정 시점**이 위치를 정한다 — 아래 「환경변수」절 |
 | **URL 배치** | **프론트 전용 도메인의 루트.** 같은 도메인의 `/api/v2/*` 를 Caddy 가 백엔드로 분기 | `basePath` 불필요 · CORS 불필요 · 빌드타임 API URL 불필요 — 아래 「URL 배치」절 |
 | API 호출 | 브라우저는 **상대경로** `/api/v2/*` | `NEXT_PUBLIC_*` 와 CORS 를 둘 다 없앤다 |
@@ -249,7 +249,8 @@ route {
 
 - **스트리밍** — Caddy `reverse_proxy` 는 응답을 버퍼링하지 않으므로 Next 의 streaming SSR·Suspense 가 그대로 동작한다. nginx 처럼 `X-Accel-Buffering` 을 따로 끌 필요가 없다.
 - **HTTPS** — Caddy 자동 인증서(HTTP-01)로 서브도메인 하나는 그대로 발급된다. 와일드카드가 아니므로 DNS-01 설정이 필요 없다.
-- **경로 충돌 없음** — 프론트 헬스체크는 `/health`, 백엔드는 `/api/v2/health` 다. 서로 겹치지 않는다.
+- **경로 충돌** — 프론트 헬스체크는 **`/api/health`**, 백엔드는 `/api/v2/health` 다. Caddy 가 `/api/v2/*` 만 백엔드로 보내므로 겹치지 않는다.
+  🚫 **그 matcher 를 `/api/*` 로 넓히지 않는다.** 넓히는 순간 프론트 헬스체크가 백엔드로 흘러가고, 프론트 컨테이너는 **영원히 unhealthy** 가 되어 재시작 루프에 빠진다. 백엔드에 새 최상위 API 경로가 필요하면 `/api/v2` 아래에 두거나 별도 matcher 를 **명시적으로** 추가한다.
 - **`/_next/*` 정적 자산** — catch-all 로 프론트에 도달한다. 별도 매처가 필요 없다.
 
 ---
@@ -517,8 +518,8 @@ standalone 크기 43M (자산 복사 전).
 
 ### Step 2 — 헬스체크 ✅ 완료 (2026-09-01)
 
-- [x] `app/health/route.ts` — liveness. 외부 의존을 검사하지 않는다
-- [x] `scripts/healthcheck.mjs` — 백엔드 것 이식, `PORT` 기본값 5502 · 경로 `/health`
+- [x] `app/api/health/route.ts` — liveness. 외부 의존을 검사하지 않는다
+- [x] `scripts/healthcheck.mjs` — 백엔드 것 이식, `PORT` 기본값 5502 · 경로 `/api/health`
 - [x] `scripts/check-health-path.mjs` — 경로 불일치 방지 (백엔드 `app.constants.spec.ts` 대응물)
 - [x] 검증 완료 — 아래
 
@@ -526,7 +527,7 @@ standalone 크기 43M (자산 복사 전).
 
 | 확인 | 결과 |
 |---|---|
-| 빌드 라우트 표기 | **`ƒ /health` (Dynamic)** — `force-dynamic` 적용됨 |
+| 빌드 라우트 표기 | **`ƒ /api/health` (Dynamic)** — `force-dynamic` 적용됨 |
 | 응답 | 200 · `{"status":"ok"}` · `application/json` |
 | 캐시 헤더 | `cache-control: no-store` |
 | `node scripts/healthcheck.mjs` (서버 살아 있음) | 종료코드 **0** |
@@ -539,7 +540,7 @@ standalone 크기 43M (자산 복사 전).
 1. **`force-dynamic` 을 붙인다** — route handler 가 정적으로 굳으면 앱이 반쯤 죽어도 캐시된 200 이 나간다. liveness 는 핸들러가 실제로 실행되는 것 자체가 신호다.
 2. **`cache-control: no-store` 를 직접 붙인다** — `force-dynamic` 은 렌더 방식만 정하고 캐시 헤더를 보장하지 않는다 (실측: 명시 전에는 헤더가 **비어 있었다**). 중간 캐시가 이 응답을 보관하면 죽은 인스턴스가 살아 보인다.
 
-**`check-health-path.mjs` 가 필요한 이유** — App Router 는 파일 경로가 곧 URL 이라 `app/health/` 를 옮기면 `healthcheck.mjs` 는 그대로 남아 404 를 받는다. **두 파일 어디에도 에러가 없어 보이고 배포해 봐야 드러난다.** Swarm 이 unhealthy 로 판정하면 재시작 루프 + 배포 롤백이다. `ci:all` 에 넣는다 (Step 5).
+**`check-health-path.mjs` 가 필요한 이유** — App Router 는 파일 경로가 곧 URL 이라 `app/api/health/` 를 옮기면 `healthcheck.mjs` 는 그대로 남아 404 를 받는다. **두 파일 어디에도 에러가 없어 보이고 배포해 봐야 드러난다.** Swarm 이 unhealthy 로 판정하면 재시작 루프 + 배포 롤백이다. `ci:all` 에 넣는다 (Step 5).
 
 ### Step 3 — 컨테이너
 

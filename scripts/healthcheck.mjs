@@ -13,9 +13,9 @@ import { get } from 'node:http';
 // standalone server.js 와 같은 기본값을 쓴다. 컨테이너에서는 ENV PORT 가 주입된다.
 const PORT = Number(process.env.PORT ?? 5502);
 
-// ⚠️ `app/health/route.ts` 의 위치와 같아야 한다. App Router 는 파일 경로가 곧 URL 이다.
+// ⚠️ `app/api/health/route.ts` 의 위치와 같아야 한다. App Router 는 파일 경로가 곧 URL 이다.
 //    `scripts/check-health-path.mjs` 가 두 값의 대응을 CI 에서 대조한다.
-const PATH = '/health';
+const PATH = '/api/health';
 
 const TIMEOUT_MS = 4000;
 

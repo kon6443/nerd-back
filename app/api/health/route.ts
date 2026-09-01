@@ -9,6 +9,11 @@
  * Swarm 의 healthcheck 와 리버스 프록시가 이 경로를 본다.
  * ⚠️ 경로를 옮기면 `scripts/healthcheck.mjs` 의 PATH 도 함께 바꿔야 한다 —
  *    `scripts/check-health-path.mjs` 가 두 값의 대응을 CI 에서 고정한다.
+ *
+ * ⚠️ **경로가 `/api/` 로 시작한다.** 같은 도메인에서 Caddy 가 `/api/v2/*` 를
+ *    백엔드로 분기하므로 지금은 겹치지 않는다. 하지만 그 규칙이 `/api/*` 로
+ *    넓어지면 이 헬스체크가 **백엔드로 흘러가** 프론트 컨테이너가 영원히
+ *    unhealthy 가 된다. Caddy matcher 는 반드시 `/api/v2/*` 로 좁게 유지한다.
  */
 
 /**

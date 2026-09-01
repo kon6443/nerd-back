@@ -105,7 +105,7 @@ pnpm ci:all              # + check:stubs + check:health-path  (PR 전 필수)
 
 | 경로 | 검사 | 쓰는 곳 |
 |---|---|---|
-| `/health` | 프로세스만 (liveness) | Swarm healthcheck, 리버스 프록시 |
+| `/api/health` | 프로세스만 (liveness) | Swarm healthcheck, 리버스 프록시 |
 
 🚫 **liveness에 외부 의존을 넣지 않는다.** 백엔드 API 같은 것을 검사하면 그쪽 장애가 이 컨테이너를 unhealthy로 만들어 재시작 루프에 빠지고, 배포까지 롤백된다.
 

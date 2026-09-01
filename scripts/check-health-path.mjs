@@ -2,7 +2,7 @@
 /**
  * `scripts/healthcheck.mjs` 의 PATH 가 실제 route handler 와 대응하는지 확인한다.
  *
- * App Router 는 **파일 경로가 곧 URL 경로**다 (`app/health/route.ts` → `/health`).
+ * App Router 는 **파일 경로가 곧 URL 경로**다 (`app/api/health/route.ts` → `/api/health`).
  * 디렉터리를 옮기거나 이름을 바꾸면 healthcheck.mjs 는 그대로 남아 404 를 받고,
  * Swarm 이 컨테이너를 unhealthy 로 판정해 **재시작 루프 + 배포 롤백**에 빠진다.
  *
@@ -27,7 +27,7 @@ if (!matched) {
 
 const urlPath = matched[1];
 
-// App Router 규칙으로 역산한다. `/health` → `app/health/route.ts`
+// App Router 규칙으로 역산한다. `/api/health` → `app/api/health/route.ts`
 const routeFile = `app${urlPath}/route.ts`;
 
 if (!existsSync(routeFile)) {
