@@ -29,7 +29,7 @@ concurrency:
 jobs:
   # 검증을 배포와 분리한 job 으로 둔다. 실패하면 build 가 시작조차 하지 않는다.
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -42,7 +42,7 @@ jobs:
 
   deploy:
     needs: verify
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     environment: PROD
     steps:
       - uses: actions/checkout@v4
@@ -51,7 +51,6 @@ jobs:
         id: meta
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       - name: 레지스트리 로그인
@@ -118,12 +117,14 @@ jobs:
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
           script: |
             set -e
-            # ⚠️ 필터는 반드시 최종 서비스 DNS 이름(prod_nerd_back_app)이어야 한다.
-            #    docker ps 의 name 필터는 부분 문자열 매칭이라 `prod_nerd_back` 으로 두면
-            #    구 스택(prod_nerd)의 컨테이너 prod_nerd_back.N.xxx 까지 매칭된다.
-            #    head -1 이 그걸 집으면 새 배포가 실패해도 스모크가 통과해 버린다.
+            # ⚠️ 컨테이너를 **스택 네임스페이스 라벨**로 고른다.
+            #    `--filter name=` 은 부분 문자열 매칭이라 이름이 겹치는 다른 스택의
+            #    컨테이너까지 잡고, head -1 이 그걸 집으면 실패한 배포가 통과로 보고된다.
+            #    2026-09-01 재명명 전환 중 실제로 신·구 6개가 한 필터에 걸렸다
+            #    (docs/lessons.md). 라벨은 정확 일치라 세대가 섞이지 않는다.
             for i in $(seq 1 20); do
-              cid=$(docker ps -q --filter "name=prod_nerd_back_app" | head -1)
+              cid=$(docker ps -q \
+                --filter "label=com.docker.stack.namespace=prod_nerd_back" | head -1)
               if [ -n "$cid" ] && docker exec "$cid" node scripts/healthcheck.mjs; then
                 echo "liveness 200 확인 (시도 $i)"
                 exit 0
