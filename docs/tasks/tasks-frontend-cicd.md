@@ -110,8 +110,19 @@ CMD ["node", "server.js"]
 
 ### 백엔드에 필요한 후속
 
-`nerd-back/.env.example:16` 의 `CORS_ORIGINS=http://localhost:3000` → `http://localhost:5502`.
-로컬 개발에서 프론트가 백엔드를 직접 부를 때만 필요하다. 상용은 같은 도메인 경유라 CORS 자체가 발생하지 않는다.
+**이 저장소에서 고칠 수 없는 항목이다. `nerd-back` 에 별건으로 등재한다.**
+
+1. **`.env.example` 의 `CORS_ORIGINS=http://localhost:3000` → `http://localhost:5502`**
+   로컬 개발에서 프론트가 백엔드를 직접 부를 때만 필요하다. 상용은 같은 도메인 경유라 CORS 자체가 발생하지 않는다.
+
+2. **`update_config.monitor` 가 `start_period` 보다 짧다** (`monitor 20s` < `start_period 30s`)
+   새 태스크가 healthy 로 판정되기 전에 다음 레플리카 교체로 넘어갈 수 있다. `start-first` 로 무중단을 설정해 놓고 실제로는 보장이 깨지는 상태다. **`monitor` 를 `start_period` 보다 길게** 잡아야 한다(예: 45s).
+   ⚠️ 지금까지 배포가 성공한 것은 앱 기동이 30s 안에 끝나 우연히 맞아떨어진 것일 수 있다. 앱이 무거워지면 드러난다.
+
+3. **`stop_grace_period` 미설정** (Swarm 기본 10s)
+   `enableShutdownHooks()` 가 진행 중인 요청을 마치기 전에 강제 종료될 수 있다.
+
+4. **스모크 테스트 필터를 라벨 방식으로** — `--filter "label=com.docker.stack.namespace=prod_nerd_back"` 이 이름 부분 매칭보다 견고하다 (`tasks-stack-rename.md` 후속 항목).
 
 ---
 
@@ -591,17 +602,34 @@ standalone 크기 43M (자산 복사 전).
 
 ⚠️ 이 사실을 모르면 "sharp 가 컨테이너에서 안 된다"고 오진하기 쉽다. **원본 파일 서빙(`/probe.png`)이 되는지 먼저 확인**하면 원인이 즉시 갈린다.
 
-### Step 4 — 스택 YAML
+### Step 4 — 스택 YAML ✅ 완료 (2026-09-01)
 
-- [ ] `infra/docker-stack.app.yml`
-  - `replicas: 3` · `order: start-first` · `parallelism: 1` · `failure_action: rollback` · `max_failure_ratio: 0`
-  - `resources`: **`limits 512M` / `reservations 128M`** (Step 3 실측 근거)
-  - `healthcheck`: `node scripts/healthcheck.mjs` · interval 15s · retries 3 · **`start_period: 60s`**
-  - **`stop_grace_period: 30s`**
-  - `placement`: `node.labels.prod_nerd_front == 1`
-  - `env_file`: `${ENV_FILE_PATH}` · `environment`: 위 런타임 표
-  - 🚫 `ports:` 를 선언하지 않는다 (호스트 publish 없음)
-- [x] 노드 라벨 부여 — `prod_nerd_front=1` (2026-09-01 완료)
+- [x] `infra/docker-stack.app.yml`
+- [x] 노드 라벨 부여 — `prod_nerd_front=1`
+- [x] `docker stack config` 로 문법·정규화 검증
+
+**확정된 값**
+
+| 항목 | 값 | 근거 |
+|---|---|---|
+| `replicas` | 3 | 단일 노드 무중단 배포 |
+| `resources` | limits **512M** / reservations **128M** | Step 3 실측 (유휴 47.9MiB) |
+| `NODE_OPTIONS` | `--max-old-space-size=384` | limits 의 75% |
+| `healthcheck` | interval 15s · timeout 5s · retries 3 · **`start_period 60s`** | Next 콜드 스타트 |
+| `update_config` | start-first · parallelism 1 · delay 5s · **`monitor 90s`** · rollback · max_failure_ratio 0 | ↓ |
+| `stop_grace_period` | **30s** | in-flight 요청 + `after()` drain |
+| `placement` | `node.labels.prod_nerd_front == 1` | 스모크 테스트가 매니저 노드에서 컨테이너를 찾는다 |
+| `ports` | **선언하지 않음** | 호스트 publish 없음 |
+
+**`environment` 는 Dockerfile 과 겹치지 않게 뒀다** — `PORT`·`HOSTNAME`·`TZ`·`NODE_ENV`·`MALLOC_ARENA_MAX` 는 Dockerfile `ENV` 가 소유한다. 두 곳에 두면 어느 쪽이 이겼는지 헷갈린다. stack YAML 에는 **Swarm 템플릿이 필요한 것**(`TASK_SLOT`)과 **limits 와 짝인 것**(`NODE_OPTIONS`), **서비스 DNS 를 참조하는 것**(`BACKEND_INTERNAL_URL`)만 둔다.
+
+#### 🔍 발견: `monitor` 는 `start_period` 보다 길어야 한다
+
+`update_config.monitor` 는 새 태스크를 띄운 뒤 실패를 감시하는 기간이고, `start_period` 는 healthcheck 를 유예하는 기간이다. **`monitor` 가 더 짧으면 새 태스크가 healthy 로 판정되기도 전에 다음 레플리카 교체로 넘어간다** — `start-first` 로 무중단을 설정해 놓고 실제로는 보장이 깨지는 상태가 된다.
+
+프론트는 `start_period 60s` 이므로 `monitor 90s` 로 잡았다.
+
+⚠️ **백엔드도 같은 문제가 있다** — `start_period 30s` 인데 `monitor 20s` 다. 아래 「백엔드에 필요한 후속」 참조.
 
 **`start_period` 를 백엔드(30s)보다 길게 잡는 이유** — 이웃 프로젝트 `next-bun` 이 60s 를 쓴다. Next 콜드 스타트가 NestJS 보다 길어서, 짧으면 기동 중인 태스크를 unhealthy 로 판정해 **재시작 루프 + 배포 롤백**에 빠진다.
 

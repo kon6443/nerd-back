@@ -1,0 +1,114 @@
+# 프론트 앱 스택.
+#
+#   docker stack deploy -c docker-stack.app.yml prod_nerd_front
+#
+# 서비스 DNS 는 `<스택>_<서비스>` 다. 스택 `prod_nerd_front` + 서비스 `app`
+# → **`prod_nerd_front_app`**. 리버스 프록시가 tasks.prod_nerd_front_app:5502 로 접근한다.
+#
+# 스택 이름을 노드 라벨 키(`prod_nerd_front`)와 **일치**시켰다. 어느 스택이 어느 라벨을
+# 보는지 파일을 열지 않고도 알 수 있다. 이미지 이름은 스택과 별개 네임스페이스라
+# `prod_nerd_front` 를 그대로 쓴다 — 바꾸면 기존 태그 이력이 단절된다.
+
+services:
+  app:
+    image: ${REGISTRY_URL}/prod_nerd_front:${IMAGE_TAG}
+
+    # 기존 overlay 네트워크에 참여한다. 리버스 프록시가 같은 망에서
+    # tasks.prod_nerd_front_app:5502 로 접근하므로 호스트 포트를 publish 하지 않는다.
+    # publish 하면 도메인을 우회한 직접 접근 경로가 열린다.
+    networks:
+      - shared
+
+    # 민감한 런타임 값만 여기서 온다. 지금은 담긴 값이 없지만 파일은 존재해야 한다 —
+    # 없으면 `docker stack deploy` 가 실패한다.
+    #
+    # 🚫 **NEXT_PUBLIC_* 를 이 파일에 넣지 말 것.** 그 값은 `next build` 시점에 이미
+    #    번들에 박혔다. 여기 넣어도 브라우저에는 반영되지 않고 "설정했는데 undefined"
+    #    로만 드러난다. 공개 값은 저장소의 `.env.production` 이 소유한다.
+    env_file:
+      - ${ENV_FILE_PATH}
+
+    environment:
+      # PORT · HOSTNAME · TZ · NODE_ENV · MALLOC_ARENA_MAX 는 Dockerfile 의 ENV 에 있다.
+      # 두 곳에 두면 어느 쪽이 이겼는지 헷갈리므로 여기서 반복하지 않는다.
+
+      # 아래 limits.memory 와 짝이다. V8 이 컨테이너 한도를 넘겨 힙을 키우지 않게 한다.
+      # 값을 바꿀 때는 limits 도 함께 본다 — 그래서 같은 파일에 둔다.
+      NODE_OPTIONS: '--max-old-space-size=384'
+
+      # 서버 컴포넌트가 백엔드를 부를 때 쓴다. overlay 직통이라 Caddy·TLS·공인 DNS 를
+      # 우회한다. 브라우저는 이 값을 쓰지 않는다 — 상대경로 `/api/v2/*` 로 간다.
+      BACKEND_INTERNAL_URL: 'http://prod_nerd_back_app:5501'
+
+      # 여러 레플리카 중 하나만 실행해야 하는 작업의 가드로 쓴다. 지금은 자리만.
+      TASK_SLOT: '{{.Task.Slot}}'
+
+    # SIGTERM 후 in-flight 요청과 after() 콜백이 끝날 시간을 준다.
+    # Swarm 기본은 10s 인데 Next 공식 문서는 10~30s drain 을 권장한다.
+    stop_grace_period: 30s
+
+    # ⚠️ liveness 경로만 찌른다 (scripts/healthcheck.mjs).
+    #    외부 의존(백엔드 API 등)을 검사하면 그쪽 장애가 이 컨테이너를 unhealthy 로
+    #    만들어 재시작 루프에 빠지고, 아래 failure_action 이 배포를 롤백한다.
+    healthcheck:
+      test: ['CMD', 'node', 'scripts/healthcheck.mjs']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      # ⚠️ 백엔드(30s)보다 길다. Next 콜드 스타트가 NestJS 보다 느려서, 짧게 잡으면
+      #    기동 중인 태스크를 unhealthy 로 판정해 재시작 루프에 빠진다.
+      #    이웃 Next 프로젝트가 실제로 60s 를 쓰고 있다.
+      start_period: 60s
+
+    deploy:
+      # 단일 노드에서도 3개를 두는 이유는 롤링 업데이트로 무중단 배포를 확보하기 위해서다.
+      replicas: 3
+
+      # 배포 노드를 고정한다. 스모크 테스트가 **매니저 노드에서** docker ps 로 컨테이너를
+      # 찾으므로, 다른 노드로 스케줄되면 컨테이너를 못 찾아 실패한다.
+      placement:
+        constraints:
+          - node.labels.prod_nerd_front == 1
+
+      # 2026-09-01 로컬 컨테이너 실측: 유휴 47.9MiB, 페이지 100회 동시 요청 후 43.5MiB.
+      # 부하를 줘도 늘지 않는다.
+      #   reservations — 실사용의 약 2.7배. 백엔드(192M)보다 낮다. 실측 근거가 있는데
+      #                  "일관성"을 이유로 늘리면 노드 자원만 묶어둔다.
+      #   limits       — 큰 이미지 하나가 sharp 에서 수백 MB 를 순간 할당할 수 있고,
+      #                  ISR 도입 시 인메모리 캐시 50MB 가 더해진다.
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+      update_config:
+        # 새 태스크를 먼저 띄우고 healthy 를 확인한 뒤 옛 태스크를 내린다.
+        order: start-first
+        parallelism: 1
+        delay: 5s
+        # ⚠️ **start_period(60s)보다 길어야 한다.** 짧으면 새 태스크가 healthy 로
+        #    판정되기 전에 다음 레플리카 교체로 넘어가, 무중단 보장이 깨진다.
+        monitor: 90s
+        # 하나라도 실패하면 즉시 되돌린다.
+        failure_action: rollback
+        max_failure_ratio: 0
+
+      rollback_config:
+        order: start-first
+        parallelism: 1
+        monitor: 30s
+        failure_action: pause
+
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 60s
+
+networks:
+  shared:
+    external: true
+    # 실제 네트워크 이름은 배포 시점에 환경변수로 주입한다.
+    # 저장소에 인프라 식별 정보를 남기지 않는다.
+    name: ${OVERLAY_NETWORK}
