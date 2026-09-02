@@ -1,6 +1,6 @@
 # Task Tracker: MySQL 자체 호스팅 (Swarm 스택)
 
-> 상태: **Step 3·4 파일 작성 완료 (2026-09-02) — 배포 전. 사람 작업(Step 1 잔여 · Step 2) 대기.**
+> 상태: **Step 1~4 완료 (2026-09-02) — 첫 배포(Step 5) 대기. main 머지가 곧 첫 배포다.**
 > 경계: 배포 구성의 정본은 [`docs/deploy.md`](../deploy.md), 코드 규약은 [`.claude/rules/code-patterns.md`](../../.claude/rules/code-patterns.md).
 > 이 문서는 **DB 도입 결정의 근거와 진행 상황**을 소유한다. 확정된 사실은 배포 후 `deploy.md` 로 승격한다.
 > 🚫 실제 노드명·마운트 경로·네트워크 이름을 이 문서에 적지 않는다. 전부 라벨과 시크릿으로 참조한다.
@@ -274,8 +274,8 @@ code-patterns §10 이 이미 **UTC 저장 · 표시 시점 변환**으로 확�
 
 ### 스택 (Step 1~5)
 
-- [~] **Step 1** — 볼륨 마운트·ext4·fstab 영속 ✅ (2026-09-02) · **남은 것**: `mkdir/chown 999` · 노드 라벨 `prod_nerd_db=1` *(사람이 매니저에서)*
-- [~] **Step 2** — GitHub `PROD` 시크릿 `MYSQL_DATA_DIR` ✅ (2026-09-02) · Swarm secret 3개 (`prod_nerd_db_{root,app,migrator}_pw`) 대기 *(사람)*
+- [x] **Step 1** — 볼륨 마운트·ext4·fstab 영속 · 데이터 디렉터리 `999:999` · 노드 라벨 `prod_nerd_db=1` ✅ (2026-09-02, 사람이 매니저에서 실행·실측)
+- [x] **Step 2** — GitHub `PROD` 시크릿 `MYSQL_DATA_DIR` · Swarm secret 3개 (`prod_nerd_db_{root,app,migrator}_pw`) ✅ (2026-09-02). 비밀번호는 사용자 비밀번호 관리자에만 존재
 - [x] **Step 3** — `infra/docker-stack.db.yml` + `infra/mysql/init-users.sh` 작성 (2026-09-02). YAML 파싱·`bash -n` 통과. arm64 매니페스트: ↓ 「검증 기록」
 - [x] **Step 4** — `.github/workflows/deploy-db.yml` 작성 (2026-09-02). 세 워크플로 paths **교집합 0건** 대조 완료. 사전 점검(라벨·secret·경로) 단계를 추가해 "pending 인데 성공" 을 배포 전에 막는다. `deploy.md` 구성표·독립 배포표 갱신
 - [ ] **Step 5** — 배포 + 스모크. 문자셋·타임존·한글 왕복·볼륨 실경로를 **SQL 로 실측** (↓ 검증) · `scripts/db-tunnel.sh` 로 노트북에서 접속되는지 실측 (D9 검증)
@@ -319,6 +319,7 @@ Step 8 에서 아래 중 하나를 고르고 **근거를 이 문서에 남긴다
 | `scripts/db-tunnel.sh` `bash -n` | ✅ · 실접속은 미검증 | 2026-09-02 |
 | 시간 설정 저장소 전수 점검 | ✅ ↑ 표 | 2026-09-02 |
 | Node 런타임 `process.env.TZ` 변경 반영 | ✅ Node 22.21 · `getHours` 9→0 | 2026-09-02 |
+| 사전 조건 — secret 3개 `docker secret ls` · 라벨 `docker node inspect` · 디렉터리 `ls -ldn` | ✅ 사용자 실측 출력 확인 | 2026-09-02 |
 | 배포 · 스모크 | 미실행 (Step 5) | |
 
 ## 검증 (배포 후 실측할 것 — 설정 파일 확인으로 대체하지 않는다)
