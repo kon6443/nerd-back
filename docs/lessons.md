@@ -94,4 +94,11 @@
 - **근본 원인**: jest 의 `setupFiles` 는 **샌드박스(vm 컨텍스트) 안**에서 실행된다. 그 안의 `process.env` 는 실제 env 의 **복사본에 씌운 프록시**라, 대입이 Node 의 네이티브 env setter 에 닿지 않고 따라서 V8 이 타임존을 재탐지하지 않는다. 같은 한 줄이 `main.ts` 에서는 동작하고(Node 22 실측 9 → 0) setupFiles 에서는 동작하지 않는 이유가 이것이다.
 - **예방 규칙**: (1) 프로세스 전역 상태(TZ·locale 등)는 **워커를 띄우기 전** — `jest.config.js` · `test/jest-e2e.js` **상단** — 에서 고정한다. JSON 설정은 코드를 못 실행하므로 E2E 설정을 JS 로 바꿨다. (2) 고정과 별개로 **검증 가드**를 둔다 — `setup-tz.ts` 는 이제 `getTimezoneOffset() !== 0` 이면 즉시 throw 해서, 고정이 깨지면 모든 테스트가 첫 줄에서 실패한다. (3) 환경 정책(TZ·인코딩·locale)을 "설정했다"로 ✅ 처리하지 않는다. **동작을 측정한 값**(`getHours` 결과 같은)을 적을 수 있을 때만 ✅ 다.
 
+## 2026-09-02 — 외부 명령의 "비어 있지 않은 출력"을 성공으로 믿었다
+
+- **실패 양상**: DB 터널 스크립트가 `docker inspect --format '{{.NetworkSettings.Networks.docker_gwbridge.IPAddress}}'` 결과를 목적지로 썼는데, 값이 **`<no value>`** 라는 문자열이었다. `[ -n "$ip" ]` 검사를 통과해 `ssh -L 127.0.0.1:3306:<no value>:3306` 이 떴고, 같은 시각 노트북의 로컬 MySQL 이 3306 을 쥐고 있어 ssh 의 bind 도 실패했지만 **ssh 는 경고만 하고 계속 돌았다.** 결과: "터널이 떠 있는데" 클라이언트는 로컬 MySQL 에 붙어 `Access denied for user 'nerd_app'@'localhost'` 를 받았다.
+- **탐지 신호**: 에러 메시지의 **호스트 부분** — 운영 DB 였다면 `@'172.18.x.x'` 여야 하는데 `@'localhost'` 였다. `pgrep -fl 'ssh -N -L'` 로 본 프로세스 인자에 `<no value>` 가 그대로 박혀 있었다.
+- **근본 원인**: 셋이 겹쳤다. (1) Go 템플릿은 키가 없으면 빈 문자열이 아니라 `<no value>` 를 낸다 — "비어 있지 않음" 은 성공의 증거가 아니다. (2) `ssh -L` 은 포워딩 실패를 **기본적으로 치명으로 보지 않는다** (`ExitOnForwardFailure=no`). (3) Swarm 태스크 컨테이너는 gwbridge 에 붙어 있어도 `docker inspect <컨테이너>` 의 Networks 에는 overlay 만 나온다 — 부착 정보는 `docker network inspect docker_gwbridge` 쪽에만 있다. 설계를 문서에 "미검증" 으로 적어둔 것은 맞았지만, 스크립트 자체가 실패를 성공처럼 보이게 만들었다.
+- **예방 규칙**: 외부 명령 출력을 다음 단계의 입력으로 쓸 때는 **형식을 검증**한다 (IP 면 `*[!0-9.]*` 거부) — 비어 있지 않음만 보지 않는다. `ssh -L/-R` 에는 항상 `-o ExitOnForwardFailure=yes`. 로컬 포트를 열기 전에 `lsof -iTCP:<port> -sTCP:LISTEN` 으로 선점 여부를 확인하고 사람이 읽을 대안을 출력한다. Docker Swarm 의 gwbridge IP 는 네트워크 쪽에서 컨테이너 ID 로 역조회한다.
+
 <!-- 새 항목은 이 줄 위에, 최신순으로 추가한다. -->

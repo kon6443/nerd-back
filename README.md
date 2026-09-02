@@ -80,8 +80,8 @@ Redis 가 없어도 앱은 기동하고 HTTP 는 응답한다. 레이트리밋�
 
 | 변수 | 로컬 (`.env`) | 배포 (서버 env 파일) |
 |---|---|---|
-| `DB_HOST` | `127.0.0.1` — `scripts/db-tunnel.sh` 로 터널을 먼저 연다 | `prod_nerd_db_mysql` (DB 스택 서비스 DNS) |
-| `DB_PORT` | `3306` (터널 로컬 포트) | `3306` |
+| `DB_HOST` | `127.0.0.1` — `scripts/db-tunnel.sh [fs-01] [포트]` 로 터널을 먼저 연다 (`sudo` 없이) | `prod_nerd_db_mysql` (DB 스택 서비스 DNS) |
+| `DB_PORT` | 터널 로컬 포트. 노트북에 MySQL 이 3306 을 쓰고 있으면 **3307** 로 열고 여기도 3307 | `3306` |
 | `DB_USER` / `DB_NAME` | `nerd_app` / `nerd` | 동일 |
 | `DB_PASSWORD` | Swarm secret `prod_nerd_db_app_pw` 와 **같은 값** (비밀번호 관리자) | 동일 — 회전 시 secret 과 함께 바꾼다 |
 | `REDIS_HOST` | `127.0.0.1` (로컬 Redis) | `prod_nerd_cache_redis` |
