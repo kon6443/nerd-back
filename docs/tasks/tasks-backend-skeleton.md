@@ -57,7 +57,7 @@
 
 | 항목 | 상태 | 무엇이 정해지면 풀리는가 |
 |---|---|---|
-| DB 종류 | **미결정** | 관리형 RDBMS 중 선택. A1 자체 호스팅은 제외됨 |
+| DB 종류 | **MySQL 자체 호스팅으로 전환 중 (2026-09-02)** | 「관리형 중 선택 · A1 자체 호스팅 제외」 결정을 **번복했다.** 같은 Swarm 에 올린다 — 근거·진행·남은 미결정은 [`tasks-db-mysql.md`](tasks-db-mysql.md) 가 소유한다 |
 | DB 계층 패키지 일괄 | DB 확정 후 | `@nestjs/typeorm` `typeorm` `typeorm-transactional` + 드라이버를 **한 번에** 설치. 미리 깔아두지 않는다 |
 | readiness 인디케이터 | Redis·DB 도입 시 | liveness는 Phase 1에서 완성, readiness는 의존이 생길 때 채운다 |
 | 엔티티 컬럼 타입·네이밍 규칙 | DB 확정 후 | DB별 타입 매핑과 대소문자 관례가 다름 |
@@ -180,8 +180,8 @@ nerd-back/
 | 앱 코드 | `@common/utils/date.utils` 헬퍼만 사용 (`nowUtc` `toIsoUtc` `dateKeyInTimeZone` `formatInTimeZone`) | ✅ |
 | 린트 | 로컬 TZ 의존 메서드(`getHours` `toLocaleString` `getTimezoneOffset` 등 18종)를 `no-restricted-syntax` 로 **error** | ✅ 위반 2건 잡히는 것 실측 확인 |
 | 컨테이너 | `Dockerfile` 에 `ENV TZ=UTC` | ✅ |
-| 테스트 | `test/setup/setup-tz.ts` 가 `process.env.TZ = 'UTC'` 고정 | ✅ |
-| DB | 세션 타임존과 컬럼 타입 | 🚧 DB 확정 후 |
+| 테스트 | jest 설정 파일 **상단**에서 고정 · `setup-tz.ts` 는 검증 가드 | ✅ **2026-09-02 정정** — setupFiles 안의 대입은 동작하지 않았다. ✅ 로 적혀 있던 동안 테스트는 KST 로 돌았다 ([lessons](../lessons.md)) |
+| DB | **MySQL 확정** — 서버 `+00:00` · `DATETIME(3)` · 드라이버 `timezone: 'Z'` | ✅ 결정 (2026-09-02) — 적용·검증은 [`tasks-db-mysql.md`](tasks-db-mysql.md) |
 
 린트로 막는 것이 핵심이다. 규약을 문서에만 적어두면 개발자 노트북(KST)·CI 러너(UTC)·컨테이너(UTC)가 서로 다른 답을 내는 코드가 들어온다. 지금은 날짜 코드가 없어 **위반 0건 상태에서 규칙을 켤 수 있는 유일한 시점**이다.
 
