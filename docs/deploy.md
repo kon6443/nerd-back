@@ -52,7 +52,21 @@ docker stack deploy -c infra/docker-stack.db.yml    prod_nerd_db      # 사전 �
 
 ---
 
-## 배포 흐름
+## MySQL 스택 (`prod_nerd_db`)
+
+운영에 필요한 **사실**만 적는다. 설정값을 왜 그렇게 골랐는지는 [`tasks/tasks-db-mysql.md`](tasks/tasks-db-mysql.md).
+
+| 항목 | 값 |
+|---|---|
+| 이미지 · 서비스 DNS | `mysql:8.4` · `prod_nerd_db_mysql` |
+| 데이터 위치 | named volume `prod_nerd_db_mysql-data` → **블록 볼륨 위 디렉터리**(`type: none, o: bind`). 경로는 GitHub 시크릿 `MYSQL_DATA_DIR`. `docker stack rm` 해도 볼륨은 남는다 |
+| 배포 사전 조건 | 노드 라벨 `prod_nerd_db=1` · Swarm secret `prod_nerd_db_{root,app,migrator}_pw` · `MYSQL_DATA_DIR` 경로 존재(= 블록 볼륨 마운트됨). **`deploy-db.yml` 사전 점검이 셋을 배포 전에 막는다** |
+| 계정 | `root`(복구) · `nerd_app`(앱, DML 만) · `nerd_migrator`(마이그레이션, DDL). 앱은 서버 `.env` 의 `DB_PASSWORD` 로 받는다 — **secret 과 `.env` 두 곳**, 회전 시 함께 |
+| 설정 변경 | `infra/docker-stack.db.yml` 의 `command:` 플래그 → main 푸시 → MySQL **재시작(10~30초 DB 요청 실패, 앱은 유지)** |
+| 첫 기동에 굳는 값 | `lower_case_table_names=1` · `MYSQL_DATABASE=nerd` · initdb 계정 생성 스크립트. 바꾸려면 덤프 후 재초기화 |
+| 외부 접속 | **포트 publish 없음.** SSH 터널만 — 사용법은 [`README`](../README.md) 「DB 접속」 |
+| 백업 | **없음** — 후속 태스크. 그때까지 유실 방어가 0 이다 |
+
 
 `main` 푸시 → GitHub Actions
 
@@ -166,7 +180,18 @@ require('http').get({host:'127.0.0.1',port:5501,path:'/api/v2/health/ready'},r=>
   let b='';r.on('data',c=>b+=c);r.on('end',()=>console.log(r.statusCode,b));})"
 ```
 
-**readiness 가 200 이면** `REDIS_HOST` 의 overlay DNS 해석까지 성공했다는 뜻이다.
+**readiness 가 200 이면** `REDIS_HOST` 해석과 **DB 연결(`db: up`)** 까지 성공했다는 뜻이다. `db: down` 이면 `message` 에 사유가 실린다(`Access denied` = 비밀번호/계정, `getaddrinfo` = 호스트명).
+
+```bash
+# MySQL — 서버가 그 값으로 떠 있나 (배포 스모크와 같은 질문. 비밀번호는 컨테이너 안 secret 파일로만 넘긴다)
+dcid=$(docker ps -q --filter "label=com.docker.stack.namespace=prod_nerd_db" | head -1)
+docker exec "$dcid" bash -c 'mysql --defaults-extra-file=<(printf "[client]\nuser=root\npassword=%s\n" "$(< /run/secrets/prod_nerd_db_root_pw)") \
+  -N -B -e "SELECT @@character_set_server, @@collation_server, @@global.time_zone, @@lower_case_table_names"'
+#   utf8mb4  utf8mb4_0900_ai_ci  +00:00  1
+
+# 데이터가 정말 블록 볼륨에 있나
+docker volume inspect prod_nerd_db_mysql-data --format '{{.Options}}'   # device 가 MYSQL_DATA_DIR 경로
+```
 
 ⚠️ **호스트 OS 는 KST, 컨테이너·DB·로그는 전부 UTC 다.** `docker logs --since 2026-09-02T07:00:00` 처럼 오프셋 없는 시각은 **호스트 TZ(KST)로 해석**된다 — 운영 명령의 시각에는 항상 `Z` 나 오프셋을 붙인다. 호스트 TZ 는 다른 서비스가 공유하므로 바꾸지 않는다.
 
@@ -222,7 +247,8 @@ if [ "$bad" -eq 0 ]; then echo "판정: 무중단"; else echo "판정: 중단 �
 ```bash
 docker service update --rollback prod_nerd_back_app    # 이전 이미지로
 docker service rm prod_nerd_back_app                   # 서비스 제거
-docker service update --rollback prod_nerd_db_mysql    # MySQL 설정 되돌리기. 데이터는 볼륨에 남는다 — 볼륨은 명시적으로만 지운다
+docker service update --rollback prod_nerd_db_mysql    # MySQL 설정 되돌리기. 데이터는 볼륨에 남는다
+docker stack rm prod_nerd_db                           # 스택 제거 — 볼륨·데이터는 남는다. 볼륨은 명시적으로만 지운다
 ```
 
 Caddy 는 블록을 제거한 뒤 `caddy validate && caddy reload`.
