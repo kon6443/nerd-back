@@ -161,10 +161,11 @@ transformOptions: { enableImplicitConversion: true }
 - Redis: `lazyConnect` + `enableOfflineQueue: false` + `maxRetriesPerRequest: 2`. 초기 연결 실패를 흡수해 **부팅을 막지 않는다.**
 - `error` 이벤트 핸들러를 반드시 붙인다. 없으면 ioredis 가 unhandled error 로 프로세스를 죽인다.
 - 종료 시 커넥션을 정리하되 **실패해도 종료를 막지 않는다.** 종료가 지연되면 배포가 멈춘다.
+- 🚫 **DB 는 이 절의 예외 — 핵심 의존이다.** 연결 실패가 재시도 예산(`DB_CONNECT_RETRY` 10회 × 3초 = 30초, healthcheck 종료 시한 75초 안쪽)을 넘기면 **부팅이 실패**하고 Swarm `restart_policy`(무제한)가 재시도한다. 이유는 [`docs/tasks/tasks-db-mysql.md`](../../docs/tasks/tasks-db-mysql.md) D8. 런타임 장애는 다르다 — 이미 뜬 앱은 살아 있고 쿼리만 실패하다가 풀이 회복한다.
 
 ## 9. 테스트 — mock 주력
 
-전 환경이 동일 DB 를 공유하는 구성이라 테스트가 DB 에 접속하지 않는다.
+전 환경이 동일 DB 를 공유하는 구성이라 테스트가 DB 에 접속하지 않는다. **도구가 막는다** — 두 jest 설정의 `moduleNameMapper` 가 `mysql2` 를 `test/setup/forbid-db.ts`(던지는 스텁)로 바꿔, 어떤 경로로든 `DataSource.initialize()` 에 도달하면 이유·대안을 담아 즉시 실패한다. 양쪽 설정에 같은 매퍼가 있어야 하고 `forbid-db.spec.ts` · `forbid-db.e2e-spec.ts` 가 각각 고정한다.
 
 - 단위 spec 은 소스 옆에 `*.spec.ts`. 헬퍼·팩토리는 `__spec__/` 안에 두고 커버리지 분모에서 제외한다.
 - **E2E 는 `AppModule` 을 import 하지 않는다.** `test/helpers/e2e-app.ts` 의 `createE2eApp()` 을 쓴다. 부팅만으로 외부 시스템에 붙는 것을 막고, CI 에서 외부 의존 없이 돌아가게 한다.
@@ -172,6 +173,7 @@ transformOptions: { enableImplicitConversion: true }
 - 에러 경로는 status·code 를 **정확히 고정**한다. `expect([403, 404]).toContain(status)` 같은 느슨한 단정은 그 차이가 곧 방어의 유무일 때 테스트를 조용히 무력화한다.
 - `restoreMocks: true` 이므로 `afterEach` 복원을 직접 쓰지 않는다.
 - ⚠️ `@Transactional` 롤백은 mock 으로 검증할 수 없다. 다중 테이블 쓰기 경로에 데코레이터가 붙었는지 **리뷰에서 grep 으로 확인**한다.
+- E2E 는 `createE2eApp({ dbQuery })` 로 DB 를 스텁한다 — `@InjectDataSource()` 의 기본 토큰(`DataSource` 클래스)에 `{ query }` 를 꽂는다.
 
 ## 10. 날짜·시간 — UTC 저장, 표시 시점에만 변환
 
@@ -204,6 +206,16 @@ dateKeyInTimeZone(nowUtc(), KST);  // '2026-08-27'  ← 일별 집계 키
 - `no-explicit-any`, `no-floating-promises`, `no-misused-promises` 가 **error** 다. 현재 `any` **0건**.
 - 불가피한 경우에만 `eslint-disable-next-line` + **사유 주석**을 남긴다 (현재 **1건** — `CustomThrottlerGuard.getTracker` 가 상위 클래스 시그니처를 따라야 함).
 - 테스트 코드도 린트 대상이다.
+
+## 12. DB 계층 — 옵션은 한 곳, 실행은 사람
+
+- 접속 옵션은 **`src/common/database/typeorm.options.ts` 한 곳**이다. 앱(`DatabaseModule`)과 마이그레이션 CLI(`src/config/data-source.ts`)가 같은 함수를 쓴다. 한쪽만 고치면 CLI 가 앱과 다른 타임존·문자셋으로 붙는다.
+- 고정값: `synchronize: false` · `migrationsRun: false` · `timezone: 'Z'` · `charset: 'utf8mb4_0900_ai_ci'` · `logging: ['error']` · `autoLoadEntities: true`. `typeorm.options.spec.ts` 가 고정한다.
+  - ⚠️ TypeORM 의 `charset` 기본값은 `UTF8_GENERAL_CI` = **utf8mb3** 다. 명시하지 않으면 이모지가 깨진다.
+- 엔티티는 `*.entity.ts`, 모듈이 `TypeOrmModule.forFeature` 로 등록한다 (경로 glob 미사용). 시각 컬럼은 `DATETIME(3)` (§10).
+- `@Transactional` 은 Service 메서드에만. `main.ts` 가 `initializeTransactionalContext({ storageDriver: ASYNC_LOCAL_STORAGE })` 를 **`NestFactory.create` 전에** 1회 부른다 — 늦으면 데코레이터가 조용히 자동 커밋으로 돈다.
+- 마이그레이션: **1개 = 1목적 · `down()` 필수 · 멱등 작성.** MySQL 은 DDL 이 암묵 커밋이라 중간 실패 시 부분 적용 상태로 남는다 — 멱등 + 1목적이 유일한 방어다. 실행은 `pnpm migration:run`(빌드 산출물 + `--env-file=.env.migration`, 계정 `nerd_migrator`)으로 **사람이** 한다. 앱 계정 `nerd_app` 에는 DDL 권한이 없어 코드 경로에서 스키마가 바뀔 수 없다.
+- 커넥션 풀 `DB_POOL_SIZE`(기본 10, 상한 30) × 레플리카 3 ≤ `max_connections` 100.
 
 ---
 

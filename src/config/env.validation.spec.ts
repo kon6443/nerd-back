@@ -1,8 +1,16 @@
-import { AppEnv, isEdgeThrottleEnabled, validateEnv } from './env.validation';
+import { AppEnv, isEdgeThrottleEnabled, validateDbEnv, validateEnv } from './env.validation';
+
+const DB_MINIMAL = {
+  DB_HOST: '127.0.0.1',
+  DB_USER: 'nerd_app',
+  DB_PASSWORD: 'secret',
+  DB_NAME: 'nerd',
+};
 
 const MINIMAL = {
   ENV: 'LOCAL',
   REDIS_HOST: '127.0.0.1',
+  ...DB_MINIMAL,
 };
 
 describe('validateEnv', () => {
@@ -13,6 +21,8 @@ describe('validateEnv', () => {
     expect(result.PORT).toBe(5501);
     expect(result.REDIS_PORT).toBe(6379);
     expect(result.TASK_SLOT).toBe(1);
+    expect(result.DB_PORT).toBe(3306);
+    expect(result.DB_POOL_SIZE).toBe(10);
   });
 
   it('문자열로 들어온 숫자를 number 로 변환한다', () => {
@@ -36,6 +46,32 @@ describe('validateEnv', () => {
 
   it('에러 메시지에 .env.example 안내를 포함한다', () => {
     expect(() => validateEnv({})).toThrow(/\.env\.example/);
+  });
+
+  describe('DB', () => {
+    it.each(['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'])('%s 가 없으면 던진다', (key) => {
+      const rest = Object.fromEntries(Object.entries(MINIMAL).filter(([k]) => k !== key));
+      expect(() => validateEnv(rest)).toThrow(new RegExp(key));
+    });
+
+    it('비밀번호가 빈 문자열이면 던진다 — .env 에 빈 줄만 남는 실수를 잡는다', () => {
+      expect(() => validateEnv({ ...MINIMAL, DB_PASSWORD: '' })).toThrow(/DB_PASSWORD/);
+    });
+
+    it('풀 크기 상한(30)을 넘으면 던진다 — 레플리카 3 × 풀이 max_connections 를 넘지 않게', () => {
+      expect(() => validateEnv({ ...MINIMAL, DB_POOL_SIZE: '31' })).toThrow(/DB_POOL_SIZE/);
+    });
+  });
+
+  describe('validateDbEnv — 마이그레이션 CLI 용', () => {
+    it('DB 변수만으로 통과한다 (Redis 등 앱 변수 불필요)', () => {
+      const result = validateDbEnv({ ...DB_MINIMAL });
+      expect(result.DB_PORT).toBe(3306);
+    });
+
+    it('안내 파일이 .env.migration.example 이다', () => {
+      expect(() => validateDbEnv({})).toThrow(/\.env\.migration\.example/);
+    });
   });
 
   describe('EDGE_THROTTLE_ENABLED', () => {

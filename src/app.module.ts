@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { Redis } from 'ioredis';
 import { THROTTLE_LONG, THROTTLE_SHORT } from '@common/constants/throttle.constants';
+import { DatabaseModule } from '@common/database/database.module';
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
 import { CustomThrottlerGuard } from '@common/guards/custom-throttler.guard';
 import { LoggerModule } from '@common/logger/logger.module';
@@ -22,6 +23,8 @@ import { HealthModule } from '@modules/health/health.module';
     }),
     LoggerModule,
     RedisModule,
+    // DB 는 핵심 의존 — 연결 실패 시 부팅이 실패한다 (DatabaseModule 주석 · D8).
+    DatabaseModule,
 
     // 레플리카가 3개이므로 스토리지가 Redis 여야 한다.
     // 메모리 스토리지를 쓰면 레플리카별로 따로 세어 실효 한도가 3배가 된다.

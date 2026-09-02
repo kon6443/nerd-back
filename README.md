@@ -71,10 +71,21 @@ Redis 가 없어도 앱은 기동하고 HTTP 는 응답한다. 레이트리밋�
 | `LOG_LEVEL` | 로컬 `debug`, 배포 `info` |
 | `CORS_ORIGINS` | 쉼표 구분. 비우면 크로스 오리진 차단. 로컬 기본값은 프론트 개발 서버(`http://localhost:5502`) |
 | `REDIS_HOST` `REDIS_PORT` `REDIS_PASSWORD` | Redis 접속 정보 |
+| `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` | MySQL 접속 정보. 앱은 **`nerd_app`**(DML 만) 계정을 쓴다 |
+| `DB_POOL_SIZE` | 커넥션 풀 크기 (기본 10, 최대 30). 레플리카 3 × 풀 + 여유 ≤ `max_connections` 100 |
 | `TASK_SLOT` | Swarm 이 주입 — 단일 실행 작업 가드용 |
 | `EDGE_THROTTLE_ENABLED` | `true`/`false` (기본 `false`). 켜면 Swagger·404 등 가드 밖 경로를 IP당 분당 300 으로 제한 |
 
-DB 관련 변수는 DB 확정 후 추가한다.
+**전 환경이 같은 서버 DB 를 쓴다** — 로컬용 DB 는 없다. 환경별 값:
+
+| 변수 | 로컬 (`.env`) | 배포 (서버 env 파일) |
+|---|---|---|
+| `DB_HOST` | `127.0.0.1` — `scripts/db-tunnel.sh` 로 터널을 먼저 연다 | `prod_nerd_db_mysql` (DB 스택 서비스 DNS) |
+| `DB_PORT` | `3306` (터널 로컬 포트) | `3306` |
+| `DB_USER` / `DB_NAME` | `nerd_app` / `nerd` | 동일 |
+| `DB_PASSWORD` | Swarm secret `prod_nerd_db_app_pw` 와 **같은 값** (비밀번호 관리자) | 동일 — 회전 시 secret 과 함께 바꾼다 |
+| `REDIS_HOST` | `127.0.0.1` (로컬 Redis) | `prod_nerd_cache_redis` |
+| `ENV` / `LOG_LEVEL` | `LOCAL` / `debug` | `PROD` / `info` |
 
 배포 환경의 env 파일은 저장소에 두지 않고 서버에서 주입한다. 파일명은 `<프로젝트>.<환경>.env` 규칙을 따른다 — 상세는 [`docs/deploy.md`](docs/deploy.md).
 
@@ -94,7 +105,27 @@ pnpm test:e2e
 
 pnpm ci:core             # lint → test → build
 pnpm ci:all              # + 타입 검사 + 스텁 검사 + E2E  (PR 전 필수)
+
+pnpm migration:show                                # 적용/미적용 목록
+pnpm migration:generate src/migrations/<PascalName> # 엔티티 diff 로 파일 생성 (실행 아님)
+pnpm migration:run                                 # ⚠️ 사람만. 실행 = 상용 적용
+pnpm migration:revert                              # 마지막 1개 되돌림
 ```
+
+### 마이그레이션 — 실행은 사람이
+
+전 환경이 같은 DB 라 **실행이 곧 상용 적용**이다. AI 는 파일 작성까지만 한다 (`CLAUDE.md`).
+
+```bash
+cp .env.migration.example .env.migration   # DB_USER=nerd_migrator (DDL 권한). 비밀번호는 비밀번호 관리자
+scripts/db-tunnel.sh                        # 다른 터미널에서 유지 (127.0.0.1:3306 → 운영 DB)
+pnpm migration:show                          # 무엇이 적용될지 먼저 본다
+pnpm migration:run
+```
+
+- 스크립트는 `pnpm build` 후 `dist/config/data-source.js` 로 TypeORM CLI 를 돌린다 (ts-node 미도입). 환경변수는 Node 의 `--env-file=.env.migration` 로 읽는다.
+- 마이그레이션은 **1개 = 1목적**, `down()` 필수, 멱등 작성 — MySQL 은 DDL 이 암묵 커밋이라 중간 실패 시 부분 적용 상태로 남는다. 상세는 `.claude/rules/code-patterns.md` §12.
+- 컬럼 시각은 `DATETIME(3)`. `TIMESTAMP` 는 쓰지 않는다 (§10).
 
 `check:types` 는 `tsc --noEmit` 이다. `build` 는 `src` 만, jest 는 로드한 spec 만 검사하므로 **`src` 와 `test` 를 한 번에 보는 수단은 이것뿐이다.**
 

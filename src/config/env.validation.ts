@@ -1,9 +1,59 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  validateSync,
+} from 'class-validator';
+import type { ClassConstructor } from 'class-transformer';
 
 export enum AppEnv {
   LOCAL = 'LOCAL',
   PROD = 'PROD',
+}
+
+/**
+ * DB 접속 변수. 앱(`EnvVariables`)과 마이그레이션 CLI(`config/data-source.ts`)가 **같은 스키마**를 쓴다 —
+ * CLI 는 Redis 등 앱 변수가 없는 `.env.migration` 으로 돌기 때문에 따로 검증할 수 있어야 한다.
+ *
+ * 배포에서는 서버 .env 가 스택 DNS(`prod_nerd_db_mysql`)를, 로컬에서는 SSH 터널(`127.0.0.1`)을 가리킨다.
+ * 전 환경이 같은 서버 DB 를 쓴다 — 로컬용 DB 는 없다.
+ */
+export class DbEnvVariables {
+  @IsString()
+  @IsNotEmpty()
+  DB_HOST: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  DB_PORT: number = 3306;
+
+  @IsString()
+  @IsNotEmpty()
+  DB_USER: string;
+
+  @IsString()
+  @IsNotEmpty()
+  DB_PASSWORD: string;
+
+  @IsString()
+  @IsNotEmpty()
+  DB_NAME: string;
+
+  /**
+   * 커넥션 풀 크기. **레플리카 3 × 이 값 + 운영·마이그레이션 여유가 MySQL `max_connections`(100) 안에
+   * 들어야 한다.** 2 OCPU 에서 동시에 실행되는 쿼리는 어차피 소수라, 키워도 대기열이 DB 안으로 옮겨갈 뿐이다.
+   */
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  DB_POOL_SIZE: number = 10;
 }
 
 /**
@@ -12,7 +62,7 @@ export enum AppEnv {
  * 누락·형식 오류면 **기동을 중단한다.** 런타임에 undefined 로 새어나가면
  * 원인이 한참 뒤 엉뚱한 곳에서 드러나기 때문이다.
  */
-export class EnvVariables {
+export class EnvVariables extends DbEnvVariables {
   @IsEnum(AppEnv, { message: 'ENV 는 LOCAL 또는 PROD 여야 한다.' })
   ENV: AppEnv;
 
@@ -68,8 +118,12 @@ export function isEdgeThrottleEnabled(value: string | undefined): boolean {
   return value === 'true';
 }
 
-export function validateEnv(config: Record<string, unknown>): EnvVariables {
-  const validated = plainToInstance(EnvVariables, config, {
+function validateAs<T extends object>(
+  schema: ClassConstructor<T>,
+  config: Record<string, unknown>,
+  exampleFile: string,
+): T {
+  const validated = plainToInstance(schema, config, {
     enableImplicitConversion: true,
   });
 
@@ -85,9 +139,18 @@ export function validateEnv(config: Record<string, unknown>): EnvVariables {
 
     throw new Error(
       `환경변수 검증에 실패했다. 기동을 중단한다.\n${detail}\n\n` +
-        '.env.example 을 참고해 누락된 값을 채운 뒤 다시 실행하세요.',
+        `${exampleFile} 을 참고해 누락된 값을 채운 뒤 다시 실행하세요.`,
     );
   }
 
   return validated;
+}
+
+export function validateEnv(config: Record<string, unknown>): EnvVariables {
+  return validateAs(EnvVariables, config, '.env.example');
+}
+
+/** 마이그레이션 CLI 용 — DB 변수만 검증한다. */
+export function validateDbEnv(config: Record<string, unknown>): DbEnvVariables {
+  return validateAs(DbEnvVariables, config, '.env.migration.example');
 }

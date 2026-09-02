@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { TerminusModule } from '@nestjs/terminus';
+import { DataSource } from 'typeorm';
 import { Test } from '@nestjs/testing';
 import { ThrottlerModule, ThrottlerStorage } from '@nestjs/throttler';
 import type { Server } from 'node:http';
@@ -74,6 +75,8 @@ describe('레이트리밋 제외 (E2E)', () => {
       controllers: [HealthController, ControlController],
       providers: [
         { provide: REDIS_CLIENT, useValue: { ping: () => Promise.resolve('PONG') } },
+        // HealthController 가 readiness 용으로 DataSource 를 주입받는다. 실 DB 는 만들지 않는다.
+        { provide: DataSource, useValue: { query: () => Promise.resolve([]) } },
         { provide: APP_GUARD, useClass: CustomThrottlerGuard },
       ],
     })
