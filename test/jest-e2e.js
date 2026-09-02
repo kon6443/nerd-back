@@ -16,6 +16,8 @@ module.exports = {
 
   // ⚠️ jest.config.js 의 moduleNameMapper · tsconfig.json 의 paths 와 1:1 로 유지할 것.
   moduleNameMapper: {
+    // 🚫 실 DB 접속 차단 — mysql2 를 던지는 스텁으로 바꾼다 (test/setup/forbid-db.ts). 양쪽 설정 세트.
+    '^mysql2(/.*)?$': '<rootDir>/setup/forbid-db.ts',
     '^@common/(.*)$': '<rootDir>/../src/common/$1',
     '^@config/(.*)$': '<rootDir>/../src/config/$1',
     '^@entities/(.*)$': '<rootDir>/../src/entities/$1',
