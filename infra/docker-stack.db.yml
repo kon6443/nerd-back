@@ -1,0 +1,152 @@
+# 이 프로젝트 전용 MySQL. 앱·Redis 와 **독립된 스택**이다.
+#
+#   docker stack deploy -c docker-stack.db.yml prod_nerd_db
+#
+# 서비스 DNS = `<스택>_<서비스>` → **`prod_nerd_db_mysql`**
+# 앱은 DB_HOST 로 이 이름을 받는다 (서버 .env).
+#
+# 스택 이름 = 노드 라벨 키(`prod_nerd_db`). Redis 의 예외(스택 prod_nerd_cache / 라벨 prod_nerd_redis)를
+# 여기서 반복하지 않는다 — named volume 이 `<스택명>_mysql-data` 로 만들어지므로 나중에는 못 바꾼다.
+#
+# 설정값을 왜 이렇게 골랐는지는 docs/tasks/tasks-db-mysql.md 「현업 수준 MySQL 설정」이 소유한다.
+# 여기 주석은 "이 줄을 건드리면 무엇이 깨지는가" 만 적는다.
+
+services:
+  mysql:
+    image: mysql:8.4
+
+    # my.cnf 를 configs: 로 넣지 않는다. `docker stack deploy` 는 config 내용이 바뀌어도
+    # 교체하지 못해 이름을 매번 올려야 한다. 플래그로 두면 diff 에 보이고 재배포로 반영된다.
+    command:
+      - mysqld
+      # ── 문자셋: 한글 + 이모지 ──
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      # ── 타임존: UTC 저장 정책 (code-patterns §10) ──
+      # ⚠️ 'Asia/Seoul' 같은 이름은 기동 실패한다 — 공식 이미지에 tz 테이블이 로드돼 있지 않다.
+      - --default-time-zone=+00:00
+      # ⚠️ 데이터 디렉터리 **초기화 시점에만** 정할 수 있다. 첫 배포 뒤 바꾸면 기동 실패.
+      - --lower-case-table-names=1
+      # ── InnoDB ──
+      # 12GB 를 앱 3레플리카·Redis 와 나눠 쓰는 예산이다. 아래 limits.memory 와 **같게 잡지 않는다** —
+      # MySQL 은 buffer pool 밖에서도 상당량을 쓴다. 같으면 OOMKill 재시작 루프.
+      - --innodb-buffer-pool-size=1G
+      - --innodb-flush-log-at-trx-commit=1
+      - --innodb-flush-method=O_DIRECT
+      - --innodb-redo-log-capacity=256M
+      # ── 커넥션: 앱 풀 10 × 레플리카 3 + 운영·로컬 개발(SSH 터널) 여유 ──
+      - --max-connections=100
+      # ⚠️ 앱 풀의 idle timeout 보다 길어야 한다. 반대면 DB 가 먼저 끊은 커넥션을 앱이 꺼내 쓴다.
+      - --wait-timeout=600
+      - --interactive-timeout=600
+      # ── binlog: 특정 시점 복구의 전제. 58GB 디스크라 7일만 보존 ──
+      - --binlog-expire-logs-seconds=604800
+      - --binlog-row-image=MINIMAL
+      - --sync-binlog=1
+      # ── slow log 만, **파일로**. 로그 수집 에이전트가 stdout 을 전부 가져가므로
+      #    general_log 나 slow log 를 stdout 으로 내면 공유 로그 스택 인제스트 한도를 먹는다. ──
+      - --slow-query-log=ON
+      - --long-query-time=1
+      - --slow-query-log-file=/var/lib/mysql/mysql-slow.log
+      # error/slow 로그의 시각. 기본값이 UTC 지만 호스트가 KST 라 의도를 명시한다.
+      - --log-timestamps=UTC
+
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/prod_nerd_db_root_pw
+      # 첫 초기화 때 서버 기본 문자셋(utf8mb4)으로 생성된다. initdb 스크립트가 이 이름에 권한을 준다.
+      MYSQL_DATABASE: nerd
+      # MYSQL_USER 를 쓰지 않는다 — 대상 DB 에 ALL 을 줘서 DDL 분리가 안 된다. 계정은 initdb 스크립트가 만든다.
+      TZ: UTC
+
+    secrets:
+      - prod_nerd_db_root_pw
+      - prod_nerd_db_app_pw
+      - prod_nerd_db_migrator_pw
+
+    configs:
+      # ⚠️ 데이터 디렉터리가 빈 **첫 기동에만 1회** 실행된다. 이후에 고쳐도 다시 돌지 않는다.
+      # ⚠️ mode 0444 — 실행 권한을 주지 않는다. 엔트리포인트는 비실행 .sh 를 source 하므로
+      #    스크립트가 docker_process_sql 함수를 쓸 수 있다. 실행 권한이 있으면 별도 프로세스로 돌아 함수가 없다.
+      - source: init-users-v1
+        target: /docker-entrypoint-initdb.d/01-users.sh
+        mode: 0444
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+    networks:
+      - shared
+
+    # ⚠️ mysqladmin ping 은 인증에 실패해도 서버가 살아 있으면 0 을 반환한다. liveness 로는 충분하고
+    #    "접속 가능" 은 앱의 readiness 가 본다. 초기화 중 임시 서버는 --skip-networking 이라
+    #    127.0.0.1 TCP ping 이 실패한다 → start_period 동안 starting 으로 남는 것이 **의도**다.
+    #    (-h 를 빼면 소켓으로 붙어 초기화 중에 healthy 가 나온다.)
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '--silent']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      # 첫 기동은 데이터 디렉터리 초기화를 포함한다. 짧으면 초기화 중 unhealthy → 재시작 루프.
+      start_period: 120s
+
+    # InnoDB 가 버퍼를 디스크에 내릴 시간. Swarm 기본 10s 면 강제 종료돼 다음 기동이 크래시 복구로 들어간다.
+    stop_grace_period: 120s
+
+    deploy:
+      replicas: 1
+
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+      update_config:
+        parallelism: 1
+        # named volume 에 두 컨테이너가 동시에 붙을 수 없다 (Redis 와 같은 이유). start-first 금지.
+        order: stop-first
+
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+        window: 120s
+
+      # 노드명이 아니라 라벨로 건다 — 노드명은 인프라 식별 정보다.
+      # ⚠️ 라벨이 없으면 태스크가 `no suitable node` 로 pending 에 걸린 채 배포는 성공으로 보인다.
+      #    deploy-db.yml 의 사전 점검이 이를 배포 전에 막는다.
+      placement:
+        constraints:
+          - node.labels.prod_nerd_db == 1
+
+volumes:
+  # 블록 스토리지 위의 디렉터리에 못박는다. 경로는 배포 시점에 시크릿(MYSQL_DATA_DIR)으로 주입한다.
+  # 순수 bind mount(`- /경로:/var/lib/mysql`)를 쓰지 않는 이유: 경로가 없으면 Docker 가 만들어 버려
+  # 블록 볼륨이 안 붙은 채로 **부트 디스크에 조용히** 데이터가 쌓인다. 아래 방식은 경로가 없으면 마운트가 실패한다.
+  # ⚠️ 이미 만들어진 볼륨의 driver_opts 는 재배포로 바뀌지 않는다. 경로를 바꾸려면 볼륨을 지우고 다시 만든다.
+  mysql-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${MYSQL_DATA_DIR}
+
+secrets:
+  # 생성은 사람이 매니저에서 1회 (docs/tasks/tasks-db-mysql.md 「시크릿」). 값은 다시 읽어낼 수 없다.
+  prod_nerd_db_root_pw:
+    external: true
+  prod_nerd_db_app_pw:
+    external: true
+  prod_nerd_db_migrator_pw:
+    external: true
+
+configs:
+  # ⚠️ 이름에 버전을 붙인다. `docker stack deploy` 는 같은 이름의 config 내용을 갱신하지 못해
+  #    파일을 고치면 배포가 실패한다 — 고칠 때는 v2 로 이름을 올린다 (위 services.mysql.configs 도 함께).
+  init-users-v1:
+    file: ./mysql/init-users.sh
+
+networks:
+  shared:
+    external: true
+    name: ${OVERLAY_NETWORK}
