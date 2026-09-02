@@ -182,7 +182,9 @@ transformOptions: { enableImplicitConversion: true }
 | 앱 코드 | `@common/utils/date.utils` 헬퍼만 사용 |
 | 린트 | 로컬 TZ 의존 메서드 **19종**을 `no-restricted-syntax` 로 **error** (2026-08-27 실측) |
 | 컨테이너 | `Dockerfile` 의 `ENV TZ=UTC` |
-| 테스트 | `test/setup/setup-tz.ts` 가 TZ 고정 |
+| 프로세스 | `src/config/timezone.ts` 가 부팅 최초에 `process.env.TZ = 'UTC'` — `main.ts` **첫 import**. 로컬 `pnpm dev`(노트북 KST)까지 UTC 로 맞춘다 |
+| 테스트 | **`jest.config.js` · `test/jest-e2e.js` 상단**에서 고정. `test/setup/setup-tz.ts` 는 고정이 아니라 **검증 가드** — 🚫 setupFiles 안의 `process.env.TZ` 대입은 샌드박스 env 에만 쓰여 V8 에 닿지 않는다 (2026-09-02 실측, [lessons](../../docs/lessons.md)) |
+| DB (MySQL) | 서버 `--default-time-zone=+00:00` · 컬럼 **`DATETIME(3)`** · 드라이버 mysql2 **`timezone: 'Z'`** |
 
 ```ts
 import { KST, dateKeyInTimeZone, nowUtc, toIsoUtc } from '@common/utils/date.utils';
@@ -194,7 +196,8 @@ dateKeyInTimeZone(nowUtc(), KST);  // '2026-08-27'  ← 일별 집계 키
 - 🚫 `getHours` `toLocaleString` `getTimezoneOffset` 등을 직접 부르지 않는다. **린트가 error 로 막는다** — 개발자 노트북(KST)·CI(UTC)·컨테이너(UTC)가 서로 다른 답을 내기 때문이다.
   - **예외 3곳은 룰이 꺼져 있다** (`eslint.config.mjs` 의 `files` 오버라이드): `src/common/utils/date.utils.ts`(헬퍼 자신) · `**/*.spec.ts` · `test/**/*.ts`. 즉 **spec 에서는 막히지 않는다** — 프로덕션 코드에만 강제된다.
 - `dateKeyInTimeZone` 이 타임존을 **인자로 강제**하는 이유: 일별 카운터의 "오늘"이 어느 타임존이냐가 집계 결과를 바꾼다. 한국 사용자 기준이면 KST 로 리셋해야 한다.
-- DB 세션 타임존·컬럼 타입은 DB 확정 후 정한다. DB별 적용 방법과 함정은 [`docs/tasks/tasks-backend-skeleton.md`](../../docs/tasks/tasks-backend-skeleton.md) 「날짜·시간 정책」.
+- 🚫 **MySQL `TIMESTAMP` 타입을 쓰지 않는다.** 세션 TZ 기준으로 저장·조회 시 자동 변환되어 환경마다 값이 달라지고, 2038-01-19 이후를 표현하지 못한다. `DATETIME(3)` 에 UTC 를 넣는다.
+- 🚫 mysql2 `timezone: 'Z'` 를 빼지 않는다. 없으면 `DATETIME` 을 프로세스 로컬 TZ 로 해석해, 같은 행을 로컬(KST)과 운영(UTC)이 다르게 읽는다. 근거·점검표는 [`docs/tasks/tasks-db-mysql.md`](../../docs/tasks/tasks-db-mysql.md) 「시간 설정 점검」.
 
 ## 11. 타입 — 억제는 도구가 막는다
 

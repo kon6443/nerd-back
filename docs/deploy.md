@@ -11,19 +11,19 @@
 | 항목 | 값 |
 |---|---|
 | 오케스트레이터 | Docker Swarm (stack) |
-| 스택 | `prod_nerd_back`(앱) · `prod_nerd_cache`(Redis) — **독립 배포** |
-| 서비스 DNS | `prod_nerd_back_app` · `prod_nerd_cache_redis` |
-| 레플리카 | 앱 **3** · Redis 1 |
+| 스택 | `prod_nerd_back`(앱) · `prod_nerd_cache`(Redis) · `prod_nerd_db`(MySQL) — **독립 배포** |
+| 서비스 DNS | `prod_nerd_back_app` · `prod_nerd_cache_redis` · `prod_nerd_db_mysql` |
+| 레플리카 | 앱 **3** · Redis 1 · MySQL 1 |
 | 컨테이너 포트 | **5501** — 호스트 publish 없음 |
 | 이미지 | 멀티스테이지, `linux/arm64` 단독, 태그 = 커밋 short SHA |
 | 네트워크 | 기존 overlay 에 `external: true` 로 참여 |
-| 노드 배치 | 라벨 제약 — `prod_nerd_back=1` · `prod_nerd_redis=1` (규칙: `prod_<프로젝트>_<역할>`) |
+| 노드 배치 | 라벨 제약 — `prod_nerd_back=1` · `prod_nerd_redis=1` · `prod_nerd_db=1` (규칙: `prod_<프로젝트>_<역할>`) |
 | 리버스 프록시 | Caddy → `reverse_proxy http://prod_nerd_back_app:5501` |
 | GitHub Environment | `PROD` (시크릿 9개) |
 
 서비스 DNS 는 **`<스택명>_<서비스명>`** 이다. 원하는 이름을 스택 쪽에 넣으면 서비스 키가 뒤에 한 번 더 붙으므로, **최종 DNS 이름을 먼저 적고 역산**한다.
 
-**스택 이름 = 노드 라벨 키**로 맞춰 두었다. 서비스 키는 `app` 으로 고정한다 — 어느 스택이 어느 라벨을 보는지 파일을 열지 않고도 알 수 있다.
+**스택 이름 = 노드 라벨 키**로 맞춰 두었다 — 어느 스택이 어느 라벨을 보는지 파일을 열지 않고도 알 수 있다. 서비스 키는 앱 스택이 `app`, 인프라 스택은 역할명(`mysql`)이다.
 ⚠️ **Redis 스택만 예외다** (`prod_nerd_cache` / 라벨 `prod_nerd_redis`). named volume 이 스택 이름을 물고 있어 이름을 바꾸면 데이터 경계가 이동한다 — `infra/docker-stack.redis.yml` 상단 주석 참조. **일관성을 이유로 바꾸지 않는다.**
 
 **호스트로 포트를 publish 하지 않는다.** Caddy 가 같은 overlay 안에 있어 서비스 DNS 로 바로 닿는다. publish 하면 도메인을 우회한 직접 접근 경로가 열리고 기존 스택과 포트가 겹칠 위험도 생긴다.
@@ -34,18 +34,20 @@
 
 앱과 Redis 를 **별도 스택**으로 둔다. 같은 스택이면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고, 결과적으로 앱까지 재배포된다.
 
-| 변경한 것 | 도는 워크플로 | 이미지 빌드 | 앱 재배포 | Redis 재시작 |
-|---|---|:-:|:-:|:-:|
-| `src/**` · `scripts/**` · `Dockerfile` · 의존성 | `deploy.yml` | O | O | X |
-| `infra/docker-stack.app.yml` | `deploy.yml` | O | O | X |
-| `infra/docker-stack.redis.yml` | `deploy-redis.yml` | X | X | O |
-| 문서·태스크 파일만 | (없음) | X | X | X |
+| 변경한 것 | 도는 워크플로 | 이미지 빌드 | 앱 재배포 | Redis 재시작 | MySQL 재시작 |
+|---|---|:-:|:-:|:-:|:-:|
+| `src/**` · `scripts/**` · `Dockerfile` · 의존성 | `deploy.yml` | O | O | X | X |
+| `infra/docker-stack.app.yml` | `deploy.yml` | O | O | X | X |
+| `infra/docker-stack.redis.yml` | `deploy-redis.yml` | X | X | O | X |
+| `infra/docker-stack.db.yml` · `infra/mysql/**` | `deploy-db.yml` | X | X | X | O |
+| 문서·태스크 파일만 | (없음) | X | X | X | X |
 
-두 워크플로의 `paths` 화이트리스트는 **교집합이 0건**이다.
+세 워크플로의 `paths` 화이트리스트는 **교집합이 0건**이다.
 
 ```bash
 docker stack deploy -c infra/docker-stack.app.yml   prod_nerd_back
 docker stack deploy -c infra/docker-stack.redis.yml prod_nerd_cache
+docker stack deploy -c infra/docker-stack.db.yml    prod_nerd_db      # 사전 조건: 라벨·secret·데이터 경로 (deploy-db.yml 사전 점검)
 ```
 
 ---
@@ -82,7 +84,7 @@ stop_grace_period: 30s
 
 레플리카 3개를 두는 이유가 이것이다. 단일 노드에서도 **무중단 배포**가 된다.
 
-⚠️ Redis 는 `order: stop-first` 다. named volume 에 두 컨테이너가 동시에 붙을 수 없어 교체 순간 짧은 공백이 있다. 그동안 앱은 레이트리밋만 축소 모드(fail-open)로 돌고 HTTP 는 계속 응답한다.
+⚠️ Redis·MySQL 은 `order: stop-first` 다. named volume 에 두 컨테이너가 동시에 붙을 수 없어 교체 순간 짧은 공백이 있다. Redis 공백 동안 앱은 레이트리밋만 축소 모드(fail-open)로 돌고 HTTP 는 계속 응답한다. MySQL 공백 동안 DB 를 쓰는 요청은 실패한다 — 앱이 DB 를 쓰기 시작하면 이 문장의 실제 영향을 재측정한다.
 
 ---
 
@@ -144,6 +146,7 @@ caddy reload   --config <경로>
 # 서비스가 떠 있나
 docker stack services prod_nerd_back
 docker stack services prod_nerd_cache
+docker stack services prod_nerd_db
 
 # Swarm 이 보는 헬스 (우리 healthcheck.mjs 결과)
 # ⚠️ 스택 단위 조회는 **네임스페이스 라벨**로 한다. `name=` 은 부분 문자열 매칭이라
@@ -163,6 +166,8 @@ require('http').get({host:'127.0.0.1',port:5501,path:'/api/v2/health/ready'},r=>
 ```
 
 **readiness 가 200 이면** `REDIS_HOST` 의 overlay DNS 해석까지 성공했다는 뜻이다.
+
+⚠️ **호스트 OS 는 KST, 컨테이너·DB·로그는 전부 UTC 다.** `docker logs --since 2026-09-02T07:00:00` 처럼 오프셋 없는 시각은 **호스트 TZ(KST)로 해석**된다 — 운영 명령의 시각에는 항상 `Z` 나 오프셋을 붙인다. 호스트 TZ 는 다른 서비스가 공유하므로 바꾸지 않는다.
 
 ### 무중단 배포 실측
 
@@ -216,6 +221,7 @@ if [ "$bad" -eq 0 ]; then echo "판정: 무중단"; else echo "판정: 중단 �
 ```bash
 docker service update --rollback prod_nerd_back_app    # 이전 이미지로
 docker service rm prod_nerd_back_app                   # 서비스 제거
+docker service update --rollback prod_nerd_db_mysql    # MySQL 설정 되돌리기. 데이터는 볼륨에 남는다 — 볼륨은 명시적으로만 지운다
 ```
 
 Caddy 는 블록을 제거한 뒤 `caddy validate && caddy reload`.

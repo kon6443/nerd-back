@@ -1,3 +1,5 @@
+// ⚠️ 첫 import 여야 한다 — 다른 모듈이 로드되기 전에 프로세스 TZ 를 UTC 로 고정한다.
+import '@config/timezone';
 import 'reflect-metadata';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';

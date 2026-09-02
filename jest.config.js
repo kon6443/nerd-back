@@ -1,3 +1,9 @@
+// ⚠️ 타임존은 **여기서**(설정 로드 시점 = 워커를 띄우기 전) 고정한다.
+//    setupFiles 안에서 process.env.TZ 를 대입하면 샌드박스의 env 복사본에만 쓰여 V8 타임존이 바뀌지 않는다
+//    (2026-09-02 실측: 대입 후에도 getHours 9 · Intl 'Asia/Seoul'). 워커는 이 프로세스의 env 를 상속한다.
+//    test/setup/setup-tz.ts 가 이 고정이 실제로 먹었는지 매 테스트 파일 앞에서 검증한다.
+process.env.TZ = 'UTC';
+
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: 'src',
