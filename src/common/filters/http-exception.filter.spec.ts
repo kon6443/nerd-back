@@ -1,9 +1,4 @@
-import {
-  HttpStatus,
-  Logger,
-  NotFoundException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { HttpStatus, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import type { ArgumentsHost } from '@nestjs/common';
 import { defineDomainError } from '../dto/define-domain-error';
 import { HttpExceptionFilter } from './http-exception.filter';
@@ -130,7 +125,10 @@ describe('HttpExceptionFilter', () => {
       const { host } = createHost();
 
       filter.catch(
-        new ServiceUnavailableException({ status: 'error', details: { redis: { status: 'down' } } }),
+        new ServiceUnavailableException({
+          status: 'error',
+          details: { redis: { status: 'down' } },
+        }),
         host,
       );
 
