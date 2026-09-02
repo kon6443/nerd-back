@@ -282,10 +282,13 @@ code-patterns §10 이 이미 **UTC 저장 · 표시 시점 변환**으로 확�
 
 ### 앱 (Step 6~9)
 
+⚠️ **순서가 곧 안전장치다.** D8 로 앱은 DB 없이 부팅하지 못한다. 그래서 Step 6~9 는 **별도 브랜치·별도 PR** 로 만들고, **PR #12(DB 스택)가 머지·배포되어 Step 5 가 끝난 뒤에** 머지한다. 같은 PR 에 묶으면 앱 재배포가 MySQL 초기화(1~2분)보다 먼저 떠서 부팅 실패 → 롤링 업데이트 롤백 → 배포 실패로 끝날 수 있다. 코드 작성·CI 검증은 mock 기반이라 DB 가 뜨기 전에도 진행할 수 있다.
+
+
 - [ ] **Step 6** — 패키지 일괄 설치: `@nestjs/typeorm` `typeorm` `typeorm-transactional` `mysql2`
       *(skeleton 태스크 주의사항 #10 — 여기서 처음 설치한다. 미리 깔지 않았던 이유가 드라이버의 arm64 위험이었고, 지금이 그 확인 시점이다)*
-- [ ] **Step 7** — `DB_*` 환경변수를 `EnvVariables` 에 추가 + `.env.example`. **부팅 시 검증되어야 한다**
-- [ ] **Step 8** — `TypeOrmModule.forRootAsync` 배선 + readiness 인디케이터 + **앱 스택 `restart_policy` 무제한**(D8) + code-patterns §8 에 DB 예외 명시
+- [ ] **Step 7** — `DB_HOST` `DB_PORT` `DB_USER` `DB_PASSWORD` `DB_NAME` 을 `EnvVariables` 에 추가 + `.env.example`. **부팅 시 검증되어야 한다.** 사람 작업: 서버 `.env`(`ENV_FILE_PATH`) 에 같은 5개를 추가 — `DB_HOST=prod_nerd_db_mysql` · `DB_USER=nerd_app` · `DB_PASSWORD`=비밀번호 관리자의 app 값 · `DB_NAME=nerd`. **GitHub 시크릿 추가는 없다** — 앱 env 는 서버 파일에서 온다(D6)
+- [ ] **Step 8** — `TypeOrmModule.forRootAsync` 배선 + **`/health/ready` 에 DB 인디케이터 추가**(liveness `/health` 와 합치지 않는다 — CLAUDE.md Never · code-patterns §7. 합치면 DB 재시작 30초에 앱 3개가 unhealthy 로 재시작되고 배포 중이면 롤백된다) + **앱 스택 `restart_policy` 무제한**(D8) + code-patterns §8 에 DB 예외 명시
 - [ ] **Step 9** — `test/setup/forbid-db.ts` 가드 + 첫 마이그레이션 **파일 작성** (실행 X)
 
 ### 앱 배선 규약 (Step 8 에서 지킬 것)
