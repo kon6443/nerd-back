@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { TerminusModule } from '@nestjs/terminus';
+import { DataSource } from 'typeorm';
 import { Test } from '@nestjs/testing';
 import { ThrottlerModule, ThrottlerStorage } from '@nestjs/throttler';
 import type { Server } from 'node:http';
@@ -77,6 +78,8 @@ async function createApp(storage: ThrottlerStorage): Promise<NestExpressApplicat
     controllers: [HealthController, ControlController],
     providers: [
       { provide: REDIS_CLIENT, useValue: { ping: () => Promise.resolve('PONG') } },
+      // HealthController 가 readiness 용으로 DataSource 를 주입받는다. 실 DB 는 만들지 않는다.
+      { provide: DataSource, useValue: { query: () => Promise.resolve([]) } },
       { provide: APP_GUARD, useClass: CustomThrottlerGuard },
     ],
   })
@@ -173,10 +176,7 @@ describe('엣지 백스톱 레이트리밋 (E2E)', () => {
           .expect(404);
       }
 
-      await request(server)
-        .get(path)
-        .set('X-Forwarded-For', `10.0.0.99, ${REAL_IP}`)
-        .expect(429);
+      await request(server).get(path).set('X-Forwarded-For', `10.0.0.99, ${REAL_IP}`).expect(429);
 
       // 통이 하나만 만들어졌음을 키로 확인한다 (위조 값이 키에 섞이지 않았다).
       const edgeKeys = [...storage.hits.keys()].filter((k) => k.startsWith('edge-'));
@@ -228,9 +228,7 @@ describe('엣지 백스톱 레이트리밋 (E2E)', () => {
       const server = app.getHttpServer() as Server;
 
       for (let i = 0; i < EDGE_LIMIT + 2; i += 1) {
-        await request(server)
-          .get(`/${API_PREFIX}/control`)
-          .expect(200);
+        await request(server).get(`/${API_PREFIX}/control`).expect(200);
       }
     });
   });

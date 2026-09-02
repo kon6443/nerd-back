@@ -79,6 +79,7 @@ paths 화이트리스트 트리거
 update_config:   order: start-first · parallelism: 1 · delay 5s · monitor 45s · failure_action: rollback · max_failure_ratio: 0
 rollback_config: order: start-first · parallelism: 1 · monitor 10s
 healthcheck:     liveness 경로만 (scripts/healthcheck.mjs) · start_period 30s
+restart_policy:  on-failure · delay 10s · **무제한** — DB 없이는 부팅 실패(D8)하므로 DB 복구 시 자동 복원되게
 stop_grace_period: 30s
 ```
 
@@ -133,7 +134,7 @@ caddy reload   --config <경로>
 | 레이트리밋은 **Redis 스토리지 필수** | 실효 한도가 3배가 되어 제한이 사실상 사라진다 |
 | 비용 카운터·예산 집계도 Redis | 3배까지 새어나간다 |
 | 스케줄러·Cron 은 `TASK_SLOT` 가드로 1개만 | 전 레플리카에서 중복 실행된다 |
-| DB 커넥션 풀 × 3 이 세션 한도 안에 들어와야 함 | 앱이 커넥션을 못 얻어 장애 |
+| DB 커넥션 풀 × 3 이 `max_connections`(100) 안에 들어와야 함 — 현재 풀 10 × 3 = 30, `DB_POOL_SIZE` 상한 30 | 앱이 커넥션을 못 얻어 장애 |
 | WebSocket 도입 시 Redis 어댑터 필수 | 다른 레플리카의 클라이언트에 브로드캐스트가 안 간다 |
 
 ---

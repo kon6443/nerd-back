@@ -11,12 +11,17 @@ import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
+import { StorageDriver, initializeTransactionalContext } from 'typeorm-transactional';
 import { API_PREFIX, DOCS_PATH, TRUST_PROXY_HOPS } from '@common/constants/app.constants';
 import { createEdgeThrottle } from '@common/middleware/edge-throttle.middleware';
 import { AppModule } from './app.module';
 import { isEdgeThrottleEnabled } from './config/env.validation';
 
 async function bootstrap(): Promise<void> {
+  // @Transactional 의 컨텍스트 저장소. **DataSource 가 만들어지기 전**에 1회 초기화해야 한다 —
+  // 늦으면 데코레이터가 트랜잭션을 찾지 못한 채 조용히 자동 커밋으로 돈다.
+  initializeTransactionalContext({ storageDriver: StorageDriver.ASYNC_LOCAL_STORAGE });
+
   // bufferLogs — Pino 로거가 준비되기 전의 부팅 로그를 버려지지 않게 모아둔다.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
 
@@ -64,15 +69,8 @@ async function bootstrap(): Promise<void> {
 
   // Swagger 는 전 환경에 노출한다. 상용 환경이 하나뿐이고, API 설계를 공개하는 편이 낫다.
   // 대신 레이트리밋과 예산 가드레일이 앞단에 반드시 있어야 한다.
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('nerd-back API')
-    .setVersion('0.1.0')
-    .build();
-  SwaggerModule.setup(
-    `${API_PREFIX}/docs`,
-    app,
-    SwaggerModule.createDocument(app, swaggerConfig),
-  );
+  const swaggerConfig = new DocumentBuilder().setTitle('nerd-back API').setVersion('0.1.0').build();
+  SwaggerModule.setup(`${API_PREFIX}/docs`, app, SwaggerModule.createDocument(app, swaggerConfig));
 
   const port = config.get<number>('PORT') ?? 5501;
   await app.listen(port, '0.0.0.0');

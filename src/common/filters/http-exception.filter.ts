@@ -44,10 +44,7 @@ function statusToCode(status: number): string {
  */
 function isHealthCheckPayload(payload: unknown): payload is Record<string, unknown> {
   return (
-    typeof payload === 'object' &&
-    payload !== null &&
-    'status' in payload &&
-    'details' in payload
+    typeof payload === 'object' && payload !== null && 'status' in payload && 'details' in payload
   );
 }
 

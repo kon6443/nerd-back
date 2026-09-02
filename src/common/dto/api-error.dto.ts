@@ -27,7 +27,10 @@ export class ApiErrorBodyDto {
   @ApiProperty({ example: 'RESOURCE_NOT_FOUND', description: '기계가 분기하는 에러 코드' })
   code: string;
 
-  @ApiProperty({ example: '요청한 리소스를 찾을 수 없습니다.', description: '사용자에게 보여줄 메시지' })
+  @ApiProperty({
+    example: '요청한 리소스를 찾을 수 없습니다.',
+    description: '사용자에게 보여줄 메시지',
+  })
   message: string;
 
   @ApiProperty({ example: '2026-08-26T10:00:00.000Z', description: 'ISO 8601' })

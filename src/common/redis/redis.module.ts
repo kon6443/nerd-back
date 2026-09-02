@@ -1,10 +1,4 @@
-import {
-  Global,
-  Inject,
-  Logger,
-  Module,
-  type OnApplicationShutdown,
-} from '@nestjs/common';
+import { Global, Inject, Logger, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 import { createLogThrottle } from '../utils/log-throttle';

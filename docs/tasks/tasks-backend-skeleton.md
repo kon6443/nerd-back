@@ -58,12 +58,12 @@
 | 항목 | 상태 | 무엇이 정해지면 풀리는가 |
 |---|---|---|
 | DB 종류 | **MySQL 자체 호스팅으로 전환 중 (2026-09-02)** | 「관리형 중 선택 · A1 자체 호스팅 제외」 결정을 **번복했다.** 같은 Swarm 에 올린다 — 근거·진행·남은 미결정은 [`tasks-db-mysql.md`](tasks-db-mysql.md) 가 소유한다 |
-| DB 계층 패키지 일괄 | DB 확정 후 | `@nestjs/typeorm` `typeorm` `typeorm-transactional` + 드라이버를 **한 번에** 설치. 미리 깔아두지 않는다 |
-| readiness 인디케이터 | Redis·DB 도입 시 | liveness는 Phase 1에서 완성, readiness는 의존이 생길 때 채운다 |
-| 엔티티 컬럼 타입·네이밍 규칙 | DB 확정 후 | DB별 타입 매핑과 대소문자 관례가 다름 |
+| DB 계층 패키지 일괄 | ✅ 2026-09-02 | `@nestjs/typeorm@11` `typeorm@0.3` `typeorm-transactional` `mysql2` — 버전 선택 근거는 [`tasks-db-mysql.md`](tasks-db-mysql.md) Step 6 |
+| readiness 인디케이터 | ✅ Redis · DB | liveness 와 분리 유지. E2E 가 고정 |
+| 엔티티 컬럼 타입·네이밍 규칙 | 시각 컬럼 `DATETIME(3)` 확정 · 네이밍은 첫 엔티티에서 | 서버 `lower_case_table_names=1` 이라 테이블명 대소문자는 무시된다 |
 | DB 세션 타임존·컬럼 타입 | DB 확정 후 | 앱 레벨 정책은 확정됨. DB별 적용 방법만 남았다 (↓ 날짜·시간 정책) |
-| 마이그레이션 멱등 가드 문법 | DB 확정 후 | 시스템 카탈로그 조회 문법이 DB별로 다름 |
-| 커넥션 풀 크기 | DB 확정 후 | 세션 한도 ÷ 레플리카 3 (↓ 주의 사항 #2) |
+| 마이그레이션 멱등 가드 문법 | MySQL 확정 — 첫 마이그레이션에서 | `information_schema` 조회 또는 `IF NOT EXISTS`. 규약은 code-patterns §12 |
+| 커넥션 풀 크기 | ✅ `DB_POOL_SIZE` 기본 10 · 상한 30 | 자체 호스팅이라 한도(`max_connections=100`)를 우리가 정한다. 10 × 3 = 30 |
 | LLM 로그 본문 정책 | **보류** | 프롬프트 본문 제외 · 토큰 수·모델명·소요시간만 남기는 규칙. 노이즈 억제(`createLogThrottle`)와 중복 기록 방지는 Phase 1 에서 확정됨 |
 | Prometheus 연결 | **후순위** | `/metrics` 노출과 스크레이프 설정은 뼈대 완료 후 |
 | 인증 | **보류** | 주제 확정 후. 지금은 `common/guards/` 자리와 `@CurrentUser()` 데코레이터만 |
