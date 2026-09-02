@@ -376,7 +376,7 @@ docker service update --force prod_nerd_db_mysql
 | 항목 | 게이트 | 비고 |
 |---|---|---|
 | **백업 + 복구 리허설** (D3) | 🔴 **배포 직후 조치** | 실데이터가 쌓이기 전에. 착수 시 `docs/tasks/tasks-db-backup.md` 생성 |
-| `deploy.md` 승격 | 후속 | 배포가 안정되면 구성표·상태 확인 절을 `deploy.md` 로 옮기고 여기는 근거만 남긴다 |
+| `deploy.md` 승격 | ✅ 2026-09-02 | 「MySQL 스택」절·상태 확인·롤백을 `deploy.md` 로, 사용법(터널·마이그레이션)은 README 로, 함정 2건은 CLAUDE.md 로 승격. 여기는 근거만 소유한다 |
 | 엔티티 네이밍·컬럼 타입 규약 | 후속 | 첫 엔티티를 쓸 때 `.claude/rules/code-patterns.md` 로 승격 |
 | mysqld exporter | 후순위 | `deploy.md` 관측성 방침과 동일 — 메트릭은 별도 태스크 |
 

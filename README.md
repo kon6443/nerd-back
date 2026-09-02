@@ -5,7 +5,7 @@ NestJS 11 + TypeScript 백엔드.
 > **이 문서는 사실과 사용법만 담는다** — 스택, 실행법, 환경 변수, 명령어.
 > 규약·설계·배포 상세는 아래 [문서와 설정](#문서와-설정)으로 분리되어 있다. 같은 내용을 두 곳에 쓰지 않는다.
 
-**현재 상태**: Phase 1(뼈대) 배포 완료. DB 계층은 미착수.
+**현재 상태**: 뼈대 + MySQL 연결까지 배포됨. 도메인 모듈은 없다.
 
 ---
 
@@ -16,7 +16,7 @@ NestJS 11 + TypeScript 백엔드.
 | 런타임 | Node 22 LTS (ARM64) |
 | 프레임워크 | NestJS 11 · Express |
 | 패키지 매니저 | pnpm |
-| ORM | TypeORM (**DB 확정 후 설치**) |
+| ORM | TypeORM 0.3 (`@nestjs/typeorm`) + `typeorm-transactional` |
 | 캐시·카운터 | Redis (`ioredis`) |
 | 로깅 | Pino (`nestjs-pino`) |
 | API 문서 | Swagger — `/api/v2/docs` |
@@ -24,7 +24,7 @@ NestJS 11 + TypeScript 백엔드.
 | 레이트리밋 | `@nestjs/throttler` + Redis 스토리지 |
 | 테스트 | Jest + supertest |
 | 배포 | Docker Swarm on ARM64 |
-| DB | **미결정** |
+| DB | MySQL 8.4 — 같은 Swarm 에 자체 호스팅 (`prod_nerd_db` 스택). 로컬용 DB 없음, 전 환경 공유 |
 
 ---
 
@@ -32,7 +32,7 @@ NestJS 11 + TypeScript 백엔드.
 
 ### 사전 요구사항
 
-Node 22 LTS · pnpm · Docker(로컬 Redis용)
+Node 22 LTS · pnpm · Docker(로컬 Redis용) · 운영 DB 터널용 **SSH 별칭 `fs-01`** (`~/.ssh/config` — 내용은 저장소 밖) · `mysql` CLI(선택)
 
 ### 실행
 
@@ -55,6 +55,20 @@ docker exec -it nerd-redis redis-cli ping     # PONG
 ```
 
 Redis 가 없어도 앱은 기동하고 HTTP 는 응답한다. 레이트리밋만 축소 모드가 된다.
+
+### DB 접속 — 로컬에도 DB 는 없다, 터널로 운영 DB 에 붙는다
+
+전 환경이 서버의 MySQL 하나를 쓴다. 호스트 포트를 열어두지 않으므로 **SSH 터널**이 유일한 경로다.
+
+```bash
+scripts/db-tunnel.sh fs-01 3307     # 터미널 1 — 열어둔 채로. 노트북에 MySQL 이 없으면 포트 생략(3306)
+mysql -h 127.0.0.1 -P 3307 -u nerd_app -p nerd     # 터미널 2 (GUI 도구도 같은 host/port)
+```
+
+- 🚫 `sudo` 로 실행하지 않는다 — root 의 `~/.ssh/config` 를 읽어 별칭을 못 찾는다.
+- **Redis 와 다르다**: DB 에 못 붙으면 앱은 30초 재시도 후 **기동에 실패**한다(의도된 동작). `pnpm dev` 전에 터널이 열려 있어야 한다.
+- 접속 확인: `SELECT @@time_zone, @@character_set_database, CURRENT_USER();` → `+00:00 / utf8mb4 / nerd_app@%`
+- 계정 3개 — `nerd_app`(앱, DML 만) · `nerd_migrator`(마이그레이션, DDL) · `root`(복구용). 비밀번호는 비밀번호 관리자에만 있다. 왜 이렇게 나눴는지는 [`docs/tasks/tasks-db-mysql.md`](docs/tasks/tasks-db-mysql.md).
 
 ---
 
@@ -118,7 +132,7 @@ pnpm migration:revert                              # 마지막 1개 되돌림
 
 ```bash
 cp .env.migration.example .env.migration   # DB_USER=nerd_migrator (DDL 권한). 비밀번호는 비밀번호 관리자
-scripts/db-tunnel.sh                        # 다른 터미널에서 유지 (127.0.0.1:3306 → 운영 DB)
+scripts/db-tunnel.sh fs-01 3307             # 다른 터미널에서 유지. .env.migration 의 DB_PORT 를 같은 포트로
 pnpm migration:show                          # 무엇이 적용될지 먼저 본다
 pnpm migration:run
 ```
@@ -143,7 +157,8 @@ pnpm migration:run
 |---|---|
 | [`CLAUDE.md`](CLAUDE.md) | 코드를 쓰기 전 — 금지 사항·함정·완료 기준 |
 | [`.claude/rules/code-patterns.md`](.claude/rules/code-patterns.md) | 모듈·API·테스트를 만들 때 |
-| [`docs/deploy.md`](docs/deploy.md) | 배포하거나 장애를 확인할 때 |
+| [`docs/deploy.md`](docs/deploy.md) | 배포하거나 장애를 확인할 때. MySQL 스택 운영 사실도 여기 |
+| [`infra/`](infra/) | 스택 YAML 을 볼 때 — 설정값을 왜 그렇게 골랐는지는 `docs/tasks/tasks-db-mysql.md` |
 | [`docs/lessons.md`](docs/lessons.md) | 같은 실수를 반복하지 않으려 할 때 |
 | [`docs/tasks/`](docs/tasks/) | 왜 이렇게 결정됐는지 확인할 때 |
 | [`.claude/templates/`](.claude/templates/) | 계획서·버그 리포트를 작성할 때 |

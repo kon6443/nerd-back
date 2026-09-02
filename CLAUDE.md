@@ -67,7 +67,7 @@
 
 - 인메모리 상태·메모리 레이트리밋 금지 ← **레플리카 3개**. 1개로 줄면 근거가 소멸한다.
 - 외부 API 본문 로깅 금지 ← **공유 로그 스택의 낮은 인제스트 한도**. 한도가 오르거나 전용 스택이 되면 재검토.
-- 마이그레이션 실행 금지 ← **전 환경 동일 DB**. 환경별 DB가 분리되면 재검토.
+- 마이그레이션 실행 금지 ← **전 환경 동일 DB**. 환경별 DB가 분리되면 재검토. (2026-09-02 자체 호스팅 전환 때 재검토했고 **유지** — 인스턴스 1대 공유, D1)
 
 ## Ask — 실행 전 사용자 승인
 
@@ -89,18 +89,20 @@
 - 검증: **`pnpm ci:core`**(lint → test → build). PR 직전 **`pnpm ci:all`**(+ 스텁 검사 + E2E)
 - 실행: `pnpm dev` → `localhost:5501/api/v2` · Swagger `/api/v2/docs`
 - ⚠️ jest 30 에서 `--testPathPattern`(단수)은 동작하지 않는다. **복수형** `--testPathPatterns` 를 쓴다.
+- DB: 로컬 개발도 **운영 DB 를 터널로** 쓴다(`scripts/db-tunnel.sh`, README). 마이그레이션은 **파일 작성까지** — `pnpm migration:run` 은 사람이 `nerd_migrator` 로
 
 ## Key Patterns (요약)
 
 > 상세와 실측 카운트는 [`.claude/rules/code-patterns.md`](.claude/rules/code-patterns.md) 에 있다.
-> **이 6줄이 그 파일과 겹치는 것은 의도된 것이다** — rule 은 `.ts` 를 읽을 때 로드되므로, 설계·계획 단계(코드를 아직 안 만진 시점)에는 이 요약이 유일한 출처다. 지운다면 그 단계가 비게 된다.
+> **이 7줄이 그 파일과 겹치는 것은 의도된 것이다** — rule 은 `.ts` 를 읽을 때 로드되므로, 설계·계획 단계(코드를 아직 안 만진 시점)에는 이 요약이 유일한 출처다. 지운다면 그 단계가 비게 된다.
 
 - **계층**: Repository 클래스 없음(Service 가 `@InjectRepository` 직접). **외부 시스템은 반드시 Port 경유**
 - **응답**: `{ code, data, message }` 객체 리터럴 직접 반환. 전역 인터셉터 없음. 상태코드는 정석 REST
 - **에러**: `defineDomainError` → 전역 필터가 `{ code, message, timestamp }` 로 통일. 바디에 `statusCode` 없음
 - **검증**: `createGlobalValidationPipe()` 하나를 프로덕션·E2E 가 공유 — **이 파일만 고친다**
 - **테스트**: mock 주력. E2E 는 외부 의존 없이 돈다
-- **외부 의존**: 죽어도 앱은 기동·응답한다. 레이트리밋은 fail-open, 비용 카운터는 fail-closed
+- **외부 의존**: 죽어도 앱은 기동·응답한다. 레이트리밋은 fail-open, 비용 카운터는 fail-closed. **DB 만 예외** — 핵심 의존이라 못 붙으면 부팅 실패 + Swarm 무제한 재시작
+- **DB**: 옵션은 `typeorm.options.ts` 한 곳 · `synchronize` 금지 · 시각은 `DATETIME(3)`(`TIMESTAMP` 금지) · 앱 계정에 DDL 없음 · 테스트는 `forbid-db` 매퍼가 접속을 막는다
 
 ## Common Pitfalls to Avoid
 
@@ -113,6 +115,8 @@
 7. **로그를 추가할 때 발생 빈도를 먼저 재라** — 재시도하는 외부 의존의 이벤트 핸들러는 트래픽 0에서도 로그를 쌓는다. `createLogThrottle` 로 감싸고, 요청 0건 유휴 60초 측정으로 검증한다.
 8. **Caddy `route` 안에서는 작성 순서가 곧 평가 순서다** — matcher 없는 `handle { }`(catch-all)이 위에 있으면 그 아래 블록은 절대 도달하지 않는다. `route` 밖에서는 구체성 순으로 정렬되므로 이 함정이 없다. **`route` 안인지 밖인지를 먼저 확인한다** (전례: `/api/v2/*` 요청이 이웃 프로젝트로 흘러감).
 9. **HEALTHCHECK 은 stack YAML 한 곳에만** — Dockerfile 에도 두면 stack 이 덮어써서 어느 쪽이 동작하는지 헷갈린다.
+10. **jest `setupFiles` 안에서 `process.env` 를 대입해도 V8 에는 닿지 않는다** — 샌드박스 env 복사본에만 쓰인다. TZ 같은 프로세스 전역은 `jest.config.js`·`test/jest-e2e.js` **상단**에서 고정하고, `test/setup/setup-tz.ts` 는 고정이 아니라 **가드**다. 되돌리면 테스트가 KST 로 조용히 돌아간다 ([lessons 2026-09-02](docs/lessons.md)).
+11. **Swarm 태스크의 `docker_gwbridge` IP 는 컨테이너 `inspect` 에 안 나온다** — `docker network inspect docker_gwbridge` 에서 컨테이너 ID 로 역조회한다. Go 템플릿은 키가 없으면 `<no value>` 문자열을 내므로 **비어 있지 않음을 성공으로 믿지 않는다** (`scripts/db-tunnel.sh`).
 
 ## Git & 커밋 컨벤션
 
