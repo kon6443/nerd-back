@@ -50,7 +50,7 @@
 | **D6** | **앱은 서버 `.env` 의 `DB_PASSWORD`** 로 받는다 | 앱 비밀번호가 secret 과 `.env` 두 곳에 존재. 회전 시 둘을 한 작업으로 |
 | **D7** | 이름 — DB `nerd` · 계정 `nerd_app` `nerd_migrator` | |
 | **D8** | **DB 연결 실패 시 앱은 부팅 실패를 허용 + Swarm 이 포기하지 않게** (`restart_policy` 무제한) | Step 8 에서 앱 스택 `max_attempts` 제거 · `delay: 10s`. TypeORM `retryAttempts × retryDelay` 는 healthcheck 종료 시한(`start_period 30s + 15s × 3`) 안쪽. 근거 ↓ 「앱 배선 규약」 |
-| **D9** | **외부 DB 접속 = SSH 터널, 포트 publish 없음** — `scripts/db-tunnel.sh` | Swarm 은 publish 를 127.0.0.1 로 못 묶는다(항상 0.0.0.0) → 노출 여부가 VCN 보안 목록 하나에 달림. 대신 컨테이너의 `docker_gwbridge` IP(호스트 로컬)로 터널. **배포 후 실측 전까지 미검증** |
+| **D9** | **외부 DB 접속 = SSH 터널, 포트 publish 없음** — `scripts/db-tunnel.sh` (기본 SSH 별칭 `fs-01`, 사용자 결정 2026-09-02. 주소는 `~/.ssh/config` 에만) | Swarm 은 publish 를 127.0.0.1 로 못 묶는다(항상 0.0.0.0) → 노출 여부가 VCN 보안 목록 하나에 달림. 대신 컨테이너의 `docker_gwbridge` IP(호스트 로컬)로 터널. **배포 후 실측 전까지 미검증** |
 | **D10** | **DB 재배포에 무중단을 기대하지 않는다** | 인스턴스 1개 · stop-first. 재시작 10~30초 동안 DB 요청 실패를 수용 |
 
 ### D1 이 유지시키는 규약 — 완화되지 않았다
