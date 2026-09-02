@@ -1,6 +1,6 @@
 # Task Tracker: MySQL 자체 호스팅 (Swarm 스택)
 
-> 상태: **Step 1~4 완료 (2026-09-02) — 첫 배포(Step 5) 대기. main 머지가 곧 첫 배포다.**
+> 상태: **DB 스택 배포 완료 · 앱 연결 코드 작성 완료 (2026-09-02) — 앱 연결 PR 머지 전. Step 5 수동 확인 3건 · 서버 .env 5개 대기.**
 > 경계: 배포 구성의 정본은 [`docs/deploy.md`](../deploy.md), 코드 규약은 [`.claude/rules/code-patterns.md`](../../.claude/rules/code-patterns.md).
 > 이 문서는 **DB 도입 결정의 근거와 진행 상황**을 소유한다. 확정된 사실은 배포 후 `deploy.md` 로 승격한다.
 > 🚫 실제 노드명·마운트 경로·네트워크 이름을 이 문서에 적지 않는다. 전부 라벨과 시크릿으로 참조한다.
@@ -278,17 +278,16 @@ code-patterns §10 이 이미 **UTC 저장 · 표시 시점 변환**으로 확�
 - [x] **Step 2** — GitHub `PROD` 시크릿 `MYSQL_DATA_DIR` · Swarm secret 3개 (`prod_nerd_db_{root,app,migrator}_pw`) ✅ (2026-09-02). 비밀번호는 사용자 비밀번호 관리자에만 존재
 - [x] **Step 3** — `infra/docker-stack.db.yml` + `infra/mysql/init-users.sh` 작성 (2026-09-02). YAML 파싱·`bash -n` 통과. arm64 매니페스트: ↓ 「검증 기록」
 - [x] **Step 4** — `.github/workflows/deploy-db.yml` 작성 (2026-09-02). 세 워크플로 paths **교집합 0건** 대조 완료. 사전 점검(라벨·secret·경로) 단계를 추가해 "pending 인데 성공" 을 배포 전에 막는다. `deploy.md` 구성표·독립 배포표 갱신
-- [ ] **Step 5** — 배포 + 스모크. 문자셋·타임존·한글 왕복·볼륨 실경로를 **SQL 로 실측** (↓ 검증) · `scripts/db-tunnel.sh` 로 노트북에서 접속되는지 실측 (D9 검증)
+- [~] **Step 5** — ✅ PR #12 머지 → `Deploy DB` 성공 (2026-09-02T08:26Z): 사전 점검 통과 · `prod_nerd_db_mysql 1/1` · 스모크 실측 **`utf8mb4 / utf8mb4_0900_ai_ci / +00:00 / 1`**. **남은 수동 확인 3건**(사람, 서버): `docker volume inspect` 실경로가 블록 볼륨인가 · `service update --force` 후 데이터 잔존 · `scripts/db-tunnel.sh` 노트북 접속(D9)
 
 ### 앱 (Step 6~9)
 
-- [ ] **Step 6** — 패키지 일괄 설치: `@nestjs/typeorm` `typeorm` `typeorm-transactional` `mysql2`
-      *(skeleton 태스크 주의사항 #10 — 여기서 처음 설치한다. 미리 깔지 않았던 이유가 드라이버의 arm64 위험이었고, 지금이 그 확인 시점이다)*
-- [ ] **Step 7** — `DB_*` 환경변수를 `EnvVariables` 에 추가 + `.env.example`. **부팅 시 검증되어야 한다**
-- [ ] **Step 8** — `TypeOrmModule.forRootAsync` 배선 + readiness 인디케이터 + **앱 스택 `restart_policy` 무제한**(D8) + code-patterns §8 에 DB 예외 명시
-- [ ] **Step 9** — `test/setup/forbid-db.ts` 가드 + 첫 마이그레이션 **파일 작성** (실행 X)
+- [x] **Step 6** — `@nestjs/typeorm@^11.0.3` · `typeorm@^0.3.31` · `typeorm-transactional@^0.5.0` · `mysql2@^3.24.3` (2026-09-02). **TypeORM 1.x 를 고르지 않은 이유**: 1.0.0 은 2026-05 출시지만 `typeorm-transactional` 최신이 2023-10 이라 1.x 호환 근거가 없다. 0.3 브랜치는 2026-07 에도 릴리스됐다. `@nestjs/typeorm` 은 Nest 11 짝인 11.x. **arm64**: `mysql2` 는 `gypfile: false`(순수 JS) — 미리 깔지 않았던 이유였던 위험이 없음을 확인
+- [~] **Step 7** — ✅ 코드: `DbEnvVariables`(CLI 재사용) ⊂ `EnvVariables`, `DB_POOL_SIZE`(기본 10·상한 30) 추가, `.env.example` · `.env.migration.example` · README 환경별 값 표. **사람 작업 대기**: 서버 `.env`(`ENV_FILE_PATH`)에 `DB_HOST=prod_nerd_db_mysql` `DB_PORT=3306` `DB_USER=nerd_app` `DB_PASSWORD=<app 값>` `DB_NAME=nerd` — **앱 연결 PR 머지 전에** 넣어야 한다. 없으면 env 검증 실패로 부팅이 막히고 배포가 롤백된다. GitHub 시크릿 추가 없음(D6)
+- [x] **Step 8** — `DatabaseModule`(`TypeOrmModule.forRootAsync` + `addTransactionalDataSource`) · 옵션은 `typeorm.options.ts` 한 곳(앱·CLI 공유, spec 으로 고정) · `main.ts` `initializeTransactionalContext(ASYNC_LOCAL_STORAGE)` · `/health/ready` 에 `db` 인디케이터(`SELECT 1`, 1.5초 제한, liveness 와 분리 유지 — E2E 로 고정) · 앱 스택 `restart_policy` 무제한(D8) · code-patterns §8 DB 예외 + §12 신설
+- [~] **Step 9** — ✅ `test/setup/forbid-db.ts`: 두 jest 설정의 moduleNameMapper 가 `mysql2` 를 던지는 스텁으로 교체, 양쪽 spec 으로 고정. ✅ 마이그레이션 **인프라**: `src/config/data-source.ts`(CLI 전용, 상대 import) · `pnpm migration:{show,generate,run,revert}`(빌드 산출물 + `--env-file=.env.migration`) · `src/migrations/`. **첫 마이그레이션 파일은 첫 엔티티와 함께** — 엔티티 없이 만드는 마이그레이션은 내용이 없어 규약을 보여주지 못한다(판단, 2026-09-02)
 
-### 앱 배선 규약 (Step 8 에서 지킬 것)
+### 앱 배선 규약 (Step 8 에서 지킴 — 정본은 code-patterns §12)
 
 | 설정 | 값 | 이유 |
 |---|---|---|
@@ -320,7 +319,8 @@ Step 8 에서 아래 중 하나를 고르고 **근거를 이 문서에 남긴다
 | 시간 설정 저장소 전수 점검 | ✅ ↑ 표 | 2026-09-02 |
 | Node 런타임 `process.env.TZ` 변경 반영 | ✅ Node 22.21 · `getHours` 9→0 | 2026-09-02 |
 | 사전 조건 — secret 3개 `docker secret ls` · 라벨 `docker node inspect` · 디렉터리 `ls -ldn` | ✅ 사용자 실측 출력 확인 | 2026-09-02 |
-| 배포 · 스모크 | 미실행 (Step 5) | |
+| 배포 · 스모크 (`Deploy DB` run 33608568134) | ✅ 사전 점검 통과 · 1/1 · 실측 `utf8mb4 / utf8mb4_0900_ai_ci / +00:00 / 1` | 2026-09-02 |
+| `mysql2` 네이티브 바인딩 | ✅ 없음 (`gypfile: false`) — arm64 위험 없음 | 2026-09-02 |
 
 ## 검증 (배포 후 실측할 것 — 설정 파일 확인으로 대체하지 않는다)
 
