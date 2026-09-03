@@ -5,7 +5,8 @@
 > **작성일**: 2026-09-01
 > **용도**: 스택·서비스 이름을 노드 라벨 체계와 1:1 로 맞추는 작업의 **결정·영향 범위·전환 절차**.
 > **경계**: 배포 구성의 정본은 [`../deploy.md`](../deploy.md) 다. 이 문서는 **바꾸는 동안**의 절차를 소유하고, 전환이 끝나면 결과를 `deploy.md` 에 반영한 뒤 이 문서를 아카이브한다.
-> **연동**: 프론트 CI/CD 는 `nerd-front` 저장소의 `docs/tasks/tasks-frontend-cicd.md` 가 소유한다. 이 재명명이 그쪽 이름의 선행 조건이다.
+> **연동**: 프론트 CI/CD 는 [`tasks-frontend-cicd.md`](tasks-frontend-cicd.md) 가 소유한다. 이 재명명이 그쪽 이름의 선행 조건이었다.
+> **2026-09-03**: 두 저장소가 [모노레포로 합쳐졌다](tasks-monorepo.md). 서버 파일 규약이 `<DEPLOY_DIR>/stacks|env/<스택명>` 으로 바뀌었으니 **경로가 걸린 항목은 `docs/deploy.md` 를 정본으로 본다.** 아래 본문의 서버 경로는 전환 당시의 기록이다.
 
 ---
 
@@ -408,7 +409,7 @@ docker node inspect --pretty <노드명> | sed -n '/Labels/,/^[A-Z]/p'
 
 ### 후속 개선 (별건)
 
-- [ ] **`deploy.yml` 스모크 테스트를 라벨 필터로 전환** — 지금은 `--filter "name=prod_nerd_back_app"` 이라 옛 스택이 사라진 현재는 문제없지만, 유사 이름 스택이 생기면 같은 함정이 재현된다. `--filter "label=com.docker.stack.namespace=prod_nerd_back"` 이 정확 일치라 견고하다. 프론트 워크플로를 만들 때 **처음부터 라벨 방식**으로 쓰고, 백엔드도 같은 커밋에서 맞춘다
+- [x] **스모크 테스트를 라벨 필터로 전환** — 완료. 프론트는 처음부터 라벨 방식이었고, 백엔드도 전환됐다. 2026-09-03 모노레포 전환 시점에 **배포 워크플로 4개 전부** `--filter "label=com.docker.stack.namespace=<스택명>"` 을 쓰는 것을 확인했다
 
 ---
 

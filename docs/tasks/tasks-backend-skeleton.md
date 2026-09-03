@@ -119,8 +119,10 @@ Controller  →  Service  →  TypeORM Repository<Entity>
 
 ### 폴더
 
+> ⚠️ **2026-09-03 기준으로 이 트리는 옛 위치다.** 저장소가 모노레포로 바뀌어 아래 내용은 전부 `apps/back/` 아래로 옮겨졌고, `docs/` · `.claude/` · `infra/`(공유 스택) 는 저장소 루트에 남았다. `.claude/rules/code-patterns.md` 는 `back-code-patterns.md` 로 이름이 바뀌었다. **현재 구조는 [`tasks-monorepo.md`](tasks-monorepo.md) 「목표 구조」와 루트 [`README.md`](../../README.md) 가 정본이다.** 아래 트리는 `src/` 내부의 **모듈 배치 결정**을 읽기 위해 남긴다.
+
 ```
-nerd-back/
+apps/back/          ← 작성 당시에는 저장소 루트였다
 ├── src/
 │   ├── common/
 │   │   ├── constants/

@@ -3,7 +3,7 @@
 Next.js 16 + React 19 프론트엔드.
 
 > **이 문서는 사실과 사용법만 담는다** — 스택, 실행법, 환경 변수, 명령어.
-> 결정의 근거·배포 설계는 [`docs/tasks/`](docs/tasks/)로 분리되어 있다. 같은 내용을 두 곳에 쓰지 않는다.
+> 결정의 근거·배포 설계는 [`docs/tasks/`](../../docs/tasks/)로 분리되어 있다. 같은 내용을 두 곳에 쓰지 않는다.
 
 **현재 상태**: CI/CD 구축 완료(Step 1~5). 첫 배포 대기 중.
 
@@ -117,11 +117,11 @@ pnpm ci:all              # + check:stubs + check:health-path  (PR 전 필수)
 
 | 파일 | 언제 여는가 |
 |---|---|
-| [`docs/tasks/`](docs/tasks/) | 결정의 근거·진행 상황을 확인할 때 |
-| [`docs/tasks/tasks-frontend-cicd.md`](docs/tasks/tasks-frontend-cicd.md) | CI/CD·컨테이너·배포 설계를 볼 때 |
+| [`docs/tasks/`](../../docs/tasks/) | 결정의 근거·진행 상황을 확인할 때 |
+| [`docs/tasks/tasks-frontend-cicd.md`](../../docs/tasks/tasks-frontend-cicd.md) | CI/CD·컨테이너·배포 설계를 볼 때 |
 | `AGENTS.md` | Next.js가 `next dev` 실행 시 자동 생성·갱신한다. 사람이 쓴 규약이 아니다 |
 
-배포 인프라의 일반 규약(Swarm·Caddy·롤백·이름 규칙)은 **`nerd-back` 저장소의 `docs/deploy.md`가 정본**이다. 여기서는 프론트에서 달라지는 것만 다룬다.
+배포 인프라의 일반 규약(Swarm·Caddy·롤백·이름 규칙)은 **저장소 루트의 [`docs/deploy.md`](../../docs/deploy.md) 가 정본**이다. 여기서는 프론트에서 달라지는 것만 다룬다.
 
 ---
 

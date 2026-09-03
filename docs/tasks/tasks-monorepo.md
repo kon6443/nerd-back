@@ -450,15 +450,26 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 - 컨테이너 빌드: `context: apps/back` · `context: apps/front` 로 로컬 ARM64 빌드·실기동 확인 (Step 1·3)
 - ⚠️ **미검증**: GitHub Actions 에서의 실제 실행. 러너·시크릿·캐시 scope 는 **PR 을 올려야** 확인된다. `DEPLOY_DIR` 이 없으면 배포 4개가 모두 scp 단계에서 실패한다 — Step 7 의 "머지 전 준비" 가 그 전제다
 
-### Step 6 — 문서 · CLAUDE.md · README
+### Step 6 — 문서 · CLAUDE.md · README ✅ 완료 (2026-09-03)
 
-- [ ] 루트 `CLAUDE.md` 재구성(공통만, ≤200줄) · `apps/back/CLAUDE.md` · `apps/front/CLAUDE.md` (위 「CLAUDE.md 구조」)
-- [ ] 루트 `README.md` 신규 · `apps/back/README.md` · `apps/front/README.md` 경로·명령 갱신
-- [ ] `docs/deploy.md`: 파일 위치 · 워크플로 표 · 「무엇을 바꾸면」 표 확장 · 시크릿 12개 · 이름 규칙표의 "저장소" 를 "앱" 으로 (`<앱>.<환경>.env`, 서버 stack 디렉터리 앱별)
-- [ ] `tasks-stack-rename.md` 「연동」 줄 갱신
-- [x] 아카이브 이동 (2026-09-03 선행) — `tasks-ai-config.md` · `tasks-db-mysql.md` → `docs/tasks/archive/`. 경로 참조 9개 파일 갱신(`README.md` · `.env.example` · `docs/deploy.md` · `.claude/rules/back-code-patterns.md` · `tasks-backend-skeleton.md` · `infra/docker-stack.{db,app}.yml` 주석 등), 갱신 후 옛 경로 `grep` **0건**. `src/` 의 주석 2곳은 경로 없는 파일명만 언급해 손대지 않았다.
-  ⚠️ **부수 효과**: `infra/docker-stack.db.yml` 주석 1줄이 바뀌어 **머지 시 `deploy-db` 가 1회 돈다.** 스펙 무변경이라 MySQL 재시작은 없다(2026-09-01 Redis 전례 — 주석은 파싱 후 사라진다). 원치 않으면 그 파일의 주석 수정만 되돌리고 옛 경로를 남긴다
-- **verify**: `grep -rn` 전수 — `nerd-front` 저장소 참조 · 루트 기준 `infra/docker-stack.app.yml` · 루트 기준 `src/` `test/` `scripts/` 참조 · `deploy.yml`(구 이름) — 남은 것이 전부 **의도된 과거 기록(lessons)** 인지 하나씩 확인. 파일 단위 제외는 `--exclude` 로 ([lessons 2026-09-01](../lessons.md)) · `wc -l CLAUDE.md` ≤ 200
+- [x] 루트 `CLAUDE.md` 재구성 — **137줄**(상한 200). 공통만 남기고 앱 고유 항목을 내렸다. Never 표에서 `E2E AppModule` · `마이그레이션 실행` 은 백엔드로, `인메모리 공유 상태` 는 근거를 "두 앱 모두 레플리카 3개" 로 고쳐 루트에 남겼다. 공통 함정 7개(전역 필터 · 로컬≠컨테이너 빌드 · HEALTHCHECK 위치 · Caddy 순서 · **paths 교집합** · 로그 빈도 · **`bufferLogs` 시각**) · Git scope 규칙 · DoD 포함
+- [x] `apps/back/CLAUDE.md` 신규 **48줄** — 백엔드 Never 2건 · Key Patterns 7줄 · 명령 · 고유 함정 7개(tsconfig↔jest 세트 · `reflect-metadata` · 에러 경로 테스트 · `LegacyRouteConverter` 경고 · jest `setupFiles` TZ · gwbridge IP · **재시도 경로 factory 멱등성**)
+- [x] `apps/front/CLAUDE.md` **36줄** — `@AGENTS.md` import 유지(Next 가 재작성하는 파일이라 손대지 않는다) + 프론트 Never 6건 · 명령 · 고유 함정 4개
+- [x] 루트 `README.md` 신규 **80줄** — 저장소 지도 · 요구사항 · 퀵스타트(`pnpm back|front`) · 로컬 env 표 · 검증 · 배포 요약 + `docs/deploy.md` 링크 · 문서 지도
+- [x] `apps/back/README.md` · `apps/front/README.md` — 루트로 올라가는 상대 링크를 `../../` 로 보정하고 명령을 루트 기준(`apps/back/scripts/db-tunnel.sh` 등)으로 고쳤다. 프론트의 "`nerd-back` 저장소의 `docs/deploy.md`" 표현은 같은 저장소 링크로 교체
+- [x] `docs/deploy.md` — 구성표(스택·DNS·레플리카·포트·라벨·프록시 4개 대상) · 「무엇을 바꾸면 무엇이 뜨는가」 표(**7행**, 앱 경로 기준) · 서버 파일 트리와 **파일명 = 스택명** 규약 · `docker stack deploy` 명령 4개 · 배포 흐름 다이어그램 · 시크릿 **9개 목록**과 `DEPLOY_DIR` 하나로 계산한다는 설명 · 이름 규칙표(앱 디렉터리·패키지명·워크플로 행 추가, 「저장소」 → 「앱」)
+- [x] `tasks-stack-rename.md` — 「연동」 줄을 같은 저장소 링크로 바꾸고 모노레포 전환 후 **경로의 정본은 `deploy.md`** 라고 명시. **후속 항목 「스모크 필터를 라벨 방식으로」 를 완료로 닫았다**(배포 4개 전부 라벨 확인)
+- [x] `tasks-backend-skeleton.md` — 폴더 트리 앞에 **옛 위치라는 경고**를 붙였다. 트리를 다시 쓰지 않은 이유는 그 트리의 값이 `src/` 내부 **모듈 배치 결정**을 읽는 데 있고, 위치는 이제 다른 문서가 소유하기 때문이다
+- [x] 아카이브 이동 (2026-09-03 선행) — `tasks-ai-config.md` · `tasks-db-mysql.md` → `docs/tasks/archive/`. 경로 참조 9개 파일 갱신 후 옛 경로 `grep` **0건**. `archive/` 로 한 단계 깊어져 어긋난 상대 링크 3건은 이 단계에서 보정했다
+  ⚠️ **부수 효과**: `infra/docker-stack.db.yml` 주석 1줄이 바뀌어 머지 시 `deploy-db` 가 1회 돈다. 서비스 스펙은 무변경이라 MySQL 재시작은 없다 (2026-09-01 Redis 전례)
+
+**verify (2026-09-03)**
+
+- **마크다운 링크 전수 검사** — 추적 `.md` + 신규 5개, 총 **23개 파일**의 상대 링크를 파일 존재로 확인. **깨진 링크 0개** (검사 전 3건 발견 → 보정)
+- 루트 `CLAUDE.md` **137줄** ≤ 200 · `docs/tasks/` **5개** ≤ 6 · `archive/` 2개
+- 저장소 간 참조 grep — 남은 1건은 `tasks-frontend-cicd.md` 의 「원 저장소: kon6443/nerd-front」로 **의도된 기록**이다
+- 루트 기준 옛 경로 grep — 남은 것은 전부 `docs/tasks/` 의 **과거 절차 기록**(재명명 전환 절차 · 프론트 Step 체크박스)이다. 교훈·절차 문서를 사후 편집하면 그때 무엇을 했는지가 사라지므로 고치지 않는다
+- 루트 `pnpm ci:core` 두 앱 통과
 
 ### Step 7 — GitHub · 서버 (사용자)
 
