@@ -373,8 +373,12 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 - **verify (2026-09-03)**:
   - `pnpm install` ✅ (733 패키지, 4.1s) → `pnpm back ci:core` ✅ — lint 0건 · **jest 10 suites 64 tests 통과** · `tsc` 빌드 성공
   - `docker build --platform linux/arm64 apps/back` ✅ **성공** — Dockerfile 내용 무변경, 컨텍스트만 `apps/back`. 컨테이너 실기동은 `.env.example` 로 띄워 **env 검증 단계까지 도달**(`DB_PASSWORD` 빈 값으로 의도된 중단) — 모듈 해석·`TS_NODE_PROJECT`·`corepack` 이 새 컨텍스트에서 동작. **healthy 까지는 로컬에서 확인 불가**(DB 없이는 설계상 부팅 실패 — D8). 실제 `.env` 를 docker 에 넘기는 것은 권한 규칙이 막는다
-  - 로컬 부팅: `pnpm back start:prod` 는 **cwd 가 `apps/back` 으로 잡히고 ConfigModule 이 `.env` 를 읽어 env 검증을 실행**한다 ✅. 단 검증이 `REDIS_HOST` · `DB_*` 누락으로 실패 — 로컬 `.env` 내용 문제로 추정(AI 는 `.env` 를 읽을 수 없어 미확인). **이동과 무관**: 이동 전에도 같은 파일·같은 키다. 사용자가 `.env.example` 과 대조 필요
-  - ⚠️ 부수 발견(**이동 전부터**): `pnpm start:prod` 는 `TS_NODE_PROJECT=tsconfig.runtime.json` 없이는 `@config/*` 를 `src/` 로 해석해 `Cannot find module` 로 죽는다. Dockerfile 은 `ENV` 로 넣어 두었지만 README 의 로컬 절차에는 없다 → **후속**(README 또는 스크립트에 반영)
+  - 로컬 부팅: `pnpm back start:prod` 는 **cwd 가 `apps/back` 으로 잡히고 ConfigModule 이 그 디렉터리의 `.env` 를 읽는다** ✅ — 사용자 실행에서 env 검증을 통과해 DB 접속 단계까지 갔다. **D14(로컬 env 는 앱별 독립)가 동작으로 확인된 셈이다.**
+    ⚠️ 정정: AI 세션의 실행이 `REDIS_HOST`·`DB_*` 누락으로 실패한 것은 **`.env` 내용 문제가 아니라 샌드박스가 `**/.env` 읽기를 막은 것**이었다(뒤에 `EPERM: operation not permitted, open '.../.env'` 로 드러남). dotenv 가 읽기 실패를 조용히 넘겨 "파일이 없는 것" 처럼 보였다. **AI 의 로컬 부팅 결과로 env 를 판단하지 않는다.**
+    별건: 사용자 실행에서 `'nerd_app'@'localhost'` 접근 거부 — 터널은 3307 인데 `DB_PORT` 가 3306 이라 노트북 로컬 MySQL 에 붙었다([lessons 2026-09-02](../lessons.md) 와 같은 모양). `.env` 의 `DB_PORT` 를 터널 포트와 맞춘다
+  - ⚠️ 부수 발견 2건 (**둘 다 이동 전부터 있던 것**)
+    1. `pnpm start:prod` 는 `TS_NODE_PROJECT=tsconfig.runtime.json` 없이는 `@config/*` 를 `src/` 로 해석해 `Cannot find module` 로 죽는다. Dockerfile 은 `ENV` 로 넣어 두었지만 README 의 로컬 절차에는 없다 → **후속**(README 또는 스크립트에 반영)
+    2. **DB 연결 재시도 10회 중 실제 접속은 1회뿐이었다** — `dataSourceFactory` 가 재시도마다 다시 불리는데 `addTransactionalDataSource` 중복 등록이 거부되어, 2회차부터 접속 전에 죽었다. 코드 결함이므로 게이트로 미루지 않고 **같은 브랜치에서 고쳤다**(`fix(back)` 커밋 · 단위 테스트 3건 · 컨테이너 실측 1회→10회). 경위와 예방 규칙은 [lessons 2026-09-03](../lessons.md) 2건
   - `git log --follow` 이력 확인은 커밋 후 (rename 이 커밋돼야 follow 가 된다)
 
 ### Step 2 — 프론트 subtree 합류 (merge 커밋)
