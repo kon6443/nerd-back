@@ -8,9 +8,13 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "nest start --watch",
+    "dev": "pnpm run db:tunnel:ensure && nest start --watch",
+    "dev:no-tunnel": "nest start --watch",
     "build": "tsc -p tsconfig.build.json",
     "start:prod": "node -r tsconfig-paths/register dist/main.js",
+    "db:tunnel": "bash scripts/db-tunnel.sh",
+    "db:tunnel:ensure": "bash scripts/db-tunnel.sh --ensure",
+    "db:tunnel:stop": "bash scripts/db-tunnel.sh --stop",
     "lint": "eslint \"{src,test,scripts}/**/*.ts\"",
     "lint:fix": "eslint \"{src,test,scripts}/**/*.ts\" --fix",
     "format": "prettier --write \"{src,test}/**/*.ts\"",

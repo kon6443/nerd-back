@@ -4,10 +4,7 @@ import {
   deleteDataSourceByName,
   getDataSourceByName,
 } from 'typeorm-transactional';
-import {
-  TRANSACTIONAL_DATA_SOURCE_NAME,
-  createTransactionalDataSource,
-} from './database.module';
+import { TRANSACTIONAL_DATA_SOURCE_NAME, createTransactionalDataSource } from './database.module';
 import { buildMysqlConnectionOptions } from './typeorm.options';
 
 const OPTIONS = buildMysqlConnectionOptions({

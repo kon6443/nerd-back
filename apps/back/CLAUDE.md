@@ -32,7 +32,8 @@
 - 실행: `pnpm back dev` → `localhost:5501/api/v2` · Swagger `/api/v2/docs`
 - ⚠️ jest 30 에서 `--testPathPattern`(단수)은 동작하지 않는다. **복수형** `--testPathPatterns` 를 쓴다
 - ⚠️ `pnpm back start:prod` 는 `TS_NODE_PROJECT=tsconfig.runtime.json` 이 필요하다. 없으면 `@config/*` 를 `src/` 로 해석해 `Cannot find module` 로 죽는다 — 컨테이너는 Dockerfile `ENV` 로 넣어 두었다
-- DB: 로컬 개발도 **운영 DB 를 터널로** 쓴다(`scripts/db-tunnel.sh`, README). ⚠️ 터널 포트와 `.env` 의 `DB_PORT` 가 다르면 노트북 로컬 MySQL 에 붙는다 — 에러의 호스트가 `@'localhost'` 면 그 경우다
+- DB: 로컬 개발도 **운영 DB 를 터널로** 쓴다. **`pnpm back dev` 가 터널을 자동으로 보장한다**(`scripts/db-tunnel.sh --ensure`) — 끄려면 `SKIP_DB_TUNNEL=1` 또는 `pnpm back dev:no-tunnel`. 닫기는 `pnpm back db:tunnel:stop`
+- ⚠️ 터널 포트의 SSOT 는 **`apps/back/.env` 의 `DB_PORT`** 다. 스크립트가 거기서 읽으므로 두 값이 어긋날 수 없다. 그래도 그 포트를 다른 프로세스가 쥐고 있으면 스크립트가 막는다 — `ssh -L` 은 bind 실패를 경고만 하고 계속 돌아 **로컬 MySQL 에 붙는다**(에러의 호스트가 `@'localhost'` 면 그 경우다)
 - 로컬 env 는 `apps/back/.env` (앱별 독립). 마이그레이션은 **파일 작성까지** — `pnpm migration:run` 은 사람이
 
 ## Common Pitfalls — 백엔드 고유

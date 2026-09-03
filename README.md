@@ -26,10 +26,12 @@ pnpm back dev           # → http://localhost:5501/api/v2   (Swagger: /api/v2/d
 pnpm front dev          # → http://localhost:5502
 ```
 
+`pnpm back dev` 는 **DB 터널을 먼저 자동으로 연다** — 백엔드는 DB 없이 기동하지 않기 때문이다. 이미 열려 있으면 그대로 쓰고, 포트는 `apps/back/.env` 의 `DB_PORT` 를 따른다. 닫을 때는 `pnpm back db:tunnel:stop`, 건드리고 싶지 않으면 `SKIP_DB_TUNNEL=1 pnpm back dev`. 상세는 [백엔드 README 「DB 접속」](apps/back/README.md).
+
 `pnpm back` · `pnpm front` 는 각각 `pnpm --filter nerd-back` · `pnpm --filter nerd-front` 의 별칭이다. 뒤에 그 앱의 스크립트 이름을 붙인다.
 
 ```bash
-pnpm back test -- --testPathPatterns health    # 앱 스크립트에 인자 전달
+pnpm back test --testPathPatterns health      # 앱 스크립트에 인자 전달 (`--` 없이 그대로 붙인다)
 pnpm front check:types
 ```
 
@@ -44,7 +46,7 @@ pnpm front check:types
 | `apps/back/.env` | 백엔드 런타임 전부 | `apps/back/.env.example` |
 | `apps/front/.env.local` | 프론트 로컬 개발용 | ⚠️ `PORT` 는 여기에 넣어도 **무시된다** |
 
-백엔드는 **DB 가 없으면 기동하지 않는다.** 로컬도 운영 DB 를 SSH 터널로 쓴다 — [백엔드 README 「DB 접속」](apps/back/README.md).
+백엔드는 **DB 가 없으면 기동하지 않는다.** 로컬도 운영 DB 를 SSH 터널로 쓰고, `pnpm back dev` 가 그 터널을 자동으로 연다 — [백엔드 README 「DB 접속」](apps/back/README.md).
 
 ## 검증
 
