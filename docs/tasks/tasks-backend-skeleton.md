@@ -73,7 +73,7 @@
 ### DB 확정 전에 이미 확정된 것 (Phase 2 선행 규약)
 
 DB 종류와 무관하게 성립하는 규약이다. 참고 A·B 에서 **실제로 사고를 낸 항목**만 옮겼다.
-DB 가 확정되면 이 표를 `.claude/rules/code-patterns.md` 로 승격하고, DB 특화 항목(멱등 가드 문법·타입 매핑·커넥션 풀)을 그때 채운다.
+DB 가 확정되면 이 표를 `.claude/rules/back-code-patterns.md` 로 승격하고, DB 특화 항목(멱등 가드 문법·타입 매핑·커넥션 풀)을 그때 채운다.
 
 | 규약 | 지키지 않았을 때 실제로 일어난 일 |
 |---|---|
@@ -219,7 +219,7 @@ nerd-back/
    — **스택 이름이 워크플로에 하드코딩되어 있다.** 지금은 환경이 하나뿐이라
    명시적인 편이 읽기 쉬워 그대로 두었다. 두 번째 환경이 생기는 시점에 파라미터화한다.
 
-**Path aliases** — alias→경로 매핑과 `tsconfig.json` ↔ `jest.config.js` 동기화 규칙은 [`.claude/rules/code-patterns.md`](../../.claude/rules/code-patterns.md) §1 이 SSOT다.
+**Path aliases** — alias→경로 매핑과 `tsconfig.json` ↔ `jest.config.js` 동기화 규칙은 [`.claude/rules/back-code-patterns.md`](../../.claude/rules/back-code-patterns.md) §1 이 SSOT다.
 
 ---
 
@@ -452,7 +452,7 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 
 - `CLAUDE.md` — 라우팅 표, Never/Ask 경계, Pitfalls, DoD, 커밋 컨벤션
   - ⚠️ 한 줄을 넣기 전에 자문한다: **"이걸 모르면 내가 틀리게 행동하는가?"** 아니면 넣지 않는다. 길어질수록 정작 중요한 금지 규칙의 준수율이 떨어진다 (참고 A lessons에 실제 사례 있음)
-- `.claude/rules/code-patterns.md` — 계층·에러·응답·테스트 규약. **규약마다 실측 카운트와 최종 확인일을 병기**한다
+- `.claude/rules/back-code-patterns.md` — 계층·에러·응답·테스트 규약. **규약마다 실측 카운트와 최종 확인일을 병기**한다
 - `docs/lessons.md` — **실패 양상 / 탐지 신호 / 근본 원인 / 예방 규칙** 4필드, 최신순 append
   - 초기 등재: **"로컬 빌드 성공 ≠ Docker 빌드 성공"** (성숙도 패턴 §5 — 남의 사고를 미리 등재)
 - `docs/playbooks/` — 반복 결함 클러스터. 판정 규칙: **1회 발생은 승격 대기, 2회째에 클러스터로 승격**
@@ -653,7 +653,7 @@ Step 11 — 문서 · AI 워크플로
   [x] CLAUDE.md (라우팅 표 / Never·Ask / Pitfalls / DoD / 커밋)
         · 2026-08-27 보강: 글로벌 충돌 시 우선순위(구체적인 쪽이 이김) · 200줄 상한 ·
           문서 분할 임계치 · Never 근거의 유효기간 · DoD 게이트 3분류
-  [x] .claude/rules/code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
+  [x] .claude/rules/back-code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
   [x] docs/deploy.md — 배포 SSOT 로 분리 (2026-08-27, 213줄 신설 / README 427→117줄)
   [x] docs/lessons.md — 4필드 포맷으로 누적 (2026-08-27 기준 8건)
   [x] README.md (스택 / 실행법 / 환경변수 / 명령어 / "언제 여는가" 인덱스)
@@ -690,7 +690,7 @@ Step 11 — 문서 · AI 워크플로
 
 ## 📚 참고
 
-- 계층·에러·응답·테스트 규약 상세: `.claude/rules/code-patterns.md` (Step 11에서 작성)
+- 계층·에러·응답·테스트 규약 상세: `.claude/rules/back-code-patterns.md` (Step 11에서 작성)
 - 금지·함정·DoD: `CLAUDE.md` (Step 11에서 작성)
 - 명령어·환경변수·배포 구성: `README.md` (Step 11에서 작성)
 

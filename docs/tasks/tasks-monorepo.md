@@ -54,7 +54,7 @@
 | API 호출 코드 | — | **0건** (설계상 브라우저는 상대경로 `/api/v2/*`) |
 | 공유 타입 | — | 없음 |
 | CLAUDE.md | 규약 문서 (≤200줄) | `@AGENTS.md` 한 줄. `AGENTS.md` 는 **Next 가 자동 생성**하는 보일러플레이트 |
-| 경로 하드코딩 | `.claude/rules/code-patterns.md` frontmatter `paths: src/**/*.ts …` · `precompact.sh` 가 `$cwd/docs/handoff` | `tsconfig paths "@/*": ["./*"]` |
+| 경로 하드코딩 | `.claude/rules/back-code-patterns.md` frontmatter `paths: src/**/*.ts …` · `precompact.sh` 가 `$cwd/docs/handoff` | `tsconfig paths "@/*": ["./*"]` |
 
 ---
 
@@ -404,10 +404,20 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 
 ### Step 4 — `.claude/` 경로 갱신
 
-- [ ] `.claude/rules/code-patterns.md` → `back-code-patterns.md`, frontmatter `paths` 를 `apps/back/{src,test,scripts}/**/*.ts` 로
-- [ ] `.claude/rules/front-code-patterns.md` 신규 (얇게)
-- [ ] `precompact.sh` — 루트 cwd 전제 확인, 변경 없으면 문서화만
-- **verify**: 루트 `pnpm ci:core` 두 앱 통과 · `apps/back/src/main.ts` 를 열 때 rule 이 주입되는지 수동 확인
+- [x] `code-patterns.md` → `back-code-patterns.md`, frontmatter `paths` 를 `apps/back/{src,test,scripts}/**/*.ts` 로. 경로 참조 **10개 파일** 갱신, 옛 경로 grep **0건**. 본문의 비공식 언급(`code-patterns §10` 처럼 절만 가리키는 것)은 그대로 뒀다 — 파일명이 아니라 절 번호를 가리키므로 유효하다
+- [x] `front-code-patterns.md` 신규 — 7절 · 스코프는 `apps/front/{app,scripts}` + `next.config.ts`. **코드에서 어기기 쉬운 것만** 담았다(상대경로 API 호출 · `NEXT_PUBLIC_*` 확정 시점 · `PORT` · 레플리카 3 제약 · 헬스체크 · standalone 자산 · 타입). 결정 근거는 `tasks-frontend-cicd.md` 가 SSOT 라고 못박아 중복을 피했다
+- [x] `precompact.sh` — **문서화로 끝나지 않았다. 실제 결함을 고쳤다** (별도 `fix(repo)` 커밋). 아래 발견 참조
+- **verify (2026-09-03)**: 루트 `pnpm ci:core` **두 앱 통과** (back 11 suites · 67 tests + build · front 빌드) · 훅을 루트 cwd 와 `apps/back` cwd 양쪽에서 실행해 **같은 루트 경로**에 쓰는 것을 확인 · `sh -n` 문법 검사 통과 · `git status` 에 handoff 미노출
+  - ⚠️ **rule 자동 주입은 이 세션에서 확정할 수 없다** — path-scoped rule 은 세션 시작 시 스코프가 잡히고 파일을 읽는 시점에 로드된다. **다음 세션에서 `apps/back/src` 의 `.ts` 를 열어 주입을 확인한다**(폴백으로 루트 `CLAUDE.md` 라우팅 표가 있다)
+  - ⚠️ 이 단계에서 `node_modules` 가 손상돼 `eslint` 바이너리가 사라졌다 — 앞선 **샌드박스 차단 설치**의 잔재였다(`.pnpm` 가상 스토어가 1개 항목만). 워크스페이스 전체를 지우고 재설치해 복구했고(`.pnpm` 735·356 항목) 그 뒤 검증을 다시 돌렸다. **코드 문제가 아니다**
+
+#### 🔍 발견: 훅이 세션 cwd 를 그대로 써서 하위 디렉터리에 스냅샷을 만들 수 있었다
+
+`precompact.sh` 는 `out_dir="$cwd/docs/handoff"` 였다. 모노레포에서 `apps/back` 에 들어가 세션을 열면 `apps/back/docs/handoff/` 가 생기는데, 루트 `.gitignore` 의 `docs/handoff/` 는 **경로에 슬래시가 있어 루트에만 적용**된다 → 그 스냅샷은 **커밋 대상으로 올라온다.** 핸드오프는 정본이 아니고 대화 내용을 담으므로 커밋되면 안 된다.
+
+- `git rev-parse --show-toplevel` 으로 **저장소 루트**를 구해 거기에 모은다. 작업 트리 변경 수집도 루트 기준으로 바꿨다 — 하위에서 세션을 열어도 다른 앱의 변경이 빠지지 않는다
+- 루트 `.gitignore` 를 `**/docs/handoff/` 로 바꿔 **어느 깊이든** 막는다 (이중 방어)
+- 이 수정으로 D9 의 "세션은 루트에서 연다" 는 **권고**로 내려간다. 훅이 위치에 의존하지 않으므로 루트 `CLAUDE.md` 에 금지로 적지 않는다
 
 ### Step 5 — 워크플로 재작성
 
@@ -427,7 +437,7 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 - [ ] 루트 `README.md` 신규 · `apps/back/README.md` · `apps/front/README.md` 경로·명령 갱신
 - [ ] `docs/deploy.md`: 파일 위치 · 워크플로 표 · 「무엇을 바꾸면」 표 확장 · 시크릿 12개 · 이름 규칙표의 "저장소" 를 "앱" 으로 (`<앱>.<환경>.env`, 서버 stack 디렉터리 앱별)
 - [ ] `tasks-stack-rename.md` 「연동」 줄 갱신
-- [x] 아카이브 이동 (2026-09-03 선행) — `tasks-ai-config.md` · `tasks-db-mysql.md` → `docs/tasks/archive/`. 경로 참조 9개 파일 갱신(`README.md` · `.env.example` · `docs/deploy.md` · `.claude/rules/code-patterns.md` · `tasks-backend-skeleton.md` · `infra/docker-stack.{db,app}.yml` 주석 등), 갱신 후 옛 경로 `grep` **0건**. `src/` 의 주석 2곳은 경로 없는 파일명만 언급해 손대지 않았다.
+- [x] 아카이브 이동 (2026-09-03 선행) — `tasks-ai-config.md` · `tasks-db-mysql.md` → `docs/tasks/archive/`. 경로 참조 9개 파일 갱신(`README.md` · `.env.example` · `docs/deploy.md` · `.claude/rules/back-code-patterns.md` · `tasks-backend-skeleton.md` · `infra/docker-stack.{db,app}.yml` 주석 등), 갱신 후 옛 경로 `grep` **0건**. `src/` 의 주석 2곳은 경로 없는 파일명만 언급해 손대지 않았다.
   ⚠️ **부수 효과**: `infra/docker-stack.db.yml` 주석 1줄이 바뀌어 **머지 시 `deploy-db` 가 1회 돈다.** 스펙 무변경이라 MySQL 재시작은 없다(2026-09-01 Redis 전례 — 주석은 파싱 후 사라진다). 원치 않으면 그 파일의 주석 수정만 되돌리고 옛 경로를 남긴다
 - **verify**: `grep -rn` 전수 — `nerd-front` 저장소 참조 · 루트 기준 `infra/docker-stack.app.yml` · 루트 기준 `src/` `test/` `scripts/` 참조 · `deploy.yml`(구 이름) — 남은 것이 전부 **의도된 과거 기록(lessons)** 인지 하나씩 확인. 파일 단위 제외는 `--exclude` 로 ([lessons 2026-09-01](../lessons.md)) · `wc -l CLAUDE.md` ≤ 200
 

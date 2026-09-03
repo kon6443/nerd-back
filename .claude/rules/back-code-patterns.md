@@ -1,8 +1,8 @@
 ---
 paths:
-  - "src/**/*.ts"
-  - "test/**/*.ts"
-  - "scripts/**/*.ts"
+  - "apps/back/src/**/*.ts"
+  - "apps/back/test/**/*.ts"
+  - "apps/back/scripts/**/*.ts"
 ---
 
 # 코드 패턴 (SSOT)

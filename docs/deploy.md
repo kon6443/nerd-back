@@ -1,7 +1,7 @@
 # 배포 및 운영 (SSOT)
 
 > **용도**: 배포 구성·흐름·롤백의 단일 출처. 배포·인프라 작업 전에 읽는다.
-> **경계**: 여기는 *어떻게 배포하고 운영하는가*. 코드 규약은 [`.claude/rules/code-patterns.md`](../.claude/rules/code-patterns.md), 금지·함정은 [`../CLAUDE.md`](../CLAUDE.md), 결정 근거는 [`tasks/tasks-backend-skeleton.md`](tasks/tasks-backend-skeleton.md).
+> **경계**: 여기는 *어떻게 배포하고 운영하는가*. 코드 규약은 [`.claude/rules/back-code-patterns.md`](../.claude/rules/back-code-patterns.md), 금지·함정은 [`../CLAUDE.md`](../CLAUDE.md), 결정 근거는 [`tasks/tasks-backend-skeleton.md`](tasks/tasks-backend-skeleton.md).
 > 🚫 실제 도메인·IP·서버 경로·네트워크 이름은 이 문서에 적지 않는다. 전부 GitHub Environment 시크릿에서 온다.
 
 ---
@@ -140,7 +140,7 @@ caddy reload   --config <경로>
 
 ## 레플리카 3개가 강제하는 것
 
-배포 구성이 코드에 거는 제약이다. 코드를 쓸 때의 상세는 [`.claude/rules/code-patterns.md`](../.claude/rules/code-patterns.md) §6·§8.
+배포 구성이 코드에 거는 제약이다. 코드를 쓸 때의 상세는 [`.claude/rules/back-code-patterns.md`](../.claude/rules/back-code-patterns.md) §6·§8.
 
 | 제약 | 어기면 |
 |---|---|

@@ -138,7 +138,7 @@ pnpm migration:run
 ```
 
 - 스크립트는 `pnpm build` 후 `dist/config/data-source.js` 로 TypeORM CLI 를 돌린다 (ts-node 미도입). 환경변수는 Node 의 `--env-file=.env.migration` 로 읽는다.
-- 마이그레이션은 **1개 = 1목적**, `down()` 필수, 멱등 작성 — MySQL 은 DDL 이 암묵 커밋이라 중간 실패 시 부분 적용 상태로 남는다. 상세는 `.claude/rules/code-patterns.md` §12.
+- 마이그레이션은 **1개 = 1목적**, `down()` 필수, 멱등 작성 — MySQL 은 DDL 이 암묵 커밋이라 중간 실패 시 부분 적용 상태로 남는다. 상세는 `.claude/rules/back-code-patterns.md` §12.
 - 컬럼 시각은 `DATETIME(3)`. `TIMESTAMP` 는 쓰지 않는다 (§10).
 
 `check:types` 는 `tsc --noEmit` 이다. `build` 는 `src` 만, jest 는 로드한 spec 만 검사하므로 **`src` 와 `test` 를 한 번에 보는 수단은 이것뿐이다.**
@@ -156,7 +156,7 @@ pnpm migration:run
 | 파일 | 언제 여는가 |
 |---|---|
 | [`CLAUDE.md`](CLAUDE.md) | 코드를 쓰기 전 — 금지 사항·함정·완료 기준 |
-| [`.claude/rules/code-patterns.md`](.claude/rules/code-patterns.md) | 모듈·API·테스트를 만들 때 |
+| [`.claude/rules/back-code-patterns.md`](.claude/rules/back-code-patterns.md) | 모듈·API·테스트를 만들 때 |
 | [`docs/deploy.md`](docs/deploy.md) | 배포하거나 장애를 확인할 때. MySQL 스택 운영 사실도 여기 |
 | [`infra/`](infra/) | 스택 YAML 을 볼 때 — 설정값을 왜 그렇게 골랐는지는 `docs/tasks/archive/tasks-db-mysql.md` |
 | [`docs/lessons.md`](docs/lessons.md) | 같은 실수를 반복하지 않으려 할 때 |
