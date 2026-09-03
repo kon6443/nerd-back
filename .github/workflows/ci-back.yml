@@ -1,0 +1,66 @@
+name: CI (back)
+
+# apps/back 의 검증. 프론트와 별도로 돈다 — 한 앱의 변경이 다른 앱 CI 를 기다리지 않는다.
+#
+# ⚠️ 여기 paths 는 **배포 워크플로와 성격이 다르다.** 배포는 산출물을 바꾸는 파일만 정확히
+#    화이트리스트로 잡아 교집합 0 을 유지하지만, CI 는 넓게 잡는다 — PR 에서 검증이
+#    안 도는 것이 더 위험하다. 루트 워크스페이스 파일은 두 CI 가 **함께** 돌아야 한다.
+on:
+  pull_request:
+    paths:
+      - 'apps/back/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ci-back.yml'
+  push:
+    branches-ignore:
+      # main 푸시는 deploy-back 이 같은 검증을 먼저 돌리므로 중복 실행하지 않는다.
+      - main
+    paths:
+      - 'apps/back/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ci-back.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          # 워크스페이스는 앱별 lockfile 을 쓴다 (sharedWorkspaceLockfile: false).
+          cache-dependency-path: '**/pnpm-lock.yaml'
+
+      # 워크스페이스 전체를 설치한다. --filter 로 좁히지 않는 이유는 두 lockfile 이
+      # 모두 최신인지(--frozen-lockfile) 함께 확인되기 때문이다.
+      - run: pnpm install --frozen-lockfile
+
+      # 스텁 검사와 E2E 까지 포함한 전체 검증. 검증 대상은 이 앱뿐이다.
+      - run: pnpm --filter nerd-back run ci:all
+
+      # ARM64 로 실제 빌드되는지 확인한다. 배포 노드가 ARM64 이므로
+      # 여기서 걸러내지 않으면 배포 단계에서야 드러난다.
+      #
+      # ⚠️ 컨테이너 빌드의 입력은 Dockerfile 의 COPY 목록뿐이다 — 레포 전체를 입력으로
+      #    쓰는 ci:all 이 통과해도 이미지 빌드는 깨질 수 있다. 실제로 모노레포 전환에서
+      #    지운 파일을 COPY 하고 있어 이 job 만 실패한 전례가 있다 (docs/lessons.md).
+      - uses: docker/setup-buildx-action@v3
+      - name: ARM64 이미지 빌드 검증
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/back
+          file: apps/back/Dockerfile
+          platforms: linux/arm64
+          push: false
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=back
+          cache-to: type=gha,mode=max,scope=back

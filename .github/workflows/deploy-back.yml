@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy back
 
 on:
   push:
@@ -6,24 +6,31 @@ on:
       - main
     # paths 는 화이트리스트로 지정한다.
     # paths-ignore 는 머지 커밋 평가에서 의도 외 트리거가 발생한다.
+    #
+    # ⚠️ 배포 워크플로 4개(back·front·db·redis)의 paths 는 **교집합이 0건**이어야 한다.
+    #    겹치면 한 커밋에 두 스택이 뜬다. 여기는 apps/back/ 아래만 본다.
+    # ⚠️ 루트 워크스페이스 파일(package.json · pnpm-workspace.yaml · 루트 lockfile)은
+    #    넣지 않는다. 컨테이너 빌드 컨텍스트가 apps/back 뿐이라 산출물을 바꿀 수 없다.
+    #    그 파일들의 회귀는 ci-back.yml 이 PR 에서 잡는다.
     paths:
-      - 'src/**'
-      - 'scripts/**'
-      - 'test/**'
-      - 'Dockerfile'
-      - '.dockerignore'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'tsconfig*.json'
-      - 'jest.config.js'
-      - 'infra/docker-stack.app.yml'
-      - '.github/workflows/deploy.yml'
+      - 'apps/back/src/**'
+      - 'apps/back/scripts/**'
+      - 'apps/back/test/**'
+      - 'apps/back/Dockerfile'
+      - 'apps/back/.dockerignore'
+      - 'apps/back/package.json'
+      - 'apps/back/pnpm-lock.yaml'
+      - 'apps/back/tsconfig*.json'
+      - 'apps/back/jest.config.js'
+      - 'apps/back/infra/docker-stack.app.yml'
+      - '.github/workflows/deploy-back.yml'
   # 코드 변경 없이 현재 main 을 다시 배포할 때 쓴다.
   workflow_dispatch:
 
 # 배포가 겹치면 Swarm 수렴 중에 다음 배포가 끼어든다. 앞선 실행을 취소하지 않고 줄을 세운다.
+# 프론트와 그룹이 달라 두 앱 배포는 병렬로 돈다.
 concurrency:
-  group: deploy-prod
+  group: deploy-back
   cancel-in-progress: false
 
 jobs:
@@ -37,8 +44,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: '**/pnpm-lock.yaml'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run ci:all
+      - run: pnpm --filter nerd-back run ci:all
 
   deploy:
     needs: verify
@@ -63,7 +71,10 @@ jobs:
       - name: 이미지 빌드 및 푸시
         uses: docker/build-push-action@v6
         with:
-          context: .
+          # 빌드 컨텍스트는 앱 디렉터리다. Dockerfile 은 자기 디렉터리가 곧 루트라고
+          # 가정하고 쓰여 있어 내용을 바꿀 필요가 없다.
+          context: apps/back
+          file: apps/back/Dockerfile
           # 배포 노드가 ARM64 단일이므로 amd64 는 빌드하지 않는다.
           platforms: linux/arm64
           push: true
@@ -71,8 +82,17 @@ jobs:
           # Swarm 의 매니페스트 처리가 attestation 을 삼키지 못한다.
           provenance: false
           sbom: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # 앱별로 캐시 scope 를 분리한다. 섞이면 서로의 레이어를 밀어낸다.
+          cache-from: type=gha,scope=back
+          cache-to: type=gha,mode=max,scope=back
+
+      # 서버 규약은 **파일명 = 스택명**이다 ($DEPLOY_DIR/stacks/<스택명>.yml).
+      # scp-action 은 업로드 중 이름을 바꿀 수 없으므로(strip_components 는 디렉터리만 벗긴다)
+      # 러너에서 미리 스택명으로 복사해 둔다.
+      - name: 전송 목록 구성 (파일명 = 스택명)
+        run: |
+          mkdir -p .stage/stacks
+          cp apps/back/infra/docker-stack.app.yml .stage/stacks/prod_nerd_back.yml
 
       - name: stack YAML 전송
         uses: appleboy/scp-action@v0.1.7
@@ -80,9 +100,9 @@ jobs:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
-          source: infra/docker-stack.app.yml
-          target: ${{ secrets.DEPLOY_STACK_DIR }}
-          strip_components: 1
+          source: .stage/stacks/prod_nerd_back.yml
+          target: ${{ secrets.DEPLOY_DIR }}/stacks
+          strip_components: 2
 
       - name: 스택 배포 (수렴까지 동기 대기)
         uses: appleboy/ssh-action@v1.2.0
@@ -90,18 +110,20 @@ jobs:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
-          envs: REGISTRY_URL,IMAGE_TAG,OVERLAY_NETWORK,ENV_FILE_PATH,STACK_DIR
+          envs: REGISTRY_URL,IMAGE_TAG,OVERLAY_NETWORK,ENV_FILE_PATH,STACK_FILE
           script: |
             set -e
             docker stack deploy --detach=false --with-registry-auth \
-              -c "$STACK_DIR/docker-stack.app.yml" prod_nerd_back
+              -c "$STACK_FILE" prod_nerd_back
             docker stack services prod_nerd_back
         env:
           REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
           IMAGE_TAG: ${{ steps.meta.outputs.tag }}
           OVERLAY_NETWORK: ${{ secrets.OVERLAY_NETWORK }}
-          ENV_FILE_PATH: ${{ secrets.ENV_FILE_PATH }}
-          STACK_DIR: ${{ secrets.DEPLOY_STACK_DIR }}
+          # 경로는 규약으로 계산한다 — 앱이 늘어도 시크릿이 늘지 않는다.
+          # stack YAML 안의 변수명(${ENV_FILE_PATH})은 그대로 두고 값만 여기서 만든다.
+          ENV_FILE_PATH: ${{ secrets.DEPLOY_DIR }}/env/prod_nerd_back.env
+          STACK_FILE: ${{ secrets.DEPLOY_DIR }}/stacks/prod_nerd_back.yml
 
       # 수렴 명령이 성공해도 앱이 실제로 응답하는지는 별개다.
       # 여기까지 통과해야 배포가 끝난 것으로 본다.

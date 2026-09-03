@@ -23,15 +23,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 서버 규약은 **파일명 = 스택명**이다 ($DEPLOY_DIR/stacks/<스택명>.yml).
+      # Redis 스택명만 `cache` 인 예외라 파일명도 prod_nerd_cache.yml 이 된다 —
+      # named volume 이 스택 이름을 물고 있어 재명명하지 않기로 한 결정이 파일명에도 드러난다
+      # (docs/tasks/tasks-stack-rename.md). scp-action 은 업로드 중 이름을 못 바꾼다.
+      - name: 전송 목록 구성 (파일명 = 스택명)
+        run: |
+          mkdir -p .stage/stacks
+          cp infra/docker-stack.redis.yml .stage/stacks/prod_nerd_cache.yml
+
       - name: stack YAML 전송
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
-          source: infra/docker-stack.redis.yml
-          target: ${{ secrets.DEPLOY_STACK_DIR }}
-          strip_components: 1
+          source: .stage/stacks/prod_nerd_cache.yml
+          target: ${{ secrets.DEPLOY_DIR }}/stacks
+          strip_components: 2
 
       - name: 스택 배포 (수렴까지 동기 대기)
         uses: appleboy/ssh-action@v1.2.0
@@ -39,15 +48,15 @@ jobs:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
-          envs: OVERLAY_NETWORK,STACK_DIR
+          envs: OVERLAY_NETWORK,STACK_FILE
           script: |
             set -e
             docker stack deploy --detach=false \
-              -c "$STACK_DIR/docker-stack.redis.yml" prod_nerd_cache
+              -c "$STACK_FILE" prod_nerd_cache
             docker stack services prod_nerd_cache
         env:
           OVERLAY_NETWORK: ${{ secrets.OVERLAY_NETWORK }}
-          STACK_DIR: ${{ secrets.DEPLOY_STACK_DIR }}
+          STACK_FILE: ${{ secrets.DEPLOY_DIR }}/stacks/prod_nerd_cache.yml
 
       # ⚠️ Redis 는 named volume 때문에 stop-first 로 교체된다.
       #    즉 재시작 순간 짧은 공백이 있다. 앱은 그 동안 레이트리밋만 축소 모드로 돌아간다
