@@ -1,14 +1,17 @@
 # Task Tracker: 프론트엔드 CI/CD 구축
 
-> **상태**: Step 1·2 완료 (포트·설정 · 헬스체크) · Step 3(컨테이너)부터 진행 중
+> **상태**: **Step 1~5 완료 · 2026-09-01 운영 배포 성공** (`main` PR #3 머지 → `prod_nerd_front` 3/3 healthy, 이미지 `1aa9484`).
+> 남은 것: Step 6 중 **Caddy 블록·DNS·무중단 실측**.
+> **2026-09-03 모노레포로 이관** — 이 앱은 `nerd-back` 저장소의 `apps/front` 다. 이 문서도 그 저장소의 `docs/tasks/` 로 옮겼다.
 > **작성일**: 2026-09-01
-> **대상 브랜치**: `feat/frontend-skeleton`
-> **용도**: 이 저장소의 CI/CD·컨테이너·배포 구성의 **결정과 근거**. 진행 상황의 정본은 이 파일이다.
+> **원 저장소**: `kon6443/nerd-front` (아카이브 예정). 이력은 subtree 로 `apps/front` 에 보존.
+> **용도**: **프론트 앱(`apps/front`)** 의 CI/CD·컨테이너·배포 구성의 **결정과 근거**. 진행 상황의 정본은 이 파일이다.
+> 모노레포 전환 자체(디렉터리·워크플로 분리·시크릿)는 [`tasks-monorepo.md`](tasks-monorepo.md) 가 소유한다.
 
 **이 문서가 SSOT 인 것** — 프론트 고유의 결정·근거·진행 상황.
-**이 문서가 SSOT 가 아닌 것** — 배포 인프라의 일반 규약(Swarm·Caddy·롤백·이름 규칙)은 `nerd-back` 저장소의 `docs/deploy.md` 가 정본이다. 여기서는 **프론트에서 달라지는 것만** 적고 같은 내용을 다시 쓰지 않는다.
+**이 문서가 SSOT 가 아닌 것** — 배포 인프라의 일반 규약(Swarm·Caddy·롤백·이름 규칙)은 같은 저장소의 [`docs/deploy.md`](../deploy.md) 가 정본이다. 여기서는 **프론트에서 달라지는 것만** 적고 같은 내용을 다시 쓰지 않는다.
 
-**선행 의존** — 스택 재명명은 `nerd-back` 저장소의 `docs/tasks/tasks-stack-rename.md` 가 소유한다. **이름은 확정됐다.** 다만 그 전환이 끝나기 전에는 `prod_nerd_back_app` 이 실제로 존재하지 않으므로, 이 이름을 참조하는 것(Caddy 블록 · `BACKEND_INTERNAL_URL`)은 전환 이후에 유효해진다.
+**선행 의존** — 스택 재명명은 [`tasks-stack-rename.md`](tasks-stack-rename.md) 가 소유한다. **이름은 확정됐다.** 다만 그 전환이 끝나기 전에는 `prod_nerd_back_app` 이 실제로 존재하지 않으므로, 이 이름을 참조하는 것(Caddy 블록 · `BACKEND_INTERNAL_URL`)은 전환 이후에 유효해진다.
 
 ---
 
@@ -110,7 +113,7 @@ CMD ["node", "server.js"]
 
 ### 백엔드에 필요한 후속
 
-**이 저장소에서 고칠 수 없는 항목이다. `nerd-back` 에 별건으로 등재한다.**
+**작성 시점에는 별도 저장소라 고칠 수 없었다. 모노레포 전환(2026-09-03) 이후로는 같은 저장소이므로 `apps/back` 에서 바로 고칠 수 있다 — 별건으로 등재한다.**
 
 1. **`.env.example` 의 `CORS_ORIGINS=http://localhost:3000` → `http://localhost:5502`**
    로컬 개발에서 프론트가 백엔드를 직접 부를 때만 필요하다. 상용은 같은 도메인 경유라 CORS 자체가 발생하지 않는다.
@@ -680,6 +683,8 @@ docker ps -q --filter "label=com.docker.stack.namespace=prod_nerd_front" | head 
 
 ### Step 6 — 배포·검증
 
+**스택 배포 자체는 2026-09-01 에 끝났다** (`main` 머지 → `deploy.yml` 완주 → 3/3 healthy). 아래는 그 뒤에 남은 것이다.
+
 - [ ] Caddy 블록 추가 (사용자 실행) — 프론트 도메인에 `/api/v2/*` → 백엔드, catch-all → 프론트. **catch-all 을 반드시 아래에**
 - [ ] `caddy validate` → `caddy reload` → 인증서 발급 확인
 - [ ] 배포 후 무중단 실측 — 배포 중 1초 간격 폴링, **비정상 0건**이 완료 조건
@@ -750,6 +755,6 @@ docker ps -q --filter "label=com.docker.stack.namespace=prod_nerd_front" | head 
 - Next.js CLI — https://nextjs.org/docs/app/api-reference/cli/next
 - Next.js 16 업그레이드 — https://nextjs.org/docs/app/guides/upgrading/version-16
 - Turbopack standalone 이슈 — https://github.com/vercel/next.js/issues/88844
-- `nerd-back` `docs/deploy.md` — 배포 인프라 일반 규약 (SSOT)
-- `nerd-back` `docs/lessons.md` — 이식 대상 교훈
-- `nerd-back` `docs/tasks/tasks-stack-rename.md` — 스택 재명명 (선행 의존)
+- [`docs/deploy.md`](../deploy.md) — 배포 인프라 일반 규약 (SSOT)
+- [`docs/lessons.md`](../lessons.md) — 이식 대상 교훈
+- [`tasks-stack-rename.md`](tasks-stack-rename.md) — 스택 재명명 (선행 의존)

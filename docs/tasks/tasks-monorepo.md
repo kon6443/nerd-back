@@ -389,12 +389,18 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 
 ### Step 3 — 프론트를 워크스페이스에 맞춤
 
-- [ ] 삭제: `apps/front/.github/` · `apps/front/pnpm-workspace.yaml` · `apps/front/.gitignore`
-- [ ] 이동: `apps/front/docs/tasks/tasks-frontend-cicd.md` → `docs/tasks/` (헤더의 "`nerd-back` 저장소의 …" 표현을 같은 저장소 경로로 갱신 · **Step 6 상태를 실제와 맞춘다** — 스택은 9월 1일에 배포됨, Caddy·DNS·무중단 실측은 Step 0 확인 결과대로)
-- [ ] `apps/front/package.json` `packageManager` → `pnpm@10.26.2` (D11)
-- [ ] `apps/front/next.config.ts` 에 `outputFileTracingRoot: __dirname` (D12)
-- [ ] 루트 `.gitignore` 에 `.next/` `out/` `next-env.d.ts` `.vercel` 추가. `.env.production` 이 생기는 시점에 `!apps/front/.env.production` 예외 (지금은 파일이 없다 — 프론트 저장소 `.gitignore` 도 예외가 없어 설계 문서와 어긋나 있었다)
-- **verify**: `pnpm install` → `pnpm front ci:all` 통과 · `docker build --platform linux/arm64 apps/front` 성공 · `.next/standalone/server.js` 가 **최상위**(`apps/front/` 중첩 없음) · 컨테이너 `/api/health` 200 · lockfile 이 `apps/front/pnpm-lock.yaml` 하나만 바뀌었는지(`git status`)
+- [x] 삭제: `apps/front/pnpm-workspace.yaml` · `apps/front/.gitignore`. **`apps/front/.github/` 는 Step 5 로 미뤘다** — 새 워크플로의 원본이라 지우기 전에 옮겨 써야 한다. 하위 디렉터리의 `.github` 는 GitHub 이 읽지 않아 그때까지 무해하다
+- [x] 이동: `tasks-frontend-cicd.md` → `docs/tasks/`. 헤더 상태를 실제와 맞추고(9월 1일 운영 배포 성공 · 남은 것은 Caddy·DNS·무중단 실측) 저장소 간 참조 9곳을 같은 저장소 상대경로로 바꿨다 — `nerd-back 저장소` 표현 잔존 **0건**
+- [x] `apps/front/package.json` `packageManager` → `pnpm@10.26.2` (D11)
+- [x] `apps/front/next.config.ts` 에 `outputFileTracingRoot: __dirname` (D12) — `next.config.ts` 에서 `__dirname` 이 동작함을 빌드로 확인
+- [x] 루트 `.gitignore` 에 `.next/` `out/` `next-env.d.ts` `.vercel` `*.pem` 추가(앵커 없이 — 프론트 원본은 `/.next/` 처럼 루트 앵커라 그대로 옮기면 하위 앱에서 안 먹는다) + `.pnpm-store/`. `.env.production` 이 생기는 시점에 `!apps/front/.env.production` 예외 (지금은 파일이 없다)
+- [x] **`apps/front/Dockerfile` 의 COPY 목록에서 `pnpm-workspace.yaml` 제거** — 계획에 없던 필수 수정. 지운 파일을 COPY 하고 있어 컨테이너 빌드가 `failed to compute cache key: "/pnpm-workspace.yaml": not found` 로 깨졌다. **「로컬 빌드 성공 ≠ 컨테이너 빌드 성공」이 그대로 재현된 사례**([lessons 2026-08-26](../lessons.md)) — `pnpm front ci:all` 은 통과하는데 이미지 빌드만 실패했다. 그 파일의 `ignoredBuiltDependencies` 는 빌드 스크립트 실행 여부만 정하고 pnpm 10 은 기본적으로 이를 막으므로 산출물은 같다(아래 sharp 확인)
+- **verify (2026-09-03)**
+  - `pnpm install`(워크스페이스 전체) ✅ · `pnpm front ci:all` ✅ — lint · `next typegen && tsc --noEmit` · `check:stubs`(6파일) · `check:health-path` · `next build` 전부 통과
+  - `.next/standalone/server.js` 가 **최상위** ✅ (`apps/front/` 중첩 없음) — D12 가 실효
+  - `docker build --platform linux/arm64 apps/front` ✅ · 컨테이너 실기동: `healthcheck.mjs` exit **0** · `/api/health` **200** · `/` **200** · `/next.svg` **200**(정적 자산 COPY 정상) · env `HOSTNAME=0.0.0.0` `PORT=5502` `TZ=UTC` `MALLOC_ARENA_MAX=2` 주입 확인 · `@img/sharp-linux-arm64@0.35.4` 포함
+  - lockfile 은 **둘 다 무변경** (`git status` 에 lockfile 없음)
+  - ⚠️ 미검증: 래스터 이미지 최적화 200 — `public/` 이 전부 SVG 라 이번에 확인하지 않았다(2026-09-01 원 저장소 실측은 있다)
 
 ### Step 4 — `.claude/` 경로 갱신
 
