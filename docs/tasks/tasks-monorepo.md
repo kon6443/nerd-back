@@ -14,7 +14,7 @@
 - **무엇을 달성하는가**: 두 저장소(`kon6443/nerd-back`, `kon6443/nerd-front`)를 하나의 pnpm 워크스페이스로 합친다. 앱 코드·Dockerfile·스택 YAML·헬스체크·Swarm 서비스는 **그대로** 두고, 위치와 워크플로만 바꾼다.
 - **수용 기준**
   1. 루트에서 `pnpm install` 한 번으로 두 앱이 설치되고 `pnpm ci:core` 가 두 앱을 모두 검증한다.
-  2. `apps/back/**` 만 바꾼 `main` 푸시는 **`deploy-back` 만**, `apps/front/**` 만 바꾼 푸시는 **`deploy-front` 만** 돈다. 6개 워크플로 `paths` 교집합 **0건**.
+  2. `apps/back/**` 만 바꾼 `main` 푸시는 **`deploy-back` 만**, `apps/front/**` 만 바꾼 푸시는 **`deploy-front` 만** 돈다. **배포 4개**(back·front·db·redis)의 `paths` 교집합 **0건** — CI 2개는 루트 워크스페이스 파일에서 의도적으로 함께 돈다(Step 5).
   3. 두 Dockerfile 과 stack YAML 4개의 **내용이 바뀌지 않는다** (빌드 컨텍스트와 업로드 경로만). `docker build apps/back` · `docker build apps/front` 가 로컬에서 성공하고 실기동 헬스체크가 통과한다.
   4. Swarm 스택·서비스 DNS·이미지 이름·노드 라벨 **무변경**. 서버 파일은 `<DEPLOY_DIR>/{stacks,env}/<스택명>.*` 트리로 이동하고, 시크릿은 경로 2개(`DEPLOY_STACK_DIR` · `ENV_FILE_PATH`)가 `DEPLOY_DIR` 1개로 대체되어 **10 → 9개**. 앱이 늘어도 시크릿이 늘지 않는다.
   5. 프론트 git 이력(12커밋, 운영 태그 `1aa9484` 포함)이 보존된다.
@@ -419,17 +419,36 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 - 루트 `.gitignore` 를 `**/docs/handoff/` 로 바꿔 **어느 깊이든** 막는다 (이중 방어)
 - 이 수정으로 D9 의 "세션은 루트에서 연다" 는 **권고**로 내려간다. 훅이 위치에 의존하지 않으므로 루트 `CLAUDE.md` 에 금지로 적지 않는다
 
-### Step 5 — 워크플로 재작성
+### Step 5 — 워크플로 재작성 ✅ 완료 (2026-09-03)
 
-- [ ] `deploy.yml` → `deploy-back.yml`: `paths` 에 `apps/back/` 접두 · `setup-node` `cache-dependency-path: apps/back/pnpm-lock.yaml` · `pnpm install --frozen-lockfile --filter nerd-back` · `pnpm back ci:all` · buildx `context: apps/back` `file: apps/back/Dockerfile` · scp `apps/back/infra/docker-stack.app.yml` → `$DEPLOY_DIR/stacks/prod_nerd_back.yml` · `ENV_FILE_PATH=$DEPLOY_DIR/env/prod_nerd_back.env` · concurrency `deploy-back`. **스택·이미지 이름·스모크 로직 무변경**
-- [ ] `deploy-front.yml`: 프론트 `deploy.yml` 을 같은 방식으로 변환 — `…/stacks/prod_nerd_front.yml` · `…/env/prod_nerd_front.env` · concurrency `deploy-front`
-- [ ] `deploy-db.yml`: scp target `$DEPLOY_DIR/stacks/prod_nerd_db.yml` + `$DEPLOY_DIR/stacks/mysql/init-users.sh` · `-c` 경로만 변경. 사전 점검·스모크 무변경
-- [ ] `deploy-redis.yml`: scp target `$DEPLOY_DIR/stacks/prod_nerd_cache.yml` · `-c` 경로만 변경
-- [ ] `ci.yml` → `ci-back.yml` + `ci-front.yml`: 각 `paths` = 앱 화이트리스트 + 루트 `package.json` `pnpm-workspace.yaml` + 자기 파일
-- [ ] 4개 배포 워크플로 공통 — scp 전에 **staging 단계**: `mkdir -p .stage/stacks && cp apps/back/infra/docker-stack.app.yml .stage/stacks/prod_nerd_back.yml` (db 는 `mysql/` 디렉터리도 함께) → `scp-action` `source: .stage/stacks/*` `target: ${{ secrets.DEPLOY_DIR }}/stacks` `strip_components: 2`. scp-action 은 업로드 중 이름을 못 바꾸므로(D16) 러너에서 미리 바꾼다. `.stage/` 는 `.gitignore` 에 추가
-- [ ] 4개 배포 워크플로에서 `DEPLOY_STACK_DIR` · `ENV_FILE_PATH` 시크릿 참조 **0건** (`grep -rn 'secrets\.\(DEPLOY_STACK_DIR\|ENV_FILE_PATH\)' .github/`)
-- [ ] (선택 · 별도 커밋) `deploy-back.yml` 스모크 필터를 `label=com.docker.stack.namespace=prod_nerd_back` 으로 — `tasks-stack-rename.md` 후속 항목. 워크플로를 이미 여는 김에 하되 **커밋은 분리**
-- **verify**: 6개 워크플로 `paths` 를 스크립트로 뽑아 **교집합 0** 확인(명령을 이 문서에 남긴다) · PR 을 올리면 `ci-back` · `ci-front` 가 **둘 다** 돈다(모든 앱 파일이 변경이므로) · 각 ARM64 빌드 job 통과
+`ci.yml` · `deploy.yml` 2개 → **6개**. 앱 이름이 파일명에 드러나므로 어느 워크플로가 무엇을 배포하는지 목록만 보고 안다.
+
+- [x] `deploy.yml` → **`deploy-back.yml`** — `paths` 에 `apps/back/` 접두 · buildx `context: apps/back` `file: apps/back/Dockerfile` · scp `.stage/stacks/prod_nerd_back.yml` → `$DEPLOY_DIR/stacks` · `ENV_FILE_PATH=$DEPLOY_DIR/env/prod_nerd_back.env` · concurrency `deploy-back`. **스택·이미지·서비스 이름·스모크 로직 무변경**
+- [x] **`deploy-front.yml`** — 프론트 원본을 같은 방식으로 변환. `DEPLOYMENT_VERSION` build-arg · `start_period 60s` 감안한 폴링(3s×40) 유지 · concurrency `deploy-front`
+- [x] **`deploy-db.yml`** — 경로만 변경. `mysql/` 하위 구조를 유지해야 한다(`configs.…file: ./mysql/init-users.sh` 가 **YAML 파일이 있는 디렉터리 기준**이라 `stacks/prod_nerd_db.yml` 옆에 `stacks/mysql/init-users.sh` 가 있어야 한다). 사전 점검·SQL 스모크 무변경
+- [x] **`deploy-redis.yml`** — 경로만 변경. 파일명이 `prod_nerd_cache.yml` 인 것은 스택명 예외가 파일명에도 드러나는 것이다(의도)
+- [x] `ci.yml` → **`ci-back.yml` + `ci-front.yml`** — 각 앱 디렉터리 전체 + 루트 워크스페이스 파일 + 자기 파일. `pnpm install --frozen-lockfile`(워크스페이스 전체) 후 `pnpm --filter <앱> run ci:all`. GHA 캐시 `scope` 를 앱별로 분리했다 — 섞으면 서로의 레이어를 밀어낸다
+- [x] 배포 4개 공통 **staging 단계** — scp-action 은 업로드 중 이름을 못 바꾼다(`strip_components` 는 디렉터리만 벗긴다). 러너에서 `.stage/stacks/<스택명>.yml` 로 복사한 뒤 `strip_components: 2` 로 올린다 (D16)
+- [x] `DEPLOY_STACK_DIR` · `secrets.ENV_FILE_PATH` 참조 **0건** — 경로는 전부 `DEPLOY_DIR` 에서 규약으로 계산한다
+- [x] 스모크 필터는 4개 모두 **라벨 방식**(`label=com.docker.stack.namespace=…`) — 백엔드도 이미 라벨이었다. `tasks-stack-rename.md` 후속 항목은 **이 시점에 닫힌다**
+
+#### 설계 판단 — CI 의 `paths` 는 배포와 성격이 다르다
+
+배포는 **산출물을 바꾸는 파일만** 정확히 잡아 교집합 0 을 유지한다. CI 는 넓게 잡는다 — PR 에서 검증이 안 도는 것이 더 위험하다. 그래서 **루트 워크스페이스 파일(`package.json` · `pnpm-workspace.yaml` · 루트 `pnpm-lock.yaml`)은 두 CI 가 함께 돈다.** 반대로 배포 화이트리스트에는 그 파일들을 **넣지 않았다** — 컨테이너 빌드 컨텍스트가 `apps/<x>` 뿐이라 산출물을 바꿀 수 없다.
+
+⚠️ **paths 필터가 있는 워크플로는 "건드리지 않은 앱" 의 체크를 아예 만들지 않는다.** 브랜치 보호에서 `CI (back)` 을 필수 체크로 걸어 두면 프론트만 바꾼 PR 이 영구히 대기한다. **필수 체크를 설정할 때 이 점을 확인한다** (지금은 미설정으로 파악).
+
+**verify (2026-09-03)**
+
+- YAML 파싱: 6개 전부 통과
+- **교집합 0 실측** — glob 을 정규식으로 바꿔 `git ls-files` 전수에 매칭했다. 문자열 비교가 아니라 **파일 단위**로 센다:
+  ```bash
+  # docs/tasks/tasks-monorepo.md 의 검증 스크립트 (paths → 정규식 → git ls-files 매칭)
+  # 결과: 추적 123개 중 배포 트리거 86개 = back 59 · front 22 · db 3 · redis 2, 중복 0개
+  ```
+  두 개 이상을 트리거하는 파일 **0개** ✅
+- 컨테이너 빌드: `context: apps/back` · `context: apps/front` 로 로컬 ARM64 빌드·실기동 확인 (Step 1·3)
+- ⚠️ **미검증**: GitHub Actions 에서의 실제 실행. 러너·시크릿·캐시 scope 는 **PR 을 올려야** 확인된다. `DEPLOY_DIR` 이 없으면 배포 4개가 모두 scp 단계에서 실패한다 — Step 7 의 "머지 전 준비" 가 그 전제다
 
 ### Step 6 — 문서 · CLAUDE.md · README
 
