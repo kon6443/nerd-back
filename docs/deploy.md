@@ -54,7 +54,7 @@ docker stack deploy -c infra/docker-stack.db.yml    prod_nerd_db      # 사전 �
 
 ## MySQL 스택 (`prod_nerd_db`)
 
-운영에 필요한 **사실**만 적는다. 설정값을 왜 그렇게 골랐는지는 [`tasks/tasks-db-mysql.md`](tasks/tasks-db-mysql.md).
+운영에 필요한 **사실**만 적는다. 설정값을 왜 그렇게 골랐는지는 [`tasks/archive/tasks-db-mysql.md`](tasks/archive/tasks-db-mysql.md).
 
 | 항목 | 값 |
 |---|---|

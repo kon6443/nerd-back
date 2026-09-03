@@ -78,7 +78,7 @@ services:
         monitor: 10s
         failure_action: pause
 
-      # D8 (docs/tasks/tasks-db-mysql.md): DB 는 핵심 의존이라 DB 없이는 부팅에 실패한다.
+      # D8 (docs/tasks/archive/tasks-db-mysql.md): DB 는 핵심 의존이라 DB 없이는 부팅에 실패한다.
       # 여기서 포기(max_attempts)하면 노드 재부팅 시 MySQL(초기 복구 20~40초)보다 앱이 먼저 떠서
       # 몇 번 실패한 뒤 **영구 정지**한다 — 사람이 손대기 전까지 서비스가 안 돌아온다.
       # 제한 없이 재시도해 DB 가 돌아오면 앱이 스스로 복구되게 한다. 배포 중 실패는

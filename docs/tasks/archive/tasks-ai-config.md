@@ -38,7 +38,7 @@
 | 6 | 문서 분할 임계치 규칙 (지금은 쪼개지 않음) | B | `CLAUDE.md` 문서 경계표 하단 |
 | 7 | 라우팅 표 셀에 폐기·반증 서술 경고 병기 | A | `CLAUDE.md` 라우팅 표 하단 |
 | 8 | `CLAUDE.md` 200줄 상한 명문화 | B | `CLAUDE.md` 서두 |
-| 9 | 도입 결정 기록 (이 문서) | B | `docs/tasks/tasks-ai-config.md` |
+| 9 | 도입 결정 기록 (이 문서) | B | `docs/tasks/archive/tasks-ai-config.md` |
 | 10 | 계획서·버그리포트 템플릿의 **저장소 이관** | D | `.claude/templates/plan.md` · `bugfix.md` + 라우팅 1행 |
 | 11 | README 문서 표를 **"언제 여는가" 인덱스**로 재정의 + 설정 파일 등재 | — | `README.md` 「문서와 설정」 — 팀 공유 자산 8개 전부 노출 |
 | 12 | 코드 규약을 **path-scoped rule** 로 전환 (자동 로드) | 공식 문서 | `docs/conventions/code-patterns.md` → `.claude/rules/code-patterns.md` + `paths:` frontmatter |

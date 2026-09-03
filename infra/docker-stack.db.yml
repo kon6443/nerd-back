@@ -8,7 +8,7 @@
 # 스택 이름 = 노드 라벨 키(`prod_nerd_db`). Redis 의 예외(스택 prod_nerd_cache / 라벨 prod_nerd_redis)를
 # 여기서 반복하지 않는다 — named volume 이 `<스택명>_mysql-data` 로 만들어지므로 나중에는 못 바꾼다.
 #
-# 설정값을 왜 이렇게 골랐는지는 docs/tasks/tasks-db-mysql.md 「현업 수준 MySQL 설정」이 소유한다.
+# 설정값을 왜 이렇게 골랐는지는 docs/tasks/archive/tasks-db-mysql.md 「현업 수준 MySQL 설정」이 소유한다.
 # 여기 주석은 "이 줄을 건드리면 무엇이 깨지는가" 만 적는다.
 
 services:
@@ -132,7 +132,7 @@ volumes:
       device: ${MYSQL_DATA_DIR}
 
 secrets:
-  # 생성은 사람이 매니저에서 1회 (docs/tasks/tasks-db-mysql.md 「시크릿」). 값은 다시 읽어낼 수 없다.
+  # 생성은 사람이 매니저에서 1회 (docs/tasks/archive/tasks-db-mysql.md 「시크릿」). 값은 다시 읽어낼 수 없다.
   prod_nerd_db_root_pw:
     external: true
   prod_nerd_db_app_pw:

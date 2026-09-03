@@ -57,8 +57,8 @@
 
 | 항목 | 상태 | 무엇이 정해지면 풀리는가 |
 |---|---|---|
-| DB 종류 | **MySQL 자체 호스팅으로 전환 중 (2026-09-02)** | 「관리형 중 선택 · A1 자체 호스팅 제외」 결정을 **번복했다.** 같은 Swarm 에 올린다 — 근거·진행·남은 미결정은 [`tasks-db-mysql.md`](tasks-db-mysql.md) 가 소유한다 |
-| DB 계층 패키지 일괄 | ✅ 2026-09-02 | `@nestjs/typeorm@11` `typeorm@0.3` `typeorm-transactional` `mysql2` — 버전 선택 근거는 [`tasks-db-mysql.md`](tasks-db-mysql.md) Step 6 |
+| DB 종류 | **MySQL 자체 호스팅으로 전환 중 (2026-09-02)** | 「관리형 중 선택 · A1 자체 호스팅 제외」 결정을 **번복했다.** 같은 Swarm 에 올린다 — 근거·진행·남은 미결정은 [`tasks-db-mysql.md`](archive/tasks-db-mysql.md) 가 소유한다 |
+| DB 계층 패키지 일괄 | ✅ 2026-09-02 | `@nestjs/typeorm@11` `typeorm@0.3` `typeorm-transactional` `mysql2` — 버전 선택 근거는 [`tasks-db-mysql.md`](archive/tasks-db-mysql.md) Step 6 |
 | readiness 인디케이터 | ✅ Redis · DB | liveness 와 분리 유지. E2E 가 고정 |
 | 엔티티 컬럼 타입·네이밍 규칙 | 시각 컬럼 `DATETIME(3)` 확정 · 네이밍은 첫 엔티티에서 | 서버 `lower_case_table_names=1` 이라 테이블명 대소문자는 무시된다 |
 | DB 세션 타임존·컬럼 타입 | DB 확정 후 | 앱 레벨 정책은 확정됨. DB별 적용 방법만 남았다 (↓ 날짜·시간 정책) |
@@ -181,7 +181,7 @@ nerd-back/
 | 린트 | 로컬 TZ 의존 메서드(`getHours` `toLocaleString` `getTimezoneOffset` 등 18종)를 `no-restricted-syntax` 로 **error** | ✅ 위반 2건 잡히는 것 실측 확인 |
 | 컨테이너 | `Dockerfile` 에 `ENV TZ=UTC` | ✅ |
 | 테스트 | jest 설정 파일 **상단**에서 고정 · `setup-tz.ts` 는 검증 가드 | ✅ **2026-09-02 정정** — setupFiles 안의 대입은 동작하지 않았다. ✅ 로 적혀 있던 동안 테스트는 KST 로 돌았다 ([lessons](../lessons.md)) |
-| DB | **MySQL 확정** — 서버 `+00:00` · `DATETIME(3)` · 드라이버 `timezone: 'Z'` | ✅ 결정 (2026-09-02) — 적용·검증은 [`tasks-db-mysql.md`](tasks-db-mysql.md) |
+| DB | **MySQL 확정** — 서버 `+00:00` · `DATETIME(3)` · 드라이버 `timezone: 'Z'` | ✅ 결정 (2026-09-02) — 적용·검증은 [`tasks-db-mysql.md`](archive/tasks-db-mysql.md) |
 
 린트로 막는 것이 핵심이다. 규약을 문서에만 적어두면 개발자 노트북(KST)·CI 러너(UTC)·컨테이너(UTC)가 서로 다른 답을 내는 코드가 들어온다. 지금은 날짜 코드가 없어 **위반 0건 상태에서 규칙을 켤 수 있는 유일한 시점**이다.
 
@@ -657,7 +657,7 @@ Step 11 — 문서 · AI 워크플로
   [x] docs/deploy.md — 배포 SSOT 로 분리 (2026-08-27, 213줄 신설 / README 427→117줄)
   [x] docs/lessons.md — 4필드 포맷으로 누적 (2026-08-27 기준 8건)
   [x] README.md (스택 / 실행법 / 환경변수 / 명령어 / "언제 여는가" 인덱스)
-  [x] docs/tasks/tasks-ai-config.md — AI 설정 도입·미도입 결정 기록 (2026-08-27)
+  [x] docs/tasks/archive/tasks-ai-config.md — AI 설정 도입·미도입 결정 기록 (2026-08-27)
   [x] .claude/settings.json 권한 3단 + 권한 파일 자체 deny + 훅 등록
   [x] .claude/commands/review.md (플로우 기반 QA 절차 + 측정 함정 3종)
   [x] .claude/templates/ — plan · bugfix (개인 글로벌은 팀에 전파되지 않아 저장소로 이관)

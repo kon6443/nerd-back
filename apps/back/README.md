@@ -68,7 +68,7 @@ mysql -h 127.0.0.1 -P 3307 -u nerd_app -p nerd     # 터미널 2 (GUI 도구도 
 - 🚫 `sudo` 로 실행하지 않는다 — root 의 `~/.ssh/config` 를 읽어 별칭을 못 찾는다.
 - **Redis 와 다르다**: DB 에 못 붙으면 앱은 30초 재시도 후 **기동에 실패**한다(의도된 동작). `pnpm dev` 전에 터널이 열려 있어야 한다.
 - 접속 확인: `SELECT @@time_zone, @@character_set_database, CURRENT_USER();` → `+00:00 / utf8mb4 / nerd_app@%`
-- 계정 3개 — `nerd_app`(앱, DML 만) · `nerd_migrator`(마이그레이션, DDL) · `root`(복구용). 비밀번호는 비밀번호 관리자에만 있다. 왜 이렇게 나눴는지는 [`docs/tasks/tasks-db-mysql.md`](docs/tasks/tasks-db-mysql.md).
+- 계정 3개 — `nerd_app`(앱, DML 만) · `nerd_migrator`(마이그레이션, DDL) · `root`(복구용). 비밀번호는 비밀번호 관리자에만 있다. 왜 이렇게 나눴는지는 [`docs/tasks/archive/tasks-db-mysql.md`](docs/tasks/archive/tasks-db-mysql.md).
 
 ---
 
@@ -158,7 +158,7 @@ pnpm migration:run
 | [`CLAUDE.md`](CLAUDE.md) | 코드를 쓰기 전 — 금지 사항·함정·완료 기준 |
 | [`.claude/rules/code-patterns.md`](.claude/rules/code-patterns.md) | 모듈·API·테스트를 만들 때 |
 | [`docs/deploy.md`](docs/deploy.md) | 배포하거나 장애를 확인할 때. MySQL 스택 운영 사실도 여기 |
-| [`infra/`](infra/) | 스택 YAML 을 볼 때 — 설정값을 왜 그렇게 골랐는지는 `docs/tasks/tasks-db-mysql.md` |
+| [`infra/`](infra/) | 스택 YAML 을 볼 때 — 설정값을 왜 그렇게 골랐는지는 `docs/tasks/archive/tasks-db-mysql.md` |
 | [`docs/lessons.md`](docs/lessons.md) | 같은 실수를 반복하지 않으려 할 때 |
 | [`docs/tasks/`](docs/tasks/) | 왜 이렇게 결정됐는지 확인할 때 |
 | [`.claude/templates/`](.claude/templates/) | 계획서·버그 리포트를 작성할 때 |
