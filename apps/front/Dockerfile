@@ -8,8 +8,15 @@ WORKDIR /app
 RUN corepack enable
 
 # 소스보다 먼저 복사해 의존성 레이어를 분리한다. 소스만 바뀌면 이 레이어가 재사용된다.
-# ⚠️ pnpm-workspace.yaml 이 빠지면 ignoredBuiltDependencies 설정이 적용되지 않는다.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+#
+# ⚠️ `pnpm-workspace.yaml` 은 여기 없다. 모노레포 전환으로 워크스페이스 루트로 올라갔고
+#    빌드 컨텍스트는 `apps/front` 뿐이라 이 컨테이너에는 들어오지 않는다.
+#    거기 있던 `ignoredBuiltDependencies: [sharp, unrs-resolver]` 는 **빌드 스크립트 실행 여부만**
+#    정하는데, pnpm 10 은 기본적으로 빌드 스크립트를 막고 경고만 낸다. sharp 0.33+ 는 prebuilt
+#    바이너리를 optional dependency 로 받아 postinstall 이 필요 없다(2026-09-01 실측).
+#    → 컨테이너 산출물은 같고, 경고 한 줄만 늘어난다. 이미지 안에서 래스터 최적화가 200 인 것을
+#    확인해 이 판단을 고정한다.
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # =============================================================================
@@ -26,7 +33,7 @@ COPY --from=deps /app/node_modules ./node_modules
 # ⚠️ COPY 목록을 함부로 줄이지 말 것.
 #    로컬 빌드의 입력은 레포 전체지만 컨테이너 빌드의 입력은 여기 적은 것뿐이다.
 #    빌드 진입 설정(next.config·tsconfig·postcss)을 바꿀 때 이 목록을 확인한다.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml ./
 COPY next.config.ts tsconfig.json postcss.config.mjs ./
 COPY app ./app
 COPY public ./public

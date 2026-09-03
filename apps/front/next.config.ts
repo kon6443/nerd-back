@@ -14,6 +14,18 @@ const nextConfig: NextConfig = {
   output: "standalone",
 
   /**
+   * 트레이싱(그리고 standalone 산출물)의 기준 디렉터리를 **이 앱으로 못박는다.**
+   *
+   * Next 는 기준을 lockfile 위치로 추론하는데, pnpm 워크스페이스는 앱별 lockfile 과
+   * **별개로 루트에도 `pnpm-lock.yaml` 을 만든다**(2026-09-03 실측). 추론에 맡기면 기준이
+   * 저장소 루트가 되어 산출물이 `.next/standalone/apps/front/server.js` 로 한 단계 깊어지고,
+   * `CMD ["node", "server.js"]` 와 `COPY .next/static` 이 조용히 어긋난다.
+   *
+   * 컨테이너 빌드 컨텍스트는 `apps/front` 뿐이라 이 값이 곧 빌드 루트다.
+   */
+  outputFileTracingRoot: __dirname,
+
+  /**
    * 배포 식별자. CI 가 커밋 short SHA 를 주입한다 (이미지 태그와 같은 값).
    *
    * 레플리카 3개 + `start-first` 롤링에서는 교체 중 구·신 이미지가 **공존**한다.

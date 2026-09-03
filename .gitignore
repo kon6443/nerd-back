@@ -47,3 +47,13 @@ docs/handoff/
 
 # 워크플로 staging 산출물 (scp 전 스택명으로 복사해 두는 임시 디렉터리)
 .stage/
+
+# Next.js (apps/front) — 앵커 없이 두어 어느 앱 디렉터리에서든 매칭되게 한다
+.next/
+out/
+next-env.d.ts
+.vercel
+*.pem
+
+# pnpm 이 전역 store 를 못 쓸 때 만드는 폴백 store — 커밋 금지
+.pnpm-store/
