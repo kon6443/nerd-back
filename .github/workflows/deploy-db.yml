@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'infra/docker-stack.db.yml'
+      - 'infra/prod_nerd_db.yml'
       - 'infra/mysql/**'
       - '.github/workflows/deploy-db.yml'
   workflow_dispatch:
@@ -24,28 +24,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 서버 규약은 **파일명 = 스택명**이다 ($DEPLOY_DIR/stacks/<스택명>.yml).
-      # scp-action 은 업로드 중 이름을 못 바꾸므로 러너에서 미리 스택명으로 복사해 둔다.
+      # 저장소의 파일명이 이미 스택명이다 — scp 가 그대로 올리면 서버 규약
+      # (`$DEPLOY_DIR/stacks/<스택명>.yml`)이 성립한다.
       #
       # ⚠️ `mysql/` 하위 구조를 유지해야 한다. YAML 의
       #    `configs.init-users-v1.file: ./mysql/init-users.sh` 는 **YAML 파일이 있는
-      #    디렉터리 기준**이므로, 올라간 뒤에도 stacks/prod_nerd_db.yml 옆에
-      #    stacks/mysql/init-users.sh 가 있어야 stack deploy 가 파일을 찾는다.
-      - name: 전송 목록 구성 (파일명 = 스택명)
-        run: |
-          mkdir -p .stage/stacks/mysql
-          cp infra/docker-stack.db.yml .stage/stacks/prod_nerd_db.yml
-          cp infra/mysql/init-users.sh .stage/stacks/mysql/init-users.sh
-
+      #    디렉터리 기준**이므로, 저장소에서도(`infra/`) 서버에서도(`stacks/`)
+      #    YAML 옆에 `mysql/init-users.sh` 가 있어야 stack deploy 가 파일을 찾는다.
+      #    `strip_components: 1` 이 `infra/` 만 벗기므로 그 구조가 그대로 간다.
       - name: stack YAML · initdb 스크립트 전송
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
-          source: .stage/stacks/prod_nerd_db.yml,.stage/stacks/mysql/init-users.sh
+          source: infra/prod_nerd_db.yml,infra/mysql/init-users.sh
           target: ${{ secrets.DEPLOY_DIR }}/stacks
-          strip_components: 2
+          strip_components: 1
 
       # stack deploy 는 아래 셋이 없어도 "성공"한다 — 태스크가 pending 에 걸리거나 볼륨 마운트가 실패한 채로.
       # 배포 전에 시끄럽게 막는다.

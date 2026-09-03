@@ -1,6 +1,6 @@
 # 이 프로젝트 전용 MySQL. 앱·Redis 와 **독립된 스택**이다.
 #
-#   docker stack deploy -c docker-stack.db.yml prod_nerd_db
+#   docker stack deploy -c prod_nerd_db.yml prod_nerd_db   (파일명 = 스택명)
 #
 # 서비스 DNS = `<스택>_<서비스>` → **`prod_nerd_db_mysql`**
 # 앱은 DB_HOST 로 이 이름을 받는다 (서버 .env).

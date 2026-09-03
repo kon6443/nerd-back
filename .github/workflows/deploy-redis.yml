@@ -7,7 +7,7 @@ on:
     branches:
       - main
     paths:
-      - 'infra/docker-stack.redis.yml'
+      - 'infra/prod_nerd_cache.yml'
       - '.github/workflows/deploy-redis.yml'
   workflow_dispatch:
 
@@ -23,24 +23,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 서버 규약은 **파일명 = 스택명**이다 ($DEPLOY_DIR/stacks/<스택명>.yml).
-      # Redis 스택명만 `cache` 인 예외라 파일명도 prod_nerd_cache.yml 이 된다 —
+      # 저장소의 파일명이 이미 스택명이다 — scp 가 그대로 올리면 서버 규약
+      # (`$DEPLOY_DIR/stacks/<스택명>.yml`)이 성립한다. 이름을 바꾸는 staging 단계가 필요 없다.
+      # Redis 만 스택명이 `cache` 인 예외라 파일명도 `prod_nerd_cache.yml` 이다 —
       # named volume 이 스택 이름을 물고 있어 재명명하지 않기로 한 결정이 파일명에도 드러난다
-      # (docs/tasks/tasks-stack-rename.md). scp-action 은 업로드 중 이름을 못 바꾼다.
-      - name: 전송 목록 구성 (파일명 = 스택명)
-        run: |
-          mkdir -p .stage/stacks
-          cp infra/docker-stack.redis.yml .stage/stacks/prod_nerd_cache.yml
-
+      # (docs/tasks/tasks-stack-rename.md).
       - name: stack YAML 전송
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
-          source: .stage/stacks/prod_nerd_cache.yml
+          source: infra/prod_nerd_cache.yml
           target: ${{ secrets.DEPLOY_DIR }}/stacks
-          strip_components: 2
+          strip_components: 1
 
       - name: 스택 배포 (수렴까지 동기 대기)
         uses: appleboy/ssh-action@v1.2.0

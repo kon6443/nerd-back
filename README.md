@@ -6,7 +6,7 @@
 |---|---|---|---|
 | [`apps/back/`](apps/back/) | NestJS API (`/api/v2`) | 5501 | `prod_nerd_back` |
 | [`apps/front/`](apps/front/) | Next.js 앱 | 5502 | `prod_nerd_front` |
-| [`infra/`](infra/) | 공유 MySQL · Redis 스택 정의 | — | `prod_nerd_db` · `prod_nerd_cache` |
+| [`infra/`](infra/) | 스택 YAML 4개 (앱 2 + MySQL + Redis). **파일명 = 스택명** | — | 4개 스택 |
 
 앱별 스택·환경변수·명령어 상세는 **각 앱의 `README.md`** 가 SSOT 다 — [백엔드](apps/back/README.md) · [프론트](apps/front/README.md).
 

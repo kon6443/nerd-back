@@ -24,7 +24,7 @@ on:
       - 'apps/front/eslint.config.mjs'
       # NEXT_PUBLIC_* 는 빌드 시점에 번들에 박힌다 — 바뀌면 반드시 재빌드해야 한다.
       - 'apps/front/.env.production'
-      - 'apps/front/infra/docker-stack.app.yml'
+      - 'infra/prod_nerd_front.yml'
       - '.github/workflows/deploy-front.yml'
   # 코드 변경 없이 현재 main 을 다시 배포할 때 쓴다.
   workflow_dispatch:
@@ -87,21 +87,17 @@ jobs:
           cache-from: type=gha,scope=front
           cache-to: type=gha,mode=max,scope=front
 
-      # 서버 규약은 **파일명 = 스택명**이다. scp-action 은 업로드 중 이름을 못 바꾼다.
-      - name: 전송 목록 구성 (파일명 = 스택명)
-        run: |
-          mkdir -p .stage/stacks
-          cp apps/front/infra/docker-stack.app.yml .stage/stacks/prod_nerd_front.yml
-
+      # 저장소의 파일명이 이미 스택명이다 — scp 가 그대로 올리면 서버 규약
+      # (`$DEPLOY_DIR/stacks/<스택명>.yml`)이 성립한다. 이름을 바꾸는 staging 단계가 필요 없다.
       - name: stack YAML 전송
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
-          source: .stage/stacks/prod_nerd_front.yml
+          source: infra/prod_nerd_front.yml
           target: ${{ secrets.DEPLOY_DIR }}/stacks
-          strip_components: 2
+          strip_components: 1
 
       - name: 스택 배포 (수렴까지 동기 대기)
         uses: appleboy/ssh-action@v1.2.0

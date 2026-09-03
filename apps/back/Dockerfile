@@ -52,7 +52,7 @@ EXPOSE 5501
 
 # 🚫 HEALTHCHECK 을 여기에 두지 않는다.
 #    stack YAML 의 healthcheck 가 이걸 덮어써서 "어느 쪽이 동작하는지" 헷갈리게 된다.
-#    헬스체크는 infra/docker-stack.app.yml 한 곳에서만 정의한다.
+#    헬스체크는 infra/prod_nerd_back.yml 한 곳에서만 정의한다.
 
 ENV TS_NODE_PROJECT=/app/tsconfig.runtime.json
 

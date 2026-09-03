@@ -25,7 +25,7 @@
 서비스 DNS 는 **`<스택명>_<서비스명>`** 이다. 원하는 이름을 스택 쪽에 넣으면 서비스 키가 뒤에 한 번 더 붙으므로, **최종 DNS 이름을 먼저 적고 역산**한다.
 
 **스택 이름 = 노드 라벨 키**로 맞춰 두었다 — 어느 스택이 어느 라벨을 보는지 파일을 열지 않고도 알 수 있다. 서비스 키는 앱 스택이 `app`, 인프라 스택은 역할명(`mysql`)이다.
-⚠️ **Redis 스택만 예외다** (`prod_nerd_cache` / 라벨 `prod_nerd_redis`). named volume 이 스택 이름을 물고 있어 이름을 바꾸면 데이터 경계가 이동한다 — `infra/docker-stack.redis.yml` 상단 주석 참조. **일관성을 이유로 바꾸지 않는다.**
+⚠️ **Redis 스택만 예외다** (`prod_nerd_cache` / 라벨 `prod_nerd_redis`). named volume 이 스택 이름을 물고 있어 이름을 바꾸면 데이터 경계가 이동한다 — `infra/prod_nerd_cache.yml` 상단 주석 참조. **일관성을 이유로 바꾸지 않는다.**
 
 **호스트로 포트를 publish 하지 않는다.** Caddy 가 같은 overlay 안에 있어 서비스 DNS 로 바로 닿는다. publish 하면 도메인을 우회한 직접 접근 경로가 열리고 기존 스택과 포트가 겹칠 위험도 생긴다.
 
@@ -38,11 +38,11 @@
 | 변경한 것 | 도는 워크플로 | 백엔드 | 프론트 | Redis | MySQL |
 |---|---|:-:|:-:|:-:|:-:|
 | `apps/back/{src,scripts,test}/**` · `apps/back/Dockerfile` · 의존성 · `tsconfig*` · `jest.config.js` | `deploy-back.yml` | **빌드+배포** | X | X | X |
-| `apps/back/infra/docker-stack.app.yml` | `deploy-back.yml` | **빌드+배포** | X | X | X |
+| `infra/prod_nerd_back.yml` | `deploy-back.yml` | **빌드+배포** | X | X | X |
 | `apps/front/{app,public,scripts}/**` · `apps/front/Dockerfile` · 의존성 · `next.config.ts` · `.env.production` | `deploy-front.yml` | X | **빌드+배포** | X | X |
-| `apps/front/infra/docker-stack.app.yml` | `deploy-front.yml` | X | **빌드+배포** | X | X |
-| `infra/docker-stack.redis.yml` | `deploy-redis.yml` | X | X | 재시작 | X |
-| `infra/docker-stack.db.yml` · `infra/mysql/**` | `deploy-db.yml` | X | X | X | 재시작 |
+| `infra/prod_nerd_front.yml` | `deploy-front.yml` | X | **빌드+배포** | X | X |
+| `infra/prod_nerd_cache.yml` | `deploy-redis.yml` | X | X | 재시작 | X |
+| `infra/prod_nerd_db.yml` · `infra/mysql/**` | `deploy-db.yml` | X | X | X | 재시작 |
 | 루트 설정(`package.json` · `pnpm-workspace.yaml` · 루트 lockfile) · 문서 · `.claude/**` | (없음) | X | X | X | X |
 
 **배포 워크플로 4개의 `paths` 화이트리스트는 교집합이 0건이다.** glob 을 정규식으로 바꿔 `git ls-files` 전수에 매칭해 확인한다 — 문자열 비교가 아니라 파일 단위로 센다 (스크립트는 `docs/tasks/tasks-monorepo.md` Step 5).
@@ -58,16 +58,24 @@ docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_cache.yml" prod_nerd_cache
 docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_db.yml"    prod_nerd_db   # 사전 조건: 라벨·secret·데이터 경로 (deploy-db.yml 사전 점검)
 ```
 
-**서버 파일 규약 — 파일명 = 스택명.** 스택명은 노드 라벨 키·서비스 DNS 접두와 같으므로 이름 하나로 YAML·env·라벨·DNS 를 전부 찾는다.
+**파일명 = 스택명 — 저장소와 서버가 같은 이름을 쓴다.** 스택명은 노드 라벨 키·서비스 DNS 접두와도 같으므로 이름 하나로 YAML·env·라벨·DNS 를 전부 찾는다. 저장소에서 이미 그 이름이라 **CI 는 파일을 그대로 올린다**(이름을 바꾸는 단계가 없다).
 
 ```
-<DEPLOY_DIR>/
+infra/                                 ← 저장소. 배포되는 스택 4개가 여기 다 있다
+├── prod_nerd_back.yml
+├── prod_nerd_front.yml
+├── prod_nerd_db.yml
+├── prod_nerd_cache.yml                ← Redis. 스택명이 cache 인 예외가 파일명에 드러난다
+└── mysql/init-users.sh                ← prod_nerd_db.yml 의 configs 가 ./mysql/ 로 참조
+
+<DEPLOY_DIR>/                          ← 서버
 ├── stacks/   prod_nerd_back.yml · prod_nerd_front.yml · prod_nerd_db.yml · prod_nerd_cache.yml · mysql/init-users.sh
 └── env/      prod_nerd_back.env · prod_nerd_front.env      (600, 사람이 관리)
 ```
 
-⚠️ `stacks/` 는 **CI 가 scp 로 덮어쓴다.** 사람이 손으로 고치면 다음 배포에 사라진다. `scp-action` 은 업로드 중 이름을 바꿀 수 없어 워크플로가 러너에서 스택명으로 복사한 뒤 올린다.
-⚠️ `mysql/init-users.sh` 는 `stacks/prod_nerd_db.yml` **옆에** 있어야 한다. YAML 의 `configs.…file: ./mysql/init-users.sh` 가 YAML 파일이 있는 디렉터리 기준이다.
+⚠️ `stacks/` 는 **CI 가 scp 로 덮어쓴다.** 사람이 손으로 고치면 다음 배포에 사라진다. 전송은 `source: infra/<스택명>.yml` + `strip_components: 1` 로, `infra/` 만 벗기고 이름은 그대로 간다.
+⚠️ `mysql/init-users.sh` 는 `prod_nerd_db.yml` **옆에** 있어야 한다 — 저장소에서도 서버에서도. YAML 의 `configs.…file: ./mysql/init-users.sh` 가 YAML 파일이 있는 디렉터리 기준이고, `strip_components: 1` 이 그 구조를 보존한다.
+⚠️ `init-users.sh` 를 고치면 **Swarm config 이름의 `-v1` 도 올려야 한다.** Swarm config 는 불변이라 같은 이름에 다른 내용을 올리면 `docker stack deploy` 가 실패한다.
 
 ---
 
@@ -81,7 +89,7 @@ docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_db.yml"    prod_nerd_db   #
 | 데이터 위치 | named volume `prod_nerd_db_mysql-data` → **블록 볼륨 위 디렉터리**(`type: none, o: bind`). 경로는 GitHub 시크릿 `MYSQL_DATA_DIR`. `docker stack rm` 해도 볼륨은 남는다 |
 | 배포 사전 조건 | 노드 라벨 `prod_nerd_db=1` · Swarm secret `prod_nerd_db_{root,app,migrator}_pw` · `MYSQL_DATA_DIR` 경로 존재(= 블록 볼륨 마운트됨). **`deploy-db.yml` 사전 점검이 셋을 배포 전에 막는다** |
 | 계정 | `root`(복구) · `nerd_app`(앱, DML 만) · `nerd_migrator`(마이그레이션, DDL). 앱은 서버 `.env` 의 `DB_PASSWORD` 로 받는다 — **secret 과 `.env` 두 곳**, 회전 시 함께 |
-| 설정 변경 | `infra/docker-stack.db.yml` 의 `command:` 플래그 → main 푸시 → MySQL **재시작(10~30초 DB 요청 실패, 앱은 유지)** |
+| 설정 변경 | `infra/prod_nerd_db.yml` 의 `command:` 플래그 → main 푸시 → MySQL **재시작(10~30초 DB 요청 실패, 앱은 유지)** |
 | 첫 기동에 굳는 값 | `lower_case_table_names=1` · `MYSQL_DATABASE=nerd` · initdb 계정 생성 스크립트. 바꾸려면 덤프 후 재초기화 |
 | 외부 접속 | **포트 publish 없음.** SSH 터널만 — 사용법은 [백엔드 README](../apps/back/README.md) 「DB 접속」 |
 | 백업 | **없음** — 후속 태스크. 그때까지 유실 방어가 0 이다 |
@@ -219,7 +227,7 @@ docker volume inspect prod_nerd_db_mysql-data --format '{{.Options}}'   # device
 
 배포 중 폴링해서 비-200 과 연결 끊김이 **0건**이어야 한다.
 
-**설정은 무중단이 되도록 구성돼 있다** — 2026-08-28 `apps/back/infra/docker-stack.app.yml` 대조 확인:
+**설정은 무중단이 되도록 구성돼 있다** — 2026-08-28 `infra/prod_nerd_back.yml`(당시 `infra/docker-stack.app.yml`) 대조 확인:
 
 | 설정 | 값 | 역할 |
 |---|---|---|
@@ -306,13 +314,13 @@ Caddy 는 블록을 제거한 뒤 `caddy validate && caddy reload`.
 | 서비스 키 | `app` 고정 | |
 | 서비스 DNS | `<스택>_app` | `prod_nerd_back_app` |
 | 이미지 | `<환경>_<프로젝트>_<역할>` — 스택과 별개 네임스페이스, 접미사 없음 | `prod_nerd_back:<sha>` |
-| 서버 stack 파일 | `<DEPLOY_DIR>/stacks/<스택명>.yml` — **파일명 = 스택명** | `stacks/prod_nerd_front.yml` |
+| 스택 파일 | 저장소 `infra/<스택명>.yml` → 서버 `<DEPLOY_DIR>/stacks/<스택명>.yml` — **양쪽 파일명 = 스택명** | `infra/prod_nerd_front.yml` |
 | 서버 env 파일 | `<DEPLOY_DIR>/env/<스택명>.env` | `env/prod_nerd_front.env` |
 | GitHub Environment | 대문자 환경명 | `PROD` |
 
 **시크릿 9개** — `REGISTRY_URL` `REGISTRY_USERNAME` `REGISTRY_PASSWORD` `DEPLOY_SERVER` `DEPLOY_USER` `SWARM_MANAGER_SSH_KEY` `OVERLAY_NETWORK` `MYSQL_DATA_DIR` **`DEPLOY_DIR`**.
 경로 시크릿은 `DEPLOY_DIR` **하나뿐**이고 나머지 경로는 워크플로가 위 규약으로 계산한다 — **앱·스택이 늘어도 시크릿이 늘지 않는다.** (`MYSQL_DATA_DIR` 만 예외 — 블록 볼륨 마운트 경로라 배포 트리와 무관하다.)
 
-🚫 **두 앱이 같은 파일명을 쓰지 않는다.** 파일명 = 스택명 규약이 이것을 구조적으로 보장한다 — 옛 구조는 두 앱의 파일명이 둘 다 `docker-stack.app.yml` 이라 저장소별로 디렉터리를 분리해야 했다.
+🚫 **두 스택이 같은 파일명을 쓰지 않는다.** 파일명 = 스택명 규약이 이것을 구조적으로 보장한다 — 옛 구조는 두 앱이 둘 다 `docker-stack.app.yml` 이라 디렉터리로만 구분됐고, 그래서 서버에서도 저장소별 디렉터리가 필요했다.
 
 ⚠️ Redis 스택(`prod_nerd_cache`)만 이 규칙의 예외다 — 위 「구성」절 참조.

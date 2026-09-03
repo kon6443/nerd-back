@@ -73,7 +73,7 @@
 |---|---|---|---|---|
 | D1 ✅ | 디렉터리 | `apps/back` · `apps/front` (패키지명 `nerd-back` · `nerd-front` 유지). **모든 축의 이름을 `back` / `front` 로 통일** — 아래 「이름 통일표」 | 백엔드를 루트에 두고 `apps/front` 만 추가 | 대칭. 비대칭은 "루트 = 백엔드" 가정이 영구화되어 필터·문서·훅이 계속 꼬인다. 디렉터리명은 스택 `prod_nerd_back/front` · 서버 파일 `nerd-back/front.prod.env` 와 1:1 |
 | D2 ☑ | lockfile | **패키지별** — `pnpm-workspace.yaml` 에 `sharedWorkspaceLockfile: false` | 공유 lockfile 1개 (pnpm 기본값) | 공유 lockfile 이면 (a) 두 Dockerfile 을 루트 컨텍스트 + `--filter`/`pnpm deploy` 로 다시 짜야 하고 (b) 프론트 의존성 하나 추가가 루트 lockfile 을 바꿔 **백엔드 배포까지 트리거**된다. 패키지별이면 둘 다 사라진다. 잃는 것은 dedup — 공유 패키지 0개인 지금은 의미 없다. **공유 패키지가 생기면 재검토** |
-| D3 ☑ | 공유 인프라 위치 | 루트 `infra/` 에 `docker-stack.db.yml` · `docker-stack.redis.yml` · `mysql/` **그대로**. 앱 스택만 `apps/<x>/infra/docker-stack.app.yml` | 전부 루트 `infra/` | DB·Redis 는 두 앱의 공유 자원(프론트 ISR 도입 시 Redis 사용 예정). `deploy-db.yml` · `deploy-redis.yml` 은 서버 경로 변수만 바뀐다(D5) |
+| D3 ✅ (재결정) | 스택 YAML 위치 | **전부 루트 `infra/` · 파일명 = 스택명** (`prod_nerd_back.yml` · `prod_nerd_front.yml` · `prod_nerd_db.yml` · `prod_nerd_cache.yml` + `mysql/`) | (폐기) 앱 스택을 `apps/<x>/infra/docker-stack.app.yml` 에 두기 | 사용자 결정(2026-09-03): 스택 YAML 을 한곳에서 관리. **저장소 파일명 = 서버 파일명 = 스택명**이 되어 `ls infra/` 로 배포 대상 전체가 보이고, 이름을 바꾸는 **staging 단계가 4개 워크플로에서 통째로 사라진다**(D16 폐기). 대가는 `deploy-back`·`deploy-front` 의 화이트리스트가 `apps/<앱>/**` 와 `infra/<스택명>.yml` 두 곳에 걸치는 것 — 파일이 서로 달라 교집합 0 은 유지된다 |
 | D4 ☑ | 워크플로 | 6개 — `ci-back` `ci-front` `deploy-back` `deploy-front` `deploy-db` `deploy-redis`. 각각 `paths` 화이트리스트 | 단일 워크플로 + changed-files 판별 job | 기존 패턴 그대로 확장. 서드파티 액션 불필요. 워크플로별 concurrency 그룹 분리로 백·프론트 배포가 병렬로 돈다 |
 | D5 ✅ (재결정) | 시크릿 · 서버 트리 | 경로 시크릿을 **`DEPLOY_DIR` 1개**로. 서버는 `<DEPLOY_DIR>/stacks/<스택명>.yml` · `<DEPLOY_DIR>/env/<스택명>.env` 규약 — **파일명 = 스택명**. `DEPLOY_STACK_DIR` · `ENV_FILE_PATH` 는 전환 후 삭제. 프론트 전용 시크릿은 만들지 않는다 | (폐기) A: `_FRONT` 2개 추가 · B: `_BACK`/`_FRONT` 4개 | 사용자 결정(2026-09-03): 다운타임 허용, 구조 우선, 경로 시크릿은 공용 1개만. 규약으로 계산하면 앱·스택이 늘어도 시크릿이 늘지 않고, 스택명 하나로 YAML·env·라벨·DNS 를 전부 찾는다. 대가: 4개 배포 워크플로가 모두 바뀌고 머지 시 전부 1회 실행 · 서버 파일 이동(사용자) — 아래 「시크릿 · 서버 디렉터리」절 |
 | D6 ☑ | git 이력 | `git subtree add --prefix=apps/front front/main` (GitHub 원격 `main` = `1aa9484`) | `git filter-repo` 로 경로 재작성 후 merge / 이력 없이 복사 | 내장 명령 1회로 11커밋 보존. filter-repo 는 `git log apps/front/…` 가 더 예쁘지만 도구 설치가 필요. 복사는 이력 손실 |
@@ -86,7 +86,7 @@
 | D13 ☑ | 루트 `package.json` | **의존성 0** · 오케스트레이션 스크립트만 | 루트에 prettier 등 공통 devDep | 루트에 의존성이 생기면 루트 lockfile · `node_modules` 가 생기고 D12 의 추론 위험이 현실화된다. 공통 도구는 각 앱 devDep 으로 |
 | D14 ✅ | env 파일 | **로컬**: 앱별 독립 — `apps/back/.env` · `apps/front/.env.local`. **운영**: 서버 env 파일 2개를 앱별로 따로 관리(현행 유지), 위치·이름만 `<DEPLOY_DIR>/env/prod_nerd_back.env` · `prod_nerd_front.env` 로 통일(D5) | 루트 공용 `.env` | 두 앱의 env 는 키가 하나도 겹치지 않고 로딩 시점도 다르다(Nest 는 전부 런타임, Next 는 빌드타임·런타임 혼재). 합치면 프론트 함정(`NEXT_PUBLIC_*` 시점 · `PORT` 무시)이 백엔드 쪽으로 번진다 — 아래 「환경변수 파일」절 |
 | D15 ✅ | 프론트 prettier | **후속** — 전환 PR 에 넣지 않는다 | 지금 도입 | prettier 는 포맷 전용이라 없어도 런타임·빌드·CI 에 영향이 없다. 루트 `.prettierrc` 가 프론트 파일에도 "보이지만" 프론트에 prettier 스크립트·devDep 이 없어 아무것도 실행되지 않는다 → **안전**. 단 에디터 format-on-save 가 루트 설정을 집어 잡음 diff 를 만들 수 있으니 전환 직후 별건 PR 로 도입한다 |
-| D16 ✅ | 파일 전송 도구 | **`appleboy/scp-action` 유지** (현행). 업로드 전 러너에서 `cp` 로 스택명 파일로 이름을 바꿔 두는 staging 단계 추가 | rsync 로 교체 | 전송 대상이 5KB 안팎 파일 4~5개라 rsync 의 성능(델타 전송)은 체감 0. rsync 의 실질 이점은 `--delete` 로 목적지를 미러링하는 것인데, 워크플로 4개가 **같은 `stacks/` 에 각자 파일 하나씩** 올리므로 `--delete` 를 쓰면 다른 워크플로의 파일을 지운다 → 이점이 사라진다. 검증된 액션을 이유 없이 바꾸지 않는다. scp-action 은 파일 **이름을 바꿔 올릴 수 없어**(`strip_components` 는 디렉터리만 벗긴다) staging `cp` 가 필요하다 — 이건 rsync 라도 같다 |
+| D16 ✅ (축소) | 파일 전송 도구 | **`appleboy/scp-action` 유지** (현행). ~~staging 단계~~ — **D3 재결정으로 불필요해졌다**: 저장소 파일명이 이미 스택명이라 `source: infra/<스택명>.yml` + `strip_components: 1` 로 그대로 올린다 | rsync 로 교체 | 전송 대상이 5KB 안팎 파일 4~5개라 rsync 의 성능(델타 전송)은 체감 0. rsync 의 실질 이점은 `--delete` 로 목적지를 미러링하는 것인데, 워크플로 4개가 **같은 `stacks/` 에 각자 파일 하나씩** 올리므로 `--delete` 를 쓰면 다른 워크플로의 파일을 지운다 → 이점이 사라진다. 검증된 액션을 이유 없이 바꾸지 않는다. scp-action 은 파일 **이름을 바꿔 올릴 수 없어**(`strip_components` 는 디렉터리만 벗긴다) staging `cp` 가 필요하다 — 이건 rsync 라도 같다 |
 
 ### 🚧 미결정
 
@@ -127,8 +127,9 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 │   ├── ci-back.yml · ci-front.yml
 │   ├── deploy-back.yml · deploy-front.yml
 │   └── deploy-db.yml · deploy-redis.yml                       (서버 경로 변수만 변경)
-├── infra/                          공유 인프라 (무변경)
-│   ├── docker-stack.db.yml · docker-stack.redis.yml · mysql/init-users.sh
+├── infra/                          **배포되는 스택 YAML 4개가 전부 여기 · 파일명 = 스택명**
+│   ├── prod_nerd_back.yml · prod_nerd_front.yml · prod_nerd_db.yml · prod_nerd_cache.yml
+│   └── mysql/init-users.sh         prod_nerd_db.yml 의 configs 가 ./mysql/ 로 참조
 ├── docs/
 │   ├── deploy.md · lessons.md
 │   ├── tasks/   tasks-monorepo.md · tasks-frontend-cicd.md(← 이동) · …
@@ -139,14 +140,12 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
     ├── back/                       = 오늘의 저장소 루트 그대로
     │   ├── package.json (nerd-back) · pnpm-lock.yaml · Dockerfile · .dockerignore
     │   ├── src/ · test/ · scripts/ · tsconfig*.json · jest.config.js · nest-cli.json · eslint.config.mjs
-    │   ├── infra/docker-stack.app.yml
     │   ├── .env.example · .env.migration.example · .env(로컬, 미추적)
     │   ├── CLAUDE.md               백엔드 고유 (Key Patterns · Pitfalls · 명령)
     │   └── README.md               (← 현재 README, 경로 갱신)
     └── front/                      = nerd-front 저장소 (subtree)
         ├── package.json (nerd-front) · pnpm-lock.yaml · Dockerfile · .dockerignore
         ├── app/ · public/ · scripts/ · next.config.ts · tsconfig.json · postcss.config.mjs · eslint.config.mjs
-        ├── infra/docker-stack.app.yml
         ├── CLAUDE.md               프론트 고유 + `@AGENTS.md`
         ├── AGENTS.md               (Next 자동 생성 — 손대지 않음)
         └── README.md
@@ -168,7 +167,7 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 | Swarm 스택 = 노드 라벨 | `prod_nerd_back` | `prod_nerd_front` | `prod_nerd_db` · `prod_nerd_cache`(**예외** — 라벨 `prod_nerd_redis`) |
 | 서비스 DNS | `prod_nerd_back_app:5501` | `prod_nerd_front_app:5502` | `prod_nerd_db_mysql` · `prod_nerd_cache_redis` |
 | 이미지 | `prod_nerd_back:<sha>` | `prod_nerd_front:<sha>` | — |
-| 서버 stack 파일 | `<DEPLOY_DIR>/stacks/prod_nerd_back.yml` | `<DEPLOY_DIR>/stacks/prod_nerd_front.yml` | `stacks/prod_nerd_db.yml` · `stacks/prod_nerd_cache.yml` · `stacks/mysql/init-users.sh` |
+| 스택 파일 (저장소=서버) | `infra/prod_nerd_back.yml` | `infra/prod_nerd_front.yml` | `infra/prod_nerd_db.yml` · `infra/prod_nerd_cache.yml` · `infra/mysql/init-users.sh` |
 | 서버 env 파일 | `<DEPLOY_DIR>/env/prod_nerd_back.env` | `<DEPLOY_DIR>/env/prod_nerd_front.env` | `env/prod_nerd_db` (비밀번호 백업, 워크플로 미참조) · redis 없음 |
 | 시크릿 | 앱별 **0개** | 앱별 **0개** | 공용 9개 — `DEPLOY_DIR` 1개로 경로 전부 계산, `MYSQL_DATA_DIR` 은 DB 전용 |
 | CLAUDE.md | `apps/back/CLAUDE.md` | `apps/front/CLAUDE.md` | 루트 `CLAUDE.md` |
@@ -186,10 +185,10 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 ```
 <DEPLOY_DIR>/                         ← 시크릿 DEPLOY_DIR (절대경로 1개). 이웃 프로젝트 트리와 형제
 ├── stacks/                           ← CI 가 scp 로 쓴다. 사람은 손대지 않는다
-│   ├── prod_nerd_back.yml            ← apps/back/infra/docker-stack.app.yml
-│   ├── prod_nerd_front.yml           ← apps/front/infra/docker-stack.app.yml
-│   ├── prod_nerd_db.yml              ← infra/docker-stack.db.yml
-│   ├── prod_nerd_cache.yml           ← infra/docker-stack.redis.yml   (Redis 스택명이 cache — 예외가 파일명에 드러난다)
+│   ├── prod_nerd_back.yml            ← infra/prod_nerd_back.yml   (같은 이름 그대로 올라온다)
+│   ├── prod_nerd_front.yml           ← infra/prod_nerd_front.yml
+│   ├── prod_nerd_db.yml              ← infra/prod_nerd_db.yml
+│   ├── prod_nerd_cache.yml           ← infra/prod_nerd_cache.yml  (Redis 스택명이 cache — 예외가 파일명에 드러난다)
 │   └── mysql/init-users.sh           ← infra/mysql/init-users.sh      (db.yml 이 ./mysql/ 상대경로로 참조 — 구조 유지)
 └── env/                              ← 사람이 쓴다 (600). CI 는 경로만 넘긴다
     ├── prod_nerd_back.env            ← 현 nerd-back.prod.env (230B) 의 복사본
@@ -305,10 +304,10 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 
 | 변경한 것 | 워크플로 | 이미지 빌드 | 재배포 |
 |---|---|---|---|
-| `apps/back/**` 중 화이트리스트 (`src` `test` `scripts` `Dockerfile` `.dockerignore` `package.json` `pnpm-lock.yaml` `tsconfig*.json` `jest.config.js` `infra/docker-stack.app.yml`) · `.github/workflows/deploy-back.yml` | `deploy-back` | 백 | 백 |
+| `apps/back/**` 중 화이트리스트 (`src` `test` `scripts` `Dockerfile` `.dockerignore` `package.json` `pnpm-lock.yaml` `tsconfig*.json` `jest.config.js` `infra/<스택명>.yml`) · `.github/workflows/deploy-back.yml` | `deploy-back` | 백 | 백 |
 | `apps/front/**` 중 화이트리스트 (`app` `public` `scripts` `Dockerfile` `.dockerignore` `package.json` `pnpm-lock.yaml` `next.config.ts` `tsconfig.json` `postcss.config.mjs` `.env.production` `infra/docker-stack.app.yml`) · `deploy-front.yml` | `deploy-front` | 프론트 | 프론트 |
-| `infra/docker-stack.db.yml` · `infra/mysql/**` | `deploy-db` | X | MySQL |
-| `infra/docker-stack.redis.yml` | `deploy-redis` | X | Redis |
+| `infra/prod_nerd_db.yml` · `infra/mysql/**` | `deploy-db` | X | MySQL |
+| `infra/prod_nerd_cache.yml` | `deploy-redis` | X | Redis |
 | 루트 `package.json` · `pnpm-workspace.yaml` · `.prettierrc` · `CLAUDE.md` · `docs/**` · `.claude/**` | (없음) | X | X |
 
 - 루트 워크스페이스 파일은 **컨테이너 컨텍스트 밖**이라 산출물을 바꾸지 못한다. 배포 화이트리스트에 넣지 않는다. 대신 `ci-back` · `ci-front` 의 `paths` 에는 넣어 PR 에서 설치 회귀를 잡는다.

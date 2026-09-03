@@ -1,6 +1,8 @@
 # 프론트 앱 스택.
 #
-#   docker stack deploy -c docker-stack.app.yml prod_nerd_front
+# **파일명 = 스택명**이다. 저장소의 이 이름 그대로 서버 `<DEPLOY_DIR>/stacks/` 로 올라간다.
+#
+#   docker stack deploy -c prod_nerd_front.yml prod_nerd_front
 #
 # 서비스 DNS 는 `<스택>_<서비스>` 다. 스택 `prod_nerd_front` + 서비스 `app`
 # → **`prod_nerd_front_app`**. 리버스 프록시가 tasks.prod_nerd_front_app:5502 로 접근한다.
