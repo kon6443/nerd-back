@@ -39,7 +39,7 @@ coverage/
 tmp/
 
 # 세션 스냅샷 (PreCompact 훅 생성 — 정본 아님, docs/tasks/ 로 옮긴 뒤 삭제)
-docs/handoff/
+**/docs/handoff/
 
 # 설정 롤백용 백업 사본 — 커밋 금지 (방치되면 어느 쪽이 정본인지 흐려진다)
 *.bak
