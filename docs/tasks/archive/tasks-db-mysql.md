@@ -1,7 +1,7 @@
 # Task Tracker: MySQL 자체 호스팅 (Swarm 스택)
 
 > 상태: **완료 (2026-09-02) — DB 스택 배포 · 앱 연결 · 터널 접속까지 전부 실측.** 후속: 백업(D3) · 첫 엔티티(+첫 마이그레이션).
-> 경계: 배포 구성의 정본은 [`docs/deploy.md`](../deploy.md), 코드 규약은 [`.claude/rules/code-patterns.md`](../../.claude/rules/code-patterns.md).
+> 경계: 배포 구성의 정본은 [`docs/deploy.md`](../../deploy.md), 코드 규약은 [`.claude/rules/back-code-patterns.md`](../../../.claude/rules/back-code-patterns.md).
 > 이 문서는 **DB 도입 결정의 근거와 진행 상황**을 소유한다. 확정된 사실은 배포 후 `deploy.md` 로 승격한다.
 > 🚫 실제 노드명·마운트 경로·네트워크 이름을 이 문서에 적지 않는다. 전부 라벨과 시크릿으로 참조한다.
 
@@ -9,7 +9,7 @@
 
 ## 왜 방향을 바꾸나
 
-[`tasks-backend-skeleton.md`](tasks-backend-skeleton.md) 「미결정」 표는 **"관리형 RDBMS 중 선택 · A1 자체 호스팅은 제외"** 였다.
+[`tasks-backend-skeleton.md`](../tasks-backend-skeleton.md) 「미결정」 표는 **"관리형 RDBMS 중 선택 · A1 자체 호스팅은 제외"** 였다.
 2026-09-02 이 결정을 **뒤집는다** — 같은 Swarm 에 MySQL 을 올린다.
 
 | 관리형을 전제로 세웠던 제약 | 자체 호스팅에서 어떻게 되나 |
@@ -377,7 +377,7 @@ docker service update --force prod_nerd_db_mysql
 |---|---|---|
 | **백업 + 복구 리허설** (D3) | 🔴 **배포 직후 조치** | 실데이터가 쌓이기 전에. 착수 시 `docs/tasks/tasks-db-backup.md` 생성 |
 | `deploy.md` 승격 | ✅ 2026-09-02 | 「MySQL 스택」절·상태 확인·롤백을 `deploy.md` 로, 사용법(터널·마이그레이션)은 README 로, 함정 2건은 CLAUDE.md 로 승격. 여기는 근거만 소유한다 |
-| 엔티티 네이밍·컬럼 타입 규약 | 후속 | 첫 엔티티를 쓸 때 `.claude/rules/code-patterns.md` 로 승격 |
+| 엔티티 네이밍·컬럼 타입 규약 | 후속 | 첫 엔티티를 쓸 때 `.claude/rules/back-code-patterns.md` 로 승격 |
 | mysqld exporter | 후순위 | `deploy.md` 관측성 방침과 동일 — 메트릭은 별도 태스크 |
 
 ## Verification Story

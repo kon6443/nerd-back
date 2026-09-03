@@ -57,8 +57,8 @@
 
 | 항목 | 상태 | 무엇이 정해지면 풀리는가 |
 |---|---|---|
-| DB 종류 | **MySQL 자체 호스팅으로 전환 중 (2026-09-02)** | 「관리형 중 선택 · A1 자체 호스팅 제외」 결정을 **번복했다.** 같은 Swarm 에 올린다 — 근거·진행·남은 미결정은 [`tasks-db-mysql.md`](tasks-db-mysql.md) 가 소유한다 |
-| DB 계층 패키지 일괄 | ✅ 2026-09-02 | `@nestjs/typeorm@11` `typeorm@0.3` `typeorm-transactional` `mysql2` — 버전 선택 근거는 [`tasks-db-mysql.md`](tasks-db-mysql.md) Step 6 |
+| DB 종류 | **MySQL 자체 호스팅으로 전환 중 (2026-09-02)** | 「관리형 중 선택 · A1 자체 호스팅 제외」 결정을 **번복했다.** 같은 Swarm 에 올린다 — 근거·진행·남은 미결정은 [`tasks-db-mysql.md`](archive/tasks-db-mysql.md) 가 소유한다 |
+| DB 계층 패키지 일괄 | ✅ 2026-09-02 | `@nestjs/typeorm@11` `typeorm@0.3` `typeorm-transactional` `mysql2` — 버전 선택 근거는 [`tasks-db-mysql.md`](archive/tasks-db-mysql.md) Step 6 |
 | readiness 인디케이터 | ✅ Redis · DB | liveness 와 분리 유지. E2E 가 고정 |
 | 엔티티 컬럼 타입·네이밍 규칙 | 시각 컬럼 `DATETIME(3)` 확정 · 네이밍은 첫 엔티티에서 | 서버 `lower_case_table_names=1` 이라 테이블명 대소문자는 무시된다 |
 | DB 세션 타임존·컬럼 타입 | DB 확정 후 | 앱 레벨 정책은 확정됨. DB별 적용 방법만 남았다 (↓ 날짜·시간 정책) |
@@ -73,7 +73,7 @@
 ### DB 확정 전에 이미 확정된 것 (Phase 2 선행 규약)
 
 DB 종류와 무관하게 성립하는 규약이다. 참고 A·B 에서 **실제로 사고를 낸 항목**만 옮겼다.
-DB 가 확정되면 이 표를 `.claude/rules/code-patterns.md` 로 승격하고, DB 특화 항목(멱등 가드 문법·타입 매핑·커넥션 풀)을 그때 채운다.
+DB 가 확정되면 이 표를 `.claude/rules/back-code-patterns.md` 로 승격하고, DB 특화 항목(멱등 가드 문법·타입 매핑·커넥션 풀)을 그때 채운다.
 
 | 규약 | 지키지 않았을 때 실제로 일어난 일 |
 |---|---|
@@ -119,8 +119,10 @@ Controller  →  Service  →  TypeORM Repository<Entity>
 
 ### 폴더
 
+> ⚠️ **2026-09-03 기준으로 이 트리는 옛 위치다.** 저장소가 모노레포로 바뀌어 아래 내용은 전부 `apps/back/` 아래로 옮겨졌고, `docs/` · `.claude/` · `infra/`(공유 스택) 는 저장소 루트에 남았다. `.claude/rules/code-patterns.md` 는 `back-code-patterns.md` 로 이름이 바뀌었다. **현재 구조는 [`tasks-monorepo.md`](tasks-monorepo.md) 「목표 구조」와 루트 [`README.md`](../../README.md) 가 정본이다.** 아래 트리는 `src/` 내부의 **모듈 배치 결정**을 읽기 위해 남긴다.
+
 ```
-nerd-back/
+apps/back/          ← 작성 당시에는 저장소 루트였다
 ├── src/
 │   ├── common/
 │   │   ├── constants/
@@ -181,7 +183,7 @@ nerd-back/
 | 린트 | 로컬 TZ 의존 메서드(`getHours` `toLocaleString` `getTimezoneOffset` 등 18종)를 `no-restricted-syntax` 로 **error** | ✅ 위반 2건 잡히는 것 실측 확인 |
 | 컨테이너 | `Dockerfile` 에 `ENV TZ=UTC` | ✅ |
 | 테스트 | jest 설정 파일 **상단**에서 고정 · `setup-tz.ts` 는 검증 가드 | ✅ **2026-09-02 정정** — setupFiles 안의 대입은 동작하지 않았다. ✅ 로 적혀 있던 동안 테스트는 KST 로 돌았다 ([lessons](../lessons.md)) |
-| DB | **MySQL 확정** — 서버 `+00:00` · `DATETIME(3)` · 드라이버 `timezone: 'Z'` | ✅ 결정 (2026-09-02) — 적용·검증은 [`tasks-db-mysql.md`](tasks-db-mysql.md) |
+| DB | **MySQL 확정** — 서버 `+00:00` · `DATETIME(3)` · 드라이버 `timezone: 'Z'` | ✅ 결정 (2026-09-02) — 적용·검증은 [`tasks-db-mysql.md`](archive/tasks-db-mysql.md) |
 
 린트로 막는 것이 핵심이다. 규약을 문서에만 적어두면 개발자 노트북(KST)·CI 러너(UTC)·컨테이너(UTC)가 서로 다른 답을 내는 코드가 들어온다. 지금은 날짜 코드가 없어 **위반 0건 상태에서 규칙을 켤 수 있는 유일한 시점**이다.
 
@@ -219,7 +221,7 @@ nerd-back/
    — **스택 이름이 워크플로에 하드코딩되어 있다.** 지금은 환경이 하나뿐이라
    명시적인 편이 읽기 쉬워 그대로 두었다. 두 번째 환경이 생기는 시점에 파라미터화한다.
 
-**Path aliases** — alias→경로 매핑과 `tsconfig.json` ↔ `jest.config.js` 동기화 규칙은 [`.claude/rules/code-patterns.md`](../../.claude/rules/code-patterns.md) §1 이 SSOT다.
+**Path aliases** — alias→경로 매핑과 `tsconfig.json` ↔ `jest.config.js` 동기화 규칙은 [`.claude/rules/back-code-patterns.md`](../../.claude/rules/back-code-patterns.md) §1 이 SSOT다.
 
 ---
 
@@ -452,7 +454,7 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 
 - `CLAUDE.md` — 라우팅 표, Never/Ask 경계, Pitfalls, DoD, 커밋 컨벤션
   - ⚠️ 한 줄을 넣기 전에 자문한다: **"이걸 모르면 내가 틀리게 행동하는가?"** 아니면 넣지 않는다. 길어질수록 정작 중요한 금지 규칙의 준수율이 떨어진다 (참고 A lessons에 실제 사례 있음)
-- `.claude/rules/code-patterns.md` — 계층·에러·응답·테스트 규약. **규약마다 실측 카운트와 최종 확인일을 병기**한다
+- `.claude/rules/back-code-patterns.md` — 계층·에러·응답·테스트 규약. **규약마다 실측 카운트와 최종 확인일을 병기**한다
 - `docs/lessons.md` — **실패 양상 / 탐지 신호 / 근본 원인 / 예방 규칙** 4필드, 최신순 append
   - 초기 등재: **"로컬 빌드 성공 ≠ Docker 빌드 성공"** (성숙도 패턴 §5 — 남의 사고를 미리 등재)
 - `docs/playbooks/` — 반복 결함 클러스터. 판정 규칙: **1회 발생은 승격 대기, 2회째에 클러스터로 승격**
@@ -653,11 +655,11 @@ Step 11 — 문서 · AI 워크플로
   [x] CLAUDE.md (라우팅 표 / Never·Ask / Pitfalls / DoD / 커밋)
         · 2026-08-27 보강: 글로벌 충돌 시 우선순위(구체적인 쪽이 이김) · 200줄 상한 ·
           문서 분할 임계치 · Never 근거의 유효기간 · DoD 게이트 3분류
-  [x] .claude/rules/code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
+  [x] .claude/rules/back-code-patterns.md (규약마다 실측 카운트 + 최종 확인일)
   [x] docs/deploy.md — 배포 SSOT 로 분리 (2026-08-27, 213줄 신설 / README 427→117줄)
   [x] docs/lessons.md — 4필드 포맷으로 누적 (2026-08-27 기준 8건)
   [x] README.md (스택 / 실행법 / 환경변수 / 명령어 / "언제 여는가" 인덱스)
-  [x] docs/tasks/tasks-ai-config.md — AI 설정 도입·미도입 결정 기록 (2026-08-27)
+  [x] docs/tasks/archive/tasks-ai-config.md — AI 설정 도입·미도입 결정 기록 (2026-08-27)
   [x] .claude/settings.json 권한 3단 + 권한 파일 자체 deny + 훅 등록
   [x] .claude/commands/review.md (플로우 기반 QA 절차 + 측정 함정 3종)
   [x] .claude/templates/ — plan · bugfix (개인 글로벌은 팀에 전파되지 않아 저장소로 이관)
@@ -690,7 +692,7 @@ Step 11 — 문서 · AI 워크플로
 
 ## 📚 참고
 
-- 계층·에러·응답·테스트 규약 상세: `.claude/rules/code-patterns.md` (Step 11에서 작성)
+- 계층·에러·응답·테스트 규약 상세: `.claude/rules/back-code-patterns.md` (Step 11에서 작성)
 - 금지·함정·DoD: `CLAUDE.md` (Step 11에서 작성)
 - 명령어·환경변수·배포 구성: `README.md` (Step 11에서 작성)
 

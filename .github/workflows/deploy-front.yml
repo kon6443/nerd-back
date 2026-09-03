@@ -1,0 +1,147 @@
+name: Deploy front
+
+on:
+  push:
+    branches:
+      - main
+    # paths 는 화이트리스트로 지정한다.
+    # paths-ignore 는 머지 커밋 평가에서 의도 외 트리거가 발생한다.
+    #
+    # ⚠️ 배포 워크플로 4개의 paths 는 **교집합이 0건**이어야 한다. 여기는 apps/front/ 아래만 본다.
+    # ⚠️ 루트 워크스페이스 파일은 넣지 않는다 — 빌드 컨텍스트가 apps/front 뿐이라
+    #    산출물을 바꿀 수 없다. 회귀는 ci-front.yml 이 PR 에서 잡는다.
+    paths:
+      - 'apps/front/app/**'
+      - 'apps/front/public/**'
+      - 'apps/front/scripts/**'
+      - 'apps/front/Dockerfile'
+      - 'apps/front/.dockerignore'
+      - 'apps/front/package.json'
+      - 'apps/front/pnpm-lock.yaml'
+      - 'apps/front/next.config.ts'
+      - 'apps/front/tsconfig.json'
+      - 'apps/front/postcss.config.mjs'
+      - 'apps/front/eslint.config.mjs'
+      # NEXT_PUBLIC_* 는 빌드 시점에 번들에 박힌다 — 바뀌면 반드시 재빌드해야 한다.
+      - 'apps/front/.env.production'
+      - 'infra/prod_nerd_front.yml'
+      - '.github/workflows/deploy-front.yml'
+  # 코드 변경 없이 현재 main 을 다시 배포할 때 쓴다.
+  workflow_dispatch:
+
+# 백엔드와 그룹이 달라 두 앱 배포는 병렬로 돈다.
+concurrency:
+  group: deploy-front
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: '**/pnpm-lock.yaml'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter nerd-front run ci:all
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-24.04-arm
+    environment: PROD
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 이미지 태그 계산 (커밋 short SHA)
+        id: meta
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # 러너가 이미 arm64 라 QEMU 가 필요 없다.
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 레지스트리 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: 이미지 빌드 및 푸시
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/front
+          file: apps/front/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ secrets.REGISTRY_URL }}/prod_nerd_front:${{ steps.meta.outputs.tag }}
+          # next.config.ts 의 deploymentId 로 들어간다. 롤링 중 version skew 를 막는다.
+          # 이미지 태그와 **같은 값**이어야 어떤 배포인지 특정된다.
+          build-args: |
+            DEPLOYMENT_VERSION=${{ steps.meta.outputs.tag }}
+          # Swarm 의 매니페스트 처리가 attestation 을 삼키지 못한다.
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=front
+          cache-to: type=gha,mode=max,scope=front
+
+      # 저장소의 파일명이 이미 스택명이다 — scp 가 그대로 올리면 서버 규약
+      # (`$DEPLOY_DIR/stacks/<스택명>.yml`)이 성립한다. 이름을 바꾸는 staging 단계가 필요 없다.
+      - name: stack YAML 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          source: infra/prod_nerd_front.yml
+          target: ${{ secrets.DEPLOY_DIR }}/stacks
+          strip_components: 1
+
+      - name: 스택 배포 (수렴까지 동기 대기)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          envs: REGISTRY_URL,IMAGE_TAG,OVERLAY_NETWORK,ENV_FILE_PATH,STACK_FILE
+          script: |
+            set -e
+            docker stack deploy --detach=false --with-registry-auth \
+              -c "$STACK_FILE" prod_nerd_front
+            docker stack services prod_nerd_front
+        env:
+          REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+          IMAGE_TAG: ${{ steps.meta.outputs.tag }}
+          OVERLAY_NETWORK: ${{ secrets.OVERLAY_NETWORK }}
+          ENV_FILE_PATH: ${{ secrets.DEPLOY_DIR }}/env/prod_nerd_front.env
+          STACK_FILE: ${{ secrets.DEPLOY_DIR }}/stacks/prod_nerd_front.yml
+
+      # 수렴 명령이 성공해도 앱이 실제로 응답하는지는 별개다.
+      #
+      # ⚠️ 컨테이너를 **스택 네임스페이스 라벨**로 고른다. `--filter name=` 은 부분 문자열
+      #    매칭이라 이름이 겹치는 다른 스택의 컨테이너까지 잡을 수 있다 (docs/lessons.md).
+      # ⚠️ `docker run --network <overlay>` 를 쓰지 않는다 — overlay 는 기본적으로 attachable 이 아니다.
+      - name: 스모크 테스트 (liveness 폴링)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          script: |
+            set -e
+            # start_period 60s 를 감안해 넉넉히 잡는다 (3s × 40 = 120s).
+            for i in $(seq 1 40); do
+              cid=$(docker ps -q \
+                --filter "label=com.docker.stack.namespace=prod_nerd_front" | head -1)
+              if [ -n "$cid" ] && docker exec "$cid" node scripts/healthcheck.mjs; then
+                echo "liveness 200 확인 (시도 $i)"
+                exit 0
+              fi
+              sleep 3
+            done
+            echo "liveness 확인 실패 — 배포를 실패로 처리한다"
+            docker service ps prod_nerd_front_app --no-trunc
+            docker service logs --tail 50 prod_nerd_front_app || true
+            exit 1

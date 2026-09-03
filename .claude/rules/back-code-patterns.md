@@ -1,8 +1,8 @@
 ---
 paths:
-  - "src/**/*.ts"
-  - "test/**/*.ts"
-  - "scripts/**/*.ts"
+  - "apps/back/src/**/*.ts"
+  - "apps/back/test/**/*.ts"
+  - "apps/back/scripts/**/*.ts"
 ---
 
 # 코드 패턴 (SSOT)
@@ -161,7 +161,7 @@ transformOptions: { enableImplicitConversion: true }
 - Redis: `lazyConnect` + `enableOfflineQueue: false` + `maxRetriesPerRequest: 2`. 초기 연결 실패를 흡수해 **부팅을 막지 않는다.**
 - `error` 이벤트 핸들러를 반드시 붙인다. 없으면 ioredis 가 unhandled error 로 프로세스를 죽인다.
 - 종료 시 커넥션을 정리하되 **실패해도 종료를 막지 않는다.** 종료가 지연되면 배포가 멈춘다.
-- 🚫 **DB 는 이 절의 예외 — 핵심 의존이다.** 연결 실패가 재시도 예산(`DB_CONNECT_RETRY` 10회 × 3초 = 30초, healthcheck 종료 시한 75초 안쪽)을 넘기면 **부팅이 실패**하고 Swarm `restart_policy`(무제한)가 재시도한다. 이유는 [`docs/tasks/tasks-db-mysql.md`](../../docs/tasks/tasks-db-mysql.md) D8. 런타임 장애는 다르다 — 이미 뜬 앱은 살아 있고 쿼리만 실패하다가 풀이 회복한다.
+- 🚫 **DB 는 이 절의 예외 — 핵심 의존이다.** 연결 실패가 재시도 예산(`DB_CONNECT_RETRY` 10회 × 3초 = 30초, healthcheck 종료 시한 75초 안쪽)을 넘기면 **부팅이 실패**하고 Swarm `restart_policy`(무제한)가 재시도한다. 이유는 [`docs/tasks/archive/tasks-db-mysql.md`](../../docs/tasks/archive/tasks-db-mysql.md) D8. 런타임 장애는 다르다 — 이미 뜬 앱은 살아 있고 쿼리만 실패하다가 풀이 회복한다.
 
 ## 9. 테스트 — mock 주력
 
@@ -199,7 +199,7 @@ dateKeyInTimeZone(nowUtc(), KST);  // '2026-08-27'  ← 일별 집계 키
   - **예외 3곳은 룰이 꺼져 있다** (`eslint.config.mjs` 의 `files` 오버라이드): `src/common/utils/date.utils.ts`(헬퍼 자신) · `**/*.spec.ts` · `test/**/*.ts`. 즉 **spec 에서는 막히지 않는다** — 프로덕션 코드에만 강제된다.
 - `dateKeyInTimeZone` 이 타임존을 **인자로 강제**하는 이유: 일별 카운터의 "오늘"이 어느 타임존이냐가 집계 결과를 바꾼다. 한국 사용자 기준이면 KST 로 리셋해야 한다.
 - 🚫 **MySQL `TIMESTAMP` 타입을 쓰지 않는다.** 세션 TZ 기준으로 저장·조회 시 자동 변환되어 환경마다 값이 달라지고, 2038-01-19 이후를 표현하지 못한다. `DATETIME(3)` 에 UTC 를 넣는다.
-- 🚫 mysql2 `timezone: 'Z'` 를 빼지 않는다. 없으면 `DATETIME` 을 프로세스 로컬 TZ 로 해석해, 같은 행을 로컬(KST)과 운영(UTC)이 다르게 읽는다. 근거·점검표는 [`docs/tasks/tasks-db-mysql.md`](../../docs/tasks/tasks-db-mysql.md) 「시간 설정 점검」.
+- 🚫 mysql2 `timezone: 'Z'` 를 빼지 않는다. 없으면 `DATETIME` 을 프로세스 로컬 TZ 로 해석해, 같은 행을 로컬(KST)과 운영(UTC)이 다르게 읽는다. 근거·점검표는 [`docs/tasks/archive/tasks-db-mysql.md`](../../docs/tasks/archive/tasks-db-mysql.md) 「시간 설정 점검」.
 
 ## 11. 타입 — 억제는 도구가 막는다
 

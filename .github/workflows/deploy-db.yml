@@ -1,13 +1,13 @@
 name: Deploy DB
 
 # MySQL 스택은 앱·Redis 와 **독립적으로** 배포된다.
-# 이 파일의 paths 는 deploy.yml · deploy-redis.yml 과 교집합이 0건이어야 한다 — 겹치면 한 커밋에 두 스택이 뜬다.
+# 이 파일의 paths 는 나머지 배포 워크플로 3개(back·front·redis)와 교집합이 0건이어야 한다 — 겹치면 한 커밋에 두 스택이 뜬다.
 on:
   push:
     branches:
       - main
     paths:
-      - 'infra/docker-stack.db.yml'
+      - 'infra/prod_nerd_db.yml'
       - 'infra/mysql/**'
       - '.github/workflows/deploy-db.yml'
   workflow_dispatch:
@@ -24,16 +24,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # YAML 과 initdb 스크립트를 함께 보낸다. YAML 의 `configs.init-users-v1.file: ./mysql/init-users.sh` 가
-      # 이 디렉터리 구조를 전제한다 — 한쪽만 바꾸면 stack deploy 가 파일을 못 찾는다.
+      # 저장소의 파일명이 이미 스택명이다 — scp 가 그대로 올리면 서버 규약
+      # (`$DEPLOY_DIR/stacks/<스택명>.yml`)이 성립한다.
+      #
+      # ⚠️ `mysql/` 하위 구조를 유지해야 한다. YAML 의
+      #    `configs.init-users-v1.file: ./mysql/init-users.sh` 는 **YAML 파일이 있는
+      #    디렉터리 기준**이므로, 저장소에서도(`infra/`) 서버에서도(`stacks/`)
+      #    YAML 옆에 `mysql/init-users.sh` 가 있어야 stack deploy 가 파일을 찾는다.
+      #    `strip_components: 1` 이 `infra/` 만 벗기므로 그 구조가 그대로 간다.
       - name: stack YAML · initdb 스크립트 전송
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
-          source: infra/docker-stack.db.yml,infra/mysql/init-users.sh
-          target: ${{ secrets.DEPLOY_STACK_DIR }}
+          source: infra/prod_nerd_db.yml,infra/mysql/init-users.sh
+          target: ${{ secrets.DEPLOY_DIR }}/stacks
           strip_components: 1
 
       # stack deploy 는 아래 셋이 없어도 "성공"한다 — 태스크가 pending 에 걸리거나 볼륨 마운트가 실패한 채로.
@@ -66,16 +72,16 @@ jobs:
           host: ${{ secrets.DEPLOY_SERVER }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
-          envs: OVERLAY_NETWORK,MYSQL_DATA_DIR,STACK_DIR
+          envs: OVERLAY_NETWORK,MYSQL_DATA_DIR,STACK_FILE
           script: |
             set -e
             docker stack deploy --detach=false \
-              -c "$STACK_DIR/docker-stack.db.yml" prod_nerd_db
+              -c "$STACK_FILE" prod_nerd_db
             docker stack services prod_nerd_db
         env:
           OVERLAY_NETWORK: ${{ secrets.OVERLAY_NETWORK }}
           MYSQL_DATA_DIR: ${{ secrets.MYSQL_DATA_DIR }}
-          STACK_DIR: ${{ secrets.DEPLOY_STACK_DIR }}
+          STACK_FILE: ${{ secrets.DEPLOY_DIR }}/stacks/prod_nerd_db.yml
 
       # 설정 파일이 맞다는 것과 서버가 그 값으로 떠 있다는 것은 다른 사실이다. SQL 로 실측한다.
       # 비밀번호를 인자·로그에 노출하지 않는다 — 컨테이너 안에서 secret 파일을 읽어 defaults-extra-file 로 넘긴다.

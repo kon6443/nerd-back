@@ -55,13 +55,16 @@ fi
 [ -z "$trigger" ] && trigger="unknown"
 
 # 프로젝트 컨텍스트가 아니면 스킵 — 임의 디렉터리 오염 방지
-is_repo=0
-git -C "$cwd" rev-parse --git-dir >/dev/null 2>&1 && is_repo=1
-if [ "$is_repo" -ne 1 ] && [ ! -d "$cwd/docs" ]; then
+repo_root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)
+if [ -z "$repo_root" ] && [ ! -d "$cwd/docs" ]; then
   exit 0
 fi
 
-out_dir="$cwd/docs/handoff"
+# ⚠️ 스냅샷은 **저장소 루트**의 docs/handoff 에 모은다.
+#    cwd 를 그대로 쓰면 모노레포에서 apps/back 같은 하위 디렉터리에서 세션을 열었을 때
+#    apps/back/docs/handoff 가 생긴다. 루트 .gitignore 의 `docs/handoff/` 는 경로에
+#    슬래시가 있어 **루트에만** 적용되므로, 그 스냅샷은 커밋 대상으로 올라온다.
+out_dir="${repo_root:-$cwd}/docs/handoff"
 mkdir -p "$out_dir" 2>/dev/null || true
 
 # 최근 3분 내 스냅샷이 있으면 모델이 직접 작성한 것으로 보고 생략
@@ -79,8 +82,9 @@ mask='s#://[^:@/[:space:]]+:[^@/[:space:]]+@#://[REDACTED]@#g; s/(authorization[
 
 # (1) 작업 트리 변경 파일
 changed=""
-if [ "$is_repo" -eq 1 ]; then
-  changed=$(git -C "$cwd" status --porcelain 2>/dev/null | head -50 | sed 's/^/  /' || true)
+if [ -n "$repo_root" ]; then
+  # 저장소 전체의 변경을 모은다 — 하위 디렉터리에서 세션을 열어도 다른 앱의 변경이 빠지지 않는다.
+  changed=$(git -C "$repo_root" status --porcelain 2>/dev/null | head -50 | sed 's/^/  /' || true)
 fi
 [ -z "$changed" ] && changed="  (변경 없음)"
 

@@ -39,8 +39,19 @@ coverage/
 tmp/
 
 # 세션 스냅샷 (PreCompact 훅 생성 — 정본 아님, docs/tasks/ 로 옮긴 뒤 삭제)
-docs/handoff/
+**/docs/handoff/
 
 # 설정 롤백용 백업 사본 — 커밋 금지 (방치되면 어느 쪽이 정본인지 흐려진다)
 *.bak
 *.bak-*
+
+
+# Next.js (apps/front) — 앵커 없이 두어 어느 앱 디렉터리에서든 매칭되게 한다
+.next/
+out/
+next-env.d.ts
+.vercel
+*.pem
+
+# pnpm 이 전역 store 를 못 쓸 때 만드는 폴백 store — 커밋 금지
+.pnpm-store/

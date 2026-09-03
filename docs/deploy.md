@@ -1,7 +1,7 @@
 # 배포 및 운영 (SSOT)
 
 > **용도**: 배포 구성·흐름·롤백의 단일 출처. 배포·인프라 작업 전에 읽는다.
-> **경계**: 여기는 *어떻게 배포하고 운영하는가*. 코드 규약은 [`.claude/rules/code-patterns.md`](../.claude/rules/code-patterns.md), 금지·함정은 [`../CLAUDE.md`](../CLAUDE.md), 결정 근거는 [`tasks/tasks-backend-skeleton.md`](tasks/tasks-backend-skeleton.md).
+> **경계**: 여기는 *어떻게 배포하고 운영하는가*. 코드 규약은 [`.claude/rules/back-code-patterns.md`](../.claude/rules/back-code-patterns.md), 금지·함정은 [`../CLAUDE.md`](../CLAUDE.md), 결정 근거는 [`tasks/tasks-backend-skeleton.md`](tasks/tasks-backend-skeleton.md).
 > 🚫 실제 도메인·IP·서버 경로·네트워크 이름은 이 문서에 적지 않는다. 전부 GitHub Environment 시크릿에서 온다.
 
 ---
@@ -11,20 +11,21 @@
 | 항목 | 값 |
 |---|---|
 | 오케스트레이터 | Docker Swarm (stack) |
-| 스택 | `prod_nerd_back`(앱) · `prod_nerd_cache`(Redis) · `prod_nerd_db`(MySQL) — **독립 배포** |
-| 서비스 DNS | `prod_nerd_back_app` · `prod_nerd_cache_redis` · `prod_nerd_db_mysql` |
-| 레플리카 | 앱 **3** · Redis 1 · MySQL 1 |
-| 컨테이너 포트 | **5501** — 호스트 publish 없음 |
-| 이미지 | 멀티스테이지, `linux/arm64` 단독, 태그 = 커밋 short SHA |
+| 스택 | `prod_nerd_back`(백엔드) · `prod_nerd_front`(프론트) · `prod_nerd_cache`(Redis) · `prod_nerd_db`(MySQL) — **전부 독립 배포** |
+| 서비스 DNS | `prod_nerd_back_app` · `prod_nerd_front_app` · `prod_nerd_cache_redis` · `prod_nerd_db_mysql` |
+| 레플리카 | 백엔드 **3** · 프론트 **3** · Redis 1 · MySQL 1 |
+| 컨테이너 포트 | 백엔드 **5501** · 프론트 **5502** — 둘 다 호스트 publish 없음 |
+| 이미지 | 멀티스테이지, `linux/arm64` 단독, 태그 = 커밋 short SHA. 이름 `prod_nerd_back` · `prod_nerd_front`(`_app` 접미사 없음) |
 | 네트워크 | 기존 overlay 에 `external: true` 로 참여 |
-| 노드 배치 | 라벨 제약 — `prod_nerd_back=1` · `prod_nerd_redis=1` · `prod_nerd_db=1` (규칙: `prod_<프로젝트>_<역할>`) |
-| 리버스 프록시 | Caddy → `reverse_proxy http://prod_nerd_back_app:5501` |
-| GitHub Environment | `PROD` (시크릿 9개) |
+| 노드 배치 | 라벨 제약 — `prod_nerd_back=1` · `prod_nerd_front=1` · `prod_nerd_redis=1` · `prod_nerd_db=1` (규칙: `prod_<프로젝트>_<역할>`) |
+| 리버스 프록시 | Caddy — 프론트 도메인의 `/api/v2/*` → `prod_nerd_back_app:5501`, 나머지(catch-all) → `prod_nerd_front_app:5502` |
+| 저장소 | 모노레포 — `apps/back` · `apps/front` · 공유 `infra/` |
+| GitHub Environment | `PROD` (시크릿 **9개**) |
 
 서비스 DNS 는 **`<스택명>_<서비스명>`** 이다. 원하는 이름을 스택 쪽에 넣으면 서비스 키가 뒤에 한 번 더 붙으므로, **최종 DNS 이름을 먼저 적고 역산**한다.
 
 **스택 이름 = 노드 라벨 키**로 맞춰 두었다 — 어느 스택이 어느 라벨을 보는지 파일을 열지 않고도 알 수 있다. 서비스 키는 앱 스택이 `app`, 인프라 스택은 역할명(`mysql`)이다.
-⚠️ **Redis 스택만 예외다** (`prod_nerd_cache` / 라벨 `prod_nerd_redis`). named volume 이 스택 이름을 물고 있어 이름을 바꾸면 데이터 경계가 이동한다 — `infra/docker-stack.redis.yml` 상단 주석 참조. **일관성을 이유로 바꾸지 않는다.**
+⚠️ **Redis 스택만 예외다** (`prod_nerd_cache` / 라벨 `prod_nerd_redis`). named volume 이 스택 이름을 물고 있어 이름을 바꾸면 데이터 경계가 이동한다 — `infra/prod_nerd_cache.yml` 상단 주석 참조. **일관성을 이유로 바꾸지 않는다.**
 
 **호스트로 포트를 publish 하지 않는다.** Caddy 가 같은 overlay 안에 있어 서비스 DNS 로 바로 닿는다. publish 하면 도메인을 우회한 직접 접근 경로가 열리고 기존 스택과 포트가 겹칠 위험도 생긴다.
 
@@ -32,29 +33,55 @@
 
 ## 독립 배포 — 무엇을 바꾸면 무엇이 뜨는가
 
-앱과 Redis 를 **별도 스택**으로 둔다. 같은 스택이면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고, 결과적으로 앱까지 재배포된다.
+네 대상을 **별도 스택 + 별도 워크플로**로 둔다. 같은 스택에 묶으면 한쪽 설정만 바꿔도 커밋 SHA 가 바뀌어 다른 쪽 이미지 태그까지 달라지고, 결과적으로 전부 재배포된다.
 
-| 변경한 것 | 도는 워크플로 | 이미지 빌드 | 앱 재배포 | Redis 재시작 | MySQL 재시작 |
+| 변경한 것 | 도는 워크플로 | 백엔드 | 프론트 | Redis | MySQL |
 |---|---|:-:|:-:|:-:|:-:|
-| `src/**` · `scripts/**` · `Dockerfile` · 의존성 | `deploy.yml` | O | O | X | X |
-| `infra/docker-stack.app.yml` | `deploy.yml` | O | O | X | X |
-| `infra/docker-stack.redis.yml` | `deploy-redis.yml` | X | X | O | X |
-| `infra/docker-stack.db.yml` · `infra/mysql/**` | `deploy-db.yml` | X | X | X | O |
-| 문서·태스크 파일만 | (없음) | X | X | X | X |
+| `apps/back/{src,scripts,test}/**` · `apps/back/Dockerfile` · 의존성 · `tsconfig*` · `jest.config.js` | `deploy-back.yml` | **빌드+배포** | X | X | X |
+| `infra/prod_nerd_back.yml` | `deploy-back.yml` | **빌드+배포** | X | X | X |
+| `apps/front/{app,public,scripts}/**` · `apps/front/Dockerfile` · 의존성 · `next.config.ts` · `.env.production` | `deploy-front.yml` | X | **빌드+배포** | X | X |
+| `infra/prod_nerd_front.yml` | `deploy-front.yml` | X | **빌드+배포** | X | X |
+| `infra/prod_nerd_cache.yml` | `deploy-redis.yml` | X | X | 재시작 | X |
+| `infra/prod_nerd_db.yml` · `infra/mysql/**` | `deploy-db.yml` | X | X | X | 재시작 |
+| 루트 설정(`package.json` · `pnpm-workspace.yaml` · 루트 lockfile) · 문서 · `.claude/**` | (없음) | X | X | X | X |
 
-세 워크플로의 `paths` 화이트리스트는 **교집합이 0건**이다.
+**배포 워크플로 4개의 `paths` 화이트리스트는 교집합이 0건이다.** glob 을 정규식으로 바꿔 `git ls-files` 전수에 매칭해 확인한다 — 문자열 비교가 아니라 파일 단위로 센다 (스크립트는 `docs/tasks/tasks-monorepo.md` Step 5).
+
+⚠️ **루트 워크스페이스 파일은 배포를 트리거하지 않는다.** 컨테이너 빌드 컨텍스트가 `apps/<앱>` 뿐이라 산출물을 바꿀 수 없기 때문이다. 그 파일들의 회귀는 `ci-back.yml` · `ci-front.yml` 이 PR 에서 잡는다(CI 는 반대로 **넓게** 잡아 두 앱이 함께 돈다).
+
+서버에서 직접 배포할 때 (`$DEPLOY_DIR` 은 시크릿):
 
 ```bash
-docker stack deploy -c infra/docker-stack.app.yml   prod_nerd_back
-docker stack deploy -c infra/docker-stack.redis.yml prod_nerd_cache
-docker stack deploy -c infra/docker-stack.db.yml    prod_nerd_db      # 사전 조건: 라벨·secret·데이터 경로 (deploy-db.yml 사전 점검)
+docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_back.yml"  prod_nerd_back
+docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_front.yml" prod_nerd_front
+docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_cache.yml" prod_nerd_cache
+docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_db.yml"    prod_nerd_db   # 사전 조건: 라벨·secret·데이터 경로 (deploy-db.yml 사전 점검)
 ```
+
+**파일명 = 스택명 — 저장소와 서버가 같은 이름을 쓴다.** 스택명은 노드 라벨 키·서비스 DNS 접두와도 같으므로 이름 하나로 YAML·env·라벨·DNS 를 전부 찾는다. 저장소에서 이미 그 이름이라 **CI 는 파일을 그대로 올린다**(이름을 바꾸는 단계가 없다).
+
+```
+infra/                                 ← 저장소. 배포되는 스택 4개가 여기 다 있다
+├── prod_nerd_back.yml
+├── prod_nerd_front.yml
+├── prod_nerd_db.yml
+├── prod_nerd_cache.yml                ← Redis. 스택명이 cache 인 예외가 파일명에 드러난다
+└── mysql/init-users.sh                ← prod_nerd_db.yml 의 configs 가 ./mysql/ 로 참조
+
+<DEPLOY_DIR>/                          ← 서버
+├── stacks/   prod_nerd_back.yml · prod_nerd_front.yml · prod_nerd_db.yml · prod_nerd_cache.yml · mysql/init-users.sh
+└── env/      prod_nerd_back.env · prod_nerd_front.env      (600, 사람이 관리)
+```
+
+⚠️ `stacks/` 는 **CI 가 scp 로 덮어쓴다.** 사람이 손으로 고치면 다음 배포에 사라진다. 전송은 `source: infra/<스택명>.yml` + `strip_components: 1` 로, `infra/` 만 벗기고 이름은 그대로 간다.
+⚠️ `mysql/init-users.sh` 는 `prod_nerd_db.yml` **옆에** 있어야 한다 — 저장소에서도 서버에서도. YAML 의 `configs.…file: ./mysql/init-users.sh` 가 YAML 파일이 있는 디렉터리 기준이고, `strip_components: 1` 이 그 구조를 보존한다.
+⚠️ `init-users.sh` 를 고치면 **Swarm config 이름의 `-v1` 도 올려야 한다.** Swarm config 는 불변이라 같은 이름에 다른 내용을 올리면 `docker stack deploy` 가 실패한다.
 
 ---
 
 ## MySQL 스택 (`prod_nerd_db`)
 
-운영에 필요한 **사실**만 적는다. 설정값을 왜 그렇게 골랐는지는 [`tasks/tasks-db-mysql.md`](tasks/tasks-db-mysql.md).
+운영에 필요한 **사실**만 적는다. 설정값을 왜 그렇게 골랐는지는 [`tasks/archive/tasks-db-mysql.md`](tasks/archive/tasks-db-mysql.md).
 
 | 항목 | 값 |
 |---|---|
@@ -62,29 +89,30 @@ docker stack deploy -c infra/docker-stack.db.yml    prod_nerd_db      # 사전 �
 | 데이터 위치 | named volume `prod_nerd_db_mysql-data` → **블록 볼륨 위 디렉터리**(`type: none, o: bind`). 경로는 GitHub 시크릿 `MYSQL_DATA_DIR`. `docker stack rm` 해도 볼륨은 남는다 |
 | 배포 사전 조건 | 노드 라벨 `prod_nerd_db=1` · Swarm secret `prod_nerd_db_{root,app,migrator}_pw` · `MYSQL_DATA_DIR` 경로 존재(= 블록 볼륨 마운트됨). **`deploy-db.yml` 사전 점검이 셋을 배포 전에 막는다** |
 | 계정 | `root`(복구) · `nerd_app`(앱, DML 만) · `nerd_migrator`(마이그레이션, DDL). 앱은 서버 `.env` 의 `DB_PASSWORD` 로 받는다 — **secret 과 `.env` 두 곳**, 회전 시 함께 |
-| 설정 변경 | `infra/docker-stack.db.yml` 의 `command:` 플래그 → main 푸시 → MySQL **재시작(10~30초 DB 요청 실패, 앱은 유지)** |
+| 설정 변경 | `infra/prod_nerd_db.yml` 의 `command:` 플래그 → main 푸시 → MySQL **재시작(10~30초 DB 요청 실패, 앱은 유지)** |
 | 첫 기동에 굳는 값 | `lower_case_table_names=1` · `MYSQL_DATABASE=nerd` · initdb 계정 생성 스크립트. 바꾸려면 덤프 후 재초기화 |
-| 외부 접속 | **포트 publish 없음.** SSH 터널만 — 사용법은 [`README`](../README.md) 「DB 접속」 |
+| 외부 접속 | **포트 publish 없음.** SSH 터널만 — 사용법은 [백엔드 README](../apps/back/README.md) 「DB 접속」 |
 | 백업 | **없음** — 후속 태스크. 그때까지 유실 방어가 0 이다 |
 
 
 `main` 푸시 → GitHub Actions
 
 ```
-paths 화이트리스트 트리거
-  → ci:all (lint → 스텁 검사 → 단위 → E2E → build)   ← 이 게이트 없이 배포하지 않는다
-  → buildx 빌드 (네이티브 arm64 러너, gha 캐시, --provenance=false --sbom=false)
+paths 화이트리스트 트리거 (앱별로 갈린다)
+  → verify job: 그 앱의 ci:all 만                     ← 이 게이트 없이 배포하지 않는다
+  → buildx 빌드 (네이티브 arm64 러너, context=apps/<앱>, gha 캐시 scope=<앱>,
+                 --provenance=false --sbom=false)
   → 레지스트리 push (태그 = 커밋 short SHA)
-  → stack YAML 을 매니저로 전송
+  → 러너에서 stack YAML 을 스택명으로 복사 → 매니저의 $DEPLOY_DIR/stacks/ 로 전송
   → docker stack deploy --detach=false               ← 수렴까지 동기 대기
-  → liveness 폴링 스모크 테스트                       ← 여기까지 통과해야 배포 완료
+  → liveness 폴링 스모크 테스트 (라벨 필터)            ← 여기까지 통과해야 배포 완료
 ```
 
 - 트리거는 `paths` **화이트리스트**로 지정한다. `paths-ignore` 는 머지 커밋 평가에서 의도 외 트리거가 발생한다.
 - 이미지 태그가 불변이라 어떤 커밋이 떠 있는지 항상 특정된다.
 - `--provenance=false --sbom=false` 가 필요하다. Swarm 의 매니페스트 처리가 attestation 을 삼키지 못한다.
 - 스모크 테스트는 **떠 있는 태스크 안에서** 확인한다. `docker run --network <overlay>` 는 쓰지 않는다 — Swarm overlay 는 기본적으로 attachable 이 아니다.
-- 러너는 **`ubuntu-24.04-arm`(네이티브 arm64)** 다. 저장소가 public 이라 무료이고 QEMU 에뮬레이션 계층이 없다. 🚫 private 으로 바꾸면 이 라벨은 실패한다.
+- 러너는 6개 워크플로 전부 **`ubuntu-24.04-arm`(네이티브 arm64)** 다. 저장소가 public 이라 무료이고 QEMU 에뮬레이션 계층이 없다. 🚫 private 으로 바꾸면 이 라벨은 실패한다.
 - 컨테이너를 고를 때는 **스택 네임스페이스 라벨**을 쓴다 — `--filter name=` 은 부분 문자열 매칭이라 이름이 겹치는 다른 스택까지 잡는다 ([lessons 2026-09-01](lessons.md)).
 
 ### 롤링 업데이트
@@ -140,7 +168,7 @@ caddy reload   --config <경로>
 
 ## 레플리카 3개가 강제하는 것
 
-배포 구성이 코드에 거는 제약이다. 코드를 쓸 때의 상세는 [`.claude/rules/code-patterns.md`](../.claude/rules/code-patterns.md) §6·§8.
+배포 구성이 코드에 거는 제약이다. 코드를 쓸 때의 상세는 [`.claude/rules/back-code-patterns.md`](../.claude/rules/back-code-patterns.md) §6·§8.
 
 | 제약 | 어기면 |
 |---|---|
@@ -199,7 +227,7 @@ docker volume inspect prod_nerd_db_mysql-data --format '{{.Options}}'   # device
 
 배포 중 폴링해서 비-200 과 연결 끊김이 **0건**이어야 한다.
 
-**설정은 무중단이 되도록 구성돼 있다** — 2026-08-28 `infra/docker-stack.app.yml` 대조 확인:
+**설정은 무중단이 되도록 구성돼 있다** — 2026-08-28 `infra/prod_nerd_back.yml`(당시 `infra/docker-stack.app.yml`) 대조 확인:
 
 | 설정 | 값 | 역할 |
 |---|---|---|
@@ -273,20 +301,26 @@ Caddy 는 블록을 제거한 뒤 `caddy validate && caddy reload`.
 
 ## 환경 추가 시 (예: QA)
 
-1. GitHub Environment `QA` 생성 후 같은 이름의 시크릿 9개를 QA 값으로 등록
-2. 서버에 `nerd-back.qa.env` 와 stack 디렉터리 생성
+1. GitHub Environment `QA` 생성 후 같은 이름의 시크릿 9개를 QA 값으로 등록 (`DEPLOY_DIR` 은 QA 트리 경로)
+2. 서버에 `<DEPLOY_DIR>/{stacks,env}` 를 만들고 `env/qa_nerd_back.env` · `env/qa_nerd_front.env` 생성
 3. 워크플로 복제 또는 파라미터화 — **스택 이름이 워크플로에 하드코딩되어 있다.** 환경이 하나뿐이라 명시적인 편이 읽기 쉬워 그대로 뒀고, 두 번째 환경이 생기는 시점에 파라미터화한다
 
 | 대상 | 규칙 | 예 |
 |---|---|---|
+| 앱 디렉터리 | `apps/<앱>` | `apps/back` · `apps/front` |
+| 패키지명 (`pnpm --filter`) | `nerd-<앱>` | `nerd-back` · `nerd-front` |
+| 워크플로 | `ci-<앱>.yml` · `deploy-<앱>.yml` | `deploy-front.yml` |
 | Swarm 스택 | `<환경>_<프로젝트>_<역할>` — **노드 라벨 키와 동일** | `prod_nerd_back` · `prod_nerd_front` |
 | 서비스 키 | `app` 고정 | |
 | 서비스 DNS | `<스택>_app` | `prod_nerd_back_app` |
 | 이미지 | `<환경>_<프로젝트>_<역할>` — 스택과 별개 네임스페이스, 접미사 없음 | `prod_nerd_back:<sha>` |
-| 서버 env 파일 | `<저장소>.<환경>.env` | `nerd-back.prod.env` |
-| 서버 stack 디렉터리 | `.../<저장소>/<환경>/` — **저장소마다 분리**한다 | 경로는 `DEPLOY_STACK_DIR` 시크릿에 있다 |
+| 스택 파일 | 저장소 `infra/<스택명>.yml` → 서버 `<DEPLOY_DIR>/stacks/<스택명>.yml` — **양쪽 파일명 = 스택명** | `infra/prod_nerd_front.yml` |
+| 서버 env 파일 | `<DEPLOY_DIR>/env/<스택명>.env` | `env/prod_nerd_front.env` |
 | GitHub Environment | 대문자 환경명 | `PROD` |
 
-🚫 **두 저장소가 같은 stack 디렉터리를 쓰지 않는다.** 올라가는 파일명이 둘 다 `docker-stack.app.yml` 이라 한쪽 배포가 다른 쪽 파일을 덮어쓴다.
+**시크릿 9개** — `REGISTRY_URL` `REGISTRY_USERNAME` `REGISTRY_PASSWORD` `DEPLOY_SERVER` `DEPLOY_USER` `SWARM_MANAGER_SSH_KEY` `OVERLAY_NETWORK` `MYSQL_DATA_DIR` **`DEPLOY_DIR`**.
+경로 시크릿은 `DEPLOY_DIR` **하나뿐**이고 나머지 경로는 워크플로가 위 규약으로 계산한다 — **앱·스택이 늘어도 시크릿이 늘지 않는다.** (`MYSQL_DATA_DIR` 만 예외 — 블록 볼륨 마운트 경로라 배포 트리와 무관하다.)
+
+🚫 **두 스택이 같은 파일명을 쓰지 않는다.** 파일명 = 스택명 규약이 이것을 구조적으로 보장한다 — 옛 구조는 두 앱이 둘 다 `docker-stack.app.yml` 이라 디렉터리로만 구분됐고, 그래서 서버에서도 저장소별 디렉터리가 필요했다.
 
 ⚠️ Redis 스택(`prod_nerd_cache`)만 이 규칙의 예외다 — 위 「구성」절 참조.

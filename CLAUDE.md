@@ -1,29 +1,41 @@
-# nerd-back — AI 에이전트 규약
+# nerd 모노레포 — AI 에이전트 규약 (공통)
 
-> 사용자 글로벌 규칙(`~/.claude/CLAUDE.md`)이 기본이고, 이 파일은 **프로젝트 고유 사항**만 보완한다.
-> 두 규칙이 부딪히면 **더 구체적인 쪽이 이긴다** — 이 파일이 명시적으로 덮어쓴 항목은 이 파일이 정본이다.
+> 사용자 글로벌 규칙(`~/.claude/CLAUDE.md`)이 기본이고, 이 파일은 **저장소 전체에 공통인 사항**만 담는다.
+> 앱 고유 규약은 **앱 디렉터리의 `CLAUDE.md`** 가 소유한다 — 그 앱 파일을 다룰 때 로드된다.
+> 두 규칙이 부딪히면 **더 구체적인 쪽이 이긴다.**
 > 한 줄을 넣기 전에 자문한다 — **"이걸 모르면 내가 틀리게 행동하는가?"** 아니면 넣지 않는다.
-> **이 문서는 200줄을 넘기지 않는다** (공식 권장 상한). 길어질수록 정작 중요한 금지 규칙의 준수율이 떨어진다.
+> **이 문서는 200줄을 넘기지 않는다.** 길어질수록 정작 중요한 금지 규칙의 준수율이 떨어진다.
+
+## 이 저장소에 있는 것
+
+| 경로 | 무엇 | 배포 단위 |
+|---|---|---|
+| [`apps/back/`](apps/back/) | NestJS API (`/api/v2`, 포트 5501) | 스택 `prod_nerd_back` |
+| [`apps/front/`](apps/front/) | Next.js 앱 (포트 5502) | 스택 `prod_nerd_front` |
+| [`infra/`](infra/) | **배포되는 스택 YAML 4개가 전부 여기** — 파일명 = 스택명 | 4개 스택 |
+
+**앱 이름은 모든 축에서 `back` / `front` 로 같다** — 디렉터리 · 패키지명 · 워크플로 · 스택 · 서비스 DNS · 이미지 · 서버 env 파일. 한 축을 알면 나머지를 파일을 열지 않고 안다 ([`docs/deploy.md`](docs/deploy.md) 이름 규칙표).
 
 **문서 경계** — 같은 내용을 두 곳에 쓰지 않는다.
 
 | 문서 | 담당 |
 |---|---|
-| [`README.md`](README.md) | 사실·사용법 (스택, 실행법, 환경변수, 명령어) |
-| **이 문서** | 규약·금지·함정 (AI 행동 지침) |
-| [`.claude/rules/code-patterns.md`](.claude/rules/code-patterns.md) | 코드 규약 상세 + 실측 카운트 |
+| [`README.md`](README.md) | 저장소 지도·퀵스타트. 앱별 사실·사용법은 **앱의 `README.md`** |
+| **이 문서** | 공통 규약·금지·함정 |
+| `apps/<앱>/CLAUDE.md` | **그 앱의** 규약·금지·함정 |
+| [`.claude/rules/`](.claude/rules/) | 코드 규약 상세 + 실측 카운트 (앱별 path-scoped) |
 | [`docs/deploy.md`](docs/deploy.md) | 배포 구성·흐름·롤백·리버스 프록시·상태 확인 |
 | [`docs/lessons.md`](docs/lessons.md) | 작업 방식의 누적 교훈 |
-| [`docs/tasks/*.md`](docs/tasks/) | 진행 상황·결정 근거 |
+| [`docs/tasks/*.md`](docs/tasks/) | 진행 상황·결정 근거 (완료분은 `archive/`) |
 | `docs/handoff/*.md` | 세션 스냅샷 (PreCompact 훅 자동 생성, git 미추적) |
 
 **진행 상황·완료 이력·커버리지 수치를 이 문서에 쓰지 않는다.** 두 곳에 두면 반드시 어긋난다.
 
-**핸드오프는 정본이 아니다.** 컨텍스트 소실을 막는 임시 스냅샷이다. 살릴 내용은 다음 세션에서 `docs/tasks/`로 옮기고 스냅샷은 지운다 — 진행 상황의 정본은 항상 `docs/tasks/`다.
+**핸드오프는 정본이 아니다.** 살릴 내용은 다음 세션에서 `docs/tasks/` 로 옮기고 스냅샷은 지운다.
 
-**분할 임계치** — 과분할도 문제다. `docs/` 루트 md가 8개를 넘으면 카테고리 디렉터리로, `docs/tasks/`가 6개를 넘으면 완료분을 `docs/tasks/archive/`로 옮긴다.
+**분할 임계치** — `docs/` 루트 md 가 8개를 넘으면 카테고리 디렉터리로, `docs/tasks/` 가 6개를 넘으면 완료분을 `docs/tasks/archive/` 로 옮긴다.
 
-🚫 **이 문서에 작업 상태를 쓰지 않는다.** 진행 중인 태스크 이름·문서 개수·완료 여부는 전부 상태이고, 상태는 바뀌는 순간 이 문서를 거짓말쟁이로 만든다. 여기에는 **규칙만** 둔다 — 무엇을 하고, 무엇을 하지 말고, 어떤 기준으로 판단하는가. 상태는 `docs/tasks/`가 소유한다.
+🚫 **이 문서에 작업 상태를 쓰지 않는다.** 진행 중인 태스크 이름·문서 개수·완료 여부는 전부 상태이고, 상태는 바뀌는 순간 이 문서를 거짓말쟁이로 만든다. 여기에는 **규칙만** 둔다. 상태는 `docs/tasks/` 가 소유한다.
 
 ---
 
@@ -33,21 +45,24 @@
 
 | 트리거 | 즉시 읽을 파일 |
 |---|---|
-| **모든 `src` 작업** (신규 모듈·API·테스트) | `.claude/rules/code-patterns.md` — **path-scoped rule 이라 `src`·`test`·`scripts` 의 `.ts` 를 읽는 순간 자동 로드된다.** 이 행은 주입이 안 됐을 때의 폴백이다 |
+| **`apps/back` 작업** (신규 모듈·API·테스트) | [`apps/back/CLAUDE.md`](apps/back/CLAUDE.md) + `.claude/rules/back-code-patterns.md` |
+| **`apps/front` 작업** (페이지·라우트 핸들러·설정) | [`apps/front/CLAUDE.md`](apps/front/CLAUDE.md) + `.claude/rules/front-code-patterns.md` |
 | **결정의 근거 확인 · 진행 중인 작업 파악 · `.claude/` 설정·훅·문서 구조 변경** | `docs/tasks/` 를 `ls` 해서 주제에 맞는 파일을 연다. **파일명이 주제를 설명해야 한다** — 개별 파일을 이 표에 등재하지 않는 이유다 |
 | 대규모 리팩터링 착수 전 · 사용자 교정 직후 | `docs/lessons.md` (검토 후 새 교훈 append) |
-| **배포·인프라·Swarm·Caddy·롤백** | `docs/deploy.md` |
-| 빌드 설정·Dockerfile·CI 변경 | `docs/deploy.md` + `docs/lessons.md` + `Dockerfile` COPY 블록 주석 |
-| 세션 재개 · `/compact` 직후 맥락 복구 | `docs/handoff/` 최신 스냅샷 — PreCompact 훅이 남긴다. 없으면 생략 |
-| 계획서·버그 리포트 작성 | `.claude/templates/plan.md` · `bugfix.md` — **이 저장소는 로컬 사본이 SSOT**(개인 글로벌 사본은 쓰지 않는다) |
+| **배포·인프라·Swarm·Caddy·롤백·워크플로** | `docs/deploy.md` |
+| 빌드 설정·Dockerfile·CI 변경 | `docs/deploy.md` + `docs/lessons.md` + 해당 앱의 `Dockerfile` COPY 블록 주석 |
+| 세션 재개 · `/compact` 직후 맥락 복구 | `docs/handoff/` 최신 스냅샷. 없으면 생략 |
+| 계획서·버그 리포트 작성 | `.claude/templates/plan.md` · `bugfix.md` — **이 저장소의 로컬 사본이 SSOT** |
+
+`.claude/rules/*` 는 **path-scoped rule 이라 해당 앱의 파일을 읽는 순간 자동 로드된다.** 위 두 행은 주입이 안 됐을 때의 폴백이다.
 
 **면제**: 단일 한 줄 수정, 단순 정보 조회, 1회성 명령 실행.
 
-**인프라·배포 작업 전에는 `docs/tasks/` 를 먼저 훑는다.** `docs/deploy.md` 는 정상 상태를 기술하고, **전환 중인 사항은 태스크 파일이 소유**한다. 표에 개별 파일명을 적어두면 그 파일이 끝날 때마다 이 문서를 고쳐야 하므로 적지 않는다.
+**인프라·배포 작업 전에는 `docs/tasks/` 를 먼저 훑는다.** `docs/deploy.md` 는 정상 상태를 기술하고, **전환 중인 사항은 태스크 파일이 소유**한다.
 
 ---
 
-## Never — 어떤 경우에도 하지 않는다
+## Never — 어떤 경우에도 하지 않는다 (두 앱 공통)
 
 | 금지 | 이유 |
 |---|---|
@@ -55,19 +70,16 @@
 | Caddyfile·`.env`·인프라 식별 정보(도메인·IP·서버 경로·네트워크 이름)를 저장소에 커밋 | 공개 저장소 노출 |
 | **외부 API 요청·응답 본문을 로그에 남기기** | 로그 수집 스택이 공유 자원이고 인제스트 한도가 낮다. 토큰 수·모델명·소요시간만 남긴다 |
 | 고카디널리티 값(`userId` `requestId` `url`)을 로그 **레이블**로 승격 | 인덱스가 폭증해 공유 중인 조회 성능 전체가 느려진다 |
-| 인메모리 변수·타이머로 공유 상태 관리 | 레플리카 3개 — 레플리카별로 갈린다. Redis 를 쓴다 |
+| 인메모리 변수·타이머로 공유 상태 관리 | **두 앱 모두 레플리카 3개다.** 레플리카별로 갈린다 — Redis 를 쓴다 |
 | 레이트리밋·카운터를 메모리 스토리지로 | 실효 한도가 3배가 된다 |
 | liveness 헬스체크에 외부 의존 검사 추가 | 의존 장애가 재시작 루프와 배포 롤백을 유발한다 |
 | `any` · `@ts-ignore` 등 타입 억제 | eslint 가 error 로 막는다. 불가피하면 disable + **사유 주석** |
-| E2E 에서 `AppModule` import | 부팅만으로 외부 시스템에 붙는다. `createE2eApp()` 을 쓴다 |
 | 사용자 지시 없는 `git commit` · `push` | auto mode 에서도 금지 |
-| DB 마이그레이션 **실행** | 전 환경이 동일 DB — 모든 실행이 곧 상용 적용. AI 는 파일 작성까지만 |
 
-**근거의 유효기간** — 위 금지 중 셋은 현재 환경 가정에 의존한다. 가정이 바뀌면 **규칙을 재검토한다**(바뀌기 전까지는 그대로 지킨다). 근거가 사라진 규칙을 근거 없이 계속 지키면, 정작 중요한 금지의 신뢰도가 같이 떨어진다.
+**근거의 유효기간** — 위 금지 중 둘은 현재 환경 가정에 의존한다. 가정이 바뀌면 **규칙을 재검토한다**(바뀌기 전까지는 그대로 지킨다).
 
 - 인메모리 상태·메모리 레이트리밋 금지 ← **레플리카 3개**. 1개로 줄면 근거가 소멸한다.
 - 외부 API 본문 로깅 금지 ← **공유 로그 스택의 낮은 인제스트 한도**. 한도가 오르거나 전용 스택이 되면 재검토.
-- 마이그레이션 실행 금지 ← **전 환경 동일 DB**. 환경별 DB가 분리되면 재검토. (2026-09-02 자체 호스팅 전환 때 재검토했고 **유지** — 인스턴스 1대 공유, D1)
 
 ## Ask — 실행 전 사용자 승인
 
@@ -78,58 +90,42 @@
 | 파일·디렉터리 삭제, 비가역 변경 | |
 | 새 의존성 추가 | 기존 스택으로 안 풀리는지 먼저 확인 |
 | API 계약 변경 (상태코드·에러코드) | 프론트 대응 필요 여부까지 커밋 본문에 명시 |
-| 마이그레이션 실행 요청 | 작성은 AI, 실행은 담당자. **완료 조건에서 분리해 명시** |
+| 마이그레이션 실행 요청 | 작성은 AI, 실행은 담당자 — [`apps/back/CLAUDE.md`](apps/back/CLAUDE.md) |
 
 ---
 
 ## Commands
 
-전체 목록은 [`README.md`](README.md) 가 SSOT. 작업 시 쓰는 것만:
+전체 목록은 [`README.md`](README.md) 가 SSOT. 앱 상세는 앱의 `README.md`.
 
-- 검증: **`pnpm ci:core`**(lint → test → build). PR 직전 **`pnpm ci:all`**(+ 스텁 검사 + E2E)
-- 실행: `pnpm dev` → `localhost:5501/api/v2` · Swagger `/api/v2/docs`
-- ⚠️ jest 30 에서 `--testPathPattern`(단수)은 동작하지 않는다. **복수형** `--testPathPatterns` 를 쓴다.
-- DB: 로컬 개발도 **운영 DB 를 터널로** 쓴다(`scripts/db-tunnel.sh`, README). 마이그레이션은 **파일 작성까지** — `pnpm migration:run` 은 사람이 `nerd_migrator` 로
+- **루트에서 앱을 부른다** — `pnpm back <script>` · `pnpm front <script>` (각각 `pnpm --filter nerd-back|nerd-front` 의 별칭). 앱 디렉터리로 `cd` 하는 절차를 문서에 쓰지 않는다
+- 검증: **`pnpm ci:core`**(두 앱) · 한 앱만 볼 때 `pnpm back ci:core`. PR 직전 **`pnpm ci:all`**
+- 실행: `pnpm back dev` → `localhost:5501/api/v2` · `pnpm front dev` → `localhost:5502`
+- 설치는 **루트에서 `pnpm install`** 한 번. 앱별 lockfile 을 쓴다(`sharedWorkspaceLockfile: false`) — 한 앱의 의존성 변경이 다른 앱 배포를 트리거하지 않게 하려는 결정이다
 
-## Key Patterns (요약)
-
-> 상세와 실측 카운트는 [`.claude/rules/code-patterns.md`](.claude/rules/code-patterns.md) 에 있다.
-> **이 7줄이 그 파일과 겹치는 것은 의도된 것이다** — rule 은 `.ts` 를 읽을 때 로드되므로, 설계·계획 단계(코드를 아직 안 만진 시점)에는 이 요약이 유일한 출처다. 지운다면 그 단계가 비게 된다.
-
-- **계층**: Repository 클래스 없음(Service 가 `@InjectRepository` 직접). **외부 시스템은 반드시 Port 경유**
-- **응답**: `{ code, data, message }` 객체 리터럴 직접 반환. 전역 인터셉터 없음. 상태코드는 정석 REST
-- **에러**: `defineDomainError` → 전역 필터가 `{ code, message, timestamp }` 로 통일. 바디에 `statusCode` 없음
-- **검증**: `createGlobalValidationPipe()` 하나를 프로덕션·E2E 가 공유 — **이 파일만 고친다**
-- **테스트**: mock 주력. E2E 는 외부 의존 없이 돈다
-- **외부 의존**: 죽어도 앱은 기동·응답한다. 레이트리밋은 fail-open, 비용 카운터는 fail-closed. **DB 만 예외** — 핵심 의존이라 못 붙으면 부팅 실패 + Swarm 무제한 재시작
-- **DB**: 옵션은 `typeorm.options.ts` 한 곳 · `synchronize` 금지 · 시각은 `DATETIME(3)`(`TIMESTAMP` 금지) · 앱 계정에 DDL 없음 · 테스트는 `forbid-db` 매퍼가 접속을 막는다
-
-## Common Pitfalls to Avoid
+## Common Pitfalls — 두 앱 공통
 
 1. **전역 필터·인터셉터는 예외 케이스를 만든다** — "모든 응답을 통일한다"를 예외 없이 적용하면 헬스체크 진단 결과처럼 형식을 바꿔선 안 되는 응답이 망가진다. 추가·수정 시 통과 케이스를 테스트로 고정한다 ([lessons](docs/lessons.md)).
-2. **로컬 빌드 성공 ≠ 컨테이너 빌드 성공** — 로컬 입력은 레포 전체, 컨테이너 입력은 `COPY` 목록뿐이다. 빌드 진입 설정을 바꾸면 같은 커밋에서 `Dockerfile` 을 확인한다. `ci:all` 은 이 종류를 못 잡아 CI 에 ARM64 빌드 검증 job 을 따로 뒀다.
-3. **`tsconfig.json` paths 와 `jest.config.js` moduleNameMapper 는 세트다** — 한쪽만 고치면 해당 alias 를 쓰는 테스트만 조용히 깨진다.
-4. **`reflect-metadata` 는 테스트에서도 필요하다** — `main.ts` 에서만 import 하면 spec 이 `Reflect.getMetadata is not a function` 으로 터진다. jest `setupFiles` 에 들어 있다.
-5. **에러 경로 테스트는 status·code 를 정확히 고정한다** — 느슨하게 받으면 그 차이가 곧 방어의 유무일 때 테스트가 조용히 무력해진다.
-6. **부팅 시 `LegacyRouteConverter: Unsupported route path: "/api/v2/*"` 경고 2줄은 무해하다** — `setGlobalPrefix` + `app.use()` 조합에서 Nest 11 이 Express 5 의 구 와일드카드 문법으로 등록하며 내는 경고다. 실측으로 helmet 헤더 6종·gzip·Swagger CSP 제외가 모두 정상 적용됨을 확인했다. **쫓지 말 것.**
-7. **로그를 추가할 때 발생 빈도를 먼저 재라** — 재시도하는 외부 의존의 이벤트 핸들러는 트래픽 0에서도 로그를 쌓는다. `createLogThrottle` 로 감싸고, 요청 0건 유휴 60초 측정으로 검증한다.
-8. **Caddy `route` 안에서는 작성 순서가 곧 평가 순서다** — matcher 없는 `handle { }`(catch-all)이 위에 있으면 그 아래 블록은 절대 도달하지 않는다. `route` 밖에서는 구체성 순으로 정렬되므로 이 함정이 없다. **`route` 안인지 밖인지를 먼저 확인한다** (전례: `/api/v2/*` 요청이 이웃 프로젝트로 흘러감).
-9. **HEALTHCHECK 은 stack YAML 한 곳에만** — Dockerfile 에도 두면 stack 이 덮어써서 어느 쪽이 동작하는지 헷갈린다.
-10. **jest `setupFiles` 안에서 `process.env` 를 대입해도 V8 에는 닿지 않는다** — 샌드박스 env 복사본에만 쓰인다. TZ 같은 프로세스 전역은 `jest.config.js`·`test/jest-e2e.js` **상단**에서 고정하고, `test/setup/setup-tz.ts` 는 고정이 아니라 **가드**다. 되돌리면 테스트가 KST 로 조용히 돌아간다 ([lessons 2026-09-02](docs/lessons.md)).
-11. **Swarm 태스크의 `docker_gwbridge` IP 는 컨테이너 `inspect` 에 안 나온다** — `docker network inspect docker_gwbridge` 에서 컨테이너 ID 로 역조회한다. Go 템플릿은 키가 없으면 `<no value>` 문자열을 내므로 **비어 있지 않음을 성공으로 믿지 않는다** (`scripts/db-tunnel.sh`).
+2. **로컬 빌드 성공 ≠ 컨테이너 빌드 성공** — 로컬 입력은 레포 전체, 컨테이너 입력은 그 앱 `Dockerfile` 의 `COPY` 목록뿐이다. 빌드 진입 설정을 바꾸면 같은 커밋에서 `Dockerfile` 을 확인한다. `ci:all` 은 이 종류를 못 잡아 CI 에 ARM64 빌드 검증 job 을 따로 뒀다. **모노레포 전환에서 실제로 이 함정에 걸렸다.**
+3. **HEALTHCHECK 은 stack YAML 한 곳에만** — Dockerfile 에도 두면 stack 이 덮어써서 어느 쪽이 동작하는지 헷갈린다.
+4. **Caddy `route` 안에서는 작성 순서가 곧 평가 순서다** — matcher 없는 `handle { }`(catch-all)이 위에 있으면 그 아래 블록은 절대 도달하지 않는다. `route` 밖에서는 구체성 순으로 정렬되므로 이 함정이 없다. **`route` 안인지 밖인지를 먼저 확인한다** (전례: `/api/v2/*` 요청이 이웃 프로젝트로 흘러감).
+5. **배포 워크플로의 `paths` 는 교집합이 0이어야 한다** — 겹치면 한 커밋에 두 스택이 뜬다. 반대로 **CI 의 `paths` 는 넓게** 잡는다(검증이 안 도는 것이 더 위험하다). 화이트리스트를 고칠 때 [`docs/deploy.md`](docs/deploy.md) 의 「무엇을 바꾸면 무엇이 뜨는가」 표를 같이 고친다.
+6. **로그를 추가할 때 발생 빈도를 먼저 재라** — 재시도하는 외부 의존의 이벤트 핸들러는 트래픽 0에서도 로그를 쌓는다. 요청 0건 유휴 60초 측정으로 검증한다.
+7. **부팅 실패를 로그 시각으로 진단하지 않는다** — 백엔드는 `bufferLogs: true` 라 부팅 구간 로그가 마지막 순간에 한꺼번에 찍힌다. 소요 시간은 컨테이너 `StartedAt`/`FinishedAt` 으로 잰다 ([lessons 2026-09-03](docs/lessons.md)).
 
 ## Git & 커밋 컨벤션
 
-- 형식: **`type(scope): 한국어 설명`** — type: `feat` `fix` `refactor` `test` `docs` `chore`
-- 한 커밋 = 한 의도. 포맷팅 전용 변경과 행위 변경을 섞지 않는다.
-- **본문에 "왜"를 남긴다.** 제목이 "무엇"이면 본문이 "왜"다. revert 는 본문에 원인 1줄 필수.
-- API 계약이 바뀌면 본문에 명시한다.
+- 형식: **`type(scope): 한국어 설명`** — type: `feat` `fix` `refactor` `test` `docs` `chore` `ci`
+- **scope 는 앱·영역을 가리킨다**: `back` · `front` · `infra`(공유 스택) · `ci`(워크플로) · `repo`(루트 설정·`.claude/`) · `docs`. 세부 모듈은 제목 본문에 쓴다
+- **한 커밋이 두 scope 에 걸치면 커밋을 나눈다.** 한 커밋 = 한 의도. 포맷팅 전용 변경과 행위 변경을 섞지 않는다
+- **본문에 "왜"를 남긴다.** 제목이 "무엇"이면 본문이 "왜"다. revert 는 본문에 원인 1줄 필수
+- API 계약이 바뀌면 본문에 명시한다
 
-## Definition of Done (이 프로젝트)
+## Definition of Done (이 저장소)
 
 글로벌 DoD 에 더해:
 
-1. **`pnpm ci:core` 통과** — 에러 0건, 경고 수를 늘리지 않는다. PR 직전 `pnpm ci:all`
+1. **`pnpm ci:core` 통과** — 에러 0건, 경고 수를 늘리지 않는다. 한 앱만 바꿨으면 `pnpm back|front ci:core` 로 좁혀도 되지만 **루트 설정을 건드렸으면 두 앱 모두** 돌린다. PR 직전 `pnpm ci:all`
 2. **변경 심볼 grep 전수 확인** — 호출처를 빠뜨리지 않았음을 증거로 제시
 3. **결정이 바뀌면 코드보다 태스크 문서를 먼저 고친다**
 4. 검증 못 한 경로는 **"미검증"으로 명시** — 빌드 통과를 동작 검증으로 포장하지 않는다
