@@ -474,7 +474,28 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 
 ### Step 7 — GitHub · 서버 (사용자)
 
-- [ ] **머지 전** 서버·GitHub 준비 — 「시크릿 · 서버 디렉터리」 전환 순서 1~3 (옛 `nerd/` 격리 → 새 트리 + env `cp` → `DEPLOY_DIR` 등록). **이게 안 돼 있으면 머지 직후 4개 배포가 전부 scp 에서 실패한다** (떠 있는 서비스는 무사)
+- [x] **머지 전 서버·GitHub 준비 완료 (2026-09-03, 사용자 실행)** — 전환 순서 1~3
+  - `docker stack ls` 에 `prod_nerd` 없음 확인 후 옛 디렉터리를 `_deprecated_nerd_20260901/` 로 격리 (app·redis YAML 2개 보존)
+  - 새 트리 `<DEPLOY_DIR>/{stacks,env}` 생성 · `stacks/` 는 비어 있음(CI 가 채운다)
+  - env 3개 `cp -p` 후 `chmod 600` — `prod_nerd_back.env` 230B · `prod_nerd_front.env` 157B · `prod_nerd_db` 167B, 전부 `-rw-------`. **원본 3개는 옛 위치에 그대로** 남아 롤백 경로가 유지된다
+  - `DEPLOY_DIR` 시크릿 등록 (Environment `PROD` → 10개, 머지 후 2개 삭제하면 9개)
+  - ⚠️ 옛 `prod_nerd_db`(664)의 **원본 권한은 그대로**다. 사본만 600 이 됐다 — 원본도 `chmod 600` 권장(별건)
+
+#### 머지 시 DB·Redis 에 무슨 일이 일어나는가 — 2026-09-03 검증
+
+배포 워크플로 4개가 모두 돌지만 **DB·Redis 는 재시작하지 않는다.** 근거를 하나씩 확인했다.
+
+| 확인 | 결과 |
+|---|---|
+| `infra/mysql/init-users.sh` 가 `origin/main` 과 동일한가 | **byte 동일** (diff 0). Swarm config 는 **불변**이라 내용이 바뀌면 `docker stack deploy` 가 실패한다(이름에 `-v1` 이 붙은 이유). 내용이 같으면 기존 config 를 그대로 재사용한다 |
+| `docker-stack.db.yml` diff | **주석 2줄만**(아카이브 경로 갱신). 파싱 후 사라지므로 서비스 스펙 동일 → 재시작 없음 |
+| `docker-stack.redis.yml` diff | **변경 0줄.** 워크플로 파일이 바뀌어 트리거만 된다 |
+| YAML 이 요구하는 `${VAR}` ↔ 워크플로가 넘기는 값 | 4개 스택 전부 **누락 없음** — back/front `REGISTRY_URL·IMAGE_TAG·OVERLAY_NETWORK·ENV_FILE_PATH`, db `OVERLAY_NETWORK·MYSQL_DATA_DIR`, redis `OVERLAY_NETWORK` |
+| named volume | 스택명이 안 바뀌어 `prod_nerd_db_mysql-data` · `prod_nerd_cache_redis-data` 그대로 → **데이터 경계 이동 없음** |
+| 파일을 옮긴 것이 떠 있는 서비스에 영향을 주는가 | **아니다.** `docker stack deploy` 는 배포 시점에 compose 를 읽어 스펙을 Swarm raft 에 굳힌다. `env_file` 도 CLI 가 그때 읽는다 — 실행 중 서비스는 디스크의 파일을 참조하지 않는다 |
+| `deploy-db` 사전 점검(노드 라벨 · Swarm secret 3개 · `MYSQL_DATA_DIR` 경로) | 무변경. 이전 배포에서 통과했으므로 그대로 통과할 것 (**머지 후 실측 필요**) |
+
+**재배포되는 것은 back·front 뿐이다** — 코드는 그대로지만 커밋 SHA 가 바뀌어 이미지 태그가 달라진다. 롤링 재배포 1회씩이다.
 - [ ] PR 리뷰 → 머지 → **배포 워크플로 4개 실행 관찰**. 백엔드는 [`deploy.md` 폴링](../deploy.md) 으로 실측(다운타임 허용이지만 재본다), 프론트는 `docker ps --filter label=com.docker.stack.namespace=prod_nerd_front` healthy 3/3, db·redis 는 재시작 없음(`docker service ps` 의 시작 시각 유지) · `ls -R <DEPLOY_DIR>/stacks` 에 파일 4개 + `mysql/`
 - [ ] **머지 후** 전환 순서 5~6 — 옛 시크릿 2개 삭제 · 옛 디렉터리·env 격리(한 달 뒤 삭제). `tasks-stack-rename.md` 절차 11 도 이때 함께 닫힌다
 - [ ] 프론트 Caddy 블록·DNS — `tasks-frontend-cicd.md` Step 6 이 소유 (이 문서의 완료 조건이 아니다)
