@@ -17,7 +17,8 @@
 | 컨테이너 포트 | 백엔드 **5501** · 프론트 **5502** — 둘 다 호스트 publish 없음 |
 | 이미지 | 멀티스테이지, `linux/arm64` 단독, 태그 = 커밋 short SHA. 이름 `prod_nerd_back` · `prod_nerd_front`(`_app` 접미사 없음) |
 | 네트워크 | 기존 overlay 에 `external: true` 로 참여 |
-| 노드 배치 | 라벨 제약 — `prod_nerd_back=1` · `prod_nerd_front=1` · `prod_nerd_redis=1` · `prod_nerd_db=1` (규칙: `prod_<프로젝트>_<역할>`) |
+| 클러스터 | Swarm 노드 **3개** (2026-09-03 확인 — `monitor_shared_*` 가 global 3/3, Redis 옛 태스크가 다른 노드에서 종료된 이력) |
+| 노드 배치 | 라벨 제약 — `prod_nerd_back=1` · `prod_nerd_front=1` · `prod_nerd_redis=1` · `prod_nerd_db=1` (규칙: `prod_<프로젝트>_<역할>`). **네 라벨이 전부 매니저 노드 하나에만 붙어 있어 우리 태스크는 모두 그 노드에 뜬다** |
 | 리버스 프록시 | Caddy — 프론트 도메인의 `/api/v2/*` → `prod_nerd_back_app:5501`, 나머지(catch-all) → `prod_nerd_front_app:5502` |
 | 저장소 | 모노레포 — `apps/back` · `apps/front` · 공유 `infra/` |
 | GitHub Environment | `PROD` (시크릿 **9개**) |
@@ -125,7 +126,14 @@ restart_policy:  on-failure · delay 10s · **무제한** — DB 없이는 부�
 stop_grace_period: 30s
 ```
 
-레플리카 3개를 두는 이유가 이것이다. 단일 노드에서도 **무중단 배포**가 된다.
+레플리카 3개를 두는 이유가 이것이다. 우리 스택이 **한 노드에 모여 있어도 무중단 배포**가 된다.
+
+### ⚠️ 스모크 테스트·사전 점검은 "태스크가 매니저 노드에 있다"에 의존한다
+
+클러스터는 노드 3개인데, 배포 워크플로는 **매니저에 SSH 해서 `docker ps` 로 컨테이너를 찾는다.** `docker ps` 는 그 노드의 컨테이너만 본다. 지금 동작하는 이유는 네 라벨이 전부 매니저 노드에 붙어 있어 태스크가 항상 거기 뜨기 때문이고, **구조적 보장이 아니다.**
+
+- 🚫 **라벨을 다른 노드에 추가하거나 `placement` 제약을 풀지 않는다.** 태스크가 다른 노드로 가면 매니저의 `docker ps` 가 컨테이너를 못 찾아 **성공한 배포가 실패로 보고**된다. `deploy-db` 의 데이터 경로 검사(`[ -d "$MYSQL_DATA_DIR" ]`)도 같은 이유로 매니저에서만 유효하다.
+- 다중 노드로 퍼뜨릴 필요가 생기면 스모크를 **노드 무관**으로 바꿔야 한다 — 서비스 DNS 를 거치거나(`tasks.<서비스>`), `docker service ps` 로 노드를 찾아 그 노드에서 실행하거나, 프록시를 경유한 도메인 폴링으로 대체한다.
 
 ⚠️ Redis·MySQL 은 `order: stop-first` 다. named volume 에 두 컨테이너가 동시에 붙을 수 없어 교체 순간 짧은 공백이 있다. Redis 공백 동안 앱은 레이트리밋만 축소 모드(fail-open)로 돌고 HTTP 는 계속 응답한다. MySQL 공백 동안 DB 를 쓰는 요청은 실패한다 — 앱이 DB 를 쓰기 시작하면 이 문장의 실제 영향을 재측정한다.
 
@@ -244,7 +252,7 @@ docker volume inspect prod_nerd_db_mysql-data --format '{{.Options}}'   # device
 - `start_period` 30s + `interval` 15s + `retries` 3 → 새 태스크가 healthy 로 판정되는 시점과 프록시가 업스트림을 다시 보는 시점이 어긋날 수 있다
 - 프록시는 `tasks.<서비스>` DNS 로 붙는다 — Swarm DNS 가 내려가는 태스크를 목록에서 빼는 타이밍과 실제 종료 사이에 공백이 생길 수 있다
 - `enableShutdownHooks()` 가 진행 중인 요청을 실제로 다 마치는지는 재봐야 안다
-- 단일 노드에 replicas 3 이므로 리소스 경합으로 새 태스크 기동이 느려질 수 있다
+- 한 노드에 replicas 3 이 모여 있으므로 리소스 경합으로 새 태스크 기동이 느려질 수 있다
 
 배포를 시작하기 **직전에** 켠다. 성공은 조용하고 **비정상만 찍히며**, 끝나면 스스로 판정한다 — 200 이 흐르는 화면을 눈으로 세지 않는다.
 

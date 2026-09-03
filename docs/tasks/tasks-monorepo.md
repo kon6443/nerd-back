@@ -1,7 +1,7 @@
 # Task Tracker: 프론트 합류 — pnpm 워크스페이스 모노레포 전환
 
-> **상태**: **Step 0~6 완료 (2026-09-03) — 저장소 작업 끝. 남은 것은 Step 7~8(사용자).**
-> 브랜치 `feat/monorepo` 에 커밋 12개. **머지 전에 서버 트리 준비 + `DEPLOY_DIR` 등록이 필요하다** — 안 하면 머지 직후 배포 4개가 모두 scp 단계에서 실패한다(떠 있는 서비스는 무사).
+> **상태**: **머지·배포 완료 (2026-09-03). 운영 확인까지 끝.** 남은 것은 **정리 3건** — 옛 시크릿 2개 삭제 · 옛 stack 디렉터리 격리 · 프론트 저장소 아카이브.
+> 배포 커밋 `c58d3fc`(PR #17) · 백엔드·프론트 각 3/3 `(healthy)` · readiness `redis: up` `db: up` · **DB·Redis 무재시작 확정**(각 23시간·7일 전 태스크 유지) · 프론트 `deploymentId` = 이미지 태그.
 > **2026-09-03 재결정**: 사용자가 다운타임을 허용하고 "모노레포에 맞게 깔끔하게" 를 택해 **D5 를 바꿨다** — 프론트 전용 시크릿 2개 추가(A안) 대신 **경로 시크릿을 `DEPLOY_DIR` 하나로 통합**하고 서버 디렉터리를 **파일명 = 스택명** 트리로 재구성한다. 아래 「시크릿 · 서버 디렉터리」절.
 > **작성일**: 2026-09-03
 > **대상 브랜치**: `feat/monorepo` (`main` a187787 기준으로 분기)
@@ -495,8 +495,31 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 | `deploy-db` 사전 점검(노드 라벨 · Swarm secret 3개 · `MYSQL_DATA_DIR` 경로) | 무변경. 이전 배포에서 통과했으므로 그대로 통과할 것 (**머지 후 실측 필요**) |
 
 **재배포되는 것은 back·front 뿐이다** — 코드는 그대로지만 커밋 SHA 가 바뀌어 이미지 태그가 달라진다. 롤링 재배포 1회씩이다.
-- [ ] PR 리뷰 → 머지 → **배포 워크플로 4개 실행 관찰**. 백엔드는 [`deploy.md` 폴링](../deploy.md) 으로 실측(다운타임 허용이지만 재본다), 프론트는 `docker ps --filter label=com.docker.stack.namespace=prod_nerd_front` healthy 3/3, db·redis 는 재시작 없음(`docker service ps` 의 시작 시각 유지) · `ls -R <DEPLOY_DIR>/stacks` 에 파일 4개 + `mysql/`
-- [ ] **머지 후** 전환 순서 5~6 — 옛 시크릿 2개 삭제 · 옛 디렉터리·env 격리(한 달 뒤 삭제). `tasks-stack-rename.md` 절차 11 도 이때 함께 닫힌다
+- [x] **PR 머지 → 배포 4개 실행 완료 (2026-09-03)** — 아래 「배포 실측」
+- [ ] **머지 후** 전환 순서 5~6 — 옛 시크릿 2개 삭제 · 옛 stack 디렉터리 격리(한 달 뒤 삭제). `tasks-stack-rename.md` 절차 11 도 이때 함께 닫힌다. **스모크가 통과했으므로 진행 가능**
+
+#### 배포 실측 (2026-09-03, 커밋 `c58d3fc`)
+
+| 확인 | 결과 |
+|---|---|
+| 백엔드 | `prod_nerd_back_app` **3/3 `(healthy)`** · 이미지 `prod_nerd_back:c58d3fc` |
+| 프론트 | `prod_nerd_front_app` **3/3 `(healthy)`** · 이미지 `prod_nerd_front:c58d3fc` |
+| 태스크 ERROR 열 | **전부 비어 있음** — 재시도 없이 한 번에 수렴 |
+| 롤링 | 레플리카 하나씩 교체 (`.3` → `.1`·`.2`, 약 1분 간격) — `parallelism: 1` + `delay 5s` 대로 |
+| **DB 무재시작** | `prod_nerd_db_mysql.1` **Running 23시간 전** (배포는 9분 전) ✅ |
+| **Redis 무재시작** | `prod_nerd_cache_redis.1` **Running 7일 전** ✅ |
+| readiness | **200** `{"status":"ok","info":{"redis":{"status":"up"},"db":{"status":"up"}}}` |
+| 서버 파일 | `<DEPLOY_DIR>/stacks/` 에 `prod_nerd_back.yml` · `prod_nerd_front.yml` · `prod_nerd_db.yml` · `prod_nerd_cache.yml` + `mysql/init-users.sh` — **파일명 = 스택명 규약 성립** |
+| 워크플로 4개 실행 | 서버 파일 mtime 이 db·redis 16:32 / 앱 16:33 — 넷이 모두 돌았고 앱이 나중 |
+| 로컬 `pnpm back dev` | 터널 자동 연결 → DB 연결 확인 (사용자 실측) → **터널 자동화의 SSH 경로도 확정** |
+| 프론트 `deploymentId` | **`c58d3fc`** — 이미지 태그와 일치. 롤링 중 version skew 방어 실효 |
+
+**digest 대조가 이번 배포의 핵심 증거다.** 백엔드는 `sha256:3e3dbec0…`(`55f9424`) → `sha256:3f254d04…`(`c58d3fc`) 로 바뀌었다 — DB 재시도 수정이 `database.module.ts` 를 바꿨으니 맞다. 반대로 그 이전 `b03db92` 와 `55f9424` 는 **태그가 다른데 digest 가 같다**(둘 다 `3e3dbec0`) — 그 사이 변경이 이미지에 안 들어가는 파일(터널 스크립트·문서)이었기 때문이다. 즉 이 저장소에서 digest 비교가 의미 있게 동작하고, 이번 변경이 의도한 것 하나에서 나왔음이 확인된다.
+
+**경로 화이트리스트가 운영에서 검증됐다.** 백엔드가 `55f9424` → `c58d3fc` 로 바로 갔다. 그 사이 `a187787`(PR #16, 문서만)은 **배포를 트리거하지 않았다.**
+
+**프론트 `deploymentId` = `c58d3fc` 확인 (2026-09-03)** — 이미지 태그와 일치하므로 롤링 중 version skew 방어가 실효한다.
+처음 준 검증 명령(`printenv DEPLOYMENT_VERSION`)은 **틀렸다**: `ARG`/`ENV` 가 builder 스테이지에만 있어 런타임에는 없는 것이 정상이다. 확인은 산출물에서 한다 — `require('/app/.next/required-server-files.json').config.deploymentId` 또는 응답 HTML 의 `dpl=`. 로컬 이미지로 방법을 먼저 증명한 뒤(`printenv` 없음 · 산출물 `local` · HTML `dpl=local`) 운영에 물었다. [lessons 2026-09-03](../lessons.md) 등재.
 - [ ] 프론트 Caddy 블록·DNS — `tasks-frontend-cicd.md` Step 6 이 소유 (이 문서의 완료 조건이 아니다)
 - [ ] `kon6443/nerd-front` 정리 (사용자) — (1) ~~`feat/frontend-skeleton` → `main` 머지~~ **완료됨** (PR #3 · 2026-09-01 · `1aa9484`) (2) `README.md` 맨 위에 "이 저장소는 `kon6443/nerd-back` 의 `apps/front` 로 이동했다 (2026-09-xx)" 1줄 커밋 (3) Settings → **Archive this repository**. 삭제하지 않는다 — 이력·시크릿 이름·이슈가 남아야 나중에 대조할 수 있고, 아카이브는 되돌릴 수 있다
 
@@ -556,7 +579,9 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 
 - **무엇이 어떻게 바뀌었는가**: 백엔드를 `apps/back` 으로 옮기고 프론트 저장소를 subtree 로 `apps/front` 에 합쳐 pnpm 워크스페이스(앱별 lockfile)로 만들었다. 워크플로를 2개 → 6개로 나눠 **바꾼 앱만 빌드·배포**하게 했고, 서버 경로 시크릿 2개를 `DEPLOY_DIR` 하나로 줄이고 서버 파일을 **파일명 = 스택명** 트리로 재구성했다. 규약 문서는 공통(루트 137줄)과 앱 고유로 나눴다. **앱 코드·Dockerfile 내용·스택 YAML·스택명·서비스 DNS·이미지 이름·노드 라벨은 바뀌지 않았다** — 유일한 행위 변경은 별도 커밋의 DB 재시도 결함 수정이다.
 - **어떻게 동작을 확인했는가**: 루트 `pnpm ci:core` 두 앱 통과(백엔드 11 suites · 67 tests + 빌드, 프론트 lint·typegen·tsc·빌드). 두 앱 모두 `apps/<앱>` 컨텍스트로 **ARM64 이미지 빌드 후 실기동** — 프론트는 헬스체크 exit 0 · `/api/health` 200 · `/` 200 · 정적 자산 200 · `HOSTNAME=0.0.0.0` 주입 확인, 백엔드는 env 검증 단계까지 도달(DB 없이는 설계상 부팅 실패). standalone `server.js` 가 최상위인 것을 확인해 `outputFileTracingRoot` 의 실효를 증명했다. 배포 4개 `paths` 는 glob 을 정규식으로 바꿔 `git ls-files` 전수에 매칭해 **교집합 0**(추적 123개 중 트리거 86개, 중복 0). 마크다운 링크 23개 파일 전수 검사에서 깨진 링크 0. 이력은 `git log --follow` 로 백엔드 파일이 이어지는 것과 프론트 원본 커밋 12개가 남은 것을 확인했다.
-- **미검증**: GitHub Actions 에서의 실제 실행(러너·시크릿·캐시 scope)과 운영 배포. 머지해야 확정된다. path-scoped rule 의 자동 주입은 다음 세션에서 확인한다.
+- **머지 후 확정 (2026-09-03)**: Actions 4개 실행 · 배포 성공 · 앱 3/3 healthy · readiness `db: up` · **DB·Redis 무재시작** · 서버 파일 규약 성립 · 로컬 터널 자동화 동작. 상세는 위 「배포 실측」.
+- **여전히 미확정**: path-scoped rule 의 자동 주입(다음 세션) · 프론트 도메인 Caddy 블록(`tasks-frontend-cicd.md` Step 6).
+- **배포로 드러난 사실**: 클러스터가 **노드 3개**다. 문서·워크플로 주석이 "단일 노드" 를 전제하고 있었고, 스모크 테스트가 "태스크가 매니저 노드에 있다"에 조용히 의존한다는 것을 이때 발견해 `deploy.md` 와 `deploy-db.yml` 주석을 고쳤다 ([lessons 2026-09-03](../lessons.md)).
 
 ## Lessons
 
