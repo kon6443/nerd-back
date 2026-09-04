@@ -1,3 +1,5 @@
+import { API_PREFIX } from '@nerd/contracts';
+
 /**
  * 전역 라우트 prefix. Swagger·헬스체크 경로 계산의 기준이다.
  *
@@ -5,10 +7,10 @@
  *    그 스크립트는 TS 빌드 밖이라 이 상수를 import 할 수 없다.
  *    불일치를 막기 위해 `app.constants.spec.ts` 가 두 값을 대조한다.
  *
- * `api/v2` 인 이유: 지금은 이웃 프로젝트와 도메인을 공유하므로 경로 네임스페이스가
- * 겹치지 않아야 한다. 전용 도메인으로 분리하면 재검토한다.
+ * **정의는 `@nerd/contracts` 가 소유한다** — 프론트가 같은 값으로 URL 을 만들므로 한 곳에만 둔다.
+ * 여기서는 기존 import 경로를 유지하기 위해 재수출한다.
  */
-export const API_PREFIX = 'api/v2';
+export { API_PREFIX };
 
 /** liveness — 외부 의존을 검사하지 않는다. Swarm healthcheck 와 리버스 프록시가 이 경로를 본다. */
 export const HEALTH_PATH = `/${API_PREFIX}/health`;
