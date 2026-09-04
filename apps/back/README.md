@@ -140,10 +140,10 @@ pnpm test:e2e
 pnpm ci:core             # lint → test → build
 pnpm ci:all              # + 타입 검사 + 스텁 검사 + E2E  (PR 전 필수)
 
-pnpm migration:show                                # 적용/미적용 목록
-pnpm migration:generate src/migrations/<PascalName> # 엔티티 diff 로 파일 생성 (실행 아님)
-pnpm migration:run                                 # ⚠️ 사람만. 실행 = 상용 적용
-pnpm migration:revert                              # 마지막 1개 되돌림
+pnpm db:migrate:list                                 # ⚠️ 사람만. 적용/미적용 목록 — 읽기 전용이 아니다
+pnpm db:migrate:generate src/migrations/<PascalName> # ⚠️ 사람만. 엔티티 diff 로 파일 생성 (적용은 아님)
+pnpm db:migrate:up                                   # ⚠️ 사람만. 실행 = 상용 적용
+pnpm db:migrate:revert                               # ⚠️ 사람만. 마지막 1개 되돌림
 ```
 
 ### 마이그레이션 — 실행은 사람이
@@ -151,14 +151,15 @@ pnpm migration:revert                              # 마지막 1개 되돌림
 전 환경이 같은 DB 라 **실행이 곧 상용 적용**이다. AI 는 파일 작성까지만 한다 (`CLAUDE.md`).
 
 ```bash
-cp apps/back/.env.migration.example apps/back/.env.migration   # DB_USER=nerd_migrator (DDL 권한). 비밀번호는 비밀번호 관리자
+apps/back/.env 의 DB_MIGRATION_USER/DB_MIGRATION_PASSWORD 를 채운다  # nerd_migrator (DDL 권한). 비밀번호는 비밀번호 관리자
 pnpm back db:tunnel:ensure                    # 터널 보장 (백그라운드). 포트는 .env 의 DB_PORT
-#                                               ⚠️ .env.migration 의 DB_PORT 도 같은 값이어야 한다
-pnpm back migration:show                      # 무엇이 적용될지 먼저 본다
-pnpm back migration:run
+#                                               ⚠️ 앱과 같은 .env 를 쓰므로 DB_PORT 는 한 곳뿐이다
+pnpm db:migrate:list                          # 무엇이 적용될지 먼저 본다
+pnpm db:migrate:up
 ```
 
-- 스크립트는 `pnpm build` 후 `dist/config/data-source.js` 로 TypeORM CLI 를 돌린다 (ts-node 미도입). 환경변수는 Node 의 `--env-file=.env.migration` 로 읽는다.
+- 스크립트는 `pnpm build` 후 `dist/config/data-source.js` 로 TypeORM CLI 를 돌린다 (ts-node 미도입). 환경변수는 Node 의 `--env-file=.env` 로 읽는다 — **앱과 같은 파일이지만 계정은 `DB_MIGRATION_*` 로 갈린다.**
+- ⚠️ **`db:migrate:list` 도 "조회" 가 아니다.** TypeORM 의 `migration:show` 는 `migrations` 테이블이 없으면 **먼저 `CREATE TABLE` 을 던진다.** 그래서 `DB_MIGRATION_*` 없이 돌리면 앱 계정으로 붙어 `ER_TABLEACCESS_DENIED_ERROR`(1142) 로 실패한다 (2026-09-04 실측). **네 명령 모두 사람이 실행한다.**
 - 마이그레이션은 **1개 = 1목적**, `down()` 필수, 멱등 작성 — MySQL 은 DDL 이 암묵 커밋이라 중간 실패 시 부분 적용 상태로 남는다. 상세는 `.claude/rules/back-code-patterns.md` §12.
 - 컬럼 시각은 `DATETIME(3)`. `TIMESTAMP` 는 쓰지 않는다 (§10).
 
