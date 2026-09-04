@@ -672,16 +672,34 @@ stack YAML 의 헬스체크가 상대경로(`node scripts/healthcheck.mjs`)라 �
 
 **미검증** — 실제 배포는 하지 않았다. 레지스트리 push·Swarm 롤링·스모크 테스트는 `main` 머지 시 CI 가 수행한다.
 
-**0-A. 백엔드 경계 + 공통 규약**
+### ✅ 0-A. 백엔드 공통 규약 (완료 2026-09-04)
 
-- [ ] `ImageGenerationPort` 인터페이스 + DI 토큰 — 🚫 **모델 식별자를 인터페이스에 노출하지 않는다**
-- [ ] `StoragePort` 인터페이스 + DI 토큰 (구현체 없이)
-- [ ] 스텁 어댑터 2종 (env 플래그, **기본 비활성**) — 프론트가 이걸로 전 플로우를 뚫는다
-- [ ] **B1** `src/common/__spec__/mock-repository.ts` 추출 + `story.service.spec.ts` 를 여기 쓰도록 정리
-- [ ] **B2** `src/entities/__spec__/entity.factory.ts` — 4원칙 적용, `story.service.spec.ts` 의 인라인 캐스팅 제거
-- [ ] **B3** `@ApiSuccessResponse(Dto)` 제네릭 데코레이터 + Slice 1 의 응답 DTO 3개를 이걸로 정리
-- [ ] **B4** `ErrorCode` 유니온 타입
-- [ ] 검증: `pnpm back ci:core` — B1·B2 정리 후에도 기존 spec 이 **같은 것을 검증하는지** 확인
+- [x] **B1** `common/__spec__/mock-repository.ts` — `createMockRepository` + `asRepository`. 로컬 스텁 정의 **0건**
+- [x] **B2** `entities/__spec__/entity.factory.ts` — 4원칙. 엔티티 인라인 캐스팅 **0건**
+- [x] **B3** `@ApiSuccessResponse(DataDto, { isArray })` — 응답 DTO 상속 보일러플레이트 **0건**(3개 제거)
+- [x] **B4** `defineDomainError` 의 `code` 를 **contracts 의 `DomainErrorCode` 유니온**으로 좁혔다
+- [x] 검증: `pnpm back ci:all` — 단위 **90**(+5) · E2E **32**(+1) · 경고 0
+
+#### B4 가 실제로 강제한다
+
+타입을 좁히자마자 **테스트 픽스처의 가짜 코드(`SAMPLE_NOT_FOUND`)가 컴파일 에러로 걸렸다.** 계약에
+테스트 값을 넣을 수는 없으므로, 필터 spec 은 `ApiErrorResponseDto` 를 직접 상속한 픽스처로 바꿨다 —
+필터가 분기하는 기준이 원래 그것이라 오히려 더 정확한 테스트가 됐다. 팩토리 자체는 새 spec 이 맡는다.
+
+이제 **새 도메인 에러를 만들려면 contracts 에 먼저 넣어야 한다.** 안 그러면 프론트가 그 분기의 존재를
+모르는 채로 배포되는데, 그걸 문서가 아니라 컴파일러가 막는다.
+
+#### ⚠️ Port 2종은 **미룬다** — 첫 소비자와 함께 만든다
+
+계획에는 `ImageGenerationPort`·`StoragePort` 인터페이스와 스텁 어댑터가 있었지만 빼기로 했다.
+
+**근거는 실측이다.** 유일한 Port 인 `llm.port.ts` 는 뼈대 때 "구현체는 나중에, 지금은 경계만" 으로
+만들어졌고 **2026-09-04 현재 참조 0건**이다. 소비자 없이 만든 인터페이스는 검증되지 않고, 실제
+어댑터를 붙일 때 형태가 안 맞아 결국 다시 쓴다. 0-B 에서 세운 「첫 사용처 없이 만들지 않는다」가
+백엔드에도 그대로 적용된다.
+
+→ **Slice 3(StoragePort)·Slice 4(ImageGenerationPort)에서 어댑터와 함께 만든다.**
+스텁 어댑터도 마찬가지다 — 프론트에 개인화 화면이 아직 없어 지금 만들면 아무도 쓰지 않는다.
 
 ### ✅ 0-B. 프론트 기반 (완료 2026-09-04)
 
