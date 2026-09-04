@@ -1,29 +1,21 @@
 import { HttpStatus } from '@nestjs/common';
-import type { ObjectLiteral, Repository } from 'typeorm';
+import {
+  type MockRepository,
+  asRepository,
+  createMockRepository,
+} from '@common/__spec__/mock-repository';
 import { ApiErrorResponseDto } from '@common/dto/api-error.dto';
+import {
+  createStoryCharacter,
+  createStoryPage,
+  createStoryPageCharacter,
+  createStoryTemplate,
+} from '@entities/__spec__/entity.factory';
 import type { StoryCharacter } from '@entities/story-character.entity';
 import type { StoryPage } from '@entities/story-page.entity';
 import type { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { STORY_TEMPLATE_STATUS, type StoryTemplate } from '@entities/story-template.entity';
 import { StoryService } from './story.service';
-
-/**
- * 실 DB 에 붙지 않는다 — `forbid-db` 매퍼가 어떤 경로로든 접속을 막는다 (code-patterns §9).
- * 여기서 검증하는 것은 **조회 조건과 응답 매핑**이지 SQL 이 아니다.
- */
-type RepoStub<T extends ObjectLiteral> = {
-  find: jest.Mock;
-  findOneBy: jest.Mock;
-  countBy: jest.Mock;
-} & Partial<Repository<T>>;
-
-function repoStub<T extends ObjectLiteral>(): RepoStub<T> {
-  return {
-    find: jest.fn(),
-    findOneBy: jest.fn(),
-    countBy: jest.fn(),
-  } as RepoStub<T>;
-}
 
 /**
  * 에러 경로는 code 와 status 를 **정확히** 고정한다 (code-patterns §9).
@@ -47,33 +39,30 @@ async function expectDomainError(
   expect(domainError.getStatus()).toBe(status);
 }
 
-const PUBLISHED_TEMPLATE = {
-  id: 7,
-  slug: 'little-red-riding-hood',
-  title: '빨간 모자',
-  summary: '숲을 지나 할머니 댁으로',
-  coverImageKey: 'covers/lrrh.png',
-  status: STORY_TEMPLATE_STATUS.PUBLISHED,
-} as StoryTemplate;
+const PUBLISHED_TEMPLATE = createStoryTemplate({ id: 7 });
 
+/**
+ * 실 DB 에 붙지 않는다 — `forbid-db` 매퍼가 어떤 경로로든 접속을 막는다 (code-patterns §9).
+ * 여기서 검증하는 것은 **조회 조건과 응답 매핑**이지 SQL 이 아니다.
+ */
 describe('StoryService', () => {
-  let templates: RepoStub<StoryTemplate>;
-  let pages: RepoStub<StoryPage>;
-  let characters: RepoStub<StoryCharacter>;
-  let pageCharacters: RepoStub<StoryPageCharacter>;
+  let templates: MockRepository<StoryTemplate>;
+  let pages: MockRepository<StoryPage>;
+  let characters: MockRepository<StoryCharacter>;
+  let pageCharacters: MockRepository<StoryPageCharacter>;
   let service: StoryService;
 
   beforeEach(() => {
-    templates = repoStub<StoryTemplate>();
-    pages = repoStub<StoryPage>();
-    characters = repoStub<StoryCharacter>();
-    pageCharacters = repoStub<StoryPageCharacter>();
+    templates = createMockRepository<StoryTemplate>();
+    pages = createMockRepository<StoryPage>();
+    characters = createMockRepository<StoryCharacter>();
+    pageCharacters = createMockRepository<StoryPageCharacter>();
 
     service = new StoryService(
-      templates as unknown as Repository<StoryTemplate>,
-      pages as unknown as Repository<StoryPage>,
-      characters as unknown as Repository<StoryCharacter>,
-      pageCharacters as unknown as Repository<StoryPageCharacter>,
+      asRepository(templates),
+      asRepository(pages),
+      asRepository(characters),
+      asRepository(pageCharacters),
     );
   });
 
@@ -127,8 +116,8 @@ describe('StoryService', () => {
       templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
       pages.countBy.mockResolvedValue(12);
       characters.find.mockResolvedValue([
-        { role: 'wolf', displayName: '늑대' },
-        { role: 'protagonist', displayName: '빨간 모자' },
+        createStoryCharacter({ role: 'wolf', displayName: '늑대' }),
+        createStoryCharacter({ id: 12, role: 'protagonist', displayName: '빨간 모자' }),
       ]);
 
       const result = await service.getPublishedDetail('little-red-riding-hood');
@@ -173,19 +162,17 @@ describe('StoryService', () => {
 
     it('본문·개인화 대상 배역·대화 가능 캐릭터를 매핑한다', async () => {
       templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
-      pages.findOneBy.mockResolvedValue({
-        id: 31,
-        pageNo: 3,
-        bodyText: '늑대가 숲에서 빨간 모자를 만났습니다.',
-        baseImageKey: 'pages/lrrh-3.png',
-        personaTargetRole: 'protagonist',
-      });
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ pageNo: 3, baseImageKey: 'pages/lrrh-3.png' }),
+      );
       pageCharacters.find.mockResolvedValue([
-        {
-          hitbox: { x: 0.4, y: 0.55, width: 0.2, height: 0.3 },
-          character: { role: 'wolf', displayName: '늑대' },
-        },
-        { hitbox: null, character: { role: 'protagonist', displayName: '빨간 모자' } },
+        // 이 테스트는 `character` 관계를 실제로 쓰므로 명시한다 — 팩토리 기본값은 UNSET 이다.
+        createStoryPageCharacter({ character: createStoryCharacter() }),
+        createStoryPageCharacter({
+          id: 102,
+          hitbox: null,
+          character: createStoryCharacter({ id: 12, role: 'protagonist', displayName: '빨간 모자' }),
+        }),
       ]);
 
       const result = await service.getPublishedPage('little-red-riding-hood', 3);
