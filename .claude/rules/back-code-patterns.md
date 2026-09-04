@@ -8,11 +8,11 @@ paths:
 # 코드 패턴 (SSOT)
 
 > **이 파일은 위 `paths` 의 파일을 읽는 순간 자동으로 컨텍스트에 로드된다.** 라우팅 표를 기억하는 것에 의존하지 않는다.
-> 최종 확인일: **2026-09-04** · 근거: `src` 전체 **50개 `.ts`**(spec 12개 포함) + `test` 실측. 각 규약에 사용 카운트를 병기한다.
+> 최종 확인일: **2026-09-04** · 근거: `src` 전체 **54개 `.ts`**(spec 13개 포함) + `test` 실측. 각 규약에 사용 카운트를 병기한다.
 > **용도**: 새 코드를 "이 프로젝트 모양"으로 쓰기 위한 규약. 신규 모듈·API·테스트 작성 **전에** 해당 섹션을 확인한다.
 > **경계**: 여기는 *코드를 어떻게 쓰는가*. 금지·함정은 [`CLAUDE.md`](../../CLAUDE.md), 사실·사용법은 [`README.md`](../../README.md), 작업 방식의 교훈은 [`docs/lessons.md`](../../docs/lessons.md).
 
-규모 참고: 컨트롤러 2 · 모듈 6 · Port 1 · 엔티티 4 · 마이그레이션 1 · 도메인 에러 정의 6 · 단위 spec 12 · E2E spec 5.
+규모 참고: 컨트롤러 2 · 모듈 6 · Port 1 · 엔티티 4 · 마이그레이션 1 · 도메인 에러 정의 6 · 단위 spec 13 · E2E spec 6 · `__spec__` 헬퍼 2.
 뼈대 + DB 연결 + **첫 도메인 모듈(`story`)** 까지 완료.
 
 ---
@@ -22,6 +22,9 @@ paths:
 - **Controller → Service → TypeORM `Repository<Entity>`** 2계층. 별도 Repository 클래스를 만들지 않는다 (`class *Repository` **0건**).
 - Service 가 `@InjectRepository(Entity)` 로 직접 주입받는다. TypeORM 의 `Repository<T>` 가 이미 리포지토리이므로 한 겹 더 감싸지 않는다.
 - **외부 시스템은 반드시 Port 를 거친다** (`src/common/port/`, **1건**). 서비스가 SDK 를 직접 들지 않는다.
+  - ⚠️ **Port 를 첫 소비자보다 먼저 만들지 않는다.** 유일한 Port 인 `llm.port.ts` 는 뼈대 때 "경계만 먼저"
+    로 만들어졌고 2026-09-04 현재 **참조 0건**이다(실측). 소비자 없이 만든 인터페이스는 검증되지 않고,
+    실제 어댑터를 붙일 때 형태가 안 맞아 결국 다시 쓰게 된다. **어댑터를 붙이는 슬라이스에서 함께 만든다.**
 - 서비스가 커지면 계층을 늘리지 말고 **협력 서비스로 옆으로 분리**한다.
 
 ### 3계층 전환 트리거
@@ -47,7 +50,11 @@ return { code: SUCCESS_CODE, data: result, message: '' };
 ```
 
 - 응답 인터셉터를 두지 않는다. 컨트롤러가 리터럴을 반환한다.
-- `ApiSuccessResponseDto` 상속 DTO 는 **Swagger 명세용 타입 선언 전용**이다. `new` 로 만들어 반환하지 않는다.
+- Swagger 성공 응답은 **`@ApiSuccessResponse(DataDto, { isArray })`** 로 붙인다 (`common/decorators/`).
+  🚫 엔드포인트마다 `class XxxResponseDto extends ApiSuccessResponseDto` 를 만들지 않는다 — 쓰이지 않는
+  클래스가 엔드포인트 수만큼 늘고 봉투 형태가 바뀌면 전부 고쳐야 한다. 제네릭은 런타임에 지워지므로
+  데코레이터가 `allOf` + `getSchemaPath` 로 잇는다. `test/swagger.e2e-spec.ts` 가 그 연결을 고정한다.
+- `data` 로 쓰는 DTO 는 **명세용 타입 선언 전용**이다. `new` 로 만들어 반환하지 않는다.
 - HTTP 상태는 정석 REST 를 따른다. 생성은 201, 본문 없음은 204. **성공을 전부 200 으로 통일하지 않는다.**
 
 ## 3. 에러 — `defineDomainError` 팩토리
@@ -64,7 +71,12 @@ throw new SessionNotFoundErrorResponseDto();                  // 기본 메시�
 throw new SessionNotFoundErrorResponseDto('만료되었습니다.');   // override
 ```
 
-- 정의는 `defineDomainError` 로만 한다 (**4건**). code 가 한 곳에 모여 프론트와의 계약이 흔들리지 않는다.
+- 정의는 `defineDomainError` 로만 한다 (**6건**). code 가 한 곳에 모여 프론트와의 계약이 흔들리지 않는다.
+- ⭐ **`code` 의 타입은 `@nerd/contracts` 의 `DomainErrorCode` 유니온이다.** 새 에러를 만들려면 먼저
+  contracts 의 `DOMAIN_ERROR_CODES` 에 넣어야 컴파일된다 — 안 그러면 프론트가 그 분기의 존재를 모르는
+  채로 배포된다. **계약을 문서가 아니라 컴파일러가 강제한다.**
+  - 그래서 **테스트용 가짜 코드를 만들 수 없다.** 필터처럼 코드와 무관한 것을 검증할 때는
+    `ApiErrorResponseDto` 를 직접 상속해 픽스처를 만든다 (`http-exception.filter.spec.ts`).
 - 도메인 에러는 각 모듈의 `dto/*.error.dto.ts` 에, 공통 에러는 `common/dto/common-error.dto.ts` 에 둔다.
 - 전역 `HttpExceptionFilter` 가 **4단 분기**로 통일한다:
   1. `ApiErrorResponseDto` → DTO 의 code·message·details
@@ -195,6 +207,15 @@ export class StoryPageParamsDto extends createZodDto(storyPageParamsSchema) {}
 전 환경이 동일 DB 를 공유하는 구성이라 테스트가 DB 에 접속하지 않는다. **도구가 막는다** — 두 jest 설정의 `moduleNameMapper` 가 `mysql2` 를 `test/setup/forbid-db.ts`(던지는 스텁)로 바꿔, 어떤 경로로든 `DataSource.initialize()` 에 도달하면 이유·대안을 담아 즉시 실패한다. 양쪽 설정에 같은 매퍼가 있어야 하고 `forbid-db.spec.ts` · `forbid-db.e2e-spec.ts` 가 각각 고정한다.
 
 - 단위 spec 은 소스 옆에 `*.spec.ts`. 헬퍼·팩토리는 `__spec__/` 안에 두고 커버리지 분모에서 제외한다.
+- **Repository 스텁은 `@common/__spec__/mock-repository` 를 쓴다.** 🚫 spec 마다 따로 만들지 않는다 —
+  메서드 하나를 새로 쓸 때 여러 파일을 고치게 된다. 주입은 `asRepository(mock)` 로 (이중 캐스팅을 반복하지 않는다).
+- **엔티티는 `@entities/__spec__/entity.factory` 로 만든다.** 4원칙:
+  1. 관계 프로퍼티는 **`UNSET`**(`undefined as never`) — **접근하면 터지는 게 의도다.** 로드하지 않은
+     관계를 쓰는 테스트가 즉시 드러난다. 관계가 필요하면 `overrides` 로 **명시**해 의존을 보이게 한다
+  2. 시각은 **`FIXED_DATE`**. 🚫 `new Date()` 를 쓰면 결과가 실행 시점에 따라 흔들린다
+  3. 🚫 **엔티티 전체를 캐스팅하지 않는다**(`{...} as Entity`). 필드가 빠져도 컴파일러가 못 잡는다.
+     팩토리는 캐스팅 없이 타입을 만족하므로 **컬럼이 늘면 팩토리에서 먼저 깨진다**
+  4. 차이는 `overrides: Partial<T>` 로만 표현한다
 - **E2E 는 `AppModule` 을 import 하지 않는다.** `test/helpers/e2e-app.ts` 의 `createE2eApp()` 을 쓴다. 부팅만으로 외부 시스템에 붙는 것을 막고, CI 에서 외부 의존 없이 돌아가게 한다.
 - E2E 도 **프로덕션과 같은 전역 파이프·필터**를 붙인다. 다르면 통과가 아무것도 보증하지 않는다.
 - 에러 경로는 status·code 를 **정확히 고정**한다. `expect([403, 404]).toContain(status)` 같은 느슨한 단정은 그 차이가 곧 방어의 유무일 때 테스트를 조용히 무력화한다.
@@ -260,10 +281,10 @@ dateKeyInTimeZone(nowUtc(), KST);  // '2026-08-27'  ← 일별 집계 키
 ## 신규 기능 체크리스트
 
 **신규 HTTP 엔드포인트**
-- [ ] 에러를 `defineDomainError` 로 정의해 throw 하는가? (§3)
+- [ ] 에러를 `defineDomainError` 로 정의해 throw 하는가? 새 code 를 **contracts 에 먼저 넣었는가**? (§3)
 - [ ] 응답을 `{ code, data, message }` 리터럴로 반환하는가? (§2)
 - [ ] 상태코드가 정석 REST 인가? 생성 201, 본문 없음 204 (§2)
-- [ ] Swagger: `@ApiOperation` + 응답 DTO + 공통 에러 데코레이터 (§2)
+- [ ] Swagger: `@ApiOperation` + **`@ApiSuccessResponse(DataDto)`** + 공통 에러 데코레이터 (§2)
 - [ ] 입력 스키마를 `@nerd/contracts` 에 두고 `createZodDto` 로 감쌌는가? (§4)
 - [ ] 응답 DTO 가 contracts 타입을 `implements` 하는가? — 계약이 어긋나면 컴파일이 깨진다 (§4)
 - [ ] 폴링되는 경로면 `@SkipThrottle(SKIP_ALL_THROTTLERS)` + `LOG_IGNORED_PATHS` (§5, §6)
@@ -281,6 +302,7 @@ dateKeyInTimeZone(nowUtc(), KST);  // '2026-08-27'  ← 일별 집계 키
 
 **신규 엔티티**
 - [ ] `src/entities/` 에 두었는가? 모든 컬럼에 `@Column({ name })` 를 명시했는가? (§13)
+- [ ] `entities/__spec__/entity.factory.ts` 에 팩토리를 **같은 커밋에서** 추가했는가? (§9)
 - [ ] 외부에 노출할 식별자를 자동증가 `id` 와 분리했는가? (§13)
 - [ ] 민감 컬럼에 `select: false` 를 걸었는가? (§13)
 - [ ] 마이그레이션 파일을 **같은 커밋에** 넣었는가? 멱등하고 `down()` 이 있는가? (§12)
