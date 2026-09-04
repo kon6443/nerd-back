@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -14,16 +15,24 @@ const nextConfig: NextConfig = {
   output: "standalone",
 
   /**
-   * 트레이싱(그리고 standalone 산출물)의 기준 디렉터리를 **이 앱으로 못박는다.**
+   * 빌드 루트. **레포 루트다** (2026-09-04 에 `__dirname` 에서 바꿨다).
    *
-   * Next 는 기준을 lockfile 위치로 추론하는데, pnpm 워크스페이스는 앱별 lockfile 과
-   * **별개로 루트에도 `pnpm-lock.yaml` 을 만든다**(2026-09-03 실측). 추론에 맡기면 기준이
-   * 저장소 루트가 되어 산출물이 `.next/standalone/apps/front/server.js` 로 한 단계 깊어지고,
-   * `CMD ["node", "server.js"]` 와 `COPY .next/static` 이 조용히 어긋난다.
+   * ⚠️ 이름은 "트레이싱"이지만 **Turbopack 의 모듈 해석 경계이기도 하다.** 이 값을
+   * `apps/front` 로 두면 앱 디렉터리 **밖**의 워크스페이스 패키지를 해석하지 못해
+   * `Module not found: Can't resolve '@nerd/contracts'` 로 **빌드가 실패한다**
+   * (2026-09-04 실측). 공유 패키지를 쓰는 한 이 값은 레포 루트여야 한다.
    *
-   * 컨테이너 빌드 컨텍스트는 `apps/front` 뿐이라 이 값이 곧 빌드 루트다.
+   * 🚫 그 대가로 산출물이 `.next/standalone/apps/front/server.js` 로 한 단계 깊어진다.
+   * **Dockerfile 의 COPY·WORKDIR 이 이 구조에 맞춰져 있으니 이 값을 바꾸면 거기도 고친다.**
+   *
+   * 추론에 맡기지 않고 명시하는 이유는 그대로다: pnpm 워크스페이스는 앱별 lockfile 과
+   * 별개로 루트에도 `pnpm-lock.yaml` 을 만들어(2026-09-03 실측) 추론 결과가 흔들린다.
+   *
+   * 참고 — `@nerd/contracts` 자체는 Next 가 서버 번들에 인라인하므로 standalone 의
+   * node_modules 에는 없다(컨테이너 실측: `require.resolve` 실패, 페이지는 정상 동작).
+   * 즉 이 설정이 필요한 이유는 **트레이싱이 아니라 해석**이다.
    */
-  outputFileTracingRoot: __dirname,
+  outputFileTracingRoot: path.join(__dirname, '..', '..'),
 
   /**
    * 배포 식별자. CI 가 커밋 short SHA 를 주입한다 (이미지 태그와 같은 값).
