@@ -11,14 +11,20 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "lint": "eslint \"src/**/*.ts\"",
     "check:types": "tsc -p tsconfig.json --noEmit",
-    "ci:core": "pnpm run build",
-    "ci:all": "pnpm run build"
+    "ci:core": "pnpm run lint && pnpm run build",
+    "ci:all": "pnpm run lint && pnpm run build",
+    "prepare": "pnpm run build"
   },
   "dependencies": {
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "@eslint/js": "^9.18.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^10.1.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.25.0"
   }
 }
