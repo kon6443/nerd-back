@@ -1,3 +1,4 @@
+import { HttpException } from '@nestjs/common';
 import type { ArgumentMetadata, PipeTransform } from '@nestjs/common';
 import { storyPageParamsSchema } from '@nerd/contracts';
 import { createZodDto } from 'nestjs-zod';
@@ -71,16 +72,49 @@ describe('createGlobalValidationPipe', () => {
     expect(error.details).toEqual([expect.stringContaining('count: ')]);
   });
 
-  it('nestjs-zod DTO 가 아니면 막는다 ⭐', () => {
+  describe('스키마 미선언 방어 ⭐', () => {
     // strictSchemaDeclaration. "검증한다고 생각했는데 안 하고 있었다" 를 도구가 잡게 한다.
+    //
+    // ⚠️ **원시 타입도 막힌다.** `@Param('slug') slug: string` 처럼 쓰면 400 이 아니라 500 이다.
+    //    빌드·부팅·타입체크로는 안 잡히고 **첫 요청에서** 드러나므로, 각 형태를 여기서 고정한다.
     class PlainDto {
       name: string;
     }
 
-    const error = run({ name: 'a' }, { type: 'body', metatype: PlainDto });
+    const cases: Array<[string, ArgumentMetadata]> = [
+      ["@Param('slug') slug: string", { type: 'param', data: 'slug', metatype: String }],
+      ["@Query('page') page: number", { type: 'query', data: 'page', metatype: Number }],
+      ['@Body() body (타입 없음)', { type: 'body' }],
+      ['@Body() body: PlainDto', { type: 'body', metatype: PlainDto }],
+    ];
 
-    expect(error).toBeInstanceOf(Error);
-    expect(error).not.toBeInstanceOf(ApiErrorResponseDto);
+    it.each(cases)('%s → 막는다', (_label, meta) => {
+      const error = run({ name: 'a' }, meta);
+
+      expect(error).toBeInstanceOf(Error);
+      // 사용자 입력 문제가 아니라 개발자 실수다 — 검증 실패(400)와 구분되어야 한다.
+      expect(error).not.toBeInstanceOf(ApiErrorResponseDto);
+    });
+
+    it('HttpException 이 아니다 — 개발자용 메시지가 응답으로 새지 않게 ⭐', () => {
+      // 전역 필터 3단은 HttpException 의 message 를 **응답 바디에 그대로 싣는다**.
+      // 여기서 HttpException 을 던지면 내부 구조·파일 경로가 클라이언트로 나간다.
+      // 일반 Error 여야 4단이 받아 고정 메시지만 내보내고 스택은 로그에만 남는다.
+      const error = run({ name: 'a' }, { type: 'param', data: 'slug', metatype: String });
+
+      expect(error).not.toBeInstanceOf(HttpException);
+    });
+
+    it('메시지가 원인과 고칠 방법을 담는다 ⭐', () => {
+      // 이 메시지는 로그(스택)로만 나간다. 없으면 500 의 원인이 어디에도 남지 않는다.
+      const error = run({ name: 'a' }, { type: 'param', data: 'slug', metatype: String });
+      const message = (error as Error).message;
+
+      expect(message).toContain('검증 스키마가 선언되지 않았다');
+      expect(message).toContain('@Param');
+      expect(message).toContain('String');
+      expect(message).toContain('createZodDto');
+    });
   });
 
   describe('다른 zod 인스턴스로 만든 스키마 ⭐', () => {
