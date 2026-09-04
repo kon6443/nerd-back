@@ -1,0 +1,24 @@
+{
+  "name": "@nerd/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "프론트·백이 공유하는 검증 스키마와 타입. 이 패키지가 API 계약의 SSOT 다.",
+  "license": "UNLICENSED",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check:types": "tsc -p tsconfig.json --noEmit",
+    "ci:core": "pnpm run build",
+    "ci:all": "pnpm run build"
+  },
+  "dependencies": {
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

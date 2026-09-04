@@ -8,8 +8,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "back": "pnpm --filter nerd-back",
-    "front": "pnpm --filter nerd-front",
+    "back": "pnpm --filter nerd-back...",
+    "front": "pnpm --filter nerd-front...",
     "lint": "pnpm -r run lint",
     "ci:core": "pnpm -r run ci:core",
     "ci:all": "pnpm -r run ci:all"
