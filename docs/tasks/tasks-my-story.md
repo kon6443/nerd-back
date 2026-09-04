@@ -618,21 +618,34 @@ env 플래그로 붙이면, 모델이 정해지기 전에도 「촬영 → 대�
 
 기능이 아니라 **경계와 기반**이다. 이게 있어야 백/프가 병렬로 간다. 두 갈래가 서로 독립이라 동시에 진행할 수 있다.
 
-**0-C. 공유 패키지 — 0-A·0-B 보다 먼저** ⚠️
+### ✅ Slice 0-C-1 — 공유 패키지 + 검증 전면 교체 (완료 2026-09-04)
 
-D7 채택의 결과다. 앱 코드가 아니라 **저장소 구조**를 건드리므로 별도로 떼어 먼저 끝낸다.
+- [x] `packages/contracts` 생성 (zod 4) + `pnpm-workspace.yaml` 에 `packages/*` 추가
+- [x] `sharedWorkspaceLockfile: false` 재검토 — 원래 근거 절반이 소멸했음을 workspace 파일 주석에 기록하고 **유지**
+- [x] 루트 `back`·`front` 스크립트를 **`--filter <앱>...`** 로 — contracts 가 앱보다 먼저 빌드된다
+- [x] **검증 전면 교체 (D8)** — 전역 파이프 · `env.validation.ts` · `story-params.dto.ts` 를 zod 로. **class-validator·class-transformer 제거**
+- [x] 검증 실패 형식(`VALIDATION_FAILED` · 400 · `details` 배열) **유지** — spec 이 고정
+- [x] Swagger — `createZodDto` + `cleanupOpenApiDoc`. `test/swagger.e2e-spec.ts` 가 **파라미터가 실제로 생성되는지** 고정
+- [x] 응답 DTO 가 contracts 타입을 **`implements`** — 계약이 어긋나면 컴파일이 깨진다
+- [x] code-patterns §4 재작성 + `CLAUDE.md` 저장소 지도·Commands 갱신
+- [x] 검증: `pnpm ci:core` 통과(3 패키지) · `pnpm back ci:all` 통과(단위 80 · E2E 31) · **경고 0건**
 
-- [ ] **백엔드 검증 전면 교체 (D8)** — 전역 파이프 · `env.validation.ts` · `story-params.dto.ts` 를 스키마 기반으로. class-validator 제거
-- [ ] 🚫 검증 실패 응답 형식(`VALIDATION_FAILED` · 400 · `details`)을 **바꾸지 않는다.** 교체 전후로 같은 형식이 나오는지 E2E 로 고정
-- [ ] Swagger 요청 스키마 생성 경로 재설계 — **B3 과 함께**
-- [ ] code-patterns §4 를 **같은 커밋에서** 다시 쓴다
-- [ ] `packages/contracts` 생성 + `pnpm-workspace.yaml` 에 `packages/*` 추가
-- [ ] `sharedWorkspaceLockfile: false` 재검토 — workspace 파일 주석이 예고해 둔 항목이다
+⚠️ **작업 중 발견 — zod 인스턴스가 둘이다.** `sharedWorkspaceLockfile: false` 라 앱과 contracts 가
+각자 zod 를 설치한다(실측: 서로 다른 `.pnpm/zod@4.5.4`). 🚫 `instanceof ZodError` 로 판별하면
+**검증은 도는데 `details` 만 조용히 비는** 형태로 깨진다. 구조 판별로 우회했고 spec 이 고정한다.
+
+### Slice 0-C-2 — 빌드 컨텍스트 · 배포 워크플로 (미착수) ⚠️
+
+앱 코드가 아니라 **배포 구조**다. 0-C-1 과 커밋을 섞지 않는다 — 되돌릴 일이 생기면 통째로 되돌려야 한다.
+
 - [ ] 두 `Dockerfile` 의 **빌드 컨텍스트를 레포 루트로** 올리고 COPY 경로 전면 수정
 - [ ] 두 배포 워크플로 `paths` 에 `packages/contracts/**` 추가 + **교집합 0 규칙의 의도된 예외**임을 주석에 명시
 - [ ] `docs/deploy.md` 의 「무엇을 바꾸면 무엇이 뜨는가」 표 갱신
 - [ ] 프론트 `outputFileTracingRoot` 가 새 컨텍스트와 어긋나지 않는지 확인
 - [ ] 검증: **CI 의 ARM64 컨테이너 빌드 job 통과가 필수다.** `ci:all` 은 이 종류를 못 잡는다
+
+🚫 **이게 끝나기 전에는 배포하지 않는다.** 지금 `main` 에 머지하면 컨테이너 빌드가 `@nerd/contracts` 를
+찾지 못해 실패한다 — 로컬은 통과하는데 컨테이너만 깨지는, 루트 `CLAUDE.md` 함정 #2 그 자체다.
 
 **0-A. 백엔드 경계 + 공통 규약**
 
