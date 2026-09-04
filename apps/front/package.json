@@ -8,12 +8,15 @@
     "start": "next start -p ${PORT:-5502}",
     "lint": "eslint",
     "check:types": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "check:stubs": "node scripts/check-stubs.mjs",
     "check:health-path": "node scripts/check-health-path.mjs",
-    "ci:core": "pnpm run lint && pnpm run check:types && pnpm run build",
-    "ci:all": "pnpm run lint && pnpm run check:types && pnpm run check:stubs && pnpm run check:health-path && pnpm run build"
+    "ci:core": "pnpm run lint && pnpm run check:types && pnpm run test && pnpm run build",
+    "ci:all": "pnpm run lint && pnpm run check:types && pnpm run check:stubs && pnpm run check:health-path && pnpm run test && pnpm run build"
   },
   "dependencies": {
+    "@nerd/contracts": "workspace:*",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -26,7 +29,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   },
   "packageManager": "pnpm@10.26.2"
 }
