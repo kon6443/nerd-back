@@ -1,6 +1,7 @@
 import type { INestApplication, ModuleMetadata } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
+import cookieParser from 'cookie-parser';
 import { TerminusModule } from '@nestjs/terminus';
 import { DataSource } from 'typeorm';
 import { API_PREFIX, TRUST_PROXY_HOPS } from '@common/constants/app.constants';
@@ -55,6 +56,10 @@ export async function createE2eApp(options: E2eAppOptions = {}): Promise<INestAp
 
   // 프로덕션과 같은 상수를 쓴다 (근거는 TRUST_PROXY_HOPS 주석).
   app.set('trust proxy', TRUST_PROXY_HOPS);
+
+  // ⚠️ 프로덕션(`main.ts`)과 **같은 미들웨어**를 붙인다. 없으면 `req.cookies` 가 undefined 라
+  //    세션 인증 E2E 가 프로덕션과 다른 것을 검증하게 된다.
+  app.use(cookieParser());
 
   app.setGlobalPrefix(API_PREFIX);
   app.useGlobalPipes(createGlobalValidationPipe());

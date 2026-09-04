@@ -105,6 +105,24 @@ describe('createGlobalValidationPipe', () => {
       expect(error).not.toBeInstanceOf(HttpException);
     });
 
+    it('커스텀 데코레이터는 통과시킨다 ⭐', () => {
+      // @CurrentUser() 처럼 **서버가 넣는 값**은 클라이언트 입력이 아니라 검증할 스키마가 없다.
+      // 이 예외가 없으면 인증된 라우트가 전부 첫 요청에서 500 이 된다.
+      class FakeUser {
+        id: number;
+      }
+      const user = { id: 1 };
+
+      expect(run(user, { type: 'custom', metatype: FakeUser })).toBe(user);
+    });
+
+    it('커스텀이어도 ZodDto 면 검증한다 — 예외가 검증을 통째로 끄지 않는다 ⭐', () => {
+      const error = run({ name: 'a', count: 0 }, { type: 'custom', metatype: SampleDto });
+
+      expect(error).toBeInstanceOf(ApiErrorResponseDto);
+      expect((error as ApiErrorResponseDto).code).toBe('VALIDATION_FAILED');
+    });
+
     it('메시지가 원인과 고칠 방법을 담는다 ⭐', () => {
       // 이 메시지는 로그(스택)로만 나간다. 없으면 500 의 원인이 어디에도 남지 않는다.
       const error = run({ name: 'a' }, { type: 'param', data: 'slug', metatype: String });

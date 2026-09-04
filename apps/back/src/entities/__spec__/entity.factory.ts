@@ -2,6 +2,7 @@ import { StoryCharacter } from '../story-character.entity';
 import { StoryPageCharacter } from '../story-page-character.entity';
 import { StoryPage } from '../story-page.entity';
 import { STORY_TEMPLATE_STATUS, StoryTemplate } from '../story-template.entity';
+import { User } from '../user.entity';
 
 /**
  * 엔티티 팩토리.
@@ -72,5 +73,15 @@ export const createStoryPageCharacter = (
   characterId: 11,
   character: UNSET,
   hitbox: { x: 0.4, y: 0.55, width: 0.2, height: 0.3 },
+  ...overrides,
+});
+
+export const createUser = (overrides: Partial<User> = {}): User => ({
+  id: 1,
+  loginId: 'tester',
+  // 실제 해시와 **같은 형식**을 쓴다. 그럴듯한 문자열이 아니라 형식이 맞아야
+  // 파싱 경로를 지나는 테스트가 의미를 갖는다.
+  passwordHash: 'scrypt$16384$8$1$00000000000000000000000000000000$0000',
+  createdAt: FIXED_DATE,
   ...overrides,
 });

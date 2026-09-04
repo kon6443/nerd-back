@@ -97,6 +97,15 @@ class GlobalValidationPipe implements PipeTransform {
       return this.inner.transform(value, metadata);
     } catch (error) {
       if (error instanceof ZodSchemaDeclarationException) {
+        // ⚠️ **커스텀 파라미터 데코레이터는 예외다.** `@CurrentUser()` 처럼 값을 **서버가**
+        //    만들어 넣는 자리라 검증할 스키마가 없고, 클라이언트 입력이 아니라 막을 것도 없다.
+        //    이 예외가 없으면 인증된 라우트가 전부 첫 요청에서 500 이 된다(실측).
+        //
+        //    ZodDto 를 쓴 커스텀 데코레이터는 위 `inner.transform` 이 정상 검증하므로 여기 오지
+        //    않는다 — **검증을 원할 때는 여전히 검증된다.**
+        // 🚫 그래서 클라이언트 입력을 읽는 커스텀 데코레이터를 만들면 그 안에서 직접 검증한다.
+        if (metadata.type === 'custom') return value;
+
         throw new SchemaDeclarationError(
           `검증 스키마가 선언되지 않았다 — ${describeParam(metadata)}. ` +
             `스키마를 @nerd/contracts 에 두고 createZodDto 로 감싼 DTO 를 파라미터 타입으로 쓴다 ` +

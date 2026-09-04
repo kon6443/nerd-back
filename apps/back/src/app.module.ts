@@ -12,6 +12,7 @@ import { LoggerModule } from '@common/logger/logger.module';
 import { createGlobalValidationPipe } from '@common/pipes/global-validation-pipe';
 import { REDIS_CLIENT, RedisModule } from '@common/redis/redis.module';
 import { validateEnv } from '@config/env.validation';
+import { AuthModule } from '@modules/auth/auth.module';
 import { HealthModule } from '@modules/health/health.module';
 import { StoryModule } from '@modules/story/story.module';
 
@@ -38,6 +39,7 @@ import { StoryModule } from '@modules/story/story.module';
     }),
 
     HealthModule,
+    AuthModule,
     StoryModule,
   ],
   providers: [

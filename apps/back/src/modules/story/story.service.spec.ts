@@ -4,7 +4,7 @@ import {
   asRepository,
   createMockRepository,
 } from '@common/__spec__/mock-repository';
-import { ApiErrorResponseDto } from '@common/dto/api-error.dto';
+import { expectDomainError } from '@common/__spec__/expect-domain-error';
 import {
   createStoryCharacter,
   createStoryPage,
@@ -16,28 +16,6 @@ import type { StoryPage } from '@entities/story-page.entity';
 import type { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { STORY_TEMPLATE_STATUS, type StoryTemplate } from '@entities/story-template.entity';
 import { StoryService } from './story.service';
-
-/**
- * 에러 경로는 code 와 status 를 **정확히** 고정한다 (code-patterns §9).
- * 느슨하게 받으면 그 차이가 곧 방어의 유무일 때 테스트가 조용히 무력해진다.
- */
-async function expectDomainError(
-  promise: Promise<unknown>,
-  code: string,
-  status: HttpStatus,
-): Promise<void> {
-  const error: unknown = await promise.then(
-    () => {
-      throw new Error(`${code} 가 발생해야 하는데 정상 반환됐다`);
-    },
-    (caught: unknown) => caught,
-  );
-
-  expect(error).toBeInstanceOf(ApiErrorResponseDto);
-  const domainError = error as ApiErrorResponseDto;
-  expect(domainError.code).toBe(code);
-  expect(domainError.getStatus()).toBe(status);
-}
 
 const PUBLISHED_TEMPLATE = createStoryTemplate({ id: 7 });
 
