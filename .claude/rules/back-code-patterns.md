@@ -96,8 +96,14 @@ export class StoryPageParamsDto extends createZodDto(storyPageParamsSchema) {}
 - 정의에 없는 필드는 스키마의 **`.strict()`** 가 막는다 (구 `forbidNonWhitelisted`).
 - 🚫 **암묵 형변환에 기대지 않는다.** 경로·쿼리의 숫자는 스키마에서 **`z.coerce`** 로 명시 변환한다 (구 `enableImplicitConversion`). 어디서 형이 바뀌는지 코드를 읽어 알 수 있어야 한다.
 - **`strictSchemaDeclaration: true`** — nestjs-zod DTO 가 아닌 값을 검증하려 하면 **에러로 막는다.** "검증한다고 생각했는데 안 하고 있었다" 를 도구가 잡는다.
+  - ⚠️ **원시 타입도 막힌다.** `@Param('slug') slug: string` · `@Query('page') page: number` · 타입 없는 `@Body()` 는 **400 이 아니라 500** 이다. 빌드·부팅·타입체크로는 안 잡히고 **첫 요청에서** 드러난다.
+  - **증상**: 500 이 나는데 로그에 `검증 스키마가 선언되지 않았다 — @Param('slug') 파라미터 (선언 타입: String)` 이 찍힌다. 그러면 그 파라미터를 `createZodDto` DTO 로 바꾼다.
+  - 메시지는 `createGlobalValidationPipe` 의 래퍼가 붙인다 — nestjs-zod 가 던지는 원본 예외는 **메시지가 없어** 전역 필터에 `Internal Server Error` 로만 남는다.
+  - 🚫 그 래퍼는 **`HttpException` 을 상속하지 않는다.** 필터 3단이 `HttpException` 의 `message` 를 **응답 바디에 그대로 싣기** 때문이다 — 상속하면 개발자용 메시지(내부 구조·파일 경로)가 클라이언트로 나간다. 일반 `Error` 여야 4단이 받아 **사용자에게는 고정 메시지, 로그에는 전체 사유**가 된다. `global-validation-pipe.spec.ts` 가 네 형태·메시지·미노출을 고정한다.
 - 커스텀 Pipe 는 만들지 않는다.
 - Swagger 요청 스키마는 `createZodDto` 가 만들고 **`main.ts` 의 `cleanupOpenApiDoc`** 이 후처리한다. 빼면 문서가 뜨긴 하지만 요청 스키마가 비거나 어긋난 채로 노출된다. `test/swagger.e2e-spec.ts` 가 파라미터 생성을 고정한다.
+- `packages/contracts` 도 **린트 대상이다** — 두 앱이 의존하는 계약 소스라 `any` 하나가 양쪽으로 퍼진다. 자체 `eslint.config.mjs` 가 앱과 같은 타입 규율을 적용한다.
+- 🚫 contracts 의 `prepare`(= build)를 **컨테이너 설치에서 돌리지 않는다.** 두 설치 단계 모두 `--ignore-scripts` 이고 빌드는 명시 단계가 한다 — 매니페스트만 복사된 시점이라 소스가 없고, `--prod` 에는 `tsc` 도 없다 ([lessons 2026-09-04](../../docs/lessons.md)).
 - 환경변수도 같은 방식이다 — `src/config/env.validation.ts` 가 zod 스키마다. 🚫 `process.env` 스키마를 `.strict()` 로 만들지 않는다(무관한 키가 잔뜩 있어 어느 환경에서도 부팅하지 못한다).
 
 ### ⚠️ zod 인스턴스가 둘이다
