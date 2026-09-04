@@ -7,21 +7,30 @@ on:
     # paths 는 화이트리스트로 지정한다.
     # paths-ignore 는 머지 커밋 평가에서 의도 외 트리거가 발생한다.
     #
-    # ⚠️ 배포 워크플로 4개의 paths 는 **교집합이 0건**이어야 한다. 여기는 apps/front/ 아래만 본다.
-    # ⚠️ 루트 워크스페이스 파일은 넣지 않는다 — 빌드 컨텍스트가 apps/front 뿐이라
-    #    산출물을 바꿀 수 없다. 회귀는 ci-front.yml 이 PR 에서 잡는다.
+    # ⚠️ **2026-09-04 부터 back 과 paths 가 겹친다 — 의도된 예외다.**
+    #    `packages/contracts/**` 와 루트 워크스페이스 파일은 두 이미지 산출물을 **실제로 둘 다**
+    #    바꾸므로, 한 커밋에 두 스택이 뜨는 것이 이 경우에는 올바른 동작이다.
+    #    나머지 경로는 여전히 교집합 0 이어야 한다 — 앱 코드끼리 겹치면 그건 사고다.
     paths:
       - 'apps/front/app/**'
+      - 'apps/front/components/**'
+      - 'apps/front/lib/**'
       - 'apps/front/public/**'
       - 'apps/front/scripts/**'
       - 'apps/front/Dockerfile'
-      - 'apps/front/.dockerignore'
       - 'apps/front/package.json'
       - 'apps/front/pnpm-lock.yaml'
       - 'apps/front/next.config.ts'
       - 'apps/front/tsconfig.json'
+      - 'apps/front/vitest.config.mts'
       - 'apps/front/postcss.config.mjs'
       - 'apps/front/eslint.config.mjs'
+      # 이미지 안에서 함께 빌드된다 (back 과 공유 — 위 주석 참조).
+      - 'packages/contracts/**'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.dockerignore'
       # NEXT_PUBLIC_* 는 빌드 시점에 번들에 박힌다 — 바뀌면 반드시 재빌드해야 한다.
       - 'apps/front/.env.production'
       - 'infra/prod_nerd_front.yml'
@@ -72,7 +81,10 @@ jobs:
       - name: 이미지 빌드 및 푸시
         uses: docker/build-push-action@v6
         with:
-          context: apps/front
+          # ⚠️ 빌드 컨텍스트는 **레포 루트**다. 앱이 워크스페이스 패키지
+          # `@nerd/contracts` 에 의존하는데 그게 앱 디렉터리 밖이라 좁힐 수 없다.
+          # ci-front.yml 과 **같은 값이어야** 한다.
+          context: .
           file: apps/front/Dockerfile
           platforms: linux/arm64
           push: true
