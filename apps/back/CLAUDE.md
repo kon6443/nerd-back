@@ -21,7 +21,7 @@
 - **계층**: Repository 클래스 없음(Service 가 `@InjectRepository` 직접). **외부 시스템은 반드시 Port 경유**
 - **응답**: `{ code, data, message }` 객체 리터럴 직접 반환. 전역 인터셉터 없음. 상태코드는 정석 REST
 - **에러**: `defineDomainError` → 전역 필터가 `{ code, message, timestamp }` 로 통일. 바디에 `statusCode` 없음
-- **검증**: `createGlobalValidationPipe()` 하나를 프로덕션·E2E 가 공유 — **이 파일만 고친다**
+- **검증**: **zod** — 스키마는 `@nerd/contracts` 소유, `createZodDto` 로 감싼다. `createGlobalValidationPipe()` 하나를 프로덕션·E2E 가 공유 — **이 파일만 고친다**
 - **테스트**: mock 주력. E2E 는 외부 의존 없이 돈다
 - **외부 의존**: 죽어도 앱은 기동·응답한다. 레이트리밋은 fail-open, 비용 카운터는 fail-closed. **DB 만 예외** — 핵심 의존이라 못 붙으면 부팅 실패 + Swarm 무제한 재시작
 - **DB**: 옵션은 `typeorm.options.ts` 한 곳 · `synchronize` 금지 · 시각은 `DATETIME(3)`(`TIMESTAMP` 금지) · 앱 계정에 DDL 없음 · 테스트는 `forbid-db` 매퍼가 접속을 막는다

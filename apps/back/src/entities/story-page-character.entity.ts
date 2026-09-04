@@ -1,18 +1,7 @@
+import type { StoryCharacterHitbox } from '@nerd/contracts';
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { StoryCharacter } from './story-character.entity';
 import { StoryPage } from './story-page.entity';
-
-/**
- * 페이지에 등장하는 캐릭터의 터치 영역.
- *
- * 정규화된 비율(0~1)로 저장한다. 픽셀로 저장하면 삽화 해상도를 바꾸는 순간 전부 어긋난다.
- */
-export interface StoryCharacterHitbox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 /**
  * "이 페이지에서 이 캐릭터와 대화할 수 있다"는 사실 (SPEC-004 · SPEC-005).
@@ -39,7 +28,11 @@ export class StoryPageCharacter {
   @JoinColumn({ name: 'character_id' })
   character: StoryCharacter;
 
-  /** 터치 영역. `null` 이면 화면에 표시하되 좌표는 프론트가 정한다. */
+  /**
+   * 터치 영역. 정규화된 비율(0~1)이다 — 픽셀로 저장하면 삽화 해상도를 바꾸는 순간 전부 어긋난다.
+   * 타입 정의는 `@nerd/contracts` 가 소유한다(프론트가 같은 좌표계를 쓴다).
+   * `null` 이면 화면에 표시하되 좌표는 프론트가 정한다.
+   */
   @Column({ name: 'hitbox', type: 'json', nullable: true })
   hitbox: StoryCharacterHitbox | null;
 }

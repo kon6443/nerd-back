@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { StoryDetail, StoryPageView, StorySummary } from '@nerd/contracts';
 import { StoryCharacter } from '@entities/story-character.entity';
 import { StoryPage } from '@entities/story-page.entity';
 import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { STORY_TEMPLATE_STATUS, StoryTemplate } from '@entities/story-template.entity';
-import type { StoryDetailDto, StoryPageDto, StorySummaryDto } from './dto/story-response.dto';
 import { StoryNotFoundErrorResponseDto, StoryPageNotFoundErrorResponseDto } from './dto/story.error.dto';
 
 /**
@@ -13,7 +13,7 @@ import { StoryNotFoundErrorResponseDto, StoryPageNotFoundErrorResponseDto } from
  *
  * 이 서비스는 **읽기 전용**이다. 콘텐츠는 운영이 마이그레이션·SQL 로 넣는다.
  * 개인화·대화·After Story 는 별도 슬라이스가 맡는다
- * (`docs/tasks/tasks-my-story-backend.md`).
+ * (`docs/tasks/tasks-my-story.md`).
  *
  * Repository 클래스를 따로 두지 않고 `Repository<T>` 를 직접 주입받는다 (code-patterns §1).
  */
@@ -31,7 +31,7 @@ export class StoryService {
   ) {}
 
   /** 공개된 동화 목록. `draft` 는 절대 포함하지 않는다. */
-  async listPublished(): Promise<StorySummaryDto[]> {
+  async listPublished(): Promise<StorySummary[]> {
     const templates = await this.templates.find({
       where: { status: STORY_TEMPLATE_STATUS.PUBLISHED },
       order: { id: 'ASC' },
@@ -40,7 +40,7 @@ export class StoryService {
     return templates.map((template) => this.toSummary(template));
   }
 
-  async getPublishedDetail(slug: string): Promise<StoryDetailDto> {
+  async getPublishedDetail(slug: string): Promise<StoryDetail> {
     const template = await this.findPublishedOrThrow(slug);
 
     const [pageCount, characters] = await Promise.all([
@@ -59,7 +59,7 @@ export class StoryService {
     };
   }
 
-  async getPublishedPage(slug: string, pageNo: number): Promise<StoryPageDto> {
+  async getPublishedPage(slug: string, pageNo: number): Promise<StoryPageView> {
     const template = await this.findPublishedOrThrow(slug);
 
     const page = await this.pages.findOneBy({ templateId: template.id, pageNo });
@@ -103,7 +103,7 @@ export class StoryService {
     return template;
   }
 
-  private toSummary(template: StoryTemplate): StorySummaryDto {
+  private toSummary(template: StoryTemplate): StorySummary {
     return {
       slug: template.slug,
       title: template.title,

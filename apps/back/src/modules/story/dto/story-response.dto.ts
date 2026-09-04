@@ -1,14 +1,23 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type {
+  StoryCharacterHitbox,
+  StoryCharacterSummary,
+  StoryDetail,
+  StoryPageCharacter,
+  StoryPageView,
+  StorySummary,
+} from '@nerd/contracts';
 import { ApiSuccessResponseDto } from '@common/dto/api-response.dto';
-import type { StoryCharacterHitbox } from '@entities/story-page-character.entity';
 
 /**
  * ⚠️ 이 파일의 클래스는 **Swagger 명세용 타입 선언 전용**이다. `new` 로 만들어 반환하지 않는다.
- * 컨트롤러는 `{ code, data, message }` 객체 리터럴을 그대로 반환하고, 서비스는 이 형태를
- * **타입으로만** 참조한다 (code-patterns §2).
+ * 컨트롤러는 `{ code, data, message }` 객체 리터럴을 그대로 반환한다 (code-patterns §2).
+ *
+ * ⭐ **각 클래스가 `@nerd/contracts` 의 타입을 `implements` 한다.** 계약이 바뀌었는데 여기를
+ * 안 고치면 **컴파일이 깨진다** — Swagger 문서가 실제 계약과 어긋난 채로 배포되는 것을 막는 장치다.
  */
 
-export class StorySummaryDto {
+export class StorySummaryDto implements StorySummary {
   @ApiProperty({ example: 'little-red-riding-hood' })
   slug: string;
 
@@ -25,7 +34,7 @@ export class StorySummaryDto {
   coverImageKey: string | null;
 }
 
-export class StoryCharacterSummaryDto {
+export class StoryCharacterSummaryDto implements StoryCharacterSummary {
   @ApiProperty({ example: 'wolf', description: '배역 키. 대화 API 의 경로가 이 값을 쓴다.' })
   role: string;
 
@@ -33,7 +42,7 @@ export class StoryCharacterSummaryDto {
   displayName: string;
 }
 
-export class StoryDetailDto extends StorySummaryDto {
+export class StoryDetailDto extends StorySummaryDto implements StoryDetail {
   @ApiProperty({ example: 12, description: '본편 페이지 수' })
   pageCount: number;
 
@@ -41,7 +50,7 @@ export class StoryDetailDto extends StorySummaryDto {
   characters: StoryCharacterSummaryDto[];
 }
 
-export class StoryPageCharacterDto extends StoryCharacterSummaryDto {
+export class StoryPageCharacterDto extends StoryCharacterSummaryDto implements StoryPageCharacter {
   @ApiProperty({
     nullable: true,
     description: '터치 영역. 0~1 로 정규화된 비율이다 (픽셀이 아니다).',
@@ -50,7 +59,7 @@ export class StoryPageCharacterDto extends StoryCharacterSummaryDto {
   hitbox: StoryCharacterHitbox | null;
 }
 
-export class StoryPageDto {
+export class StoryPageDto implements StoryPageView {
   @ApiProperty({ example: 1 })
   pageNo: number;
 

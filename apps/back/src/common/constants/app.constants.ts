@@ -38,5 +38,10 @@ export const LOG_IGNORED_PATHS: readonly string[] = [HEALTH_PATH, READY_PATH, DO
  */
 export const TRUST_PROXY_HOPS = 1;
 
-/** 성공 응답의 code 값. 컨트롤러가 객체 리터럴로 직접 반환한다. */
-export const SUCCESS_CODE = 'SUCCESS';
+/**
+ * 성공 응답의 `code` 값. 컨트롤러가 객체 리터럴로 직접 반환한다.
+ *
+ * **정의는 `@nerd/contracts` 가 소유한다** — 프론트가 같은 값으로 분기하므로 한 곳에만 둔다.
+ * 여기서는 기존 import 경로를 유지하기 위해 재수출만 한다.
+ */
+export { SUCCESS_CODE } from '@nerd/contracts';
