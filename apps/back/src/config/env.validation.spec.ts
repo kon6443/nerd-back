@@ -69,8 +69,19 @@ describe('validateEnv', () => {
       expect(result.DB_PORT).toBe(3306);
     });
 
-    it('안내 파일이 .env.migration.example 이다', () => {
-      expect(() => validateDbEnv({})).toThrow(/\.env\.migration\.example/);
+    // 마이그레이션 CLI 도 앱과 **같은 `.env`** 를 읽는다. 안내가 없어진 파일
+    // (`.env.migration.example`)을 가리키면 사람이 만들 수 없는 파일을 찾게 된다.
+    it('안내 파일이 .env.example 이다 — 마이그레이션 전용 env 파일은 없다', () => {
+      expect(() => validateDbEnv({})).toThrow(/\.env\.example/);
+      expect(() => validateDbEnv({})).not.toThrow(/\.env\.migration/);
+    });
+
+    it('DB_MIGRATION_USER 만 채우면 통과한다 — 짝 검사는 data-source 가 한다', () => {
+      // 스키마는 둘 다 optional 이다. 한쪽만 채운 상태를 막는 책임은
+      // 실제로 그 값으로 접속하는 `config/data-source.ts` 에 있다.
+      const result = validateDbEnv({ ...DB_MINIMAL, DB_MIGRATION_USER: 'nerd_migrator' });
+      expect(result.DB_MIGRATION_USER).toBe('nerd_migrator');
+      expect(result.DB_MIGRATION_PASSWORD).toBeUndefined();
     });
   });
 

@@ -6,7 +6,7 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * 목적 하나 = 사전 제작 콘텐츠 4개 테이블. 사용자별 진행 상태(세션·개인화 결과)는
  * 다른 마이그레이션이 만든다 — 두 관심사는 수명주기도 쓰기 주체도 다르다.
  *
- * 🚫 **실행은 사람이 한다** (`pnpm migration:run`, 계정 `nerd_migrator`). 전 환경이 같은 DB 라
+ * 🚫 **실행은 사람이 한다** (`pnpm db:migrate:up`, 계정 `DB_MIGRATION_*`). 전 환경이 같은 DB 라
  * 실행이 곧 상용 적용이다 (`apps/back/CLAUDE.md` Never).
  *
  * **멱등 작성** — MySQL 은 DDL 이 암묵 커밋이라 중간에 실패하면 부분 적용 상태로 남는다.

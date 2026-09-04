@@ -26,7 +26,8 @@ const requiredText = z.string().min(1);
 
 /**
  * DB 접속 변수. 앱(`envSchema`)과 마이그레이션 CLI(`config/data-source.ts`)가 **같은 스키마**를 쓴다 —
- * CLI 는 Redis 등 앱 변수가 없는 `.env.migration` 으로 돌기 때문에 따로 검증할 수 있어야 한다.
+ * 둘 다 `.env` 한 파일을 읽지만 CLI 에는 Redis 등 앱 변수가 필요 없다 — 그래서 DB 부분만
+ * 따로 검증할 수 있어야 한다. 계정은 `DB_MIGRATION_*` 로 갈린다.
  *
  * 배포에서는 서버 .env 가 스택 DNS 를, 로컬에서는 SSH 터널(`127.0.0.1`)을 가리킨다.
  * 전 환경이 같은 서버 DB 를 쓴다 — 로컬용 DB 는 없다.
@@ -42,6 +43,19 @@ export const dbEnvSchema = z.object({
    * 들어야 한다.** 2 OCPU 에서 동시에 실행되는 쿼리는 어차피 소수라, 키워도 대기열이 DB 안으로 옮겨갈 뿐이다.
    */
   DB_POOL_SIZE: z.coerce.number().int().min(1).max(30).default(10),
+
+  /**
+   * 마이그레이션 CLI 전용 계정. **앱과 같은 `.env` 를 읽지만 계정은 다르다.**
+   *
+   * `DB_USER`(nerd_app)에는 DDL 권한이 없다 — 코드 경로에서 스키마가 바뀔 수 없게 하려는
+   * 의도된 제약이다. 🚫 앱 계정에 DDL 을 주어 이 값을 없애지 말 것.
+   *
+   * ⚠️ **`db:migrate:list` 에도 필요하다.** TypeORM 의 `migration:show` 는 조회 전에
+   * `migrations` 테이블이 없으면 `CREATE TABLE` 을 먼저 던진다 — 이름과 달리 읽기 전용이 아니다.
+   * 비워 두면 `ER_TABLEACCESS_DENIED_ERROR`(1142) 로 실패한다 (2026-09-04 실측).
+   */
+  DB_MIGRATION_USER: z.string().min(1).optional(),
+  DB_MIGRATION_PASSWORD: z.string().min(1).optional(),
 });
 
 export const envSchema = dbEnvSchema.extend({
@@ -109,5 +123,5 @@ export function validateEnv(config: Record<string, unknown>): EnvVariables {
 
 /** 마이그레이션 CLI 용 — DB 변수만 검증한다. */
 export function validateDbEnv(config: Record<string, unknown>): DbEnvVariables {
-  return validateWith(dbEnvSchema, config, '.env.migration.example');
+  return validateWith(dbEnvSchema, config, '.env.example');
 }

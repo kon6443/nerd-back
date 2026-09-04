@@ -31,6 +31,39 @@ export function buildMysqlConnectionOptions(env: DbEnvVariables): MysqlConnectio
   };
 }
 
+/**
+ * 마이그레이션 CLI 의 접속 옵션 — 앱과 **같은 `.env` 를 읽지만 계정만 다르다.**
+ *
+ * `DB_USER`(nerd_app)에는 DDL 권한이 없다. 코드 경로에서 스키마가 바뀔 수 없게 하려는 의도된
+ * 제약이라, 마이그레이션만 `DB_MIGRATION_USER`/`DB_MIGRATION_PASSWORD` 로 덮어쓴다.
+ * 🚫 이 분리를 없애고 앱 계정에 DDL 을 주지 말 것 — 그러면 앱이 도는 동안 스키마가 바뀔 수 있다.
+ *
+ * 짝이 어긋나면 **아이디와 비밀번호가 다른 계정의 것으로 섞여** 붙는다. 인증 실패가
+ * "비밀번호가 틀렸나?" 로 보여 원인 추적이 길어지므로 접속 전에 먼저 멈춘다.
+ *
+ * ⚠️ 🚫 **`db:migrate:list` 를 "읽기 전용" 으로 취급하지 않는다.** TypeORM 의 `migration:show` 는
+ * 조회 전에 `migrations` 테이블이 없으면 `CREATE TABLE` 을 던진다. 즉 **네 명령 전부 DDL 을 낼 수
+ * 있고, 전부 사람이 실행한다.** (2026-09-04 실측: 앱 계정으로 돌려 1142 거부 확인)
+ */
+export function buildMigrationConnectionOptions(env: DbEnvVariables): MysqlConnectionOptions {
+  const hasUser = env.DB_MIGRATION_USER !== undefined;
+  const hasPassword = env.DB_MIGRATION_PASSWORD !== undefined;
+
+  if (hasUser !== hasPassword) {
+    throw new Error(
+      'DB_MIGRATION_USER 와 DB_MIGRATION_PASSWORD 는 함께 채우거나 함께 비워야 한다.\n' +
+        '  - 둘 다 채움: 그 계정(nerd_migrator)으로 붙는다. 네 명령 모두 이 상태를 요구한다.\n' +
+        '  - 둘 다 비움: 앱 계정(DB_USER)으로 붙어 DDL 이 거부된다(1142). list 도 마찬가지다.\n' +
+        '  apps/back/.env 를 확인하세요.',
+    );
+  }
+
+  const base = buildMysqlConnectionOptions(env);
+  if (!hasUser) return base;
+
+  return { ...base, username: env.DB_MIGRATION_USER, password: env.DB_MIGRATION_PASSWORD };
+}
+
 export function buildTypeOrmOptions(env: DbEnvVariables): TypeOrmModuleOptions {
   return {
     ...buildMysqlConnectionOptions(env),
