@@ -75,18 +75,39 @@ throw new SessionNotFoundErrorResponseDto('만료되었습니다.');   // overri
 - 로그 레벨은 필터가 나눈다. `status >= 500` 은 `error`(스택 포함), 그 외는 `warn`.
 - ⚠️ **전역 필터·인터셉터를 추가·수정할 때는 "이 규칙이 적용되면 안 되는 응답"을 먼저 확인**하고 통과 케이스를 테스트로 고정한다.
 
-## 4. 검증 — 전역 ValidationPipe 하나
+## 4. 검증 — 스키마는 `@nerd/contracts`, 파이프는 하나
+
+요청 검증은 **zod 스키마**로 한다 (2026-09-04 전환, class-validator 걷어냄).
+스키마는 **`packages/contracts` 가 소유**한다 — 프론트의 폼 검증이 같은 스키마를 쓰므로
+"프론트는 통과했는데 백엔드가 400" 이 구조적으로 생기지 않는다.
+
+```ts
+// packages/contracts/src/story.ts — 계약의 SSOT
+export const storyPageParamsSchema = z.object({ ... }).strict();
+
+// apps/back — Nest 가 아는 형태로 감싸기만 한다
+export class StoryPageParamsDto extends createZodDto(storyPageParamsSchema) {}
+```
 
 `src/common/pipes/global-validation-pipe.ts` 의 `createGlobalValidationPipe()` 하나가 `APP_PIPE` 와 E2E 에서 **공유**된다. 한쪽만 바꾸면 E2E 가 프로덕션과 다른 규칙으로 검증하므로 **이 파일만 고친다.**
 
-```
-whitelist: true · forbidNonWhitelisted: true · transform: true
-transformOptions: { enableImplicitConversion: true }
-```
-
-- 암묵 변환이 켜져 있어 `@Type(() => Number)` 를 쓰지 않는다 (**0건**).
-- 검증 실패는 `VALIDATION_FAILED` · 400 이고 `details` 에 `필드: 메시지` 배열이 담긴다.
+- 실패는 **`VALIDATION_FAILED` · 400** 이고 `details` 에 `필드: 메시지` 배열이 담긴다.
+  🚫 **이 형식을 바꾸지 않는다** — 프론트와의 계약이다. 검증 라이브러리를 바꿔도 형식은 유지한다.
+- 정의에 없는 필드는 스키마의 **`.strict()`** 가 막는다 (구 `forbidNonWhitelisted`).
+- 🚫 **암묵 형변환에 기대지 않는다.** 경로·쿼리의 숫자는 스키마에서 **`z.coerce`** 로 명시 변환한다 (구 `enableImplicitConversion`). 어디서 형이 바뀌는지 코드를 읽어 알 수 있어야 한다.
+- **`strictSchemaDeclaration: true`** — nestjs-zod DTO 가 아닌 값을 검증하려 하면 **에러로 막는다.** "검증한다고 생각했는데 안 하고 있었다" 를 도구가 잡는다.
 - 커스텀 Pipe 는 만들지 않는다.
+- Swagger 요청 스키마는 `createZodDto` 가 만들고 **`main.ts` 의 `cleanupOpenApiDoc`** 이 후처리한다. 빼면 문서가 뜨긴 하지만 요청 스키마가 비거나 어긋난 채로 노출된다. `test/swagger.e2e-spec.ts` 가 파라미터 생성을 고정한다.
+- 환경변수도 같은 방식이다 — `src/config/env.validation.ts` 가 zod 스키마다. 🚫 `process.env` 스키마를 `.strict()` 로 만들지 않는다(무관한 키가 잔뜩 있어 어느 환경에서도 부팅하지 못한다).
+
+### ⚠️ zod 인스턴스가 둘이다
+
+`sharedWorkspaceLockfile: false` 라 `apps/back` 과 `packages/contracts` 가 **각자의 zod 를 설치**한다
+(2026-09-04 실측: 서로 다른 `.pnpm/zod@4.5.4` 경로).
+
+🚫 **그래서 zod 오류를 `instanceof ZodError` 로 판별하지 않는다.** 스키마를 만든 zod 와 판별하는 zod 가
+달라 `instanceof` 가 조용히 `false` 가 되고, **검증은 도는데 실패 사유(`details`)만 사라진다** — 가장 찾기
+어려운 형태다. `toValidationDetails` 는 `issues` 구조로 판별하고, spec 이 contracts 스키마로 이 경로를 고정한다.
 
 ## 5. 로깅 — Pino, 본문은 남기지 않는다
 
@@ -237,6 +258,8 @@ dateKeyInTimeZone(nowUtc(), KST);  // '2026-08-27'  ← 일별 집계 키
 - [ ] 응답을 `{ code, data, message }` 리터럴로 반환하는가? (§2)
 - [ ] 상태코드가 정석 REST 인가? 생성 201, 본문 없음 204 (§2)
 - [ ] Swagger: `@ApiOperation` + 응답 DTO + 공통 에러 데코레이터 (§2)
+- [ ] 입력 스키마를 `@nerd/contracts` 에 두고 `createZodDto` 로 감쌌는가? (§4)
+- [ ] 응답 DTO 가 contracts 타입을 `implements` 하는가? — 계약이 어긋나면 컴파일이 깨진다 (§4)
 - [ ] 폴링되는 경로면 `@SkipThrottle(SKIP_ALL_THROTTLERS)` + `LOG_IGNORED_PATHS` (§5, §6)
 
 **외부 시스템 연동 추가**

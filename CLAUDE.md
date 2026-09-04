@@ -12,6 +12,7 @@
 |---|---|---|
 | [`apps/back/`](apps/back/) | NestJS API (`/api/v2`, 포트 5501) | 스택 `prod_nerd_back` |
 | [`apps/front/`](apps/front/) | Next.js 앱 (포트 5502) | 스택 `prod_nerd_front` |
+| [`packages/contracts/`](packages/contracts/) | 프론트·백이 공유하는 **검증 스키마와 타입** (API 계약의 SSOT) | 배포 단위 아님 — 두 앱에 함께 빌드된다 |
 | [`infra/`](infra/) | **배포되는 스택 YAML 4개가 전부 여기** — 파일명 = 스택명 | 4개 스택 |
 
 **앱 이름은 모든 축에서 `back` / `front` 로 같다** — 디렉터리 · 패키지명 · 워크플로 · 스택 · 서비스 DNS · 이미지 · 서버 env 파일. 한 축을 알면 나머지를 파일을 열지 않고 안다 ([`docs/deploy.md`](docs/deploy.md) 이름 규칙표).
@@ -98,7 +99,7 @@
 
 전체 목록은 [`README.md`](README.md) 가 SSOT. 앱 상세는 앱의 `README.md`.
 
-- **루트에서 앱을 부른다** — `pnpm back <script>` · `pnpm front <script>` (각각 `pnpm --filter nerd-back|nerd-front` 의 별칭). 앱 디렉터리로 `cd` 하는 절차를 문서에 쓰지 않는다
+- **루트에서 앱을 부른다** — `pnpm back <script>` · `pnpm front <script>` (각각 `pnpm --filter nerd-back...|nerd-front...` 의 별칭). **끝의 `...` 는 의존 워크스페이스 패키지를 포함하라는 뜻**이다 — `packages/contracts` 가 앱보다 먼저 빌드된다. 빼면 앱이 낡은 `dist` 를 쓴다. 앱 디렉터리로 `cd` 하는 절차를 문서에 쓰지 않는다
 - 검증: **`pnpm ci:core`**(두 앱) · 한 앱만 볼 때 `pnpm back ci:core`. PR 직전 **`pnpm ci:all`**
 - 실행: `pnpm back dev` → `localhost:5501/api/v2` · `pnpm front dev` → `localhost:5502`
 - 설치는 **루트에서 `pnpm install`** 한 번. 앱별 lockfile 을 쓴다(`sharedWorkspaceLockfile: false`) — 한 앱의 의존성 변경이 다른 앱 배포를 트리거하지 않게 하려는 결정이다
