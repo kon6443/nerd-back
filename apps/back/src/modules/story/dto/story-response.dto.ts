@@ -7,7 +7,6 @@ import type {
   StoryPageView,
   StorySummary,
 } from '@nerd/contracts';
-import { ApiSuccessResponseDto } from '@common/dto/api-response.dto';
 
 /**
  * ⚠️ 이 파일의 클래스는 **Swagger 명세용 타입 선언 전용**이다. `new` 로 만들어 반환하지 않는다.
@@ -78,19 +77,4 @@ export class StoryPageDto implements StoryPageView {
 
   @ApiProperty({ type: [StoryPageCharacterDto], description: '대화 가능한 등장인물' })
   characters: StoryPageCharacterDto[];
-}
-
-export class StoryListResponseDto extends ApiSuccessResponseDto {
-  @ApiProperty({ type: [StorySummaryDto] })
-  data: StorySummaryDto[];
-}
-
-export class StoryDetailResponseDto extends ApiSuccessResponseDto {
-  @ApiProperty({ type: StoryDetailDto })
-  data: StoryDetailDto;
-}
-
-export class StoryPageResponseDto extends ApiSuccessResponseDto {
-  @ApiProperty({ type: StoryPageDto })
-  data: StoryPageDto;
 }
