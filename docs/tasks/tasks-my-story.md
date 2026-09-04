@@ -634,18 +634,39 @@ env 플래그로 붙이면, 모델이 정해지기 전에도 「촬영 → 대�
 각자 zod 를 설치한다(실측: 서로 다른 `.pnpm/zod@4.5.4`). 🚫 `instanceof ZodError` 로 판별하면
 **검증은 도는데 `details` 만 조용히 비는** 형태로 깨진다. 구조 판별로 우회했고 spec 이 고정한다.
 
-### Slice 0-C-2 — 빌드 컨텍스트 · 배포 워크플로 (미착수) ⚠️
+### ✅ Slice 0-C-2 — 빌드 컨텍스트 · 배포 워크플로 (완료 2026-09-04)
 
 앱 코드가 아니라 **배포 구조**다. 0-C-1 과 커밋을 섞지 않는다 — 되돌릴 일이 생기면 통째로 되돌려야 한다.
 
-- [ ] 두 `Dockerfile` 의 **빌드 컨텍스트를 레포 루트로** 올리고 COPY 경로 전면 수정
-- [ ] 두 배포 워크플로 `paths` 에 `packages/contracts/**` 추가 + **교집합 0 규칙의 의도된 예외**임을 주석에 명시
-- [ ] `docs/deploy.md` 의 「무엇을 바꾸면 무엇이 뜨는가」 표 갱신
-- [ ] 프론트 `outputFileTracingRoot` 가 새 컨텍스트와 어긋나지 않는지 확인
-- [ ] 검증: **CI 의 ARM64 컨테이너 빌드 job 통과가 필수다.** `ci:all` 은 이 종류를 못 잡는다
+- [x] **`apps/back` 의 빌드 컨텍스트를 레포 루트로** 올리고 COPY 경로 전면 수정 (2단계 모두 워크스페이스 설치)
+- [x] 루트 `.dockerignore` 신설 · `apps/back/.dockerignore` 제거(컨텍스트가 바뀌어 죽은 파일이 된다)
+- [x] `deploy-back.yml` · `ci-back.yml` 의 `context: .` — **두 값이 같아야** CI 통과가 배포를 보증한다
+- [x] `deploy-back.yml` `paths` 에 `packages/contracts/**` + 루트 워크스페이스 파일 추가
+- [x] `ci-back.yml` `paths` 도 넓게 (검증이 안 도는 것이 더 위험하다)
+- [x] `docs/deploy.md` 트리거 표 + 「빌드 컨텍스트가 앱마다 다르다」 절 추가
+- [x] 검증: **로컬 arm64 컨테이너 빌드 성공**(50초) + 이미지 안에서 런타임 해석 확인
 
-🚫 **이게 끝나기 전에는 배포하지 않는다.** 지금 `main` 에 머지하면 컨테이너 빌드가 `@nerd/contracts` 를
-찾지 못해 실패한다 — 로컬은 통과하는데 컨테이너만 깨지는, 루트 `CLAUDE.md` 함정 #2 그 자체다.
+**`apps/front` 은 바꾸지 않았다.** 아직 contracts 에 의존하지 않아 컨텍스트가 `apps/front` 로 남는다.
+그 덕에 **배포 워크플로 교집합이 여전히 0건**이다(스크립트로 확인). 프론트가 contracts 를 가져가는
+시점에 그쪽도 옮기고, 그때 두 워크플로가 경로를 공유하는 **의도된 예외**가 된다.
+→ 그래서 `outputFileTracingRoot` 확인은 지금 할 일이 아니다. 프론트 이동 시점으로 미룬다.
+
+**이미지 배치가 바뀌었다** — WORKDIR 이 `/app` → **`/app/apps/back`**.
+stack YAML 의 헬스체크가 상대경로(`node scripts/healthcheck.mjs`)라 그대로 동작하는 것을 이미지 안에서 확인했다.
+⚠️ WORKDIR 을 다시 바꾸면 `infra/prod_nerd_back.yml` 도 같이 고쳐야 한다.
+
+**검증 근거** (`ci:all` 이 못 잡는 종류라 컨테이너로 직접 확인했다)
+
+| 확인한 것 | 결과 |
+|---|---|
+| arm64 컨테이너 빌드 | 성공 · 50초 · 이미지 361MB |
+| contracts → back 빌드 순서 | `pnpm --filter nerd-back...` 이 contracts 를 먼저 빌드 |
+| `@nerd/contracts` 런타임 해석 | `/app/packages/contracts/dist/index.js` — `workspace:*` 가 프로덕션 스테이지에서도 해석됨 |
+| `tsconfig-paths` alias + contracts 재수출 | `SUCCESS_CODE` · `API_PREFIX` 정상 |
+| WORKDIR 상대 헬스체크 경로 | `scripts/healthcheck.mjs` 존재 |
+| 워크플로 `paths` 교집합 | **0건** (스크립트 대조) |
+
+**미검증** — 실제 배포는 하지 않았다. 레지스트리 push·Swarm 롤링·스모크 테스트는 `main` 머지 시 CI 가 수행한다.
 
 **0-A. 백엔드 경계 + 공통 규약**
 

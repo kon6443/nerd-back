@@ -232,7 +232,7 @@ apps/back/          ← 작성 당시에는 저장소 루트였다
 | 묶음 | 패키지 |
 |---|---|
 | 코어 | `@nestjs/common` `@nestjs/core` `@nestjs/platform-express` `reflect-metadata` `rxjs` |
-| 설정 | `@nestjs/config` `class-validator` `class-transformer` |
+| 설정 | `@nestjs/config` `zod` — ⚠️ **2026-09-04 에 `class-validator`·`class-transformer` 를 제거하고 zod 로 전면 교체했다** ([`tasks-my-story.md`](tasks-my-story.md) D8) |
 | DB | 🚧 **Phase 1에서 설치하지 않음** — `@nestjs/typeorm` `typeorm` `typeorm-transactional` + 드라이버를 DB 확정 시 일괄 추가 |
 | 문서 | `@nestjs/swagger` `swagger-ui-express` |
 | 로깅 | `nestjs-pino` `pino` `pino-http` |

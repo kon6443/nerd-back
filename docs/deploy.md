@@ -44,11 +44,22 @@
 | `infra/prod_nerd_front.yml` | `deploy-front.yml` | X | **빌드+배포** | X | X |
 | `infra/prod_nerd_cache.yml` | `deploy-redis.yml` | X | X | 재시작 | X |
 | `infra/prod_nerd_db.yml` · `infra/mysql/**` | `deploy-db.yml` | X | X | X | 재시작 |
-| 루트 설정(`package.json` · `pnpm-workspace.yaml` · 루트 lockfile) · 문서 · `.claude/**` | (없음) | X | X | X | X |
+| `packages/contracts/**` · 루트 설정(`package.json` · `pnpm-workspace.yaml` · 루트 lockfile · `.dockerignore`) | `deploy-back.yml` | **빌드+배포** | X | X | X |
+| 문서 · `.claude/**` · `ideas/**` | (없음) | X | X | X | X |
 
 **배포 워크플로 4개의 `paths` 화이트리스트는 교집합이 0건이다.** glob 을 정규식으로 바꿔 `git ls-files` 전수에 매칭해 확인한다 — 문자열 비교가 아니라 파일 단위로 센다 (스크립트는 `docs/tasks/tasks-monorepo.md` Step 5).
 
-⚠️ **루트 워크스페이스 파일은 배포를 트리거하지 않는다.** 컨테이너 빌드 컨텍스트가 `apps/<앱>` 뿐이라 산출물을 바꿀 수 없기 때문이다. 그 파일들의 회귀는 `ci-back.yml` · `ci-front.yml` 이 PR 에서 잡는다(CI 는 반대로 **넓게** 잡아 두 앱이 함께 돈다).
+### ⚠️ 빌드 컨텍스트가 앱마다 다르다 (2026-09-04~)
+
+| 앱 | 빌드 컨텍스트 | 제외 목록 | 이유 |
+|---|---|---|---|
+| back | **레포 루트 (`.`)** | 루트 `.dockerignore` | 워크스페이스 패키지 `@nerd/contracts` 가 앱 디렉터리 밖이라 좁힐 수 없다 |
+| front | `apps/front` | `apps/front/.dockerignore` | 아직 contracts 에 의존하지 않는다 |
+
+- 그래서 **루트 워크스페이스 파일이 백엔드 배포는 트리거하고 프론트는 트리거하지 않는다.** 실제로 백엔드 이미지 안에만 들어가기 때문이다. 이 비대칭이 교집합 0 을 지켜 준다.
+- ⚠️ **프론트가 contracts 를 가져가는 순간 이 전제가 깨진다.** 그때는 프론트도 루트 컨텍스트로 옮기고, 두 워크플로가 `packages/contracts/**` 를 공유하는 **의도된 예외**가 된다 — 한 커밋에 두 스택이 뜨는 것이 그때는 올바른 동작이다.
+- ⚠️ `ci-back.yml` 과 `deploy-back.yml` 의 `context:` 는 **같은 값이어야 한다.** 다르면 CI 가 통과해도 배포 빌드가 깨진다.
+- 백엔드 이미지 안의 배치가 바뀌었다 — WORKDIR 이 `/app` 에서 **`/app/apps/back`** 이 됐다. stack YAML 의 헬스체크가 상대경로(`node scripts/healthcheck.mjs`)라 그대로 동작하지만, **WORKDIR 을 바꾸면 stack YAML 도 같이 고쳐야 한다.**
 
 서버에서 직접 배포할 때 (`$DEPLOY_DIR` 은 시크릿):
 
@@ -101,7 +112,7 @@ infra/                                 ← 저장소. 배포되는 스택 4개�
 ```
 paths 화이트리스트 트리거 (앱별로 갈린다)
   → verify job: 그 앱의 ci:all 만                     ← 이 게이트 없이 배포하지 않는다
-  → buildx 빌드 (네이티브 arm64 러너, context=apps/<앱>, gha 캐시 scope=<앱>,
+  → buildx 빌드 (네이티브 arm64 러너, context=레포 루트(back) | apps/front(front), gha 캐시 scope=<앱>,
                  --provenance=false --sbom=false)
   → 레지스트리 push (태그 = 커밋 short SHA)
   → 러너에서 stack YAML 을 스택명으로 복사 → 매니저의 $DEPLOY_DIR/stacks/ 로 전송
