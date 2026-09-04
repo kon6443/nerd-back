@@ -14,8 +14,8 @@ paths:
 # 프론트 코드 패턴 (`apps/front`)
 
 > **이 파일은 위 `paths` 의 파일을 읽는 순간 자동으로 컨텍스트에 로드된다.**
-> 최종 확인일: 2026-09-04 · 규모: `app/` **4파일** · `scripts/` **3파일**.
-> ⚠️ **§8·§9 는 아직 구현이 없는 상태에서 먼저 정한 규약이다** — 첫 컴포넌트를 쓰는 순간부터 적용된다. 근거는 [`tasks-my-story.md`](../../docs/tasks/tasks-my-story.md).
+> 최종 확인일: **2026-09-04** · 규모: `app/` 4파일 · `components/` 4 · `lib/` 2 · `scripts/` 3 · 테스트 1(11건).
+> 기반(디자인 토큰 · `lib/api` · UI 3종 · vitest)까지 구현됨. 근거는 [`tasks-my-story.md`](../../docs/tasks/tasks-my-story.md) 0-B.
 > **용도**: 프론트 코드를 쓸 때 **코드에서 어기기 쉬운 것**만 모았다. 결정의 근거와 배경은 [`docs/tasks/tasks-frontend-cicd.md`](../../docs/tasks/tasks-frontend-cicd.md) 가 SSOT 다.
 > **경계**: 백엔드 규약은 [`back-code-patterns.md`](back-code-patterns.md), 금지·함정 전체는 [`CLAUDE.md`](../../CLAUDE.md), 배포 규약은 [`docs/deploy.md`](../../docs/deploy.md).
 
@@ -29,6 +29,10 @@ paths:
 |---|---|
 | 클라이언트 컴포넌트·브라우저 | **상대경로** `fetch('/api/v2/...')` |
 | 서버 컴포넌트·route handler | `process.env.BACKEND_INTERNAL_URL` (overlay 직통, stack YAML 이 주입) |
+
+**이 분기를 화면마다 반복하지 않는다.** `lib/api` 의 `apiFetch` 가 **호출 시점에** 결정한다 —
+🚫 모듈 로드 시점에 고정하면 서버 렌더와 클라이언트 렌더 중 한쪽이 반드시 틀린 값을 쓴다.
+경로 접두(`api/v2`)도 손으로 쓰지 않는다. `@nerd/contracts` 의 `API_PREFIX` 가 SSOT 다.
 
 - 🚫 **`NEXT_PUBLIC_API_BASE_URL` 류를 새로 만들지 않는다.** 상대경로면 빌드타임 env 가 하나 줄고 이미지가 환경 독립이 되며 CORS 자체가 발생하지 않는다.
 - 🚫 도메인을 코드·`.env.production` 에 하드코딩하지 않는다 (인프라 식별 정보 — `CLAUDE.md` Never).
@@ -69,7 +73,9 @@ paths:
 - **standalone 서버는 기동 시점에 `public/` 을 스캔한다.** 런타임에 파일을 추가해도 서빙되지 않는다. 정적 자산을 볼륨 마운트하거나 런타임에 생성하는 설계는 동작하지 않는다.
 - `next/image` 는 `sharp`(libvips)를 쓴다. **V8 힙 밖에서 할당해 `--max-old-space-size` 로 막을 수 없다** — 큰 이미지를 다룰 때는 `images.minimumCacheTTL` 과 `limits.memory` 를 함께 본다. SVG 는 최적화 경로를 타지 않는다(`dangerouslyAllowSVG` 기본 비활성).
 - 🚫 `outputFileTracingIncludes` 로 `node_modules/sharp/**/*` 를 넣지 않는다. pnpm 격리 구조에서는 **아무것도 매칭하지 못하는데** "챙겼다"는 착각만 남는다. 기본 트레이싱이 이미 담는다.
-- 🚫 `next.config.ts` 의 `outputFileTracingRoot` 를 지우지 않는다. 없으면 워크스페이스 루트가 추론되어 산출물이 `.next/standalone/apps/front/server.js` 로 깊어지고 Dockerfile COPY 와 어긋난다.
+- 🚫 `next.config.ts` 의 `outputFileTracingRoot` 를 지우거나 **앱으로 좁히지 않는다.** 값은 **레포 루트**여야 한다 — 이름은 트레이싱이지만 **Turbopack 의 모듈 해석 경계**라, 좁히면 워크스페이스 패키지를 못 찾아 `Module not found: Can't resolve '@nerd/contracts'` 로 **빌드가 실패한다**(2026-09-04 실측).
+  - 그 대가로 standalone 산출물이 `apps/front/server.js` 로 한 단계 깊어진다. **Dockerfile 의 COPY·WORKDIR 이 이 구조에 맞춰져 있다** — 값을 바꾸면 거기도 고친다.
+  - 참고: `@nerd/contracts` 자체는 Next 가 서버 번들에 인라인하므로 standalone 의 `node_modules` 에는 없다(컨테이너 실측: `require.resolve` 실패, 페이지는 정상). 이 설정이 필요한 이유는 트레이싱이 아니라 **해석**이다.
 
 ## 6. 타입·린트
 
@@ -77,25 +83,33 @@ paths:
 - 타입 검사는 **`next typegen && tsc --noEmit`** 이다. `typegen` 이 선행되지 않으면 라우트 타입이 검증되지 않는다.
 - 검증 명령: `pnpm front ci:core`(lint → check:types → build). PR 직전 `pnpm front ci:all`(+ 스텁 검사 + 헬스 경로 검사).
 
-## 7. 테스트
+## 7. 테스트 — vitest
 
-**아직 없다** (의도된 미도입 — `tasks-frontend-cicd.md`). 그래서 `ci:core` 에 `test` 단계가 없다.
-도입하면 `check:stubs` 의 `.only` 규칙이 실효를 갖고 `ci:core` 정의가 바뀐다 — 그때 이 절을 채운다.
+2026-09-04 도입 (D6 해소). `ci:core` 와 `ci:all` 에 **`test` 단계가 있다.**
 
-⚠️ 팀 방침은 TDD 인데 프론트만 테스트가 없다. 도입 여부는 미결정이다 ([`tasks-my-story.md`](../../docs/tasks/tasks-my-story.md) D6).
+- 설정은 `vitest.config.mts` 하나. 테스트 파일은 **소스 옆에** `*.test.ts` 로 둔다(`lib/api/client.test.ts`).
+- 지금은 `environment: 'node'` 다 — **순수 로직과 `lib/api` 래퍼**를 덮는다. 컴포넌트 테스트(jsdom + Testing Library)는 필요해질 때 도입하고 그때 이 절을 고친다.
+- `@nerd/contracts` 는 **소스로** 해석한다(`resolve.alias`). dist 로 두면 contracts 를 고치고 빌드를 안 했을 때 낡은 산출물을 검증한다.
+- `restoreMocks: true` 라 `afterEach` 복원을 직접 쓰지 않는다. 전역 스텁은 `vi.unstubAllGlobals()` 로 되돌린다.
+- ⚠️ `scripts/check-stubs.mjs` 의 `TARGET_DIRS` 에 **새 최상위 디렉터리를 추가한다.** 빠지면 그 디렉터리의 `.only`·`TODO` 가 검사에서 통째로 빠진다(현재 `app` · `components` · `lib` · `scripts`).
 
 ## 8. 컴포넌트·디자인 시스템
 
 ### 폴더 경계
 
 ```text
-app/                    라우트만. (demo) = 시연 · (trial) = 체험(인증 필요)
-components/ui/          Button · Card · Modal — 도메인을 모른다
-components/story/       StoryCard · BookFrame · AudioPlayer
-hooks/  lib/api/  types/
+app/                    라우트만. (demo) = 시연 · (trial) = 체험(인증 필요, Slice 2)
+components/ui/          actionStyles · ActionLink · Card — 도메인을 모른다
+components/story/       StoryCard — 도메인 컴포넌트
+lib/api/                fetch 래퍼 · ApiError
 ```
 
+🚫 **빈 디렉터리를 미리 만들지 않는다.** `hooks/` · `types/` 는 넣을 것이 생길 때 만든다 —
+지금 만들면 git 이 추적하지도 않고 Dockerfile COPY 목록만 헷갈리게 한다.
+⚠️ **새 최상위 디렉터리를 만들면 `Dockerfile` 의 COPY 목록과 `check-stubs` 의 `TARGET_DIRS` 에 함께 추가한다.**
+
 - `@/*` alias 가 `./*` 로 잡혀 있다. 상대경로 `../../` 를 쓰지 않는다.
+- 라우트 그룹 `(demo)` 는 로그인 없이 도는 시연 모드다. `(trial)` 은 인증이 생기는 Slice 2 에서 만든다.
 - 🚫 **`components/ui/` 가 도메인 타입을 import 하지 않는다.** 동화·세션 타입이 들어오는 순간 그 컴포넌트는 `components/story/` 로 간다. 이 경계가 무너지면 "공용 UI"가 도메인에 묶여 재사용이 끊긴다.
 - 라우트 전용 컴포넌트는 그 라우트 폴더에 colocate 한다. **두 번째 라우트가 쓰는 순간** `components/` 로 올린다 — 미리 올리지 않는다.
 - 인증 가드는 **`(trial)/layout.tsx` 한 곳**에만 둔다. 페이지마다 검사하면 빠뜨린 페이지가 곧 구멍이다.
@@ -108,9 +122,27 @@ const variantStyles: Record<Variant, string> = { primary: '...', ghost: '...' };
 
 🚫 `cva`·`tailwind-merge`·`clsx` 를 도입하지 않는다. 객체 맵으로 같은 일이 되고, 새 의존성은 승인 대상이다 (`CLAUDE.md` Ask).
 
+### ⭐ 같은 모양이 태그를 넘나들면 **래퍼가 아니라 문자열을 공유**한다
+
+같은 CTA 가 상황에 따라 `<button>` 도 되고 `<Link>` 도 된다. 래퍼만 만들어 두면 **다른 태그가 필요한
+순간 클래스를 손으로 옮겨 적게 되고 두 벌이 된다** — 2026-09-04 리뷰에서 실제로 잡혔다(홈 링크가
+버튼 클래스 10개를 복제하고 있었다).
+
+- 스타일 문자열을 `components/ui/actionStyles.ts` 처럼 **함수 하나로** 뽑고, 래퍼들이 그것을 부른다.
+- 🚫 새 래퍼를 만들 때 클래스를 복사하지 않는다. `actionClass(variant, extra)` 를 부른다.
+
+### 🚫 컴포넌트를 **첫 사용처 없이** 만들지 않는다
+
+쓰이지 않는 컴포넌트는 린트도 타입체크도 잡지 못하고(빌드에서 조용히 트리셰이킹된다), 디자인이
+바뀌어도 아무도 고치지 않아 **틀린 예제**로 남는다. 필요해지는 화면과 **같은 커밋에서** 만든다.
+- 미사용 판별은 어휘 grep 만으로 하지 않는다 — **빌드 산출물(JS 청크)에 식별 문자열이 있는지**로 교차 확인한다
+  (Tailwind 는 import 여부와 무관하게 소스를 스캔하므로 **CSS 는 근거가 되지 않는다**).
+
 ### 디자인 토큰
 
-- 정의는 **`app/globals.css` 의 `@theme inline` 한 곳**이다 (Tailwind v4 CSS-first). 🚫 `tailwind.config.ts` 를 만들지 않는다.
+- 정의는 **`app/globals.css` 의 `@theme` 한 곳**이다 (Tailwind v4 CSS-first). 🚫 `tailwind.config.ts` 를 만들지 않는다.
+- 생성되는 유틸리티: `bg-primary` `text-ink` `rounded-card` `rounded-pill` `min-h-touch` `size-touch` 등. **토큰을 추가하면 빌드 산출 CSS 에서 유틸리티가 실제로 나오는지 확인한다** — 오타는 빌드를 깨뜨리지 않고 그냥 클래스가 없는 상태가 된다.
+- 🚫 **폰트에 `next/font/google` 을 쓰지 않는다.** `next build` 가 네트워크를 타게 되고(오프라인·프록시 빌드 실패), 한글 서브셋 확보가 불확실하다. 시스템 스택을 쓴다.
 - 🚫 **컴포넌트에 색 리터럴(`bg-[#6BA3D6]`)을 쓰지 않는다.** 토큰만 쓴다. 리터럴이 한 번 퍼지면 팔레트 변경이 전수 수정이 된다.
 - 🚫 다크모드를 쓰지 않는다. 시안이 전부 라이트이고 파스텔 팔레트가 다크에서 성립하지 않는다.
 
