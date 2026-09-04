@@ -13,6 +13,7 @@ import { createGlobalValidationPipe } from '@common/pipes/global-validation-pipe
 import { REDIS_CLIENT, RedisModule } from '@common/redis/redis.module';
 import { validateEnv } from '@config/env.validation';
 import { HealthModule } from '@modules/health/health.module';
+import { StoryModule } from '@modules/story/story.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { HealthModule } from '@modules/health/health.module';
     }),
 
     HealthModule,
+    StoryModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
