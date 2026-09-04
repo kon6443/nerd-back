@@ -205,16 +205,20 @@ AI 시안 5장(홈·리더·비하인드 선택·생성 대기·개인화 결과
 
 시안에서 **같은 구조가 세 화면에 반복**된다. 이걸 하나로 안 잡으면 카드 컴포넌트가 3벌 생긴다.
 
-| 컴포넌트 | 시안 등장 | 비고 |
-|---|---|---|
-| **`StoryCard`** | 홈 앨범 · 서재 목록 · **비하인드 A/B 선택** | ⭐ **셋이 같은 구조다** — 썸네일 + 제목 + 부제 + 설명 + 액션. `variant`(album·library·choice)로 흡수 |
-| `AppShell` + `TabBar` | 홈 (메인/동화 목록/설정/내 프로필) | 전역 레이아웃 |
-| `IconButton` | 리더·비하인드의 `집` 버튼 | 반복 등장 |
-| `ActionButton` | `얼굴 인식 시작` · `선택하기` · `다음 페이지` | 색만 다르다 → `variant` |
-| `FaceGuideCircle` | 홈 얼굴 등록 | 촬영 화면과 공유 |
-| `BookFrame` | 리더 · 비하인드 | 페이지 컬 배경 |
-| ~~`AudioPlayer`~~ | 리더 | **보류 (D9)** — 낭독을 할지 자체가 미정이다. 쓸지 모르는 컴포넌트를 먼저 만들지 않는다 |
-| `ProgressWithTip` | 생성 대기 | 진행률 + 팁 텍스트. **Slice 4 의 UX 답이다** |
+> ⚠️ 아래는 **시안이 요구하는 목록**이지 구현 현황이 아니다. 🚫 컴포넌트는 **첫 사용처와 함께** 만든다 —
+> 미리 만들면 아무도 import 하지 않는 죽은 코드가 되고, 디자인이 바뀌어도 안 고쳐져 틀린 예제로 남는다
+> (2026-09-04 리뷰에서 실제로 걸렸다). **구현됨** 표기가 없으면 아직 없는 것이다.
+
+| 컴포넌트 | 시안 등장 | 상태 | 비고 |
+|---|---|---|---|
+| **`StoryCard`** | 홈 앨범 · 서재 목록 · **비하인드 A/B 선택** | ✅ | ⭐ **셋이 같은 구조다** — 썸네일 + 제목 + 부제 + 설명 + 액션. `variant`(album·library·choice)로 흡수 |
+| `AppShell` + `TabBar` | 홈 (메인/동화 목록/설정/내 프로필) | 미구현 | 전역 레이아웃 |
+| `IconButton` | 리더·비하인드의 `집` 버튼 | 미구현 | 반복 등장 |
+| `ActionButton` | `얼굴 인식 시작` · `선택하기` · `다음 페이지` | 미구현 — 스타일은 `actionClass` 가 이미 있다 | 색만 다르다 → `variant` |
+| `FaceGuideCircle` | 홈 얼굴 등록 | 미구현 | 촬영 화면과 공유 |
+| `BookFrame` | 리더 · 비하인드 | 미구현 | 페이지 컬 배경 |
+| ~~`AudioPlayer`~~ | 리더 | 보류 | **보류 (D9)** — 낭독을 할지 자체가 미정이다. 쓸지 모르는 컴포넌트를 먼저 만들지 않는다 |
+| `ProgressWithTip` | 생성 대기 | 미구현 | 진행률 + 팁 텍스트. **Slice 4 의 UX 답이다** |
 
 **variant 는 `Record<Variant, string>` 객체 맵으로 관리한다.** 참고 B 의 방식이고 `cva`·`tailwind-merge`·`clsx` **의존성이 0개**로 해결된다. 새 의존성은 승인 대상이므로 이쪽이 유리하다.
 
@@ -679,16 +683,66 @@ stack YAML 의 헬스체크가 상대경로(`node scripts/healthcheck.mjs`)라 �
 - [ ] **B4** `ErrorCode` 유니온 타입
 - [ ] 검증: `pnpm back ci:core` — B1·B2 정리 후에도 기존 spec 이 **같은 것을 검증하는지** 확인
 
-**0-B. 프론트 기반**
+### ✅ 0-B. 프론트 기반 (완료 2026-09-04)
 
-- [ ] 스캐폴드 잔재 정리 — `lang="ko"` · 서비스명 · **한글 폰트** · `body` font-family 잔재 · 다크모드 블록 제거
-- [ ] `globals.css` 의 `@theme inline` 에 **디자인 토큰** 정의 (색·반경·터치 타깃)
-- [ ] 폴더 뼈대 — `components/ui` · `components/story` · `hooks` · `lib/api` · `types`
-- [ ] `lib/api` — `ApiSuccess<T>` · `ApiErrorBody` · `ApiError` 클래스 + fetch 래퍼. **baseURL 은 호출 컨텍스트가 정한다**
-- [ ] `components/ui` 1차 — `ActionButton` · `IconButton` · `Card` (variant 는 `Record<Variant,string>` 맵)
-- [ ] 라우트 그룹 뼈대 — `(demo)` · `(trial)`
-- [ ] **vitest 도입 (D6)** — 순수 로직과 `lib/api` 래퍼부터. `ci:core` 에 `test` 단계를 넣고 `front-code-patterns.md` §7 을 다시 쓴다
-- [ ] 검증: `pnpm front ci:core` (이제 `test` 포함)
+- [x] 스캐폴드 잔재 정리 — `lang="ko"` · 서비스명 · `body` font-family 잔재 · **다크모드 블록 제거**(빌드 CSS 에서 `prefers-color-scheme` 0건 확인)
+- [x] `globals.css` 의 `@theme` 에 **디자인 토큰** — 색·반경·`--spacing-touch`(56px). **빌드 산출 CSS 에서 유틸리티가 실제로 생성되는지 대조 확인**
+- [x] 폴더 뼈대 — `components/ui` · `components/story` · `lib/api`
+- [x] `lib/api` — `ApiError` + `apiFetch`. **baseURL 은 호출 시점에 결정**한다(모듈 로드 시점 고정 금지)
+- [x] `components/ui` — `actionStyles`(스타일 소스) · `ActionLink` · `Card` (variant 는 `Record<Variant,string>` 맵, 의존성 0개)
+- [x] `components/story/StoryCard` — 앨범·서재·비하인드 **세 화면의 중복을 하나로 흡수**
+- [x] 라우트 그룹 `(demo)` + 서재 페이지(`force-dynamic` — 빌드 시점에 백엔드를 부르지 않는다)
+- [x] **vitest 도입 (D6)** — `ci:core`·`ci:all` 에 `test` 단계. `lib/api` 11건
+- [x] `check-stubs` 의 `TARGET_DIRS` 에 `components`·`lib` 추가 — 빠지면 그 디렉터리의 `.only`·`TODO` 가 통째로 검사에서 빠진다
+- [x] **프론트 빌드 컨텍스트를 레포 루트로** + 워크플로 `context`·`paths` + `docs/deploy.md`
+- [x] 검증: `pnpm ci:all` 통과 · **컨테이너를 실제로 띄워** 확인
+
+#### 2차 리뷰 지적 반영 (2026-09-04)
+
+리뷰가 **이 슬라이스의 목적과 정면으로 어긋나는 중복**을 잡았다. 셋 다 고쳤다.
+
+| 지적 | 실체 | 수정 |
+|---|---|---|
+| 홈 링크가 CTA 클래스를 **인라인 복제** | 두 문자열의 **공통 클래스 10개** — `ActionButton` 이 `<button>` 이라 링크에 못 써서 옮겨 적었다 | 스타일을 `actionStyles.ts` 의 `actionClass()` **함수 하나**로 뽑고 `ActionLink` 가 그것을 쓴다. **래퍼가 아니라 문자열을 공유**한다 |
+| `ActionButton`·`IconButton` **미사용** | import 0건 + 빌드 JS 청크 **0개 파일**(대조군 `StoryCard` 3개) | 삭제. 버튼형 CTA 는 첫 사용처가 생길 때 **같은 `actionClass` 로** 만든다 |
+| `*.test.ts` 가 빌드 컨텍스트에 포함 | `**/test` 는 **디렉터리명만** 매칭한다 | `.dockerignore` 에 `**/*.test.ts(x)` 추가. 컨텍스트 프로브로 **0건** 확인(대조군 `client.ts` 존재) |
+
+**검증** — 수정 후 `pnpm ci:all` 통과(back 단위 85·E2E 31, front 11, 경고 0), pristine 트리에서 두 컨테이너 빌드 성공, 프론트 기동(헬스체크 exit 0 · `/` 200 · CTA 렌더 확인).
+모든 컴포넌트가 빌드 JS 에 존재(11/3/3), 삭제된 것은 0개, BASE 클래스 문자열은 **소스 1개 파일**에만 있다.
+
+**하지 않은 것** — `(trial)` 라우트 그룹은 인증이 생기는 Slice 2 에서 만든다. `hooks/`·`types/` 는
+넣을 것이 생길 때 만든다(빈 디렉터리는 git 이 추적하지도 않고 COPY 목록만 헷갈리게 한다).
+컴포넌트 테스트(jsdom + Testing Library)도 필요해질 때 도입한다.
+
+**폰트** — `next/font/google` 을 쓰지 않고 **시스템 스택**으로 갔다. `next build` 가 네트워크를 타지
+않게 하려는 것이고(오프라인·프록시 빌드 실패 제거), 한글 서브셋 확보가 Google Fonts 경로에서
+불확실하다. 유아틱 라운드 폰트는 UI 담당이 정하면 `globals.css` 한 곳에서 교체한다. **색 값도 초안이다.**
+
+**`API_PREFIX` 를 contracts 로 올렸다** — 프론트가 URL 을 만들 때 같은 값을 쓰므로 계약 값이다.
+백엔드는 재수출한다(`SUCCESS_CODE` 와 같은 선례).
+
+#### ⚠️ 이번에 드러난 것 — `outputFileTracingRoot` 는 **모듈 해석 경계**다
+
+프론트가 `@nerd/contracts` 를 가져가면서 `next.config.ts` 의 `outputFileTracingRoot` 를 **레포 루트로
+바꿔야 했다.** 이름은 "트레이싱"이지만 **Turbopack 의 모듈 해석 경계이기도 해서**, 앱으로 좁히면
+`Module not found: Can't resolve '@nerd/contracts'` 로 **빌드가 실패한다**(실측).
+
+⚠️ 처음에는 "NFT 가 앱 밖 파일을 담지 못한다" 는 이유로 바꿨는데 **그 가정은 틀렸다** —
+Next 는 서버 코드를 번들링하므로 contracts 는 산출물에 인라인된다(컨테이너 실측: `require.resolve`
+는 실패하는데 페이지는 정상). 되돌렸다가 빌드가 깨져서 진짜 이유를 알았다. 코드 주석에 실측 근거로 적었다.
+
+**검증 근거**
+
+| 확인한 것 | 결과 |
+|---|---|
+| `pnpm ci:all` | contracts · back(단위 85 · E2E 31) · front(11) 전부 통과 · 경고 0 |
+| 디자인 토큰 | 빌드 CSS 에서 `min-h-touch` `size-touch` `rounded-card` `rounded-pill` 등 **생성 확인** |
+| 다크모드 제거 | 빌드 CSS 에 `prefers-color-scheme` **0건** |
+| 프론트 컨테이너 | 빌드 → **기동** → 헬스체크 exit 0 · `/` 200(한글 렌더) · CSS 200 · `/api/health` 200 |
+| contracts 런타임 | `/library` 가 `Cannot find module` 이 아니라 **`fetch failed`** 로 실패 (모듈은 해석됨) |
+| `.env` 규칙 | 빌드 컨텍스트에 `apps/front/.env.production` **만** 들어가고 `.env.local` 은 차단 (양성·음성 대조) |
+| 백엔드 컨테이너 | `.dockerignore` 변경 후 재빌드·런타임 해석 재확인 |
+| 워크플로 paths | 공유 5건은 **의도된 예외**, 앱·인프라 경로 겹침 **0건** | (이제 `test` 포함)
 
 > ⚠️ **B1~B3 은 이미 머지된 Slice 1 코드를 건드린다.** 리팩터링과 신규 기능을 같은 커밋에 섞지 않는다 —
 > 별도 커밋(`refactor(back): ...`)으로 분리하고, **테스트가 같은 것을 검증하는지**를 먼저 확인한다.
