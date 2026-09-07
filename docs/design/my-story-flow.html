@@ -46,41 +46,22 @@
 
   * { box-sizing: border-box; }
 
+  html, body { height: 100%; }
   body {
     margin: 0;
-    padding: 20px 16px 36px;
-    background: #E9F2F8;
+    padding: 0;
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--color-primary-tint), var(--color-primary-soft));
     color: var(--color-ink);
     font-family: var(--font-body);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
+    display: grid;
+    place-items: center;
   }
 
-  .page-head {
-    width: min(1088px, 100%);
-    display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px;
-  }
-  .page-head h1 { font-family: var(--font-display); font-size: 20px; margin: 0; }
-  .page-head p { margin: 0; font-size: 13px; color: var(--color-ink-soft); }
-  .page-head .sp { flex: 1; }
-  .flowmap { display: flex; flex-wrap: wrap; gap: 5px; font-size: 11px; color: var(--color-ink-faint); }
-  .flowmap b { font-weight: 400; padding: 3px 8px; border-radius: var(--radius-pill); border: 1px solid var(--color-line); background: #fff; }
-  .flowmap b.on { color: #fff; background: var(--color-ink); border-color: var(--color-ink); }
-
-  /* ── 태블릿 (기준 뷰포트 1024×768 가로) ────────────── */
-  .stagewrap { width: 100%; display: flex; justify-content: center; }
-  .device {
-    width: 1088px; height: 832px; flex: none;
-    transform-origin: top center;
-    background: linear-gradient(160deg, #2C4A64, #1D3549);
-    border-radius: 40px; padding: 32px;
-    box-shadow: 0 26px 60px rgba(20,45,70,.32), inset 0 2px 0 rgba(255,255,255,.14);
-  }
+  /* ── 화면 (기준 뷰포트 1024×768 태블릿 가로) ───────── */
   .screen {
-    position: relative; width: 1024px; height: 768px;
-    border-radius: 16px; overflow: hidden;
+    position: relative; width: 1024px; height: 768px; flex: none;
+    overflow: hidden;
     background: linear-gradient(180deg, var(--color-primary-tint), var(--color-primary-soft));
   }
   .scene-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
@@ -347,27 +328,12 @@
            font-size: 14px; display: none; max-width: 78%; }
   .toast.on { display: block; animation: rise .28s ease both; }
 
-  .notes { width: min(1088px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(238px, 1fr)); gap: 12px; }
-  .note { border: 1px solid #CFE0EC; border-radius: 14px; padding: 14px 16px; background: #F3F8FC; }
-  .note h3 { font-family: var(--font-display); font-size: 14px; margin: 0 0 6px; color: var(--color-ink); }
-  .note p { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--color-ink-soft); }
-  .note b { color: var(--color-ink); font-weight: 400; }
-
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
   }
 </style>
 
-<div class="page-head">
-  <h1>내가 주인공인 동화</h1>
-  <p>시연 · 체험 두 모드 · 기준 뷰포트 1024×768</p>
-  <div class="sp"></div>
-  <div class="flowmap" id="flowmap"></div>
-</div>
-
-<div class="stagewrap">
-<div class="device" id="device">
-  <div class="screen">
+  <div class="screen" id="screen">
 
     <svg class="scene-bg" viewBox="0 0 1024 768" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
       <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
@@ -604,35 +570,19 @@
 
     <div class="toast" id="toast"></div>
   </div>
-</div>
-</div>
-
-<div class="notes">
-  <div class="note"><h3>순서를 바로잡았다</h3>
-    <p>얼굴 촬영이 <b>동화 선택 뒤</b>로 갔다. <code>POST /sessions</code> 가 어떤 동화인지 알아야 세션을 만들고, 얼굴은 그 세션에 붙는다(<code>/sessions/:id/face</code>).</p></div>
-  <div class="note"><h3>제한은 카운터가 아니다</h3>
-    <p><code>UNIQUE(user_id, template_id)</code> 라 <b>이미 만든 동화는 서재에서 잠긴다.</b> 남은 횟수를 보여주지 않는 이유다.</p></div>
-  <div class="note"><h3>시연도 촬영을 탄다</h3>
-    <p>같은 화면·같은 연출을 쓰되 <b>카메라를 켜지 않고 AI 도 부르지 않는다.</b> 미리 합성해 둔 얼굴을 만든 것처럼 보여준다. 그래서 진행이 더 빠르다.</p></div>
-  <div class="note"><h3>시연은 로그인이 없다</h3>
-    <p>코드로 확인했다 — <code>(demo)</code> 에 인증 가드가 없고 <code>story</code> 컨트롤러에도 <code>AuthGuard</code> 가 0건이다. 로그인은 「내 얼굴로 만들기」에서만 요구한다.</p></div>
-  <div class="note"><h3>정면 1장</h3>
-    <p>3컷 → <b>1컷</b>. 촬영 실패 지점이 셋에서 하나로 줄고, 아이가 지루해지기 전에 끝난다.</p></div>
-</div>
 
 <script>
 (function () {
   "use strict";
 
-  /* ── 화면 맞춤 ─────────────────────────────────────── */
-  var device = document.getElementById("device");
+  /* ── 화면 맞춤 — 1024×768 고정 설계를 창에 맞춰 확대·축소 ── */
+  var screen = document.getElementById("screen");
   function fit() {
-    var w = document.documentElement.clientWidth - 32;
-    var h = window.innerHeight - 190;
-    var s = Math.min(w / 1088, h / 832, 1);
+    var w = document.documentElement.clientWidth;
+    var h = window.innerHeight;
+    var s = Math.min(w / 1024, h / 768);
     if (!isFinite(s) || s <= 0) s = 1;
-    device.style.transform = "scale(" + s + ")";
-    device.parentElement.style.height = (832 * s) + "px";
+    screen.style.transform = "scale(" + s + ")";
   }
   window.addEventListener("resize", fit); fit();
 
@@ -812,13 +762,7 @@
   }
 
   /* ── 뷰 전환 ───────────────────────────────────────── */
-  var FLOW = [["home","진입"],["login","로그인"],["library","서재"],["detail","상세"],["capture","얼굴 촬영"],
-              ["magic","합성"],["confirm","확인"],["generating","생성"],["reader","읽기"],["branch","비하인드 A/B"],
-              ["end","마무리"],["album","앨범"]];
   var cur = "home";
-  var flowmap = document.getElementById("flowmap");
-  flowmap.innerHTML = FLOW.map(function (f) { return '<b data-k="' + f[0] + '">' + f[1] + "</b>"; }).join("");
-
   var NAV = [["home","홈"],["library","서재"],["album","앨범"],["login","로그인"]];
   function renderNav() {
     document.getElementById("appnav").innerHTML = NAV.map(function (n) {
@@ -833,7 +777,6 @@
     document.querySelectorAll(".view.on").forEach(function (v) { v.classList.remove("on"); });
     el.classList.add("on");
     cur = key;
-    flowmap.querySelectorAll("b").forEach(function (b) { b.classList.toggle("on", b.dataset.k === key); });
     renderNav();
     document.getElementById("floatbtn").hidden = !(key === "reader" && S.mode === "demo");
     if (key !== "capture") stopCam();
