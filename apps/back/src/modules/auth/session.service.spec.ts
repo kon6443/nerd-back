@@ -1,79 +1,61 @@
-import { Redis } from 'ioredis';
 import { SESSION_TTL_SECONDS, SessionService } from './session.service';
 
-function createRedis() {
-  return { set: jest.fn(), get: jest.fn(), del: jest.fn() };
-}
-
+/**
+ * 서명 쿠키 세션.
+ *
+ * ⚠️ **서명 자체는 여기서 검증하지 않는다.** HMAC 은 `cookie-parser`(cookie-signature)가 하고,
+ * 그 라이브러리는 HMAC-SHA256 + `crypto.timingSafeEqual` 이다. 여기서 검증하는 것은 **우리가 쓴
+ * 부분** — 값 형식과 만료 판정이다. 서명이 실제로 붙는지는 E2E(`auth.e2e-spec.ts`)가 고정한다.
+ */
 describe('SessionService', () => {
-  let redis: ReturnType<typeof createRedis>;
-  let service: SessionService;
+  const service = new SessionService();
 
-  beforeEach(() => {
-    redis = createRedis();
-    service = new SessionService(redis as unknown as Redis);
-  });
+  describe('issue', () => {
+    it('`<userId>:<만료 epoch>` 형식이다', () => {
+      const value = service.issue(42);
+      const [userId, expiresAt] = value.split(':');
 
-  describe('create', () => {
-    it('TTL 과 함께 저장한다', async () => {
-      await service.create(7);
-
-      expect(redis.set).toHaveBeenCalledWith(
-        expect.stringMatching(/^sess:/),
-        '7',
-        'EX',
-        SESSION_TTL_SECONDS,
-      );
+      expect(userId).toBe('42');
+      expect(Number(expiresAt)).toBeGreaterThan(Date.now());
     });
 
-    it('세션 id 가 매번 다르다 ⭐', async () => {
-      const [a, b] = await Promise.all([service.create(1), service.create(1)]);
+    it('만료가 TTL 만큼 뒤다', () => {
+      const before = Date.now();
+      const expiresAt = Number(service.issue(1).split(':')[1]);
 
-      expect(a).not.toBe(b);
-      // 32바이트를 base64url 로 — 추측 가능한 길이가 아니어야 한다.
-      expect(a.length).toBeGreaterThanOrEqual(40);
+      // 실행 시간 오차를 감안해 범위로 본다. 🚫 정확한 값을 기대하지 않는다 — 그러면
+      // 느린 CI 에서 간헐적으로 깨지는 테스트가 된다.
+      expect(expiresAt).toBeGreaterThanOrEqual(before + SESSION_TTL_SECONDS * 1000);
+      expect(expiresAt).toBeLessThanOrEqual(Date.now() + SESSION_TTL_SECONDS * 1000);
     });
   });
 
   describe('resolveUserId', () => {
-    it('저장된 사용자 id 를 돌려준다', async () => {
-      redis.get.mockResolvedValue('7');
-
-      await expect(service.resolveUserId('sid')).resolves.toBe(7);
+    it('방금 발급한 값에서 사용자 id 를 되찾는다', () => {
+      expect(service.resolveUserId(service.issue(42))).toBe(42);
     });
 
-    it('없는 세션은 null 이다', async () => {
-      redis.get.mockResolvedValue(null);
+    it('만료된 값은 거절한다 ⭐', () => {
+      // 🚫 쿠키의 maxAge 에 기대지 않는다 — 그건 브라우저에게 주는 힌트일 뿐이라
+      //    만료된 쿠키를 계속 보내는 클라이언트를 서버가 막지 못한다.
+      const expired = `42:${Date.now() - 1}`;
 
-      await expect(service.resolveUserId('sid')).resolves.toBeNull();
+      expect(service.resolveUserId(expired)).toBeNull();
     });
 
-    it('숫자가 아닌 값은 null 이다', async () => {
-      redis.get.mockResolvedValue('not-a-number');
-
-      await expect(service.resolveUserId('sid')).resolves.toBeNull();
-    });
-
-    it('Redis 장애면 **거절한다** — fail-closed ⭐', async () => {
-      // 레이트리밋은 fail-open 이지만 인증은 반대다. 이 방향이 뒤집히면
-      // Redis 장애가 곧 전면 인증 우회가 된다.
-      redis.get.mockRejectedValue(new Error('ECONNREFUSED'));
-
-      await expect(service.resolveUserId('sid')).resolves.toBeNull();
-    });
-  });
-
-  describe('destroy', () => {
-    it('키를 지운다', async () => {
-      await service.destroy('sid');
-
-      expect(redis.del).toHaveBeenCalledWith('sess:sid');
-    });
-
-    it('Redis 장애여도 던지지 않는다 — 로그아웃 응답까지 실패시키지 않는다', async () => {
-      redis.del.mockRejectedValue(new Error('ECONNREFUSED'));
-
-      await expect(service.destroy('sid')).resolves.toBeUndefined();
+    it.each([
+      ['없음(undefined)', undefined],
+      ['서명 위조 — cookie-parser 가 false 를 준다 ⭐', false],
+      ['빈 문자열', ''],
+      ['구분자 없음', '42'],
+      ['userId 가 숫자가 아님', 'abc:9999999999999'],
+      ['userId 가 0 — Number("") 가 0 이 되는 경로', ':9999999999999'],
+      ['userId 가 음수', '-1:9999999999999'],
+      ['userId 가 소수', '1.5:9999999999999'],
+      ['만료가 숫자가 아님', '42:abc'],
+      ['만료가 비어 있음', '42:'],
+    ])('%s → null', (_label, value) => {
+      expect(service.resolveUserId(value)).toBeNull();
     });
   });
 });

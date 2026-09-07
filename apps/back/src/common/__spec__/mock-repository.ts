@@ -12,7 +12,7 @@ import type { ObjectLiteral, Repository } from 'typeorm';
 
 /**
  * 스텁이 제공하는 메서드. **지금 spec 이 실제로 호출하는 것만 둔다** (2026-09-04 실측:
- * `find` · `findOne` · `findOneBy` · `countBy` · `save`). 🚫 `Repository<T>` 의 표면을 미리 흉내 내지
+ * `find` · `findOne` · `findOneBy` · `countBy` · `save` · `delete`). 🚫 `Repository<T>` 의 표면을 미리 흉내 내지
  * 않는다 — 쓰지 않는 스텁은 "이 스텁으로 뭘 검증할 수 있나"를 흐린다.
  *
  * 필요해지면 **두 곳(타입·팩토리)에 한 줄씩** 추가한다.
@@ -23,6 +23,7 @@ interface MockedMethods {
   findOneBy: jest.Mock;
   countBy: jest.Mock;
   save: jest.Mock;
+  delete: jest.Mock;
 }
 
 export type MockRepository<T extends ObjectLiteral> = MockedMethods & Partial<Repository<T>>;
@@ -34,6 +35,7 @@ export function createMockRepository<T extends ObjectLiteral>(): MockRepository<
     findOneBy: jest.fn(),
     countBy: jest.fn(),
     save: jest.fn(),
+    delete: jest.fn(),
   };
 }
 

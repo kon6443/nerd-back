@@ -4,7 +4,6 @@ import request from 'supertest';
 import type { INestApplication } from '@nestjs/common';
 import type { Server } from 'node:http';
 import { API_PREFIX } from '@common/constants/app.constants';
-import { REDIS_CLIENT } from '@common/redis/redis.module';
 import { AuthGuard } from '@common/guards/auth.guard';
 import { User } from '@entities/user.entity';
 import { AuthController } from '@modules/auth/auth.controller';
@@ -18,21 +17,17 @@ function server(app: INestApplication): Server {
 }
 
 /**
- * Redis·DB 를 **메모리로 대체**해 가입 → 쿠키 → 인증까지 한 흐름으로 검증한다.
+ * DB 를 **메모리로 대체**해 가입 → 쿠키 → 인증까지 한 흐름으로 검증한다.
  * 스텁이 아니라 흐름이 목적이라 상태를 실제로 들고 있게 만든다.
+ *
+ * ⚠️ **Redis 스텁이 없다.** 2026-09-07 부터 세션이 서명 쿠키라 인증 경로가 Redis 를 쓰지 않는다.
+ * (`createE2eApp` 이 헬스체크용 `ping` 스텁을 기본으로 넣어 준다.)
  */
 function createStores() {
-  const redis = new Map<string, string>();
   const rows: User[] = [];
   let nextId = 1;
 
   return {
-    redis: {
-      ping: () => Promise.resolve('PONG'),
-      set: (k: string, v: string) => Promise.resolve(redis.set(k, v) && 'OK'),
-      get: (k: string) => Promise.resolve(redis.get(k) ?? null),
-      del: (k: string) => Promise.resolve(redis.delete(k) ? 1 : 0),
-    },
     users: {
       save: (input: Partial<User>) => {
         // DB UNIQUE 제약을 흉내 낸다 — 앱이 그 위반을 409 로 옮기는 경로를 검증하려면 필요하다.
@@ -69,7 +64,6 @@ describe('인증 (E2E)', () => {
         SessionService,
         AuthGuard,
         { provide: ConfigService, useValue: { get: () => 'LOCAL' } },
-        { provide: REDIS_CLIENT, useValue: stores.redis },
         { provide: getRepositoryToken(User), useValue: stores.users },
       ],
     });
@@ -181,7 +175,33 @@ describe('인증 (E2E)', () => {
   });
 
   describe('로그아웃', () => {
-    it('204 를 주고 세션을 무효화한다 ⭐', async () => {
+    it('204 를 주고 브라우저의 쿠키를 지운다', async () => {
+      const created = await signup();
+      const cookie = created.headers['set-cookie'];
+
+      const res = await request(server(app))
+        .post(`/${API_PREFIX}/auth/logout`)
+        .set('Cookie', cookie)
+        .expect(204);
+
+      // 심을 때와 같은 옵션으로 지워야 브라우저가 같은 쿠키로 인식하고 실제로 지운다.
+      const cleared = (res.headers['set-cookie'] as unknown as string[]).join(';');
+      expect(cleared).toContain('sid=;');
+      expect(cleared).toContain('Path=/');
+    });
+
+    /**
+     * ⚠️ **이 동작은 2026-09-07 에 의도적으로 바뀌었다.** 세션을 Redis 에서 서명 쿠키로 옮기면서
+     * **서버측 강제 만료를 잃었다.** 예전에는 이 자리에서 401 이 나왔다.
+     *
+     * 실제 사용자에게는 차이가 없다 — 브라우저가 쿠키를 지웠으므로 다시 보내지 않는다.
+     * 차이는 **이미 탈취된 쿠키**에서 난다: 만료(7일)까지 유효하고 서버가 막을 수단이 없다.
+     *
+     * 🚫 이 테스트를 "버그" 로 보고 고치지 않는다. 강제 로그아웃이 필요해지면
+     * **서버측 세션으로 되돌리는 것**이 답이고, 그때 이 테스트가 401 로 돌아온다
+     * (`session.service.ts` 주석의 재검토 조건).
+     */
+    it('⚠️ 로그아웃해도 이미 발급된 쿠키 자체는 만료까지 유효하다 — 취소 수단이 없다', async () => {
       const created = await signup();
       const cookie = created.headers['set-cookie'];
 
@@ -190,8 +210,7 @@ describe('인증 (E2E)', () => {
         .set('Cookie', cookie)
         .expect(204);
 
-      // 같은 쿠키로 다시 접근하면 이제 막혀야 한다.
-      await request(server(app)).get(`/${API_PREFIX}/auth/me`).set('Cookie', cookie).expect(401);
+      await request(server(app)).get(`/${API_PREFIX}/auth/me`).set('Cookie', cookie).expect(200);
     });
 
     it('쿠키 없이도 204 다 — 멱등이라 재시도가 안전하다', async () => {

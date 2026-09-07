@@ -81,6 +81,16 @@ export const envSchema = dbEnvSchema.extend({
   REDIS_HOST: requiredText,
   REDIS_PORT: port(6379),
   REDIS_PASSWORD: z.string().optional(),
+  /**
+   * 세션 쿠키 서명 키 (`cookie-parser`).
+   *
+   * ⭐ **레플리카 3개가 같은 값을 써야 한다.** 다르면 A 가 심은 쿠키를 B 가 위조로 보고 거절해
+   * "새로고침할 때마다 로그인이 풀린다" 로 드러난다.
+   * ⚠️ 값을 바꾸면 **모든 사용자가 로그아웃된다**(서명이 안 맞게 되므로). 서버측 세션이 없는
+   * 지금 이것이 유일한 「전체 강제 로그아웃」 수단이다.
+   * 🚫 짧게 두지 않는다 — HMAC 키라 길이가 곧 강도다.
+   */
+  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET 은 32자 이상이어야 합니다.'),
   /** Swarm 이 {{.Task.Slot}} 으로 주입한다. 단일 실행 작업의 가드에 쓴다. */
   TASK_SLOT: z.coerce.number().int().min(1).default(1),
   /**

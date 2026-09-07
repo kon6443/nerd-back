@@ -21,13 +21,13 @@ function duplicateKeyError() {
 describe('AuthService', () => {
   let users: MockRepository<User>;
   let passwords: { hash: jest.Mock; verify: jest.Mock };
-  let sessions: { create: jest.Mock; destroy: jest.Mock };
+  let sessions: { issue: jest.Mock };
   let service: AuthService;
 
   beforeEach(() => {
     users = createMockRepository<User>();
     passwords = { hash: jest.fn().mockResolvedValue('scrypt$hash'), verify: jest.fn() };
-    sessions = { create: jest.fn().mockResolvedValue('sid-1'), destroy: jest.fn() };
+    sessions = { issue: jest.fn().mockReturnValue('42:9999999999999') };
 
     service = new AuthService(
       asRepository(users),
@@ -41,13 +41,13 @@ describe('AuthService', () => {
       users.save.mockResolvedValue(createUser({ id: 9 }));
 
       await expect(service.signup({ loginId: 'tester', password: 'pw12345678' })).resolves.toBe(
-        'sid-1',
+        '42:9999999999999',
       );
 
       expect(passwords.hash).toHaveBeenCalledWith('pw12345678');
       // 🚫 평문이 저장 경로에 들어가지 않는다.
       expect(users.save).toHaveBeenCalledWith({ loginId: 'tester', passwordHash: 'scrypt$hash' });
-      expect(sessions.create).toHaveBeenCalledWith(9);
+      expect(sessions.issue).toHaveBeenCalledWith(9);
     });
 
     it('아이디 중복은 409 · LOGIN_ID_TAKEN 이다 ⭐', async () => {
@@ -90,8 +90,8 @@ describe('AuthService', () => {
       users.findOne.mockResolvedValue(createUser({ id: 3 }));
       passwords.verify.mockResolvedValue(true);
 
-      await expect(service.login({ loginId: 'tester', password: 'pw' })).resolves.toBe('sid-1');
-      expect(sessions.create).toHaveBeenCalledWith(3);
+      await expect(service.login({ loginId: 'tester', password: 'pw' })).resolves.toBe('42:9999999999999');
+      expect(sessions.issue).toHaveBeenCalledWith(3);
     });
 
     it('비밀번호가 틀리면 401 · INVALID_CREDENTIALS 다', async () => {
@@ -131,13 +131,10 @@ describe('AuthService', () => {
 
       await service.login({ loginId: 'nobody', password: 'pw' }).catch(() => undefined);
 
-      expect(sessions.create).not.toHaveBeenCalled();
+      expect(sessions.issue).not.toHaveBeenCalled();
     });
   });
 
-  it('로그아웃은 세션을 파기한다', async () => {
-    await service.logout('sid-1');
-
-    expect(sessions.destroy).toHaveBeenCalledWith('sid-1');
-  });
+  // 🚫 로그아웃 테스트가 없다. 서버측 세션 상태가 없어 AuthService 가 하는 일이 없다 —
+  //    쿠키 삭제는 컨트롤러의 일이고 E2E 가 고정한다.
 });

@@ -33,8 +33,10 @@ export default async function StoryReaderPage({ params }: PageProps<"/library/[s
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 p-4 md:p-8">
       <header className="flex items-center justify-between gap-4">
+        {/* ⚠️ 목적지는 서재 목록이 아니라 **이 동화의 상세**다. 라벨을 「서재로」로 두면
+            전역 네비의 「서재」와 같은 곳으로 가는 것처럼 보이는데 실제로는 다르다. */}
         <ActionLink href={`/library/${slug}`} className="px-6 text-base">
-          서재로
+          동화 소개
         </ActionLink>
         <p className="text-lg font-bold text-ink-muted" aria-live="polite">
           {pageNo} / {story.pageCount}

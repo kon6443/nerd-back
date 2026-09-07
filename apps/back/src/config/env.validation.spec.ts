@@ -10,6 +10,7 @@ const DB_MINIMAL = {
 const MINIMAL = {
   ENV: 'LOCAL',
   REDIS_HOST: '127.0.0.1',
+  SESSION_SECRET: 'test-session-secret-0123456789abcdef',
   ...DB_MINIMAL,
 };
 
@@ -23,6 +24,20 @@ describe('validateEnv', () => {
     expect(result.TASK_SLOT).toBe(1);
     expect(result.DB_PORT).toBe(3306);
     expect(result.DB_POOL_SIZE).toBe(10);
+  });
+
+  describe('SESSION_SECRET — 세션 쿠키 서명 키', () => {
+    it('없으면 기동을 막는다 ⭐', () => {
+      // 🚫 기본값을 주지 않는다. 기본값이 있으면 **모든 배포가 같은 키**를 쓰게 되어
+      //    누구나 남의 세션 쿠키를 만들 수 있다. 없으면 부팅이 실패하는 쪽이 안전하다.
+      const { SESSION_SECRET: _omitted, ...withoutSecret } = MINIMAL;
+
+      expect(() => validateEnv(withoutSecret)).toThrow(/SESSION_SECRET/);
+    });
+
+    it('짧으면 막는다 — HMAC 키는 길이가 곧 강도다', () => {
+      expect(() => validateEnv({ ...MINIMAL, SESSION_SECRET: 'short' })).toThrow(/SESSION_SECRET/);
+    });
   });
 
   it('문자열로 들어온 숫자를 number 로 변환한다', () => {

@@ -8,6 +8,13 @@ import { StoryCharacter } from '@entities/story-character.entity';
 import { StoryPage } from '@entities/story-page.entity';
 import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { StoryTemplate } from '@entities/story-template.entity';
+import { ConfigService } from '@nestjs/config';
+import { User } from '@entities/user.entity';
+import { AuthController } from '@modules/auth/auth.controller';
+import { AuthService } from '@modules/auth/auth.service';
+import { PasswordService } from '@modules/auth/password.service';
+import { SessionService } from '@modules/auth/session.service';
+import { AuthGuard } from '@common/guards/auth.guard';
 import { StoryController } from '@modules/story/story.controller';
 import { StoryService } from '@modules/story/story.service';
 import { createE2eApp } from './helpers/e2e-app';
@@ -33,9 +40,17 @@ describe('Swagger 문서 (E2E)', () => {
 
   beforeAll(async () => {
     app = await createE2eApp({
-      controllers: [StoryController],
+      // ⚠️ **문서에 실리는 컨트롤러를 전부 올린다.** 하나라도 빠지면 그 엔드포인트가 문서에서
+      //    사라져도 이 테스트가 초록이다 — 2026-09-07 까지 auth 4종이 그 상태였다.
+      controllers: [StoryController, AuthController],
       providers: [
         StoryService,
+        AuthService,
+        PasswordService,
+        SessionService,
+        AuthGuard,
+        { provide: getRepositoryToken(User), useValue: stub() },
+        { provide: ConfigService, useValue: { get: () => 'LOCAL' } },
         { provide: getRepositoryToken(StoryTemplate), useValue: stub() },
         { provide: getRepositoryToken(StoryPage), useValue: stub() },
         { provide: getRepositoryToken(StoryCharacter), useValue: stub() },
@@ -59,6 +74,32 @@ describe('Swagger 문서 (E2E)', () => {
         PAGE_PATH,
       ]),
     );
+  });
+
+  it('인증 엔드포인트 4종이 문서에 있다', () => {
+    expect(Object.keys(doc.paths)).toEqual(
+      expect.arrayContaining([
+        `/${API_PREFIX}/auth/signup`,
+        `/${API_PREFIX}/auth/login`,
+        `/${API_PREFIX}/auth/logout`,
+        `/${API_PREFIX}/auth/me`,
+      ]),
+    );
+  });
+
+  /**
+   * ⚠️ **이 테스트는 문서만 본다. 실제 응답과 같은지는 검증하지 못한다.**
+   *
+   * 문서의 상태코드는 `@ApiSuccessResponse` 가 직접 선언하므로, `@HttpCode` 를 지워
+   * 실제 응답이 201 로 바뀌어도 문서는 200 그대로다 — 2026-09-07 변이 테스트로 확인했다.
+   *
+   * **실제 응답을 고정하는 것은 `auth.e2e-spec.ts` 다**(같은 변이에서 `expected 200, got 201`
+   * 로 실패한다). 둘은 짝이고, 한쪽만 있으면 문서와 동작이 갈려도 초록이다.
+   */
+  it('문서에 성공 상태코드가 선언되어 있다 (실제 응답 검증은 auth.e2e 가 한다)', () => {
+    expect(Object.keys(doc.paths[`/${API_PREFIX}/auth/signup`].post!.responses)).toContain('201');
+    expect(Object.keys(doc.paths[`/${API_PREFIX}/auth/login`].post!.responses)).toContain('200');
+    expect(Object.keys(doc.paths[`/${API_PREFIX}/auth/logout`].post!.responses)).toContain('204');
   });
 
   it('zod DTO 에서 경로 파라미터가 생성된다 ⭐', () => {

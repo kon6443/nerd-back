@@ -23,13 +23,11 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const sid: unknown = request.cookies?.[SESSION_COOKIE];
 
-    if (typeof sid !== 'string' || sid.length === 0) {
-      throw new UnauthorizedErrorResponseDto();
-    }
-
-    const userId = await this.sessions.resolveUserId(sid);
+    // ⚠️ **`cookies` 가 아니라 `signedCookies` 다.** `cookies` 에서 읽으면 서명이 검증되지 않은
+    //    원문을 그대로 믿게 되어 누구나 `sid=1:9999999999999` 로 남의 계정이 된다.
+    //    서명이 깨지면 cookie-parser 가 `false` 를 넣는다 — 없을 때(undefined)와 타입이 다르다.
+    const userId = this.sessions.resolveUserId(request.signedCookies?.[SESSION_COOKIE]);
     if (userId === null) {
       throw new UnauthorizedErrorResponseDto();
     }
