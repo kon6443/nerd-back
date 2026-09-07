@@ -11,8 +11,8 @@
 | 항목 | 값 |
 |---|---|
 | 오케스트레이터 | Docker Swarm (stack) |
-| 스택 | `prod_nerd_back`(백엔드) · `prod_nerd_front`(프론트) · `prod_nerd_cache`(Redis) · `prod_nerd_db`(MySQL) — **전부 독립 배포** |
-| 서비스 DNS | `prod_nerd_back_app` · `prod_nerd_front_app` · `prod_nerd_cache_redis` · `prod_nerd_db_mysql` |
+| 스택 | `prod_nerd_back`(백엔드) · `prod_nerd_front`(프론트) · `prod_nerd_cache`(Redis) · `prod_nerd_db`(MySQL) · `prod_nerd_storage`(MinIO) — **전부 독립 배포** |
+| 서비스 DNS | `prod_nerd_back_app` · `prod_nerd_front_app` · `prod_nerd_cache_redis` · `prod_nerd_db_mysql` · `prod_nerd_storage_minio` |
 | 레플리카 | 백엔드 **3** · 프론트 **3** · Redis 1 · MySQL 1 |
 | 컨테이너 포트 | 백엔드 **5501** · 프론트 **5502** — 둘 다 호스트 publish 없음 |
 | 이미지 | 멀티스테이지, `linux/arm64` 단독, 태그 = 커밋 short SHA. 이름 `prod_nerd_back` · `prod_nerd_front`(`_app` 접미사 없음) |
@@ -26,7 +26,7 @@
 서비스 DNS 는 **`<스택명>_<서비스명>`** 이다. 원하는 이름을 스택 쪽에 넣으면 서비스 키가 뒤에 한 번 더 붙으므로, **최종 DNS 이름을 먼저 적고 역산**한다.
 
 **스택 이름 = 노드 라벨 키**로 맞춰 두었다 — 어느 스택이 어느 라벨을 보는지 파일을 열지 않고도 알 수 있다. 서비스 키는 앱 스택이 `app`, 인프라 스택은 역할명(`mysql`)이다.
-⚠️ **Redis 스택만 예외다** (`prod_nerd_cache` / 라벨 `prod_nerd_redis`). named volume 이 스택 이름을 물고 있어 이름을 바꾸면 데이터 경계가 이동한다 — `infra/prod_nerd_cache.yml` 상단 주석 참조. **일관성을 이유로 바꾸지 않는다.**
+⚠️ **이름 규약의 예외가 둘 있다.** ① Redis 스택 (`prod_nerd_cache` / 라벨 `prod_nerd_redis`). ② **스토리지 스택은 자기 라벨이 없다** — 백엔드와 같은 A1 인스턴스에 묶으려고 `prod_nerd_back` 라벨을 그대로 쓴다 (2026-09-07 결정). named volume 이 스택 이름을 물고 있어 이름을 바꾸면 데이터 경계가 이동한다 — `infra/prod_nerd_cache.yml` 상단 주석 참조. **일관성을 이유로 바꾸지 않는다.**
 
 **호스트로 포트를 publish 하지 않는다.** Caddy 가 같은 overlay 안에 있어 서비스 DNS 로 바로 닿는다. publish 하면 도메인을 우회한 직접 접근 경로가 열리고 기존 스택과 포트가 겹칠 위험도 생긴다.
 
@@ -36,18 +36,19 @@
 
 네 대상을 **별도 스택 + 별도 워크플로**로 둔다. 같은 스택에 묶으면 한쪽 설정만 바꿔도 커밋 SHA 가 바뀌어 다른 쪽 이미지 태그까지 달라지고, 결과적으로 전부 재배포된다.
 
-| 변경한 것 | 도는 워크플로 | 백엔드 | 프론트 | Redis | MySQL |
-|---|---|:-:|:-:|:-:|:-:|
-| `apps/back/{src,scripts,test}/**` · `apps/back/Dockerfile` · 의존성 · `tsconfig*` · `jest.config.js` | `deploy-back.yml` | **빌드+배포** | X | X | X |
-| `infra/prod_nerd_back.yml` | `deploy-back.yml` | **빌드+배포** | X | X | X |
-| `apps/front/{app,public,scripts}/**` · `apps/front/Dockerfile` · 의존성 · `next.config.ts` · `.env.production` | `deploy-front.yml` | X | **빌드+배포** | X | X |
-| `infra/prod_nerd_front.yml` | `deploy-front.yml` | X | **빌드+배포** | X | X |
-| `infra/prod_nerd_cache.yml` | `deploy-redis.yml` | X | X | 재시작 | X |
-| `infra/prod_nerd_db.yml` · `infra/mysql/**` | `deploy-db.yml` | X | X | X | 재시작 |
-| `packages/contracts/**` · 루트 설정(`package.json` · `pnpm-workspace.yaml` · 루트 lockfile · `.dockerignore`) | `deploy-back.yml` **+** `deploy-front.yml` | **빌드+배포** | **빌드+배포** | X | X |
-| 문서 · `.claude/**` · `ideas/**` | (없음) | X | X | X | X |
+| 변경한 것 | 도는 워크플로 | 백엔드 | 프론트 | Redis | MySQL | 스토리지 |
+|---|---|:-:|:-:|:-:|:-:|:-:|
+| `apps/back/{src,scripts,test}/**` · `apps/back/Dockerfile` · 의존성 · `tsconfig*` · `jest.config.js` | `deploy-back.yml` | **빌드+배포** | X | X | X | X |
+| `infra/prod_nerd_back.yml` | `deploy-back.yml` | **빌드+배포** | X | X | X | X |
+| `apps/front/{app,public,scripts}/**` · `apps/front/Dockerfile` · 의존성 · `next.config.ts` · `.env.production` | `deploy-front.yml` | X | **빌드+배포** | X | X | X |
+| `infra/prod_nerd_front.yml` | `deploy-front.yml` | X | **빌드+배포** | X | X | X |
+| `infra/prod_nerd_cache.yml` | `deploy-redis.yml` | X | X | 재시작 | X | X |
+| `infra/prod_nerd_db.yml` · `infra/mysql/**` | `deploy-db.yml` | X | X | X | 재시작 | X |
+| `infra/prod_nerd_storage.yml` | `deploy-storage.yml` | X | X | X | X | 재시작 |
+| `packages/contracts/**` · 루트 설정(`package.json` · `pnpm-workspace.yaml` · 루트 lockfile · `.dockerignore`) | `deploy-back.yml` **+** `deploy-front.yml` | **빌드+배포** | **빌드+배포** | X | X | X |
+| 문서 · `.claude/**` · `ideas/**` | (없음) | X | X | X | X | X |
 
-**배포 워크플로 4개의 `paths` 화이트리스트는 교집합이 0건이다.** glob 을 정규식으로 바꿔 `git ls-files` 전수에 매칭해 확인한다 — 문자열 비교가 아니라 파일 단위로 센다 (스크립트는 `docs/tasks/tasks-monorepo.md` Step 5).
+**배포 워크플로 5개의 `paths` 화이트리스트는 교집합이 0건이다** (contracts·루트 설정을 공유하는 back↔front 는 **의도된 예외**). glob 을 정규식으로 바꿔 `git ls-files` 전수에 매칭해 확인한다 — 문자열 비교가 아니라 파일 단위로 센다 (스크립트는 `docs/tasks/tasks-monorepo.md` Step 5).
 
 ### ⚠️ 빌드 컨텍스트는 **레포 루트**다 (2026-09-04~)
 
@@ -73,7 +74,7 @@ docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_db.yml"    prod_nerd_db   #
 **파일명 = 스택명 — 저장소와 서버가 같은 이름을 쓴다.** 스택명은 노드 라벨 키·서비스 DNS 접두와도 같으므로 이름 하나로 YAML·env·라벨·DNS 를 전부 찾는다. 저장소에서 이미 그 이름이라 **CI 는 파일을 그대로 올린다**(이름을 바꾸는 단계가 없다).
 
 ```
-infra/                                 ← 저장소. 배포되는 스택 4개가 여기 다 있다
+infra/                                 ← 저장소. 배포되는 스택 5개가 여기 다 있다
 ├── prod_nerd_back.yml
 ├── prod_nerd_front.yml
 ├── prod_nerd_db.yml
@@ -337,8 +338,13 @@ Caddy 는 블록을 제거한 뒤 `caddy validate && caddy reload`.
 | 서버 env 파일 | `<DEPLOY_DIR>/env/<스택명>.env` | `env/prod_nerd_front.env` |
 | GitHub Environment | 대문자 환경명 | `PROD` |
 
-**시크릿 9개** — `REGISTRY_URL` `REGISTRY_USERNAME` `REGISTRY_PASSWORD` `DEPLOY_SERVER` `DEPLOY_USER` `SWARM_MANAGER_SSH_KEY` `OVERLAY_NETWORK` `MYSQL_DATA_DIR` **`DEPLOY_DIR`**.
-경로 시크릿은 `DEPLOY_DIR` **하나뿐**이고 나머지 경로는 워크플로가 위 규약으로 계산한다 — **앱·스택이 늘어도 시크릿이 늘지 않는다.** (`MYSQL_DATA_DIR` 만 예외 — 블록 볼륨 마운트 경로라 배포 트리와 무관하다.)
+**시크릿 12개** — `REGISTRY_URL` `REGISTRY_USERNAME` `REGISTRY_PASSWORD` `DEPLOY_SERVER` `DEPLOY_USER` `SWARM_MANAGER_SSH_KEY` `OVERLAY_NETWORK` `MYSQL_DATA_DIR` **`DEPLOY_DIR`** · 스토리지 3개 `MINIO_DATA_DIR` `MINIO_SERVER_URL` `STORAGE_CORS_ORIGINS`.
+경로 시크릿은 `DEPLOY_DIR` **하나뿐**이고 나머지 경로는 워크플로가 위 규약으로 계산한다 — **앱·스택이 늘어도 시크릿이 늘지 않는다.** 예외는 **블록 볼륨 마운트 경로**(`MYSQL_DATA_DIR` · `MINIO_DATA_DIR`)와 **외부 노출 도메인**(`MINIO_SERVER_URL` · `STORAGE_CORS_ORIGINS`)이다 — 둘 다 배포 트리와 무관하고, 도메인은 🚫 저장소에 커밋하지 않는 인프라 식별 정보다.
+
+**블록 볼륨 데이터 경로 규약** — `<블록볼륨 마운트>/nerd/prod/<컴포넌트>/data`.
+프로젝트(`nerd`)·환경(`prod`)으로 한 번씩 격리해 같은 볼륨에 다른 프로젝트가 들어와도 섞이지 않는다.
+⚠️ **마운트 지점 바로 그 자리를 쓰지 않는다.** 블록 볼륨이 안 붙으면 그 하위 경로가 부트 디스크에 존재하지 않아 `type: none, o: bind` 마운트가 **확실히 실패**한다 — 조용한 성공보다 시끄러운 실패가 낫다.
+(`MYSQL_DATA_DIR` 은 이 규약 이전에 만들어져 `<마운트>/mysql/data` 다. 옮기려면 MySQL 정지가 필요하므로 그대로 둔다.)
 
 🚫 **두 스택이 같은 파일명을 쓰지 않는다.** 파일명 = 스택명 규약이 이것을 구조적으로 보장한다 — 옛 구조는 두 앱이 둘 다 `docker-stack.app.yml` 이라 디렉터리로만 구분됐고, 그래서 서버에서도 저장소별 디렉터리가 필요했다.
 

@@ -34,3 +34,6 @@
 2. **`update_config.monitor` 는 `start_period` 보다 길어야 한다** — 짧으면 새 태스크가 healthy 로 판정되기 전에 다음 레플리카 교체로 넘어가 `start-first` 무중단 보장이 깨진다. 프론트는 `start_period 60s` / `monitor 90s` 다.
 3. **레플리카 3개 + `start-first` 는 롤링 중 구·신 이미지를 공존시킨다** — `deploymentId`(커밋 SHA)가 없으면 클라이언트가 사라진 청크를 요청한다(version skew). ISR·Server Action 을 도입하면 Redis cacheHandler 와 암호화 키 고정이 **필수**가 된다.
 4. **`pnpm-workspace.yaml` 은 이 디렉터리에 두지 않는다** — pnpm 이 `apps/front` 를 별도 워크스페이스 루트로 잡는다. `ignoredBuiltDependencies` 는 루트 파일에 있고, 컨테이너에는 들어오지 않는다(Dockerfile 주석 참조).
+5. **`next build`(Turbopack)가 `binding to a port — Operation not permitted` 로 죽으면 코드 문제가 아니다** — Tailwind v4 의 PostCSS 로더를 Turbopack 이 **워커 프로세스로 띄우며 소켓을 연다.** 리스닝이 막힌 환경(샌드박스 등)에서는 `globals.css` 파싱 단계에서 실패한다. 진단은 `node -e "require('net').createServer().listen(0)"` 한 줄이면 갈린다(EPERM 이면 환경).
+6. ⭐ **Turbopack 은 실패도 캐시한다 — 환경을 고쳤으면 `.next` 를 지우고 다시 돌린다.** 위 5번을 겪고 제약을 푼 뒤 그대로 재시도하면 **똑같은 패닉이 그대로 재생되어** "고쳐도 안 된다 → 환경 탓" 으로 오진하게 된다. 실제로 그렇게 오진했다(2026-09-04). `rm -rf apps/front/.next` 후 통과. 🚫 재시도 결과만 보고 원인을 확정하지 않는다 — 캐시를 지운 재시도여야 근거가 된다.
+7. **원인을 가르고 싶으면 `next build --webpack`** — webpack 은 PostCSS 를 같은 프로세스에서 돌려 소켓이 필요 없다. 통과하면 코드가 아니라 실행 환경이다. ⚠️ 배포·CI 는 Turbopack 이므로 webpack 통과는 **대체 증거이지 동일 검증이 아니다.**

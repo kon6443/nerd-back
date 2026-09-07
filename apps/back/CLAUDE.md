@@ -9,7 +9,7 @@
 | 금지 | 이유 |
 |---|---|
 | E2E 에서 `AppModule` import | 부팅만으로 외부 시스템에 붙는다. `createE2eApp()` 을 쓴다 |
-| DB 마이그레이션 **명령 실행** (`pnpm db:migrate:*` **4개 전부**) | 전 환경이 동일 DB — 실행이 곧 상용 적용. AI 는 파일 작성까지만. 실행은 사람이 `DB_MIGRATION_*`(nerd_migrator) 계정으로. ⚠️ `list` 도 포함이다 — `migration:show` 는 `migrations` 테이블이 없으면 `CREATE TABLE` 을 먼저 던진다(실측) |
+| **DB 에 쓰는 명령 실행** — `pnpm db:migrate:*`(**4개 전부**) · `pnpm db:seed:dev` | 전 환경이 동일 DB — 실행이 곧 상용 적용. AI 는 파일 작성까지만, 실행은 사람이. 마이그레이션은 `DB_MIGRATION_*`(nerd_migrator), 시드는 앱 계정(DDL 이 아니라 행 쓰기라 그걸로 충분하다). ⚠️ `db:migrate:list` 도 포함이다 — `migration:show` 는 `migrations` 테이블이 없으면 `CREATE TABLE` 을 먼저 던진다(실측) |
 
 **근거의 유효기간** — 마이그레이션 실행 금지 ← **전 환경 동일 DB**. 환경별 DB 가 분리되면 재검토한다. (2026-09-02 자체 호스팅 전환 때 재검토했고 **유지** — 인스턴스 1대 공유)
 

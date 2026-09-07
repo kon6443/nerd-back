@@ -48,6 +48,24 @@ pnpm front check:types
 
 백엔드는 **DB 가 없으면 기동하지 않는다.** 로컬도 운영 DB 를 SSH 터널로 쓰고, `pnpm back dev` 가 그 터널을 자동으로 연다 — [백엔드 README 「DB 접속」](apps/back/README.md).
 
+## DB — 스키마와 픽스처
+
+**루트에서 부른다.** 상세(계정·순서·주의)는 [백엔드 README 「마이그레이션」](apps/back/README.md).
+
+```bash
+pnpm db:migrate:list                 # 적용/미적용 목록
+pnpm db:migrate:generate src/migrations/<PascalName>   # 엔티티 diff 로 파일 생성
+pnpm db:migrate:up                   # 적용
+pnpm db:migrate:revert               # 마지막 1개 되돌림
+pnpm db:seed:dev [--publish]         # 개발용 더미 동화 투입
+```
+
+⚠️ **전 환경이 같은 DB 를 쓴다. 실행이 곧 상용 적용이다** — 위 5개는 **사람이** 실행한다. AI 는 파일 작성까지만 한다 ([`CLAUDE.md`](CLAUDE.md) Ask).
+
+- 환경변수는 앱과 **같은 `apps/back/.env`** 다. 계정만 갈린다 — 마이그레이션은 `DB_MIGRATION_USER`/`DB_MIGRATION_PASSWORD`(DDL 권한), 시드는 앱 계정(`DB_USER`). 🚫 앱 계정에 DDL 을 주지 않는다
+- ⚠️ **`db:migrate:list` 도 "조회" 가 아니다.** TypeORM 의 `migration:show` 는 `migrations` 테이블이 없으면 `CREATE TABLE` 을 먼저 던진다 (2026-09-04 실측)
+- 처음 세팅하는 순서: `pnpm db:migrate:up` → `pnpm db:seed:dev --publish` → `pnpm front dev`
+
 ## 검증
 
 ```bash
