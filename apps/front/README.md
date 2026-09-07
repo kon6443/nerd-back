@@ -51,10 +51,24 @@ PORT=5599 pnpm dev        # 5599 로 뜬다
 
 | 위치 | 담는 것 | 시점 | git |
 |---|---|---|---|
+| `.env.example` | **로컬 설정 예시** — 값은 더미 | — | **커밋한다** |
 | `.env.production` | **`NEXT_PUBLIC_*` 만** | 빌드타임 | **커밋한다** |
 | `.env.local` | 로컬 개발용 전부 | 로컬 | ignore |
 | stack YAML `environment:` | 비밀 **아닌** 런타임 값 | 런타임 | 커밋한다 |
 | 서버 `nerd-front.prod.env` | **민감한** 런타임 값 | 런타임 | 저장소에 두지 않는다 |
+
+### ⭐ 로컬에서 처음 띄울 때 — `BACKEND_INTERNAL_URL` 이 없으면 전부 500 이다
+
+```bash
+cp apps/front/.env.example apps/front/.env.local
+```
+
+서버 컴포넌트는 백엔드를 **절대 URL** 로 부른다(브라우저는 상대경로라 필요 없다).
+이 값이 없으면 데이터를 부르는 페이지가 전부 500 이고, `pnpm ci:all` 은 **통과한다** —
+서버 컴포넌트 렌더를 덮는 테스트가 없기 때문이다. 2026-09-07 리뷰에서 실제로 이 상태였다.
+
+`pnpm back dev` 도 함께 떠 있어야 한다. 배포에서는 stack YAML 이 overlay 서비스 DNS 를 주입하므로
+이 파일이 관여하지 않는다.
 
 ### 🚫 서버 env 파일에 `NEXT_PUBLIC_*`를 넣어도 브라우저에 반영되지 않는다
 

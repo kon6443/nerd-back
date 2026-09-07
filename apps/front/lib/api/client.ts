@@ -53,9 +53,13 @@ function resolveBaseUrl(): string {
 
   const internal = process.env.BACKEND_INTERNAL_URL;
   if (!internal) {
+    // ⚠️ 메시지에 **로컬 해결책을 먼저** 적는다. 이 오류를 실제로 만나는 사람은 대부분
+    //    `pnpm front dev` 를 처음 띄운 개발자인데, "stack YAML 을 보라"고만 하면
+    //    배포 설정을 뒤지게 된다 — 로컬에서는 stack YAML 이 아무 역할도 하지 않는다.
     throw new Error(
-      "BACKEND_INTERNAL_URL 이 없다. 서버에서 백엔드를 부르려면 이 값이 필요하다 " +
-        "(stack YAML 의 environment 로 주입한다).",
+      "BACKEND_INTERNAL_URL 이 없다. 서버 컴포넌트가 백엔드를 부르려면 이 값이 필요하다.\n" +
+        "  - 로컬: `cp apps/front/.env.example apps/front/.env.local` 후 `pnpm back dev` 를 띄운다\n" +
+        "  - 배포: stack YAML 의 environment 가 주입한다 (건드릴 일 없음)",
     );
   }
   return internal.replace(/\/+$/, "");
