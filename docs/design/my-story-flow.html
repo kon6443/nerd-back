@@ -1,0 +1,1258 @@
+<title>내가 주인공인 동화</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&family=Gowun+Batang:wght@400;700&display=swap">
+<style>
+  /* ═══════════════════════════════════════════════════════════
+     토큰 — 이름을 apps/front/app/globals.css 의 @theme 과 맞췄다.
+     그대로 복사해 옮길 수 있다. 다크모드는 쓰지 않는다(09-04 확정).
+     ═══════════════════════════════════════════════════════════ */
+  :root {
+    --color-primary:       #3F92D6;
+    --color-primary-deep:  #2E77B6;
+    --color-primary-soft:  #CDE7F6;
+    --color-primary-tint:  #EAF7FD;
+
+    --color-surface:       #FFF9EC;   /* 크림 — 책 지면 */
+    --color-panel:         #FFFFFF;
+    --color-line:          #DCEAF4;
+
+    --color-accent-a:      #57C1C0;   /* 민트 — 다음 · 비하인드 A */
+    --color-accent-a-deep: #3EA5A4;
+    --color-accent-b:      #EE8FA3;   /* 코랄 — 비하인드 B */
+    --color-accent-b-deep: #D06A80;
+
+    --color-ink:           #234C77;
+    --color-ink-soft:      #5B87AE;
+    --color-ink-faint:     #8FAECA;
+
+    --color-magic:         #B79BE8;   /* 얼굴 합성 전용 */
+    --color-magic-deep:    #8E6DC7;
+    --color-gold:          #E9A93C;   /* 체험 모드 */
+    --color-gold-deep:     #C8862A;
+
+    --color-hill-1:        #A9D8A2;
+    --color-hill-2:        #8AC888;
+    --color-paper-line:    #EBDCBE;
+
+    --radius-card:  22px;
+    --radius-pill:  999px;
+    --radius-sm:    12px;
+
+    --spacing-touch: 56px;            /* 모든 터치 타깃 최소 */
+
+    --font-display: "Jua", "Apple SD Gothic Neo", sans-serif;
+    --font-body:    "Gowun Dodum", "Apple SD Gothic Neo", sans-serif;
+    --font-story:   "Gowun Batang", serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 20px 16px 36px;
+    background: #E9F2F8;
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .page-head {
+    width: min(1088px, 100%);
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px;
+  }
+  .page-head h1 { font-family: var(--font-display); font-size: 20px; margin: 0; }
+  .page-head p { margin: 0; font-size: 13px; color: var(--color-ink-soft); }
+  .page-head .sp { flex: 1; }
+  .flowmap { display: flex; flex-wrap: wrap; gap: 5px; font-size: 11px; color: var(--color-ink-faint); }
+  .flowmap b { font-weight: 400; padding: 3px 8px; border-radius: var(--radius-pill); border: 1px solid var(--color-line); background: #fff; }
+  .flowmap b.on { color: #fff; background: var(--color-ink); border-color: var(--color-ink); }
+
+  /* ── 태블릿 (기준 뷰포트 1024×768 가로) ────────────── */
+  .stagewrap { width: 100%; display: flex; justify-content: center; }
+  .device {
+    width: 1088px; height: 832px; flex: none;
+    transform-origin: top center;
+    background: linear-gradient(160deg, #2C4A64, #1D3549);
+    border-radius: 40px; padding: 32px;
+    box-shadow: 0 26px 60px rgba(20,45,70,.32), inset 0 2px 0 rgba(255,255,255,.14);
+  }
+  .screen {
+    position: relative; width: 1024px; height: 768px;
+    border-radius: 16px; overflow: hidden;
+    background: linear-gradient(180deg, var(--color-primary-tint), var(--color-primary-soft));
+  }
+  .scene-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+
+  /* ── 전역 상단 네비 (main 의 AppHeader) ─────────────── */
+  .appheader {
+    position: absolute; inset: 0 0 auto 0; z-index: 6;
+    height: 66px; padding: 0 20px;
+    display: flex; align-items: center; gap: 14px;
+    background: rgba(255,255,255,.82);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--color-line);
+  }
+  .brand { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-size: 19px; color: var(--color-ink); }
+  .brand .mark {
+    width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center;
+    background: linear-gradient(150deg, var(--color-accent-a), var(--color-primary));
+    color: #fff; font-size: 16px;
+  }
+  .appnav { display: flex; gap: 4px; }
+  .appnav button {
+    height: 40px; padding: 0 16px; border: none; border-radius: var(--radius-pill);
+    background: none; font-family: var(--font-body); font-size: 15px;
+    color: var(--color-ink-soft); cursor: pointer;
+  }
+  .appnav button:hover { background: var(--color-primary-tint); }
+  .appnav button[aria-current="page"] { background: var(--color-primary); color: #fff; }
+  .appheader .sp { flex: 1; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 34px; padding: 0 14px; border-radius: var(--radius-pill);
+    font-size: 13px; border: 1px solid var(--color-line); background: #fff;
+  }
+  .chip.demo { color: var(--color-accent-a-deep); background: #E8F8F8; border-color: #BCE6E5; }
+  .chip.trial { color: var(--color-gold-deep); background: #FDF3E0; border-color: #F2DCB0; }
+
+  /* ── 버튼 ──────────────────────────────────────────── */
+  button { font-family: inherit; }
+  .btn {
+    border: none; border-radius: var(--radius-pill); cursor: pointer;
+    font-family: var(--font-display);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: var(--spacing-touch);
+    transition: transform .13s ease, box-shadow .13s ease;
+  }
+  .btn:active { transform: translateY(2px); }
+  .btn:focus-visible { outline: 3px solid var(--color-magic-deep); outline-offset: 3px; }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; transform: none; }
+  .btn-xl { min-height: 68px; padding: 0 40px; font-size: 23px; }
+  .btn-lg { min-height: 60px; padding: 0 30px; font-size: 19px; }
+  .btn-md { min-height: var(--spacing-touch); padding: 0 22px; font-size: 16px; }
+  .btn-primary { background: linear-gradient(180deg, #5AA8E4, var(--color-primary-deep)); color: #fff; box-shadow: 0 6px 0 #24608F; }
+  .btn-a       { background: linear-gradient(180deg, #6BD0CF, var(--color-accent-a-deep)); color: #fff; box-shadow: 0 6px 0 #2F8887; }
+  .btn-b       { background: linear-gradient(180deg, #F4A3B4, var(--color-accent-b-deep)); color: #fff; box-shadow: 0 6px 0 #A95064; }
+  .btn-gold    { background: linear-gradient(180deg, #F3BC5C, var(--color-gold-deep)); color: #fff; box-shadow: 0 6px 0 #A66C1E; }
+  .btn-magic   { background: linear-gradient(180deg, #C9AFF2, var(--color-magic-deep)); color: #fff; box-shadow: 0 6px 0 #6F4FAA; }
+  .btn-ghost   { background: #fff; color: var(--color-ink-soft); border: 2px solid var(--color-line); box-shadow: 0 4px 0 #E6EFF6; }
+  .btn-quiet   { background: none; border: none; color: var(--color-ink-soft); font-family: var(--font-body);
+                 font-size: 15px; text-decoration: underline; text-underline-offset: 5px; cursor: pointer; min-height: var(--spacing-touch); padding: 0 10px; }
+
+  /* ── 뷰 ────────────────────────────────────────────── */
+  .stage { position: absolute; inset: 66px 0 0 0; z-index: 4; }
+  .view { position: absolute; inset: 0; padding: 20px 40px 32px; display: none; flex-direction: column; }
+  .view.on { display: flex; animation: rise .34s cubic-bezier(.22,.9,.3,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px);} to { opacity: 1; transform: none; } }
+  .center { align-items: center; justify-content: center; text-align: center; }
+
+  h2.title { font-family: var(--font-display); font-size: 34px; margin: 0; text-wrap: balance; }
+  h2.title.big { font-size: 52px; line-height: 1.18; }
+  p.sub { font-size: 16px; color: var(--color-ink-soft); line-height: 1.65; margin: 10px 0 0; max-width: 62ch; }
+  .row { display: flex; gap: 12px; align-items: center; }
+  .row.c { justify-content: center; }
+
+  /* 홈 */
+  .badge { display: inline-flex; align-items: center; gap: 7px; background: #fff; border: 1px solid var(--color-line);
+           color: var(--color-ink-soft); font-size: 14px; padding: 7px 16px; border-radius: var(--radius-pill); margin-bottom: 18px; }
+
+  /* 로그인 */
+  .authcard { background: var(--color-panel); border: 2px solid var(--color-line); border-radius: var(--radius-card);
+              padding: 34px 40px; width: 440px; box-shadow: 0 16px 34px rgba(35,76,119,.13); }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+  .field label { font-size: 14px; color: var(--color-ink-soft); }
+  .field input {
+    min-height: var(--spacing-touch); border: 2px solid var(--color-line); border-radius: var(--radius-sm);
+    padding: 0 14px; font-family: var(--font-body); font-size: 17px; color: var(--color-ink); background: #fff;
+  }
+  .field input:focus { outline: none; border-color: var(--color-primary); }
+  .field.bad input { border-color: var(--color-accent-b-deep); }
+  .err { font-size: 13px; color: var(--color-accent-b-deep); min-height: 18px; }
+
+  /* 카드 · 서재 */
+  .grid { display: grid; gap: 20px; }
+  .books { grid-template-columns: repeat(3, 1fr); }
+  .storycard {
+    position: relative; background: var(--color-panel); border: 2px solid var(--color-line);
+    border-radius: var(--radius-card); padding: 14px; text-align: left; cursor: pointer;
+    display: flex; flex-direction: column; gap: 10px; transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .storycard:hover { transform: translateY(-6px); box-shadow: 0 14px 26px rgba(35,76,119,.16); }
+  .storycard:focus-visible { outline: 3px solid var(--color-magic-deep); outline-offset: 4px; }
+  .storycard[aria-pressed="true"] { border-color: var(--color-gold); box-shadow: 0 0 0 3px rgba(233,169,60,.34); }
+  .storycard .cover { border-radius: var(--radius-sm); overflow: hidden; aspect-ratio: 4/3; background: var(--color-primary-soft); }
+  .storycard .cover svg { display: block; width: 100%; height: 100%; }
+  .storycard .t { font-family: var(--font-display); font-size: 19px; color: var(--color-ink); }
+  .storycard .d { font-size: 13px; color: var(--color-ink-soft); }
+  .ribbon {
+    position: absolute; top: 10px; right: 10px; z-index: 2;
+    background: var(--color-magic-deep); color: #fff; font-size: 12px;
+    padding: 5px 11px; border-radius: var(--radius-pill);
+  }
+  .ribbon.locked { background: var(--color-ink-faint); }
+
+  /* 상세 */
+  .detail { display: grid; grid-template-columns: 380px 1fr; gap: 32px; align-items: start; }
+  .detail .art { border-radius: var(--radius-card); overflow: hidden; border: 3px solid #fff; box-shadow: 0 14px 28px rgba(35,76,119,.18); }
+  .detail .art svg { display: block; width: 100%; }
+  .blurb { font-family: var(--font-story); font-size: 17px; line-height: 1.8; color: var(--color-ink-soft); margin: 14px 0 0; }
+  .tags { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }
+  .tag { font-size: 13px; padding: 5px 12px; border-radius: var(--radius-pill); background: var(--color-primary-soft); color: var(--color-ink); }
+
+  /* 등장인물 섹션 */
+  .cast { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+  .castitem { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--color-line);
+              border-radius: var(--radius-pill); padding: 7px 16px 7px 7px; }
+  .castitem .av { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; flex: none; background: var(--color-primary-soft); }
+  .castitem .av svg { width: 100%; height: 100%; display: block; }
+  .castitem .nm { font-family: var(--font-display); font-size: 15px; }
+  .castitem .rl { font-size: 12px; color: var(--color-ink-faint); }
+
+  /* 촬영 */
+  .capwrap { display: grid; grid-template-columns: 1fr 320px; gap: 30px; align-items: center; height: 100%; }
+  .viewfinder {
+    position: relative; justify-self: center; width: 340px; height: 340px; border-radius: 50%;
+    background: #16303F; overflow: hidden; display: grid; place-items: center;
+    box-shadow: 0 0 0 8px rgba(255,255,255,.8), 0 0 0 10px var(--color-line), 0 16px 32px rgba(35,76,119,.24);
+  }
+  .viewfinder video, .viewfinder .vf-art { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .viewfinder .ring { position: absolute; inset: 22px; border-radius: 50%; border: 3px dashed rgba(255,255,255,.6); pointer-events: none; }
+  .viewfinder.flash::after { content: ""; position: absolute; inset: 0; background: #fff; animation: fl .5s ease-out forwards; }
+  @keyframes fl { from { opacity: .9; } to { opacity: 0; } }
+  .tip { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--color-ink-soft);
+         background: #fff; border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: 11px 13px; margin-top: 10px; line-height: 1.55; }
+
+  /* 마법 · 생성 */
+  .orb { position: relative; width: 250px; height: 250px; display: grid; place-items: center; }
+  .orb .halo { position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(circle, rgba(183,155,232,.5), rgba(183,155,232,0) 68%); animation: pulse 2.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(.9); opacity: .8; } 50% { transform: scale(1.08); opacity: 1; } }
+  .orb .slot { width: 168px; height: 168px; border-radius: 50%; overflow: hidden; background: var(--color-surface);
+               box-shadow: 0 0 0 7px #fff, 0 10px 26px rgba(142,109,199,.36); }
+  .orb .slot img, .orb .slot svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .spark { position: absolute; font-size: 23px; animation: tw 1.8s ease-in-out infinite; }
+  @keyframes tw { 0%,100% { opacity:.2; transform: scale(.75) rotate(0); } 50% { opacity:1; transform: scale(1.15) rotate(16deg); } }
+  .bar { width: 380px; height: 14px; border-radius: var(--radius-pill); background: #fff; border: 2px solid var(--color-line); overflow: hidden; margin-top: 22px; }
+  .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--color-magic), var(--color-magic-deep)); transition: width .28s linear; }
+  .steplist { margin-top: 16px; display: flex; flex-direction: column; gap: 7px; font-size: 14px; color: var(--color-ink-faint); }
+  .steplist .s.done { color: var(--color-accent-a-deep); }
+  .steplist .s.now { color: var(--color-ink); font-weight: 700; }
+
+  /* 확인 */
+  .confirm { display: grid; grid-template-columns: 260px 1fr; gap: 34px; align-items: center; height: 100%; }
+  .facecard { background: var(--color-panel); border: 2px solid var(--color-line); border-radius: var(--radius-card);
+              padding: 18px; text-align: center; box-shadow: 0 12px 26px rgba(35,76,119,.12); }
+  .facecard .slot { width: 200px; height: 200px; border-radius: 50%; overflow: hidden; margin: 0 auto 10px; background: var(--color-surface); }
+  .facecard .slot img, .facecard .slot svg { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* 리더 */
+  #v-reader { padding: 14px 30px 22px; }
+  .spread { position: relative; flex: 1; display: grid; grid-template-columns: 1fr 1fr;
+            background: var(--color-surface); border: 3px solid #fff; border-radius: 16px; overflow: hidden;
+            box-shadow: 0 16px 34px rgba(35,76,119,.22); }
+  .spread::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 28px; transform: translateX(-50%);
+    pointer-events: none; background: linear-gradient(90deg, rgba(0,0,0,0), rgba(120,90,50,.14), rgba(0,0,0,0)); }
+  .pg-art { position: relative; }
+  .pg-art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .hitbox {
+    position: absolute; border: none; border-radius: 50%; cursor: pointer;
+    background: rgba(255,255,255,.16); box-shadow: 0 0 0 3px rgba(255,255,255,.55);
+    animation: bob 2.4s ease-in-out infinite;
+  }
+  .hitbox::after {
+    content: "💬"; position: absolute; top: -12px; right: -12px; font-size: 20px;
+    background: #fff; border-radius: 50%; width: 32px; height: 32px; display: grid; place-items: center;
+    box-shadow: 0 3px 8px rgba(0,0,0,.2);
+  }
+  @keyframes bob { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-5px);} }
+  .pg-txt { padding: 40px 40px; display: flex; flex-direction: column; justify-content: center;
+            background: repeating-linear-gradient(180deg, var(--color-surface), var(--color-surface) 44px, #FCF3E1 44px, #FCF3E1 45px); }
+  .storytext { font-family: var(--font-story); font-size: 24px; line-height: 1.95; color: #4A3A24; margin: 0; text-wrap: pretty; }
+  .storytext em { font-style: normal; font-weight: 700; color: var(--color-magic-deep); }
+  .pgno { font-family: var(--font-display); color: #A08758; font-size: 14px; margin-top: auto; padding-top: 18px; }
+  .readerbar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .readerbar .sp { flex: 1; }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: #fff; border: 2px solid var(--color-ink-faint); }
+  .dots i.on { background: var(--color-gold); border-color: var(--color-gold-deep); }
+  .dots i.behind { border-style: dashed; }
+
+  .narration { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,.9);
+               border: 2px solid var(--color-paper-line); border-radius: var(--radius-pill); padding: 6px; margin-top: 12px; }
+  .narration .play { width: 44px; height: 44px; border-radius: 50%; border: none; background: var(--color-accent-a-deep); color: #fff; font-size: 15px; cursor: pointer; }
+  .narration .track { flex: 1; height: 7px; border-radius: var(--radius-pill); background: #EFE3CB; overflow: hidden; }
+  .narration .track > i { display: block; height: 100%; width: 0; background: var(--color-accent-a); }
+  .narration .lab { font-size: 12px; color: #A08758; padding-right: 8px; white-space: nowrap; }
+
+  /* 대화 오버레이 */
+  .chatwrap { position: absolute; inset: 0; z-index: 12; display: none; }
+  .chatwrap.on { display: block; }
+  .chatwrap .scrim { position: absolute; inset: 0; background: rgba(24,52,78,.4); }
+  .chatpanel {
+    position: absolute; right: 0; top: 0; bottom: 0; width: 420px; background: var(--color-panel);
+    border-left: 2px solid var(--color-line); display: flex; flex-direction: column;
+    animation: slide .3s cubic-bezier(.22,.9,.3,1) both;
+  }
+  @keyframes slide { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .chathead { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid var(--color-line); }
+  .chathead .av { width: 46px; height: 46px; border-radius: 50%; overflow: hidden; background: var(--color-primary-soft); }
+  .chathead .av svg { width: 100%; height: 100%; }
+  .chathead .nm { font-family: var(--font-display); font-size: 18px; }
+  .chathead .sc { font-size: 12px; color: var(--color-ink-faint); }
+  .chatlog { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 84%; padding: 11px 15px; border-radius: 16px; font-size: 15px; line-height: 1.6; }
+  .msg.them { background: var(--color-primary-tint); color: var(--color-ink); border-bottom-left-radius: 5px; align-self: flex-start; }
+  .msg.me { background: var(--color-primary); color: #fff; border-bottom-right-radius: 5px; align-self: flex-end; }
+  .chatsug { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 16px 12px; }
+  .chatsug button { border: 1px solid var(--color-line); background: #fff; border-radius: var(--radius-pill);
+                    padding: 9px 14px; font-size: 13px; color: var(--color-ink-soft); cursor: pointer; font-family: var(--font-body); }
+  .chatsug button:hover { border-color: var(--color-primary); color: var(--color-primary-deep); }
+  .chatfoot { padding: 12px 16px 16px; border-top: 1px solid var(--color-line); display: flex; gap: 8px; }
+  .chatfoot input { flex: 1; min-height: var(--spacing-touch); border: 2px solid var(--color-line); border-radius: var(--radius-pill);
+                    padding: 0 16px; font-family: var(--font-body); font-size: 15px; }
+  .chatfoot input:focus { outline: none; border-color: var(--color-primary); }
+
+  /* 비하인드 분기 */
+  .branchgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%; max-width: 820px; margin-top: 24px; }
+  .branchcard { border: 3px solid var(--color-line); border-radius: var(--radius-card); background: #fff;
+                padding: 20px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 12px;
+                transition: transform .18s ease, border-color .18s ease; }
+  .branchcard:hover { transform: translateY(-6px); }
+  .branchcard.a:hover { border-color: var(--color-accent-a); }
+  .branchcard.b:hover { border-color: var(--color-accent-b); }
+  .branchcard .lab { font-family: var(--font-display); font-size: 15px; color: #fff; align-self: flex-start;
+                     padding: 5px 14px; border-radius: var(--radius-pill); }
+  .branchcard.a .lab { background: var(--color-accent-a-deep); }
+  .branchcard.b .lab { background: var(--color-accent-b-deep); }
+  .branchcard h3 { font-family: var(--font-display); font-size: 21px; margin: 0; color: var(--color-ink); }
+  .branchcard p { margin: 0; font-size: 14px; color: var(--color-ink-soft); line-height: 1.6; }
+
+  /* 앨범 */
+  .albumempty { background: #fff; border: 2px dashed var(--color-line); border-radius: var(--radius-card);
+                padding: 44px; text-align: center; color: var(--color-ink-soft); }
+
+  /* 마무리 */
+  .endcard { background: var(--color-panel); border: 2px solid var(--color-line); border-radius: var(--radius-card);
+             padding: 34px 40px; text-align: center; box-shadow: 0 16px 34px rgba(35,76,119,.14); max-width: 640px; }
+
+  .float { position: absolute; top: 78px; right: 24px; z-index: 9; animation: bob 2.6s ease-in-out infinite; }
+  .float .ping { position: absolute; inset: -5px; border-radius: var(--radius-pill); border: 3px solid var(--color-gold); animation: ping 2.4s ease-out infinite; pointer-events: none; }
+  @keyframes ping { 0% { opacity:.7; transform: scale(.95);} 70%,100% { opacity:0; transform: scale(1.15);} }
+
+  .toast { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 20;
+           background: rgba(28,60,88,.94); color: #fff; padding: 12px 22px; border-radius: var(--radius-pill);
+           font-size: 14px; display: none; max-width: 78%; }
+  .toast.on { display: block; animation: rise .28s ease both; }
+
+  .notes { width: min(1088px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(238px, 1fr)); gap: 12px; }
+  .note { border: 1px solid #CFE0EC; border-radius: 14px; padding: 14px 16px; background: #F3F8FC; }
+  .note h3 { font-family: var(--font-display); font-size: 14px; margin: 0 0 6px; color: var(--color-ink); }
+  .note p { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--color-ink-soft); }
+  .note b { color: var(--color-ink); font-weight: 400; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  }
+</style>
+
+<div class="page-head">
+  <h1>내가 주인공인 동화</h1>
+  <p>시연 · 체험 두 모드 · 기준 뷰포트 1024×768</p>
+  <div class="sp"></div>
+  <div class="flowmap" id="flowmap"></div>
+</div>
+
+<div class="stagewrap">
+<div class="device" id="device">
+  <div class="screen">
+
+    <svg class="scene-bg" viewBox="0 0 1024 768" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#EAF7FD"/><stop offset="1" stop-color="#CDE7F6"/></linearGradient></defs>
+      <rect width="1024" height="768" fill="url(#sky)"/>
+      <g fill="#fff" opacity=".8">
+        <ellipse cx="150" cy="118" rx="66" ry="30"/><ellipse cx="200" cy="106" rx="46" ry="24"/>
+        <ellipse cx="860" cy="150" rx="76" ry="32"/><ellipse cx="916" cy="136" rx="48" ry="23"/>
+      </g>
+      <path d="M0 640 Q170 556 370 618 T700 596 T1024 652 L1024 768 L0 768Z" fill="#BFE4B8" opacity=".85"/>
+      <path d="M0 690 Q230 616 480 676 T820 658 T1024 704 L1024 768 L0 768Z" fill="#A9D8A2"/>
+      <path d="M0 736 Q280 686 590 730 T1024 740 L1024 768 L0 768Z" fill="#8AC888"/>
+    </svg>
+
+    <header class="appheader">
+      <div class="brand"><span class="mark">📖</span> 동화나라</div>
+      <nav class="appnav" id="appnav" aria-label="주요 메뉴"></nav>
+      <div class="sp"></div>
+      <span class="chip demo" id="modechip">✨ 시연 모드</span>
+    </header>
+
+    <div class="float" id="floatbtn" hidden>
+      <span class="ping"></span>
+      <button class="btn btn-gold btn-md" id="btn-toTrial">📷 내 얼굴로 만들기</button>
+    </div>
+
+    <div class="stage">
+
+      <!-- 1. 홈 -->
+      <section class="view center on" id="v-home">
+        <span class="badge">👧 4–9세 · 태블릿 가로</span>
+        <h2 class="title big">동화 속 주인공이<br>바로 나예요</h2>
+        <p class="sub" style="margin-left:auto;margin-right:auto">먼저 시연 동화를 읽어 보고,<br>마음에 들면 내 얼굴로 진짜 동화책을 만들 수 있어요.</p>
+        <div class="row c" style="margin-top:26px">
+          <button class="btn btn-a btn-xl" id="btn-demo">✨ 시연 동화 보기</button>
+          <button class="btn btn-gold btn-lg" id="btn-trial">📷 내 얼굴로 만들기</button>
+        </div>
+        <p class="sub" style="font-size:14px;color:var(--color-ink-faint)">시연은 로그인 없이 바로 볼 수 있어요.</p>
+      </section>
+
+      <!-- 2. 로그인 -->
+      <section class="view center" id="v-login">
+        <div class="authcard">
+          <h2 class="title" style="font-size:26px" id="auth-title">로그인</h2>
+          <p class="sub" style="font-size:14px" id="auth-desc">내 얼굴로 만든 동화책을 계정에 보관해요.</p>
+          <div class="field" id="f-id">
+            <label for="i-id">아이디</label>
+            <input id="i-id" autocomplete="username" placeholder="4자 이상">
+          </div>
+          <div class="field" id="f-pw">
+            <label for="i-pw">비밀번호</label>
+            <input id="i-pw" type="password" autocomplete="new-password" placeholder="8자 이상">
+          </div>
+          <div class="field" id="f-pw2" hidden>
+            <label for="i-pw2">비밀번호 확인</label>
+            <input id="i-pw2" type="password" autocomplete="new-password" placeholder="한 번 더">
+          </div>
+          <p class="err" id="auth-err"></p>
+          <button class="btn btn-primary btn-lg" id="btn-auth" style="width:100%">로그인</button>
+          <div class="row c" style="margin-top:6px">
+            <button class="btn-quiet" id="btn-authswitch">처음이신가요? 가입하기</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. 서재 -->
+      <section class="view" id="v-library">
+        <h2 class="title">서재</h2>
+        <p class="sub" id="lib-sub"></p>
+        <div class="grid books" id="books" style="margin-top:20px"></div>
+      </section>
+
+      <!-- 4. 상세 (등장인물 포함) -->
+      <section class="view" id="v-detail">
+        <div class="detail">
+          <div class="art" id="d-art"></div>
+          <div>
+            <h2 class="title" id="d-title"></h2>
+            <div class="tags" id="d-tags"></div>
+            <p class="blurb" id="d-blurb"></p>
+            <h3 style="font-family:var(--font-display);font-size:18px;margin:22px 0 0">등장인물</h3>
+            <p class="sub" style="font-size:13px;margin-top:4px">읽는 중에 말을 걸 수 있어요.</p>
+            <div class="cast" id="d-cast"></div>
+            <div class="row" style="margin-top:24px">
+              <button class="btn btn-a btn-lg" id="btn-read">📖 읽기 시작</button>
+              <button class="btn-quiet" data-go="library">서재로</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. 얼굴 촬영 (정면 1장) -->
+      <section class="view" id="v-capture">
+        <div class="capwrap">
+          <div>
+            <div class="viewfinder" id="viewfinder"><div class="ring"></div></div>
+          </div>
+          <div>
+            <h2 class="title" style="font-size:28px">얼굴을 찍어요</h2>
+            <p class="sub" style="font-size:15px" id="cap-sub">동그라미 안에 얼굴을 맞추고 <b>정면</b>을 한 장 찍어 주세요.</p>
+            <div class="tip"><span>💡</span><span id="cap-privacy">사진은 삽화를 만드는 동안에만 쓰고, 끝나면 <b>보관하지 않습니다.</b></span></div>
+            <div class="tip"><span>📚</span><span id="cap-book">이 동화의 주인공이 됩니다.</span></div>
+            <div class="row" style="margin-top:22px">
+              <button class="btn btn-a btn-lg" id="btn-shoot">📸 찍기</button>
+              <button class="btn-quiet" data-go="detail">뒤로</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. 합성 중 -->
+      <section class="view center" id="v-magic">
+        <div class="orb">
+          <span class="halo"></span>
+          <span class="spark" style="top:2px;left:14px">✨</span>
+          <span class="spark" style="top:34px;right:4px;animation-delay:.5s">⭐</span>
+          <span class="spark" style="bottom:12px;left:30px;animation-delay:1s">💫</span>
+          <div class="slot" id="magic-face"></div>
+        </div>
+        <h2 class="title" style="margin-top:20px">얼굴을 살펴보는 중이에요</h2>
+        <p class="sub" id="magic-step"></p>
+        <div class="bar"><i id="magic-bar"></i></div>
+      </section>
+
+      <!-- 7. 확인 -->
+      <section class="view" id="v-confirm">
+        <div class="confirm">
+          <div class="facecard">
+            <div class="slot" id="confirm-face"></div>
+            <button class="btn-quiet" id="btn-retake">다시 찍기</button>
+          </div>
+          <div>
+            <h2 class="title">이 얼굴로 주인공이 될까요?</h2>
+            <p class="sub" id="confirm-sub"></p>
+            <div class="row" style="margin-top:26px">
+              <button class="btn btn-magic btn-lg" id="btn-generate">✨ 이 얼굴로 만들기</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. 생성 중 -->
+      <section class="view center" id="v-generating">
+        <div class="orb">
+          <span class="halo"></span>
+          <span class="spark" style="top:6px;right:16px">📖</span>
+          <span class="spark" style="bottom:14px;left:16px;animation-delay:.8s">✨</span>
+          <div class="slot" id="gen-face"></div>
+        </div>
+        <h2 class="title" style="margin-top:20px">동화책을 만들고 있어요</h2>
+        <div class="steplist" id="gen-steps"></div>
+        <div class="bar"><i id="gen-bar"></i></div>
+        <p class="sub" style="font-size:13px;color:var(--color-ink-faint)">한 장이 실패해도 그 장만 다시 만들 수 있어요.</p>
+      </section>
+
+      <!-- 9. 리더 -->
+      <section class="view" id="v-reader">
+        <div class="spread">
+          <div class="pg-art" id="pg-art"></div>
+          <div class="pg-txt">
+            <p class="storytext" id="pg-text"></p>
+            <div class="narration">
+              <button class="play" id="btn-play" aria-label="이야기 들려주기">▶</button>
+              <div class="track"><i id="narr-bar"></i></div>
+              <span class="lab">팀 녹음</span>
+            </div>
+            <div class="pgno" id="pgno"></div>
+          </div>
+        </div>
+        <div class="readerbar">
+          <button class="btn btn-ghost btn-md" id="btn-prev">← 이전</button>
+          <div class="dots" id="dots"></div>
+          <div class="sp"></div>
+          <button class="btn-quiet" data-go="detail">동화 소개</button>
+          <button class="btn btn-a btn-md" id="btn-next">다음 페이지 →</button>
+        </div>
+      </section>
+
+      <!-- 10. 비하인드 분기 -->
+      <section class="view center" id="v-branch">
+        <h2 class="title" id="br-title">그날 밤, 이야기는 어떻게 될까요?</h2>
+        <p class="sub" id="br-sub"></p>
+        <div class="branchgrid">
+          <button class="branchcard a" id="br-a">
+            <span class="lab">A</span><h3 id="br-a-t"></h3><p id="br-a-d"></p>
+          </button>
+          <button class="branchcard b" id="br-b">
+            <span class="lab">B</span><h3 id="br-b-t"></h3><p id="br-b-d"></p>
+          </button>
+        </div>
+        <p class="sub" style="font-size:13px;color:var(--color-ink-faint)">고른 뒤에도 다시 볼 수 있어요.</p>
+      </section>
+
+      <!-- 11. 마무리 -->
+      <section class="view center" id="v-end">
+        <div class="endcard">
+          <div style="font-size:46px">🎉</div>
+          <h2 class="title" id="end-title"></h2>
+          <p class="sub" id="end-sub" style="margin-left:auto;margin-right:auto"></p>
+          <div class="row c" style="margin-top:24px;flex-wrap:wrap" id="end-actions"></div>
+        </div>
+      </section>
+
+      <!-- 12. 나의 동화 앨범 -->
+      <section class="view" id="v-album">
+        <h2 class="title">나의 동화 앨범</h2>
+        <p class="sub" id="album-sub"></p>
+        <div id="album-body" style="margin-top:20px"></div>
+      </section>
+
+    </div>
+
+    <!-- 등장인물 대화 -->
+    <div class="chatwrap" id="chatwrap">
+      <div class="scrim" id="chat-scrim"></div>
+      <div class="chatpanel">
+        <div class="chathead">
+          <div class="av" id="chat-av"></div>
+          <div>
+            <div class="nm" id="chat-nm"></div>
+            <div class="sc" id="chat-sc"></div>
+          </div>
+          <div style="flex:1"></div>
+          <button class="btn-quiet" id="chat-close">닫기</button>
+        </div>
+        <div class="chatlog" id="chat-log"></div>
+        <div class="chatsug" id="chat-sug"></div>
+        <div class="chatfoot">
+          <input id="chat-input" placeholder="무엇이든 물어보세요" aria-label="메시지">
+          <button class="btn btn-primary btn-md" id="chat-send">보내기</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+</div>
+
+<div class="notes">
+  <div class="note"><h3>순서를 바로잡았다</h3>
+    <p>얼굴 촬영이 <b>동화 선택 뒤</b>로 갔다. <code>POST /sessions</code> 가 어떤 동화인지 알아야 세션을 만들고, 얼굴은 그 세션에 붙는다(<code>/sessions/:id/face</code>).</p></div>
+  <div class="note"><h3>제한은 카운터가 아니다</h3>
+    <p><code>UNIQUE(user_id, template_id)</code> 라 <b>이미 만든 동화는 서재에서 잠긴다.</b> 남은 횟수를 보여주지 않는 이유다.</p></div>
+  <div class="note"><h3>시연도 촬영을 탄다</h3>
+    <p>같은 화면·같은 연출을 쓰되 <b>카메라를 켜지 않고 AI 도 부르지 않는다.</b> 미리 합성해 둔 얼굴을 만든 것처럼 보여준다. 그래서 진행이 더 빠르다.</p></div>
+  <div class="note"><h3>시연은 로그인이 없다</h3>
+    <p>코드로 확인했다 — <code>(demo)</code> 에 인증 가드가 없고 <code>story</code> 컨트롤러에도 <code>AuthGuard</code> 가 0건이다. 로그인은 「내 얼굴로 만들기」에서만 요구한다.</p></div>
+  <div class="note"><h3>정면 1장</h3>
+    <p>3컷 → <b>1컷</b>. 촬영 실패 지점이 셋에서 하나로 줄고, 아이가 지루해지기 전에 끝난다.</p></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ── 화면 맞춤 ─────────────────────────────────────── */
+  var device = document.getElementById("device");
+  function fit() {
+    var w = document.documentElement.clientWidth - 32;
+    var h = window.innerHeight - 190;
+    var s = Math.min(w / 1088, h / 832, 1);
+    if (!isFinite(s) || s <= 0) s = 1;
+    device.style.transform = "scale(" + s + ")";
+    device.parentElement.style.height = (832 * s) + "px";
+  }
+  window.addEventListener("resize", fit); fit();
+
+  /* ── 상태 ──────────────────────────────────────────── */
+  var S = {
+    mode: "demo",        // demo | trial
+    user: null,          // { loginId }
+    authMode: "login",   // login | signup
+    story: null,
+    page: 0,             // 본편 0..3
+    phase: "main",       // main | behind | ending
+    branch: null,        // 'A' | 'B'
+    face: null,          // dataURL
+    owned: [],           // 생성 완료한 slug
+    resume: null,
+    stream: null,
+    video: null
+  };
+
+  /* ── 얼굴 ──────────────────────────────────────────── */
+  function faceSVG(seed) {
+    var skin = ["#F7D9BE", "#EFC6A3"][seed % 2];
+    var hair = ["#4A3728", "#6B4A2F"][seed % 2];
+    return '<svg viewBox="0 0 200 200" role="img" aria-label="주인공 얼굴">' +
+      '<rect width="200" height="200" fill="#FBECCB"/>' +
+      '<path d="M100 36c33 0 52 23 52 54v13c0 33-23 56-52 56s-52-23-52-56V90c0-31 19-54 52-54z" fill="' + skin + '"/>' +
+      '<path d="M100 28c37 0 56 25 56 56 0 8-4 11-10 9-10-4-27-9-46-9s-36 5-46 9c-6 2-10-1-10-9 0-31 19-56 56-56z" fill="' + hair + '"/>' +
+      '<circle cx="79" cy="106" r="6.5" fill="#2B2119"/><circle cx="121" cy="106" r="6.5" fill="#2B2119"/>' +
+      '<ellipse cx="66" cy="123" rx="9" ry="5.5" fill="#F2A9A0" opacity=".6"/>' +
+      '<ellipse cx="134" cy="123" rx="9" ry="5.5" fill="#F2A9A0" opacity=".6"/>' +
+      '<path d="M87 131q13 12 26 0" stroke="#B5654E" stroke-width="4.5" fill="none" stroke-linecap="round"/></svg>';
+  }
+  function paintFace(el) {
+    if (!el) return;
+    el.innerHTML = S.face ? '<img src="' + S.face + '" alt="촬영한 주인공 얼굴">' : faceSVG(0);
+  }
+
+  /* ── 캐릭터 아바타 ─────────────────────────────────── */
+  var AVATAR = {
+    wolf: '<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#DDE4EA"/><circle cx="50" cy="56" r="28" fill="#9AA3AC"/><path d="M30 34l-3-16 15 8zM70 34l3-16-15 8z" fill="#7F888F"/><circle cx="41" cy="52" r="4" fill="#2B2119"/><circle cx="59" cy="52" r="4" fill="#2B2119"/><path d="M44 66h12l-6 7z" fill="#5C646B"/></svg>',
+    granny: '<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#EFE6F5"/><circle cx="50" cy="56" r="26" fill="#F7D9BE"/><path d="M24 50a26 26 0 0 1 52 0z" fill="#E3E3E9"/><circle cx="42" cy="56" r="3.4" fill="#2B2119"/><circle cx="58" cy="56" r="3.4" fill="#2B2119"/><path d="M44 68q6 5 12 0" stroke="#B5654E" stroke-width="3" fill="none" stroke-linecap="round"/></svg>',
+    pig: '<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#FBE9EE"/><circle cx="50" cy="56" r="27" fill="#F3B7C4"/><ellipse cx="50" cy="62" rx="11" ry="8" fill="#E092A6"/><circle cx="46" cy="62" r="2.2" fill="#B96B80"/><circle cx="54" cy="62" r="2.2" fill="#B96B80"/><circle cx="40" cy="48" r="3.4" fill="#2B2119"/><circle cx="60" cy="48" r="3.4" fill="#2B2119"/></svg>',
+    hunter: '<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="#E4EFE2"/><circle cx="50" cy="58" r="25" fill="#EFC6A3"/><path d="M24 50h52l-6-12H30z" fill="#6E8F5E"/><circle cx="42" cy="58" r="3.4" fill="#2B2119"/><circle cx="58" cy="58" r="3.4" fill="#2B2119"/><path d="M44 70q6 4 12 0" stroke="#8A5A44" stroke-width="3" fill="none" stroke-linecap="round"/></svg>'
+  };
+
+  /* ── 삽화 ──────────────────────────────────────────── */
+  var PROP = {
+    trees: '<g fill="#6FAF6C"><path d="M56 470l34-104 34 104z"/><path d="M400 476l40-120 40 120z"/></g>' +
+           '<rect x="84" y="460" width="11" height="30" fill="#8A6A45"/><rect x="434" y="466" width="11" height="30" fill="#8A6A45"/>',
+    path:  '<path d="M250 620 Q222 548 268 494 T250 414" stroke="#E7D3A8" stroke-width="46" fill="none" stroke-linecap="round" opacity=".9"/>',
+    house: '<g><rect x="322" y="404" width="112" height="86" rx="7" fill="#F6E3C4"/><path d="M312 408l66-50 66 50z" fill="#D4715F"/><rect x="354" y="440" width="30" height="50" rx="4" fill="#9C6B4A"/><circle cx="410" cy="432" r="14" fill="#CFE7F6"/></g>',
+    wolf:  '<g><ellipse cx="372" cy="470" rx="54" ry="35" fill="#9AA3AC"/><circle cx="416" cy="444" r="26" fill="#9AA3AC"/><path d="M400 424l-5-22 21 12zM428 422l12-21 5 23z" fill="#7F888F"/><circle cx="426" cy="440" r="3.5" fill="#2B2119"/></g>',
+    pigs:  '<g fill="#F3B7C4"><circle cx="128" cy="476" r="27"/><circle cx="184" cy="482" r="23"/><circle cx="234" cy="476" r="19"/></g>',
+    grand: '<g><ellipse cx="128" cy="452" rx="38" ry="45" fill="#C9B6DA"/><circle cx="128" cy="396" r="26" fill="#F7D9BE"/><path d="M102 390a26 26 0 0 1 52 0z" fill="#E3E3E9"/></g>',
+    night: '<circle cx="404" cy="96" r="38" fill="#FBECCB"/><g fill="#fff"><circle cx="120" cy="80" r="3"/><circle cx="300" cy="60" r="3.5"/><circle cx="460" cy="180" r="3"/></g>',
+    bricks:'<g fill="#D98D6E"><rect x="330" y="430" width="120" height="60" rx="4"/></g><g stroke="#B8785C" stroke-width="2"><path d="M330 450h120M330 470h120M370 430v20M410 450v20"/></g>'
+  };
+
+  function sceneSVG(p, uid) {
+    var cid = "c" + uid, fx = p.fx, fy = p.fy, fr = p.fr || 46;
+    var face = S.face
+      ? '<image href="' + S.face + '" x="' + (fx - fr) + '" y="' + (fy - fr) + '" width="' + (fr * 2) + '" height="' + (fr * 2) + '" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + cid + ')"/>'
+      : '<g clip-path="url(#' + cid + ')"><rect x="' + (fx - fr) + '" y="' + (fy - fr) + '" width="' + (fr * 2) + '" height="' + (fr * 2) + '" fill="#F7D9BE"/>' +
+        '<circle cx="' + fx + '" cy="' + (fy - fr * .55) + '" r="' + (fr * .95) + '" fill="#4A3728"/>' +
+        '<circle cx="' + (fx - fr * .3) + '" cy="' + fy + '" r="' + (fr * .11) + '" fill="#2B2119"/>' +
+        '<circle cx="' + (fx + fr * .3) + '" cy="' + fy + '" r="' + (fr * .11) + '" fill="#2B2119"/>' +
+        '<path d="M' + (fx - fr * .26) + ' ' + (fy + fr * .34) + 'q' + (fr * .26) + ' ' + (fr * .26) + ' ' + (fr * .52) + ' 0" stroke="#B5654E" stroke-width="' + (fr * .1) + '" fill="none" stroke-linecap="round"/></g>';
+    var props = ""; (p.props || []).forEach(function (k) { props += PROP[k] || ""; });
+    return '<svg viewBox="0 0 512 620" preserveAspectRatio="xMidYMid slice" role="img" aria-label="' + (p.alt || "삽화") + '">' +
+      '<defs><clipPath id="' + cid + '"><circle cx="' + fx + '" cy="' + fy + '" r="' + fr + '"/></clipPath>' +
+      '<linearGradient id="g' + uid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + p.sky[0] + '"/><stop offset="1" stop-color="' + p.sky[1] + '"/></linearGradient></defs>' +
+      '<rect width="512" height="620" fill="url(#g' + uid + ')"/>' + props +
+      '<path d="M0 496 Q128 452 256 484 T512 472 L512 620 L0 620Z" fill="' + p.g1 + '"/>' +
+      '<path d="M0 542 Q150 506 300 536 T512 528 L512 620 L0 620Z" fill="' + p.g2 + '"/>' +
+      '<ellipse cx="' + fx + '" cy="' + (fy + fr * 3.2) + '" rx="' + (fr * 1.4) + '" ry="' + (fr * 1.7) + '" fill="' + p.outfit + '"/>' +
+      '<circle cx="' + fx + '" cy="' + fy + '" r="' + (fr + 4) + '" fill="none" stroke="#fff" stroke-width="5"/>' + face +
+      (p.hood ? '<path d="M' + (fx - fr - 7) + ' ' + fy + ' a' + (fr + 7) + ' ' + (fr + 7) + ' 0 0 1 ' + ((fr + 7) * 2) + ' 0 z" fill="' + p.hood + '"/>' : "") +
+      '</svg>';
+  }
+
+  function coverSVG(b) {
+    return '<svg viewBox="0 0 320 240" role="img" aria-label="' + b.title + ' 표지">' +
+      '<defs><linearGradient id="cv' + b.slug + '" x1="0" y1="0" x2="1" y2="1">' +
+      '<stop offset="0" stop-color="' + b.cover[0] + '"/><stop offset="1" stop-color="' + b.cover[1] + '"/></linearGradient>' +
+      '<clipPath id="cf' + b.slug + '"><circle cx="160" cy="118" r="40"/></clipPath></defs>' +
+      '<rect width="320" height="240" fill="url(#cv' + b.slug + ')"/>' +
+      '<path d="M0 190 Q90 162 170 184 T320 176 L320 240 L0 240Z" fill="rgba(255,255,255,.32)"/>' +
+      '<circle cx="160" cy="118" r="45" fill="#fff" opacity=".9"/>' +
+      (S.face
+        ? '<image href="' + S.face + '" x="120" y="78" width="80" height="80" preserveAspectRatio="xMidYMid slice" clip-path="url(#cf' + b.slug + ')"/>'
+        : '<g clip-path="url(#cf' + b.slug + ')"><rect x="120" y="78" width="80" height="80" fill="#F7D9BE"/>' +
+          '<circle cx="160" cy="96" r="35" fill="#4A3728"/><circle cx="150" cy="120" r="4" fill="#2B2119"/>' +
+          '<circle cx="170" cy="120" r="4" fill="#2B2119"/></g>') +
+      '<text x="160" y="52" text-anchor="middle" font-family="Jua, sans-serif" font-size="25" fill="#fff">' + b.title + '</text></svg>';
+  }
+
+  /* ── 콘텐츠 (본편 4 + 비하인드 2 = 6장) ────────────── */
+  var SKY_DAY = ["#EAF7FD", "#CDE7F6"], SKY_WARM = ["#FBF1DC", "#F3DEB8"], SKY_DUSK = ["#DCE6F4", "#B9CBE4"];
+
+  var BOOKS = [
+    {
+      slug: "red-hood", title: "빨간 모자", demo: true,
+      cover: ["#F6C6C0", "#E0796C"], tags: ["숲속 모험", "5–7세", "6장"],
+      blurb: "빨간 모자를 쓴 아이가 할머니 댁으로 가는 길, 숲에서 낯선 늑대를 만납니다. 조심해야 할 순간을 스스로 알아차리는 이야기예요.",
+      cast: [
+        { key: "wolf", name: "늑대", role: "숲에서 만난 낯선 이", sug: ["늑대야, 지금 어디 가고 있어?", "왜 나를 따라와?", "숲에서 조심할 게 뭐야?"],
+          reply: { "어디": "나? 그냥… 산책 중이야. 너는 어디 가는 길이니?", "따라": "따라간 게 아니라 길이 같았을 뿐이야. 정말이야!", "조심": "해가 지기 전에 큰길로 다녀. 지름길은 나도 무서워." } },
+        { key: "granny", name: "할머니", role: "언덕 너머에 사는", sug: ["할머니, 잘 지내셨어요?", "무슨 음식 좋아하세요?"],
+          reply: { "지내": "우리 아가 덕분에 아주 잘 지냈지. 어서 들어오렴.", "음식": "따뜻한 호박죽이란다. 너도 한 그릇 줄까?" } }
+      ],
+      pages: [
+        { text: "옛날 옛적에 빨간 모자를 쓴 아이 {name}이(가) 살았어요.\n오늘은 할머니 댁에 가는 날이에요.",
+          sky: SKY_DAY, g1: "#BFE4B8", g2: "#A9D8A2", outfit: "#E0796C", hood: "#E0796C", fx: 250, fy: 300, fr: 48, props: ["trees", "path"], alt: "숲길에 선 주인공" },
+        { text: "숲 한가운데에서 {name}은(는) 커다란 늑대를 만났어요.\n\"어디 가는 길이니?\" 늑대가 물었어요.",
+          sky: SKY_DAY, g1: "#B2DCAB", g2: "#96CE93", outfit: "#E0796C", hood: "#E0796C", fx: 168, fy: 314, fr: 44, props: ["trees", "wolf"], alt: "늑대를 만난 주인공", hit: { key: "wolf", x: 68, y: 60, r: 13 } },
+        { text: "\"낯선 사람에게는 알려주지 않을래.\"\n{name}은(는) 씩씩하게 말하고 큰길로 걸었어요.",
+          sky: SKY_DAY, g1: "#BFE4B8", g2: "#A9D8A2", outfit: "#E0796C", hood: "#E0796C", fx: 242, fy: 306, fr: 46, props: ["path", "house"], alt: "큰길로 향하는 주인공" },
+        { text: "할머니는 {name}을(를) 꼭 안아 주었어요.\n\"우리 아가, 정말 잘했구나!\"",
+          sky: SKY_WARM, g1: "#C6E6BF", g2: "#AEDCA6", outfit: "#E0796C", hood: "#E0796C", fx: 292, fy: 300, fr: 46, props: ["house", "grand"], alt: "할머니와 만난 주인공", hit: { key: "granny", x: 25, y: 66, r: 12 } }
+      ],
+      behind: {
+        intro: { text: "그날 밤, {name}은(는) 창밖에서 부스럭 소리를 들었어요.\n늑대가 문 앞에 서 있었어요.",
+          sky: SKY_DUSK, g1: "#9FC3A0", g2: "#83AC87", outfit: "#E0796C", hood: "#E0796C", fx: 232, fy: 306, fr: 46, props: ["night", "house", "wolf"], alt: "밤의 집 앞" },
+        A: { label: "문을 열어 이야기를 들어본다", desc: "무서워도 먼저 말을 걸어보는 쪽이에요.",
+          text: "{name}이(가) 문틈으로 물었어요. \"왜 왔어?\"\n늑대는 작게 말했어요. \"길을 잃었어. 무서웠어.\"",
+          sky: SKY_DUSK, g1: "#9FC3A0", g2: "#83AC87", outfit: "#E0796C", hood: "#E0796C", fx: 220, fy: 300, fr: 46, props: ["night", "house", "wolf"], alt: "문틈으로 대화하는 장면" },
+        B: { label: "할머니를 깨워 함께 본다", desc: "혼자 정하지 않고 어른에게 알리는 쪽이에요.",
+          text: "{name}은(는) 할머니를 깨웠어요.\n\"잘했어. 무서울 땐 꼭 나를 불러야 해.\"",
+          sky: SKY_DUSK, g1: "#9FC3A0", g2: "#83AC87", outfit: "#E0796C", hood: "#E0796C", fx: 288, fy: 300, fr: 46, props: ["night", "house", "grand"], alt: "할머니를 깨우는 장면" }
+      }
+    },
+    {
+      slug: "three-pigs", title: "아기 돼지 삼형제", demo: false,
+      cover: ["#FBE0C0", "#E2A05A"], tags: ["끈기", "4–6세", "6장"],
+      blurb: "튼튼한 집을 짓기까지, 서두르지 않고 끝까지 해내는 법을 배우는 이야기입니다.",
+      cast: [
+        { key: "pig", name: "첫째 돼지", role: "제일 급한 형", sug: ["왜 짚으로 지었어?", "지금은 어때?"],
+          reply: { "짚": "빨리 놀고 싶었거든… 지금은 좀 후회해.", "지금": "네 벽돌집 보고 배웠어. 같이 다시 지어볼래?" } },
+        { key: "wolf", name: "늑대", role: "바람을 몰고 온", sug: ["왜 자꾸 불어?", "미안하다고 할 거야?"],
+          reply: { "불": "튼튼한지 궁금했을 뿐이야. 정말 튼튼하더라!", "미안": "…미안해. 다음엔 문을 두드릴게." } }
+      ],
+      pages: [
+        { text: "숲속 마을에 아기 돼지 삼형제가 살았어요.\n그리고 그 옆집에는 {name}이(가) 살았답니다.",
+          sky: SKY_WARM, g1: "#C6E6BF", g2: "#AEDCA6", outfit: "#7FB2E0", fx: 280, fy: 306, fr: 46, props: ["pigs", "house"], alt: "삼형제와 주인공", hit: { key: "pig", x: 26, y: 70, r: 12 } },
+        { text: "\"짚으로 지으면 금방인데!\"\n하지만 {name}은(는) 고개를 저었어요.",
+          sky: SKY_DAY, g1: "#BFE4B8", g2: "#A9D8A2", outfit: "#7FB2E0", fx: 268, fy: 302, fr: 46, props: ["pigs", "trees"], alt: "집을 의논하는 장면" },
+        { text: "{name}이(가) 벽돌을 하나씩 쌓았어요.\n느리지만 아주 단단했지요.",
+          sky: SKY_DAY, g1: "#BFE4B8", g2: "#A9D8A2", outfit: "#7FB2E0", fx: 236, fy: 306, fr: 46, props: ["bricks", "trees"], alt: "벽돌집을 짓는 주인공" },
+        { text: "바람이 아무리 불어도 집은 끄떡없었어요.\n\"우리 {name}이(가) 최고야!\"",
+          sky: SKY_WARM, g1: "#C6E6BF", g2: "#AEDCA6", outfit: "#7FB2E0", fx: 276, fy: 302, fr: 46, props: ["house", "pigs"], alt: "완성된 집" }
+      ],
+      behind: {
+        intro: { text: "다음 날 아침, 늑대가 집 앞에 서 있었어요.\n이번엔 바람을 불지 않았어요.",
+          sky: SKY_DUSK, g1: "#9FC3A0", g2: "#83AC87", outfit: "#7FB2E0", fx: 232, fy: 304, fr: 46, props: ["house", "wolf"], alt: "찾아온 늑대" },
+        A: { label: "늑대에게 집 짓는 법을 알려준다", desc: "함께 만드는 쪽이에요.",
+          text: "{name}은(는) 벽돌 쌓는 법을 알려주었어요.\n늑대의 집도 튼튼해졌답니다.",
+          sky: SKY_WARM, g1: "#C6E6BF", g2: "#AEDCA6", outfit: "#7FB2E0", fx: 250, fy: 302, fr: 46, props: ["bricks", "wolf"], alt: "함께 집을 짓는 장면" },
+        B: { label: "먼저 사과를 받는다", desc: "약속을 분명히 하는 쪽이에요.",
+          text: "\"먼저 미안하다고 해 줘.\"\n늑대는 고개를 숙였고, 그제야 문이 열렸어요.",
+          sky: SKY_WARM, g1: "#C6E6BF", g2: "#AEDCA6", outfit: "#7FB2E0", fx: 262, fy: 302, fr: 46, props: ["house", "wolf"], alt: "사과하는 늑대" }
+      }
+    }
+  ];
+
+  function bookBySlug(s) { return BOOKS.filter(function (b) { return b.slug === s; })[0]; }
+
+  /* ── 이름 · 조사 ───────────────────────────────────── */
+  function heroName() { return S.user ? S.user.loginId : "친구"; }
+  function hasJong(n) { var c = n.charCodeAt(n.length - 1); if (c < 0xAC00 || c > 0xD7A3) return false; return (c - 0xAC00) % 28 !== 0; }
+  function withName(t) {
+    var n = heroName(), j = hasJong(n);
+    return t.replace(/\{name\}(은\(는\)|이\(가\)|을\(를\))?/g, function (_, josa) {
+      if (!josa) return n;
+      var m = { "은(는)": ["은", "는"], "이(가)": ["이", "가"], "을(를)": ["을", "를"] }[josa];
+      return n + (j ? m[0] : m[1]);
+    });
+  }
+
+  /* ── 뷰 전환 ───────────────────────────────────────── */
+  var FLOW = [["home","진입"],["login","로그인"],["library","서재"],["detail","상세"],["capture","얼굴 촬영"],
+              ["magic","합성"],["confirm","확인"],["generating","생성"],["reader","읽기"],["branch","비하인드 A/B"],
+              ["end","마무리"],["album","앨범"]];
+  var cur = "home";
+  var flowmap = document.getElementById("flowmap");
+  flowmap.innerHTML = FLOW.map(function (f) { return '<b data-k="' + f[0] + '">' + f[1] + "</b>"; }).join("");
+
+  var NAV = [["home","홈"],["library","서재"],["album","앨범"],["login","로그인"]];
+  function renderNav() {
+    document.getElementById("appnav").innerHTML = NAV.map(function (n) {
+      var label = n[0] === "login" && S.user ? "로그아웃" : n[1];
+      return '<button data-nav="' + n[0] + '"' + (cur === n[0] ? ' aria-current="page"' : "") + ">" + label + "</button>";
+    }).join("");
+  }
+
+  function show(key) {
+    var el = document.getElementById("v-" + key);
+    if (!el) return;
+    document.querySelectorAll(".view.on").forEach(function (v) { v.classList.remove("on"); });
+    el.classList.add("on");
+    cur = key;
+    flowmap.querySelectorAll("b").forEach(function (b) { b.classList.toggle("on", b.dataset.k === key); });
+    renderNav();
+    document.getElementById("floatbtn").hidden = !(key === "reader" && S.mode === "demo");
+    if (key !== "capture") stopCam();
+    stopNarration();
+    if (key === "library") renderLibrary();
+    if (key === "album") renderAlbum();
+  }
+
+  document.addEventListener("click", function (e) {
+    var g = e.target.closest("[data-go]"); if (g) { show(g.dataset.go); return; }
+    var n = e.target.closest("[data-nav]");
+    if (n) {
+      var k = n.dataset.nav;
+      if (k === "login" && S.user) { S.user = null; S.owned = []; S.face = null; setMode("demo"); toast("로그아웃했어요."); show("home"); return; }
+      if (k === "album" && !S.user) { toast("앨범은 로그인하면 볼 수 있어요."); openAuth("login", "album"); return; }
+      show(k);
+    }
+  });
+
+  function toast(m) {
+    var t = document.getElementById("toast");
+    t.textContent = m; t.classList.add("on");
+    clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove("on"); }, 3000);
+  }
+
+  function setMode(m) {
+    S.mode = m;
+    var c = document.getElementById("modechip");
+    c.className = "chip " + (m === "demo" ? "demo" : "trial");
+    c.textContent = m === "demo" ? "✨ 시연 모드" : "📷 체험 모드 · " + heroName();
+  }
+
+  /* ── 홈 ────────────────────────────────────────────── */
+  document.getElementById("btn-demo").addEventListener("click", function () {
+    setMode("demo"); S.face = null; show("library");
+  });
+  document.getElementById("btn-trial").addEventListener("click", function () {
+    if (S.user) { setMode("trial"); show("library"); } else { openAuth("signup", "library"); }
+  });
+
+  /* ── 로그인 ────────────────────────────────────────── */
+  var after = "library";
+  function openAuth(mode, next) { after = next || "library"; S.authMode = mode; renderAuth(); show("login"); }
+
+  function renderAuth() {
+    var signup = S.authMode === "signup";
+    document.getElementById("auth-title").textContent = signup ? "가입하기" : "로그인";
+    document.getElementById("auth-desc").textContent = signup
+      ? "아이디와 비밀번호만 있으면 돼요. 다른 정보는 받지 않아요."
+      : "내 얼굴로 만든 동화책을 계정에 보관해요.";
+    document.getElementById("btn-auth").textContent = signup ? "가입하고 시작" : "로그인";
+    document.getElementById("btn-authswitch").textContent = signup ? "이미 계정이 있어요" : "처음이신가요? 가입하기";
+    document.getElementById("f-pw2").hidden = !signup;
+    document.getElementById("auth-err").textContent = "";
+    ["f-id", "f-pw", "f-pw2"].forEach(function (id) { document.getElementById(id).classList.remove("bad"); });
+  }
+  document.getElementById("btn-authswitch").addEventListener("click", function () {
+    S.authMode = S.authMode === "signup" ? "login" : "signup"; renderAuth();
+  });
+
+  document.getElementById("btn-auth").addEventListener("click", function () {
+    var id = document.getElementById("i-id").value.trim();
+    var pw = document.getElementById("i-pw").value;
+    var pw2 = document.getElementById("i-pw2").value;
+    var signup = S.authMode === "signup";
+    var err = "", bad = "";
+    if (id.length < 4) { err = "아이디는 4자 이상이어야 해요."; bad = "f-id"; }
+    else if (pw.length < 8) { err = "비밀번호는 8자 이상이어야 해요."; bad = "f-pw"; }
+    else if (signup && pw2 !== pw) { err = "비밀번호가 서로 달라요."; bad = "f-pw2"; }
+    ["f-id", "f-pw", "f-pw2"].forEach(function (x) { document.getElementById(x).classList.remove("bad"); });
+    if (err) { document.getElementById("auth-err").textContent = err; document.getElementById(bad).classList.add("bad"); return; }
+    S.user = { loginId: id };
+    setMode("trial");
+    toast(signup ? "가입했어요. 이제 동화를 골라 주세요." : "반가워요, " + id + " 님!");
+    show(after);
+  });
+
+  /* ── 서재 ──────────────────────────────────────────── */
+  function renderLibrary() {
+    var demo = S.mode === "demo";
+    var list = demo ? BOOKS.filter(function (b) { return b.demo; }) : BOOKS;
+    document.getElementById("lib-sub").textContent = demo
+      ? "시연 동화 1권을 준비했어요. 읽어 보고 마음에 들면 내 얼굴로 만들 수 있어요."
+      : heroName() + " 님, 어떤 이야기의 주인공이 되고 싶어요? 동화마다 한 번씩 만들 수 있어요.";
+    document.getElementById("books").innerHTML = list.map(function (b) {
+      var owned = S.owned.indexOf(b.slug) >= 0;
+      return '<button class="storycard" data-slug="' + b.slug + '">' +
+        (owned ? '<span class="ribbon">내 책이 있어요</span>' : (!demo ? '<span class="ribbon locked">아직 안 만듦</span>' : "")) +
+        '<span class="cover">' + coverSVG(b) + "</span>" +
+        '<span class="t">' + b.title + '</span><span class="d">' + b.tags.join(" · ") + "</span></button>";
+    }).join("");
+  }
+  document.getElementById("books").addEventListener("click", function (e) {
+    var c = e.target.closest("[data-slug]"); if (!c) return;
+    S.story = bookBySlug(c.dataset.slug); openDetail();
+  });
+
+  /* ── 상세 ──────────────────────────────────────────── */
+  function openDetail() {
+    var b = S.story, owned = S.owned.indexOf(b.slug) >= 0;
+    document.getElementById("d-title").textContent = b.title;
+    document.getElementById("d-tags").innerHTML =
+      b.tags.map(function (t) { return '<span class="tag">' + t + "</span>"; }).join("") +
+      (S.mode === "trial" && owned ? '<span class="tag" style="background:#F3E6FB;color:#7A5AAF">이미 만든 책</span>' : "");
+    document.getElementById("d-blurb").textContent = b.blurb;
+    document.getElementById("d-art").innerHTML = sceneSVG(b.pages[0], "dt");
+    document.getElementById("d-cast").innerHTML = b.cast.map(function (c) {
+      return '<span class="castitem"><span class="av">' + (AVATAR[c.key] || "") + '</span>' +
+        '<span><span class="nm">' + c.name + '</span><br><span class="rl">' + c.role + "</span></span></span>";
+    }).join("");
+    var btn = document.getElementById("btn-read");
+    if (S.mode === "demo") { btn.textContent = "✨ 얼굴 넣어 보기"; btn.className = "btn btn-a btn-lg"; }
+    else if (owned) { btn.textContent = "📖 내 책 읽기"; btn.className = "btn btn-a btn-lg"; }
+    else { btn.textContent = "📷 내 얼굴로 만들기"; btn.className = "btn btn-gold btn-lg"; }
+    show("detail");
+  }
+
+  document.getElementById("btn-read").addEventListener("click", function () {
+    // 시연도 촬영 플로우를 탄다. 다른 것은 카메라·AI 를 쓰지 않는다는 점뿐이다.
+    if (S.mode === "trial" && S.owned.indexOf(S.story.slug) >= 0) { startReading(); }
+    else { startCapture(); }
+  });
+
+  /* ── 촬영 (정면 1장) ───────────────────────────────── */
+  var vf = document.getElementById("viewfinder");
+  function startCapture() {
+    var demo = S.mode === "demo";
+    document.getElementById("cap-book").innerHTML = "<b>" + S.story.title + "</b>의 주인공이 됩니다.";
+    document.getElementById("cap-sub").innerHTML = demo
+      ? "시연에서는 <b>미리 준비한 사진</b>으로 보여드려요. 카메라는 켜지 않습니다."
+      : "동그라미 안에 얼굴을 맞추고 <b>정면</b>을 한 장 찍어 주세요.";
+    document.getElementById("cap-privacy").innerHTML = demo
+      ? "실제 촬영은 <b>「내 얼굴로 만들기」</b>에서만 일어나요."
+      : "사진은 삽화를 만드는 동안에만 쓰고, 끝나면 <b>보관하지 않습니다.</b>";
+
+    vf.querySelectorAll("video, .vf-art").forEach(function (n) { n.remove(); });
+    S.face = null;
+
+    // 시연: 카메라를 요청하지 않는다. 미리 준비한 얼굴을 뷰파인더에 띄운다.
+    if (demo) { showPreparedFace(); show("capture"); return; }
+
+    var v = document.createElement("video");
+    v.autoplay = true; v.playsInline = true; v.muted = true;
+    vf.insertBefore(v, vf.firstChild); S.video = v;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { camFallback(); }
+    else {
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 640 }, audio: false })
+        .then(function (st) { S.stream = st; v.srcObject = st; })
+        .catch(function () { camFallback(); });
+    }
+    show("capture");
+  }
+
+  function showPreparedFace() {
+    var a = document.createElement("div"); a.className = "vf-art"; a.innerHTML = faceSVG(0);
+    a.firstChild.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    vf.insertBefore(a, vf.firstChild);
+  }
+  function camFallback() {
+    if (S.video) { S.video.remove(); S.video = null; }
+    var a = document.createElement("div"); a.className = "vf-art"; a.innerHTML = faceSVG(1);
+    a.firstChild.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    vf.insertBefore(a, vf.firstChild);
+    toast("카메라를 쓸 수 없어 예시 얼굴로 이어갑니다.");
+  }
+  function stopCam() {
+    if (S.stream) { S.stream.getTracks().forEach(function (t) { t.stop(); }); S.stream = null; }
+    if (S.video) { S.video.remove(); S.video = null; }
+  }
+  function grab() {
+    if (!S.video || !S.video.videoWidth) return null;
+    var side = Math.min(S.video.videoWidth, S.video.videoHeight);
+    var c = document.createElement("canvas"); c.width = c.height = 320;
+    var g = c.getContext("2d"); g.translate(320, 0); g.scale(-1, 1);
+    g.drawImage(S.video, (S.video.videoWidth - side) / 2, (S.video.videoHeight - side) / 2, side, side, 0, 0, 320, 320);
+    try { return c.toDataURL("image/jpeg", .85); } catch (e) { return null; }
+  }
+  document.getElementById("btn-shoot").addEventListener("click", function () {
+    vf.classList.remove("flash"); void vf.offsetWidth; vf.classList.add("flash");
+    if (S.mode === "trial") { var f = grab(); if (f) S.face = f; }
+    setTimeout(runMagic, 480);
+  });
+  document.getElementById("btn-retake").addEventListener("click", function () { S.face = null; startCapture(); });
+
+  /* ── 진행바 ────────────────────────────────────────── */
+  function progress(barId, tick, done, speed) {
+    var bar = document.getElementById(barId), p = 0;
+    bar.style.width = "0%";
+    var t = setInterval(function () {
+      p += (speed || 5) + Math.random() * 6;
+      if (p >= 100) { bar.style.width = "100%"; clearInterval(t); setTimeout(done, 380); }
+      else { bar.style.width = p + "%"; tick(p); }
+    }, 180);
+  }
+
+  function runMagic() {
+    stopCam();
+    paintFace(document.getElementById("magic-face"));
+    show("magic");
+    var msgs = ["얼굴을 살펴보고 있어요…", "표정을 익히는 중이에요…", "레퍼런스를 만드는 중…"];
+    var el = document.getElementById("magic-step"); el.textContent = msgs[0];
+    // 시연은 AI 를 부르지 않는다 — 미리 합성해 둔 결과를 같은 연출로 보여줄 뿐이라 더 빠르다.
+    progress("magic-bar", function (p) { el.textContent = msgs[Math.min(2, Math.floor(p / 34))]; },
+      function () {
+        paintFace(document.getElementById("confirm-face"));
+        document.getElementById("confirm-sub").innerHTML = S.mode === "demo"
+          ? "삽화 6장에 이 얼굴이 들어가요. 시연이라 <b>미리 준비해 둔 얼굴</b>입니다."
+          : "삽화 6장에 이 얼굴이 들어가요. 한 번 만들면 <b>같은 동화는 다시 만들 수 없어요.</b>";
+        show("confirm");
+      }, S.mode === "demo" ? 16 : 7);
+  }
+
+  document.getElementById("btn-generate").addEventListener("click", function () {
+    paintFace(document.getElementById("gen-face"));
+    var steps = ["1장 · 숲으로 가는 길", "2장 · 늑대와의 만남", "3장 · 큰길로", "4장 · 할머니 댁", "비하인드 2장"];
+    var el = document.getElementById("gen-steps");
+    function draw(i) {
+      el.innerHTML = steps.map(function (s, n) {
+        var cls = n < i ? "done" : n === i ? "now" : "";
+        return '<span class="s ' + cls + '">' + (n < i ? "✓ " : n === i ? "◔ " : "· ") + s + "</span>";
+      }).join("");
+    }
+    draw(0); show("generating");
+    // 시연은 이미 만들어 둔 책이라 빠르다. 앨범에도 쌓이지 않는다(계정이 없다).
+    progress("gen-bar", function (p) { draw(Math.min(4, Math.floor(p / 20))); }, function () {
+      draw(5);
+      if (S.mode === "trial" && S.owned.indexOf(S.story.slug) < 0) S.owned.push(S.story.slug);
+      startReading();
+    }, S.mode === "demo" ? 12 : 4);
+  });
+
+  /* ── 리더 ──────────────────────────────────────────── */
+  function startReading() { S.page = 0; S.phase = "main"; S.branch = null; renderPage(); show("reader"); }
+
+  function currentPageData() {
+    var b = S.story;
+    if (S.phase === "main") return b.pages[S.page];
+    if (S.phase === "behind") return b.behind.intro;
+    return b.behind[S.branch];
+  }
+
+  function renderPage() {
+    var b = S.story, p = currentPageData();
+    var art = document.getElementById("pg-art");
+    art.innerHTML = sceneSVG(p, "pg" + S.phase + S.page + (S.branch || ""));
+    if (p.hit) {
+      var btn = document.createElement("button");
+      btn.className = "hitbox";
+      btn.style.left = p.hit.x + "%"; btn.style.top = p.hit.y + "%";
+      btn.style.width = (p.hit.r * 2) + "%"; btn.style.aspectRatio = "1";
+      btn.setAttribute("aria-label", "등장인물에게 말 걸기");
+      btn.addEventListener("click", function () { openChat(p.hit.key); });
+      art.appendChild(btn);
+    }
+    var esc = function (x) { return x.replace(/&/g, "&amp;").replace(/</g, "&lt;"); };
+    var nm = heroName();
+    document.getElementById("pg-text").innerHTML = p.text.split("\n").map(function (line) {
+      return esc(withName(line)).split(esc(nm)).join("<em>" + esc(nm) + "</em>");
+    }).join("<br>");
+
+    var total = 6;
+    var idx = S.phase === "main" ? S.page + 1 : S.phase === "behind" ? 5 : 6;
+    document.getElementById("pgno").textContent = idx + " / " + total + (S.phase !== "main" ? " · 비하인드" : "");
+    document.getElementById("dots").innerHTML =
+      [0,1,2,3].map(function (i) { return '<i class="' + (S.phase === "main" && i === S.page ? "on" : "") + '"></i>'; }).join("") +
+      '<i class="behind ' + (S.phase === "behind" ? "on" : "") + '"></i>' +
+      '<i class="behind ' + (S.phase === "ending" ? "on" : "") + '"></i>';
+
+    document.getElementById("btn-prev").disabled = (S.phase === "main" && S.page === 0);
+    var next = document.getElementById("btn-next");
+    if (S.phase === "main" && S.page === 3) next.textContent = "비하인드 보기 →";
+    else if (S.phase === "behind") next.textContent = "어떻게 될까? →";
+    else if (S.phase === "ending") next.textContent = "다 읽었어요 →";
+    else next.textContent = "다음 페이지 →";
+  }
+
+  document.getElementById("btn-next").addEventListener("click", function () {
+    if (S.phase === "main") {
+      if (S.page < 3) { S.page++; renderPage(); }
+      else { S.phase = "behind"; renderPage(); }
+    } else if (S.phase === "behind") { openBranch(); }
+    else { openEnd(); }
+  });
+  document.getElementById("btn-prev").addEventListener("click", function () {
+    if (S.phase === "ending") { S.phase = "behind"; renderPage(); }
+    else if (S.phase === "behind") { S.phase = "main"; S.page = 3; renderPage(); }
+    else if (S.page > 0) { S.page--; renderPage(); }
+  });
+
+  /* ── 낭독 (D9 보류 — 음원 없이 진행바만) ───────────── */
+  var narrT = null;
+  function stopNarration() {
+    clearInterval(narrT); narrT = null;
+    var b = document.getElementById("btn-play"); if (b) b.textContent = "▶";
+    var n = document.getElementById("narr-bar"); if (n) n.style.width = "0%";
+  }
+  document.getElementById("btn-play").addEventListener("click", function () {
+    if (narrT) { stopNarration(); return; }
+    this.textContent = "❚❚";
+    var p = 0, bar = document.getElementById("narr-bar");
+    narrT = setInterval(function () {
+      p += 2.4; bar.style.width = Math.min(100, p) + "%";
+      if (p >= 100) { stopNarration(); }
+    }, 90);
+  });
+
+  /* ── 등장인물 대화 ─────────────────────────────────── */
+  var chatWrap = document.getElementById("chatwrap"), chatChar = null;
+  function openChat(key) {
+    chatChar = S.story.cast.filter(function (c) { return c.key === key; })[0];
+    if (!chatChar) return;
+    document.getElementById("chat-av").innerHTML = AVATAR[chatChar.key] || "";
+    document.getElementById("chat-nm").textContent = chatChar.name;
+    document.getElementById("chat-sc").textContent = "지금 장면에 대해서만 이야기해요";
+    document.getElementById("chat-log").innerHTML = "";
+    addMsg("them", "안녕, " + heroName() + "! 나한테 궁금한 게 있어?");
+    document.getElementById("chat-sug").innerHTML = chatChar.sug.map(function (s) {
+      return "<button>" + s + "</button>";
+    }).join("");
+    chatWrap.classList.add("on");
+    document.getElementById("chat-input").focus();
+  }
+  function addMsg(who, text) {
+    var d = document.createElement("div");
+    d.className = "msg " + who; d.textContent = text;
+    var log = document.getElementById("chat-log");
+    log.appendChild(d); log.scrollTop = log.scrollHeight;
+  }
+  function answer(q) {
+    var keys = Object.keys(chatChar.reply);
+    for (var i = 0; i < keys.length; i++) if (q.indexOf(keys[i]) >= 0) return chatChar.reply[keys[i]];
+    return "음… 그건 이 장면에서는 말해 줄 수 없어. 대신 지금 여기 이야기라면 얼마든지!";
+  }
+  function sendChat(text) {
+    if (!text.trim()) return;
+    addMsg("me", text);
+    document.getElementById("chat-input").value = "";
+    setTimeout(function () { addMsg("them", answer(text)); }, 420);
+  }
+  document.getElementById("chat-sug").addEventListener("click", function (e) {
+    if (e.target.tagName === "BUTTON") sendChat(e.target.textContent);
+  });
+  document.getElementById("chat-send").addEventListener("click", function () {
+    sendChat(document.getElementById("chat-input").value);
+  });
+  document.getElementById("chat-input").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") sendChat(this.value);
+  });
+  function closeChat() { chatWrap.classList.remove("on"); }
+  document.getElementById("chat-close").addEventListener("click", closeChat);
+  document.getElementById("chat-scrim").addEventListener("click", closeChat);
+
+  /* ── 비하인드 분기 ─────────────────────────────────── */
+  function openBranch() {
+    var bh = S.story.behind;
+    document.getElementById("br-sub").textContent = heroName() + " 님의 선택으로 마지막 장이 달라져요.";
+    document.getElementById("br-a-t").textContent = bh.A.label;
+    document.getElementById("br-a-d").textContent = bh.A.desc;
+    document.getElementById("br-b-t").textContent = bh.B.label;
+    document.getElementById("br-b-d").textContent = bh.B.desc;
+    show("branch");
+  }
+  function pick(which) { S.branch = which; S.phase = "ending"; renderPage(); show("reader"); }
+  document.getElementById("br-a").addEventListener("click", function () { pick("A"); });
+  document.getElementById("br-b").addEventListener("click", function () { pick("B"); });
+
+  /* ── 시연 → 체험 전환 (읽던 위치 유지) ─────────────── */
+  document.getElementById("btn-toTrial").addEventListener("click", function () {
+    S.resume = { slug: S.story.slug, page: S.page, phase: S.phase, branch: S.branch };
+    toast("만들고 나면 읽던 곳으로 돌아와요.");
+    if (S.user) { setMode("trial"); openDetail(); } else { openAuth("signup", "detail"); }
+  });
+
+  /* ── 마무리 ────────────────────────────────────────── */
+  function openEnd() {
+    var demo = S.mode === "demo";
+    document.getElementById("end-title").textContent = S.story.title + ", 끝!";
+    document.getElementById("end-sub").textContent = demo
+      ? "지금은 시연용 얼굴이었어요. 진짜 내 얼굴로 만들면 계정에 영원히 보관돼요."
+      : heroName() + " 님의 동화책이 앨범에 저장되었어요.";
+    var acts = ['<button class="btn btn-ghost btn-md" id="e-again">처음부터 다시 읽기</button>',
+                '<button class="btn btn-ghost btn-md" id="e-other">' + (S.branch === "A" ? "B" : "A") + " 결말도 보기</button>"];
+    acts.push(demo
+      ? '<button class="btn btn-gold btn-lg" id="e-trial">📷 내 얼굴로 만들기</button>'
+      : '<button class="btn btn-magic btn-lg" id="e-album">📚 앨범에서 보기</button>');
+    document.getElementById("end-actions").innerHTML = acts.join("");
+    show("end");
+    document.getElementById("e-again").addEventListener("click", function () { startReading(); });
+    document.getElementById("e-other").addEventListener("click", function () { pick(S.branch === "A" ? "B" : "A"); });
+    var t = document.getElementById("e-trial");
+    if (t) t.addEventListener("click", function () {
+      if (S.user) { setMode("trial"); openDetail(); } else { openAuth("signup", "detail"); }
+    });
+    var a = document.getElementById("e-album");
+    if (a) a.addEventListener("click", function () { show("album"); });
+  }
+
+  /* ── 앨범 ──────────────────────────────────────────── */
+  function renderAlbum() {
+    var body = document.getElementById("album-body");
+    document.getElementById("album-sub").textContent = S.user
+      ? heroName() + " 님이 만든 동화책이에요. 계정에 계속 보관됩니다."
+      : "로그인하면 내가 만든 동화책을 볼 수 있어요.";
+    if (!S.user || !S.owned.length) {
+      body.innerHTML = '<div class="albumempty"><div style="font-size:38px">📚</div>' +
+        '<p style="margin:10px 0 0">아직 만든 동화책이 없어요.<br>서재에서 동화를 고르고 얼굴을 찍어 보세요.</p></div>';
+      return;
+    }
+    body.innerHTML = '<div class="grid books">' + S.owned.map(function (slug) {
+      var b = bookBySlug(slug);
+      return '<button class="storycard" data-album="' + slug + '"><span class="ribbon">내 책</span>' +
+        '<span class="cover">' + coverSVG(b) + '</span><span class="t">' + b.title + "</span>" +
+        '<span class="d">주인공 ' + heroName() + " · 6장</span></button>";
+    }).join("") + "</div>";
+    body.querySelectorAll("[data-album]").forEach(function (el) {
+      el.addEventListener("click", function () { S.story = bookBySlug(el.dataset.album); startReading(); });
+    });
+  }
+
+  renderNav();
+})();
+</script>
