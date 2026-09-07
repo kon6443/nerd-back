@@ -1,8 +1,15 @@
+import type { DomainErrorCode } from '@nerd/contracts';
 import { ApiErrorResponseDto } from './api-error.dto';
 
 interface DomainErrorConfig {
-  /** 기계가 분기하는 코드. UPPER_SNAKE. */
-  code: string;
+  /**
+   * 기계가 분기하는 코드. UPPER_SNAKE.
+   *
+   * ⭐ 타입이 **`@nerd/contracts` 의 `DomainErrorCode` 유니온**이다. 새 에러를 만들려면
+   * 먼저 contracts 의 `DOMAIN_ERROR_CODES` 에 넣어야 컴파일된다 — 안 그러면 프론트가
+   * 그 분기의 존재를 모르는 채로 배포된다. **계약을 도구가 강제한다.**
+   */
+  code: DomainErrorCode;
   status: number;
   /** 기본 메시지. 생성 시 인자로 덮어쓸 수 있다. */
   message: string;

@@ -25,6 +25,15 @@ export const THROTTLE_LONG = { name: 'long', ttl: 60_000, limit: 60 } as const;
 export const THROTTLE_EDGE = { name: 'edge', ttl: 60_000, limit: 300 } as const;
 
 /**
+ * 로그인 전용 한도. 전역 `long`(분당 60)으로는 **대입 공격을 막지 못한다** —
+ * 분당 60번이면 하루 86,400번이다.
+ *
+ * ⚠️ IP 기준이라 같은 망에서 여러 사람이 로그인하면 함께 걸린다. 시연 환경에서 그 비용보다
+ * 무차별 대입을 여는 비용이 크다고 봤다.
+ */
+export const THROTTLE_LOGIN = { ttl: 60_000, limit: 5 } as const;
+
+/**
  * `@SkipThrottle()` 에 넘길 값.
  *
  * ⚠️ **인자 없는 `@SkipThrottle()` 은 우리 설정에서 동작하지 않는다.**

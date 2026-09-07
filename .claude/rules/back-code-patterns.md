@@ -8,12 +8,12 @@ paths:
 # 코드 패턴 (SSOT)
 
 > **이 파일은 위 `paths` 의 파일을 읽는 순간 자동으로 컨텍스트에 로드된다.** 라우팅 표를 기억하는 것에 의존하지 않는다.
-> 최종 확인일: 2026-09-02 · 근거: `src` 전체 **37개 `.ts`**(spec 10개 포함) + `test` 실측. 각 규약에 사용 카운트를 병기한다.
+> 최종 확인일: **2026-09-04** · 근거: `src` 전체 **70개 `.ts`**(spec 16개 포함) + `test` 실측. 각 규약에 사용 카운트를 병기한다.
 > **용도**: 새 코드를 "이 프로젝트 모양"으로 쓰기 위한 규약. 신규 모듈·API·테스트 작성 **전에** 해당 섹션을 확인한다.
 > **경계**: 여기는 *코드를 어떻게 쓰는가*. 금지·함정은 [`CLAUDE.md`](../../CLAUDE.md), 사실·사용법은 [`README.md`](../../README.md), 작업 방식의 교훈은 [`docs/lessons.md`](../../docs/lessons.md).
 
-규모 참고: 컨트롤러 1 · 모듈 5 · Port 1 · 도메인 에러 정의 4 · 단위 spec 10 · E2E spec 4.
-뼈대 + DB 연결(`DatabaseModule`)까지 완료. 도메인 모듈은 없다.
+규모 참고: 컨트롤러 3 · 모듈 7 · Port 1 · 가드 2 · 엔티티 5 · 마이그레이션 2 · 도메인 에러 정의 9 · 단위 spec 16 · E2E spec 7 · `__spec__` 헬퍼 3.
+뼈대 + DB 연결 + 도메인 모듈 `story`·`auth` 까지 완료.
 
 ---
 
@@ -22,6 +22,9 @@ paths:
 - **Controller → Service → TypeORM `Repository<Entity>`** 2계층. 별도 Repository 클래스를 만들지 않는다 (`class *Repository` **0건**).
 - Service 가 `@InjectRepository(Entity)` 로 직접 주입받는다. TypeORM 의 `Repository<T>` 가 이미 리포지토리이므로 한 겹 더 감싸지 않는다.
 - **외부 시스템은 반드시 Port 를 거친다** (`src/common/port/`, **1건**). 서비스가 SDK 를 직접 들지 않는다.
+  - ⚠️ **Port 를 첫 소비자보다 먼저 만들지 않는다.** 유일한 Port 인 `llm.port.ts` 는 뼈대 때 "경계만 먼저"
+    로 만들어졌고 2026-09-04 현재 **참조 0건**이다(실측). 소비자 없이 만든 인터페이스는 검증되지 않고,
+    실제 어댑터를 붙일 때 형태가 안 맞아 결국 다시 쓰게 된다. **어댑터를 붙이는 슬라이스에서 함께 만든다.**
 - 서비스가 커지면 계층을 늘리지 말고 **협력 서비스로 옆으로 분리**한다.
 
 ### 3계층 전환 트리거
@@ -47,7 +50,11 @@ return { code: SUCCESS_CODE, data: result, message: '' };
 ```
 
 - 응답 인터셉터를 두지 않는다. 컨트롤러가 리터럴을 반환한다.
-- `ApiSuccessResponseDto` 상속 DTO 는 **Swagger 명세용 타입 선언 전용**이다. `new` 로 만들어 반환하지 않는다.
+- Swagger 성공 응답은 **`@ApiSuccessResponse(DataDto, { isArray })`** 로 붙인다 (`common/decorators/`).
+  🚫 엔드포인트마다 `class XxxResponseDto extends ApiSuccessResponseDto` 를 만들지 않는다 — 쓰이지 않는
+  클래스가 엔드포인트 수만큼 늘고 봉투 형태가 바뀌면 전부 고쳐야 한다. 제네릭은 런타임에 지워지므로
+  데코레이터가 `allOf` + `getSchemaPath` 로 잇는다. `test/swagger.e2e-spec.ts` 가 그 연결을 고정한다.
+- `data` 로 쓰는 DTO 는 **명세용 타입 선언 전용**이다. `new` 로 만들어 반환하지 않는다.
 - HTTP 상태는 정석 REST 를 따른다. 생성은 201, 본문 없음은 204. **성공을 전부 200 으로 통일하지 않는다.**
 
 ## 3. 에러 — `defineDomainError` 팩토리
@@ -64,7 +71,12 @@ throw new SessionNotFoundErrorResponseDto();                  // 기본 메시�
 throw new SessionNotFoundErrorResponseDto('만료되었습니다.');   // override
 ```
 
-- 정의는 `defineDomainError` 로만 한다 (**4건**). code 가 한 곳에 모여 프론트와의 계약이 흔들리지 않는다.
+- 정의는 `defineDomainError` 로만 한다 (**6건**). code 가 한 곳에 모여 프론트와의 계약이 흔들리지 않는다.
+- ⭐ **`code` 의 타입은 `@nerd/contracts` 의 `DomainErrorCode` 유니온이다.** 새 에러를 만들려면 먼저
+  contracts 의 `DOMAIN_ERROR_CODES` 에 넣어야 컴파일된다 — 안 그러면 프론트가 그 분기의 존재를 모르는
+  채로 배포된다. **계약을 문서가 아니라 컴파일러가 강제한다.**
+  - 그래서 **테스트용 가짜 코드를 만들 수 없다.** 필터처럼 코드와 무관한 것을 검증할 때는
+    `ApiErrorResponseDto` 를 직접 상속해 픽스처를 만든다 (`http-exception.filter.spec.ts`).
 - 도메인 에러는 각 모듈의 `dto/*.error.dto.ts` 에, 공통 에러는 `common/dto/common-error.dto.ts` 에 둔다.
 - 전역 `HttpExceptionFilter` 가 **4단 분기**로 통일한다:
   1. `ApiErrorResponseDto` → DTO 의 code·message·details
@@ -75,18 +87,46 @@ throw new SessionNotFoundErrorResponseDto('만료되었습니다.');   // overri
 - 로그 레벨은 필터가 나눈다. `status >= 500` 은 `error`(스택 포함), 그 외는 `warn`.
 - ⚠️ **전역 필터·인터셉터를 추가·수정할 때는 "이 규칙이 적용되면 안 되는 응답"을 먼저 확인**하고 통과 케이스를 테스트로 고정한다.
 
-## 4. 검증 — 전역 ValidationPipe 하나
+## 4. 검증 — 스키마는 `@nerd/contracts`, 파이프는 하나
+
+요청 검증은 **zod 스키마**로 한다 (2026-09-04 전환, class-validator 걷어냄).
+스키마는 **`packages/contracts` 가 소유**한다 — 프론트의 폼 검증이 같은 스키마를 쓰므로
+"프론트는 통과했는데 백엔드가 400" 이 구조적으로 생기지 않는다.
+
+```ts
+// packages/contracts/src/story.ts — 계약의 SSOT
+export const storyPageParamsSchema = z.object({ ... }).strict();
+
+// apps/back — Nest 가 아는 형태로 감싸기만 한다
+export class StoryPageParamsDto extends createZodDto(storyPageParamsSchema) {}
+```
 
 `src/common/pipes/global-validation-pipe.ts` 의 `createGlobalValidationPipe()` 하나가 `APP_PIPE` 와 E2E 에서 **공유**된다. 한쪽만 바꾸면 E2E 가 프로덕션과 다른 규칙으로 검증하므로 **이 파일만 고친다.**
 
-```
-whitelist: true · forbidNonWhitelisted: true · transform: true
-transformOptions: { enableImplicitConversion: true }
-```
-
-- 암묵 변환이 켜져 있어 `@Type(() => Number)` 를 쓰지 않는다 (**0건**).
-- 검증 실패는 `VALIDATION_FAILED` · 400 이고 `details` 에 `필드: 메시지` 배열이 담긴다.
+- 실패는 **`VALIDATION_FAILED` · 400** 이고 `details` 에 `필드: 메시지` 배열이 담긴다.
+  🚫 **이 형식을 바꾸지 않는다** — 프론트와의 계약이다. 검증 라이브러리를 바꿔도 형식은 유지한다.
+- 정의에 없는 필드는 스키마의 **`.strict()`** 가 막는다 (구 `forbidNonWhitelisted`).
+- 🚫 **암묵 형변환에 기대지 않는다.** 경로·쿼리의 숫자는 스키마에서 **`z.coerce`** 로 명시 변환한다 (구 `enableImplicitConversion`). 어디서 형이 바뀌는지 코드를 읽어 알 수 있어야 한다.
+- **`strictSchemaDeclaration: true`** — nestjs-zod DTO 가 아닌 값을 검증하려 하면 **에러로 막는다.** "검증한다고 생각했는데 안 하고 있었다" 를 도구가 잡는다.
+  - ⚠️ **원시 타입도 막힌다.** `@Param('slug') slug: string` · `@Query('page') page: number` · 타입 없는 `@Body()` 는 **400 이 아니라 500** 이다. 빌드·부팅·타입체크로는 안 잡히고 **첫 요청에서** 드러난다.
+  - **증상**: 500 이 나는데 로그에 `검증 스키마가 선언되지 않았다 — @Param('slug') 파라미터 (선언 타입: String)` 이 찍힌다. 그러면 그 파라미터를 `createZodDto` DTO 로 바꾼다.
+  - ⚠️ **커스텀 파라미터 데코레이터(`@CurrentUser()` 등)는 예외로 통과시킨다.** 값을 **서버가** 넣는 자리라 검증할 스키마가 없고, 이 예외가 없으면 **인증된 라우트가 전부 첫 요청에서 500** 이 된다(실측). ZodDto 를 쓴 커스텀 데코레이터는 그대로 검증되므로 검증을 통째로 끄는 것이 아니다.
+  - 메시지는 `createGlobalValidationPipe` 의 래퍼가 붙인다 — nestjs-zod 가 던지는 원본 예외는 **메시지가 없어** 전역 필터에 `Internal Server Error` 로만 남는다.
+  - 🚫 그 래퍼는 **`HttpException` 을 상속하지 않는다.** 필터 3단이 `HttpException` 의 `message` 를 **응답 바디에 그대로 싣기** 때문이다 — 상속하면 개발자용 메시지(내부 구조·파일 경로)가 클라이언트로 나간다. 일반 `Error` 여야 4단이 받아 **사용자에게는 고정 메시지, 로그에는 전체 사유**가 된다. `global-validation-pipe.spec.ts` 가 네 형태·메시지·미노출을 고정한다.
 - 커스텀 Pipe 는 만들지 않는다.
+- Swagger 요청 스키마는 `createZodDto` 가 만들고 **`main.ts` 의 `cleanupOpenApiDoc`** 이 후처리한다. 빼면 문서가 뜨긴 하지만 요청 스키마가 비거나 어긋난 채로 노출된다. `test/swagger.e2e-spec.ts` 가 파라미터 생성을 고정한다.
+- `packages/contracts` 도 **린트 대상이다** — 두 앱이 의존하는 계약 소스라 `any` 하나가 양쪽으로 퍼진다. 자체 `eslint.config.mjs` 가 앱과 같은 타입 규율을 적용한다.
+- 🚫 contracts 의 `prepare`(= build)를 **컨테이너 설치에서 돌리지 않는다.** 두 설치 단계 모두 `--ignore-scripts` 이고 빌드는 명시 단계가 한다 — 매니페스트만 복사된 시점이라 소스가 없고, `--prod` 에는 `tsc` 도 없다 ([lessons 2026-09-04](../../docs/lessons.md)).
+- 환경변수도 같은 방식이다 — `src/config/env.validation.ts` 가 zod 스키마다. 🚫 `process.env` 스키마를 `.strict()` 로 만들지 않는다(무관한 키가 잔뜩 있어 어느 환경에서도 부팅하지 못한다).
+
+### ⚠️ zod 인스턴스가 둘이다
+
+`sharedWorkspaceLockfile: false` 라 `apps/back` 과 `packages/contracts` 가 **각자의 zod 를 설치**한다
+(2026-09-04 실측: 서로 다른 `.pnpm/zod@4.5.4` 경로).
+
+🚫 **그래서 zod 오류를 `instanceof ZodError` 로 판별하지 않는다.** 스키마를 만든 zod 와 판별하는 zod 가
+달라 `instanceof` 가 조용히 `false` 가 되고, **검증은 도는데 실패 사유(`details`)만 사라진다** — 가장 찾기
+어려운 형태다. `toValidationDetails` 는 `issues` 구조로 판별하고, spec 이 contracts 스키마로 이 경로를 고정한다.
 
 ## 5. 로깅 — Pino, 본문은 남기지 않는다
 
@@ -168,6 +208,15 @@ transformOptions: { enableImplicitConversion: true }
 전 환경이 동일 DB 를 공유하는 구성이라 테스트가 DB 에 접속하지 않는다. **도구가 막는다** — 두 jest 설정의 `moduleNameMapper` 가 `mysql2` 를 `test/setup/forbid-db.ts`(던지는 스텁)로 바꿔, 어떤 경로로든 `DataSource.initialize()` 에 도달하면 이유·대안을 담아 즉시 실패한다. 양쪽 설정에 같은 매퍼가 있어야 하고 `forbid-db.spec.ts` · `forbid-db.e2e-spec.ts` 가 각각 고정한다.
 
 - 단위 spec 은 소스 옆에 `*.spec.ts`. 헬퍼·팩토리는 `__spec__/` 안에 두고 커버리지 분모에서 제외한다.
+- **Repository 스텁은 `@common/__spec__/mock-repository` 를 쓴다.** 🚫 spec 마다 따로 만들지 않는다 —
+  메서드 하나를 새로 쓸 때 여러 파일을 고치게 된다. 주입은 `asRepository(mock)` 로 (이중 캐스팅을 반복하지 않는다).
+- **엔티티는 `@entities/__spec__/entity.factory` 로 만든다.** 4원칙:
+  1. 관계 프로퍼티는 **`UNSET`**(`undefined as never`) — **접근하면 터지는 게 의도다.** 로드하지 않은
+     관계를 쓰는 테스트가 즉시 드러난다. 관계가 필요하면 `overrides` 로 **명시**해 의존을 보이게 한다
+  2. 시각은 **`FIXED_DATE`**. 🚫 `new Date()` 를 쓰면 결과가 실행 시점에 따라 흔들린다
+  3. 🚫 **엔티티 전체를 캐스팅하지 않는다**(`{...} as Entity`). 필드가 빠져도 컴파일러가 못 잡는다.
+     팩토리는 캐스팅 없이 타입을 만족하므로 **컬럼이 늘면 팩토리에서 먼저 깨진다**
+  4. 차이는 `overrides: Partial<T>` 로만 표현한다
 - **E2E 는 `AppModule` 을 import 하지 않는다.** `test/helpers/e2e-app.ts` 의 `createE2eApp()` 을 쓴다. 부팅만으로 외부 시스템에 붙는 것을 막고, CI 에서 외부 의존 없이 돌아가게 한다.
 - E2E 도 **프로덕션과 같은 전역 파이프·필터**를 붙인다. 다르면 통과가 아무것도 보증하지 않는다.
 - 에러 경로는 status·code 를 **정확히 고정**한다. `expect([403, 404]).toContain(status)` 같은 느슨한 단정은 그 차이가 곧 방어의 유무일 때 테스트를 조용히 무력화한다.
@@ -214,18 +263,51 @@ dateKeyInTimeZone(nowUtc(), KST);  // '2026-08-27'  ← 일별 집계 키
   - ⚠️ TypeORM 의 `charset` 기본값은 `UTF8_GENERAL_CI` = **utf8mb3** 다. 명시하지 않으면 이모지가 깨진다.
 - 엔티티는 `*.entity.ts`, 모듈이 `TypeOrmModule.forFeature` 로 등록한다 (경로 glob 미사용). 시각 컬럼은 `DATETIME(3)` (§10).
 - `@Transactional` 은 Service 메서드에만. `main.ts` 가 `initializeTransactionalContext({ storageDriver: ASYNC_LOCAL_STORAGE })` 를 **`NestFactory.create` 전에** 1회 부른다 — 늦으면 데코레이터가 조용히 자동 커밋으로 돈다.
-- 마이그레이션: **1개 = 1목적 · `down()` 필수 · 멱등 작성.** MySQL 은 DDL 이 암묵 커밋이라 중간 실패 시 부분 적용 상태로 남는다 — 멱등 + 1목적이 유일한 방어다. 실행은 `pnpm migration:run`(빌드 산출물 + `--env-file=.env.migration`, 계정 `nerd_migrator`)으로 **사람이** 한다. 앱 계정 `nerd_app` 에는 DDL 권한이 없어 코드 경로에서 스키마가 바뀔 수 없다.
+- 마이그레이션: **1개 = 1목적 · `down()` 필수 · 멱등 작성.** MySQL 은 DDL 이 암묵 커밋이라 중간 실패 시 부분 적용 상태로 남는다 — 멱등 + 1목적이 유일한 방어다. 실행은 **`pnpm db:migrate:up`** 으로 **사람이** 한다(빌드 산출물 + `--env-file=.env`). 앱과 **같은 `.env`** 를 읽지만 계정은 `DB_MIGRATION_USER`/`DB_MIGRATION_PASSWORD` 로 갈린다 — 앱 계정 `nerd_app` 에는 DDL 권한이 없어 코드 경로에서 스키마가 바뀔 수 없다. 🚫 이 분리를 없애고 앱 계정에 DDL 을 주지 않는다. 🚫 둘 중 하나만 채우면 `buildMigrationConnectionOptions` 가 접속 전에 막는다.
+  - ⚠️ **`db:migrate:list` 를 예외로 두지 않는다.** `migration:show` 는 `migrations` 테이블이 없으면 `CREATE TABLE` 을 먼저 던진다 — 이름과 달리 조회가 아니다. **네 명령 전부 사람이 실행한다** (2026-09-04 실측: 앱 계정으로 1142 거부 확인).
 - 커넥션 풀 `DB_POOL_SIZE`(기본 10, 상한 30) × 레플리카 3 ≤ `max_connections` 100.
+
+## 13. 엔티티 — 위치와 이름은 명시로 고정한다
+
+첫 도메인 모듈(`story`, 2026-09-04)에서 확정했다. 근거는 [`tasks-my-story.md`](../../docs/tasks/tasks-my-story.md).
+
+- **엔티티는 `src/entities/` 에 둔다** (모듈 폴더 안이 아니다, **4건**). `@entities/*` alias 가 이미 그 자리를 가리키고, 세션→템플릿처럼 **모듈을 넘는 참조에서 순환 import 가 생기지 않는다.**
+- 테이블명은 **snake_case 복수형**(`story_templates`), 컬럼명은 snake_case, 엔티티 속성은 camelCase.
+- 🚫 **컬럼명을 규약 유추에 맡기지 않는다. 모든 컬럼에 `@Column({ name: '...' })` 를 명시한다.** 유추되는 컬럼과 명시된 컬럼이 섞이면 **속성명을 다듬는 것만으로 SQL 컬럼이 조용히 바뀐다.**
+- PK 는 `INT UNSIGNED AUTO_INCREMENT`. 🚫 **자동증가 id 를 API 에 노출하지 않는다** — 콘텐츠 수가 드러나고 값을 1씩 바꿔가며 미공개 리소스를 찾는 시도가 쉬워진다. 외부 식별자는 `slug` 같은 별도 컬럼을 둔다.
+- 민감·비공개 컬럼(프롬프트 persona, 비밀번호 해시 등)은 **`select: false`**. 선언된 컬럼은 모든 `find` 에서 SELECT 되어 응답·로그로 샌다.
+- 시각 컬럼은 `DATETIME(3)` + DB 기본값 (§10).
+
+
+## 14. 인증 — 세션은 Redis, 실패는 한 가지로
+
+- **비밀번호는 `node:crypto` 의 scrypt.** 새 의존성을 들이지 않는다. 저장 형식에 **파라미터를 함께 담아** 나중에 값을 올려도 옛 해시를 검증할 수 있게 한다.
+  - 🚫 검증 실패를 예외로 던지지 않는다. 형식이 깨진 해시와 비밀번호 불일치를 호출부가 구분하면 그 차이가 곧 계정 상태의 신호다.
+  - 비교는 **`timingSafeEqual`**. 🚫 `===` 를 쓰지 않는다.
+- **세션은 Redis + httpOnly 쿠키.** 🚫 인메모리 금지 — 레플리카가 3개라 로그인한 레플리카에서만 인증된다. JWT 를 쓰지 않는 이유는 **무효화**(로그아웃·강제 만료)다.
+  - ⭐ **세션 조회는 fail-closed 다.** Redis 를 못 읽으면 거절한다. 레이트리밋의 fail-open 을 여기 옮기면 **Redis 장애가 곧 전면 인증 우회**가 된다. 🚫 이 방향을 뒤집지 말 것.
+  - 로그아웃은 멱등이고, Redis 장애로 못 지워도 응답을 실패시키지 않는다(TTL 이 결국 만료시킨다).
+  - 🚫 sid·세션 값을 로그에 남기지 않는다. 남기면 로그가 곧 세션 탈취 수단이다.
+  - 쿠키를 지울 때는 **심을 때와 같은 옵션**(path 등)을 쓴다. 다르면 브라우저가 다른 쿠키로 보고 지우지 않는다.
+- 🚫 **로그인 실패 사유를 구분하지 않는다.** "아이디 없음"과 "비밀번호 틀림"을 나누면 그 차이가 곧 계정 존재 여부다. 코드 하나(`INVALID_CREDENTIALS`)로 답한다.
+  - ⭐ **없는 아이디에도 해시 검증을 실제로 수행한다.** 코드를 통일해도 "없을 때만 빠른" 응답 시간이 존재를 알려준다. 더미 해시로 KDF 를 돌린다.
+  - ⚠️ 가입의 중복 아이디(409)는 **반대다** — 알려주지 않으면 사용자가 아무것도 할 수 없다. 화면의 목적이 다르므로 정책도 다르다.
+- **중복은 DB `UNIQUE` 가 최종 방어선이다.** 🚫 "먼저 조회해서 없으면 저장" 으로 막지 않는다 — 동시 요청 둘이 모두 "없음"을 보고 통과한다. 제약 위반을 도메인 에러로 옮긴다. 🚫 그때 **모든** 저장 실패를 409 로 바꾸지 않는다(진짜 장애가 "중복"으로 위장된다).
+- **`AuthGuard` 를 전역(`APP_GUARD`)으로 등록하지 않는다.** 전역이면 공개 라우트마다 예외를 달게 되고, 예외를 깜빡한 라우트는 조용히 막히는 게 아니라 조용히 **열린다** — 실수의 방향이 위험한 쪽이다. `@UseGuards(AuthGuard)` 로 붙인다.
+- 로그인 경로에는 **별도의 좁은 한도**를 건다(`THROTTLE_LOGIN`). 전역 `long`(분당 60)이면 하루 86,400번이다.
+- ⚠️ **`@Post` 의 Nest 기본 응답은 201 이다.** 로그인처럼 자원을 만들지 않는 POST 는 `@HttpCode(200)` 를 명시한다 — 안 하면 Swagger(200)와 실제(201)가 갈린다. E2E 가 실제로 이 불일치를 잡았다.
 
 ---
 
 ## 신규 기능 체크리스트
 
 **신규 HTTP 엔드포인트**
-- [ ] 에러를 `defineDomainError` 로 정의해 throw 하는가? (§3)
+- [ ] 에러를 `defineDomainError` 로 정의해 throw 하는가? 새 code 를 **contracts 에 먼저 넣었는가**? (§3)
 - [ ] 응답을 `{ code, data, message }` 리터럴로 반환하는가? (§2)
 - [ ] 상태코드가 정석 REST 인가? 생성 201, 본문 없음 204 (§2)
-- [ ] Swagger: `@ApiOperation` + 응답 DTO + 공통 에러 데코레이터 (§2)
+- [ ] Swagger: `@ApiOperation` + **`@ApiSuccessResponse(DataDto)`** + 공통 에러 데코레이터 (§2)
+- [ ] 입력 스키마를 `@nerd/contracts` 에 두고 `createZodDto` 로 감쌌는가? (§4)
+- [ ] 응답 DTO 가 contracts 타입을 `implements` 하는가? — 계약이 어긋나면 컴파일이 깨진다 (§4)
 - [ ] 폴링되는 경로면 `@SkipThrottle(SKIP_ALL_THROTTLERS)` + `LOG_IGNORED_PATHS` (§5, §6)
 
 **외부 시스템 연동 추가**
@@ -238,6 +320,17 @@ dateKeyInTimeZone(nowUtc(), KST);  // '2026-08-27'  ← 일별 집계 키
 **전역 장치(필터·인터셉터·가드) 추가·수정**
 - [ ] 이 규칙이 적용되면 **안 되는** 응답을 확인했는가? (§3, lessons)
 - [ ] 통과 케이스를 테스트로 고정했는가?
+
+**인증이 걸린 라우트**
+- [ ] `@UseGuards(AuthGuard)` 를 라우트에 붙였는가? (전역 등록이 아니다, §14)
+- [ ] 자원을 만들지 않는 POST 에 `@HttpCode(200)` 을 명시했는가? (§14)
+
+**신규 엔티티**
+- [ ] `src/entities/` 에 두었는가? 모든 컬럼에 `@Column({ name })` 를 명시했는가? (§13)
+- [ ] `entities/__spec__/entity.factory.ts` 에 팩토리를 **같은 커밋에서** 추가했는가? (§9)
+- [ ] 외부에 노출할 식별자를 자동증가 `id` 와 분리했는가? (§13)
+- [ ] 민감 컬럼에 `select: false` 를 걸었는가? (§13)
+- [ ] 마이그레이션 파일을 **같은 커밋에** 넣었는가? 멱등하고 `down()` 이 있는가? (§12)
 
 **날짜·시간 다루는 코드**
 - [ ] `date.utils` 헬퍼를 쓰는가? 로컬 TZ 의존 메서드를 직접 부르지 않는가? (§10)

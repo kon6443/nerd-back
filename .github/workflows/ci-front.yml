@@ -6,18 +6,22 @@ on:
   pull_request:
     paths:
       - 'apps/front/**'
+      - 'packages/contracts/**'
       - 'package.json'
       - 'pnpm-workspace.yaml'
       - 'pnpm-lock.yaml'
+      - '.dockerignore'
       - '.github/workflows/ci-front.yml'
   push:
     branches-ignore:
       - main
     paths:
       - 'apps/front/**'
+      - 'packages/contracts/**'
       - 'package.json'
       - 'pnpm-workspace.yaml'
       - 'pnpm-lock.yaml'
+      - '.dockerignore'
       - '.github/workflows/ci-front.yml'
 
 jobs:
@@ -48,7 +52,8 @@ jobs:
       - name: ARM64 이미지 빌드 검증
         uses: docker/build-push-action@v6
         with:
-          context: apps/front
+          # 빌드 컨텍스트는 레포 루트다 (deploy-front.yml 과 **같은 값이어야** 한다).
+          context: .
           file: apps/front/Dockerfile
           platforms: linux/arm64
           push: false

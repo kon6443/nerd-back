@@ -9,7 +9,7 @@
 | 금지 | 이유 |
 |---|---|
 | E2E 에서 `AppModule` import | 부팅만으로 외부 시스템에 붙는다. `createE2eApp()` 을 쓴다 |
-| DB 마이그레이션 **실행** | 전 환경이 동일 DB — 모든 실행이 곧 상용 적용. AI 는 파일 작성까지만. 실행은 사람이 `nerd_migrator` 로 |
+| **DB 에 쓰는 명령 실행** — `pnpm db:migrate:*`(**4개 전부**) · `pnpm db:seed:dev` | 전 환경이 동일 DB — 실행이 곧 상용 적용. AI 는 파일 작성까지만, 실행은 사람이. 마이그레이션은 `DB_MIGRATION_*`(nerd_migrator), 시드는 앱 계정(DDL 이 아니라 행 쓰기라 그걸로 충분하다). ⚠️ `db:migrate:list` 도 포함이다 — `migration:show` 는 `migrations` 테이블이 없으면 `CREATE TABLE` 을 먼저 던진다(실측) |
 
 **근거의 유효기간** — 마이그레이션 실행 금지 ← **전 환경 동일 DB**. 환경별 DB 가 분리되면 재검토한다. (2026-09-02 자체 호스팅 전환 때 재검토했고 **유지** — 인스턴스 1대 공유)
 
@@ -20,8 +20,8 @@
 
 - **계층**: Repository 클래스 없음(Service 가 `@InjectRepository` 직접). **외부 시스템은 반드시 Port 경유**
 - **응답**: `{ code, data, message }` 객체 리터럴 직접 반환. 전역 인터셉터 없음. 상태코드는 정석 REST
-- **에러**: `defineDomainError` → 전역 필터가 `{ code, message, timestamp }` 로 통일. 바디에 `statusCode` 없음
-- **검증**: `createGlobalValidationPipe()` 하나를 프로덕션·E2E 가 공유 — **이 파일만 고친다**
+- **에러**: `defineDomainError` → 전역 필터가 `{ code, message, timestamp }` 로 통일. 바디에 `statusCode` 없음. **code 는 `@nerd/contracts` 유니온** — 새 에러는 계약에 먼저 넣어야 컴파일된다
+- **검증**: **zod** — 스키마는 `@nerd/contracts` 소유, `createZodDto` 로 감싼다. `createGlobalValidationPipe()` 하나를 프로덕션·E2E 가 공유 — **이 파일만 고친다**
 - **테스트**: mock 주력. E2E 는 외부 의존 없이 돈다
 - **외부 의존**: 죽어도 앱은 기동·응답한다. 레이트리밋은 fail-open, 비용 카운터는 fail-closed. **DB 만 예외** — 핵심 의존이라 못 붙으면 부팅 실패 + Swarm 무제한 재시작
 - **DB**: 옵션은 `typeorm.options.ts` 한 곳 · `synchronize` 금지 · 시각은 `DATETIME(3)`(`TIMESTAMP` 금지) · 앱 계정에 DDL 없음 · 테스트는 `forbid-db` 매퍼가 접속을 막는다
@@ -34,7 +34,7 @@
 - ⚠️ `pnpm back start:prod` 는 `TS_NODE_PROJECT=tsconfig.runtime.json` 이 필요하다. 없으면 `@config/*` 를 `src/` 로 해석해 `Cannot find module` 로 죽는다 — 컨테이너는 Dockerfile `ENV` 로 넣어 두었다
 - DB: 로컬 개발도 **운영 DB 를 터널로** 쓴다. **`pnpm back dev` 가 터널을 자동으로 보장한다**(`scripts/db-tunnel.sh --ensure`) — 끄려면 `SKIP_DB_TUNNEL=1` 또는 `pnpm back dev:no-tunnel`. 닫기는 `pnpm back db:tunnel:stop`
 - ⚠️ 터널 포트의 SSOT 는 **`apps/back/.env` 의 `DB_PORT`** 다. 스크립트가 거기서 읽으므로 두 값이 어긋날 수 없다. 그래도 그 포트를 다른 프로세스가 쥐고 있으면 스크립트가 막는다 — `ssh -L` 은 bind 실패를 경고만 하고 계속 돌아 **로컬 MySQL 에 붙는다**(에러의 호스트가 `@'localhost'` 면 그 경우다)
-- 로컬 env 는 `apps/back/.env` (앱별 독립). 마이그레이션은 **파일 작성까지** — `pnpm migration:run` 은 사람이
+- 로컬 env 는 `apps/back/.env` **한 곳** (마이그레이션도 같은 파일을 쓰고 계정만 `DB_MIGRATION_*` 로 갈린다). 마이그레이션은 **파일 작성까지** — `pnpm db:migrate:up` 은 사람이
 
 ## Common Pitfalls — 백엔드 고유
 

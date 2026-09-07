@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    // 백엔드가 commonjs 라 그쪽에 맞춘다. 프론트(bundler 해석)는 CJS 를 그대로 소비할 수 있다.
+    "target": "ES2023",
+    "module": "commonjs",
+    "lib": ["ES2023"],
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    // 소비하는 쪽이 타입을 보려면 선언 파일이 필요하다. 앱 tsconfig 와 다른 점이다.
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

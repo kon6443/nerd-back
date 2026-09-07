@@ -9,9 +9,11 @@ on:
   pull_request:
     paths:
       - 'apps/back/**'
+      - 'packages/contracts/**'
       - 'package.json'
       - 'pnpm-workspace.yaml'
       - 'pnpm-lock.yaml'
+      - '.dockerignore'
       - '.github/workflows/ci-back.yml'
   push:
     branches-ignore:
@@ -19,9 +21,11 @@ on:
       - main
     paths:
       - 'apps/back/**'
+      - 'packages/contracts/**'
       - 'package.json'
       - 'pnpm-workspace.yaml'
       - 'pnpm-lock.yaml'
+      - '.dockerignore'
       - '.github/workflows/ci-back.yml'
 
 jobs:
@@ -56,7 +60,9 @@ jobs:
       - name: ARM64 이미지 빌드 검증
         uses: docker/build-push-action@v6
         with:
-          context: apps/back
+          # 빌드 컨텍스트는 레포 루트다 (deploy-back.yml 과 **같은 값이어야** 한다).
+          # 다르면 CI 가 통과해도 배포 빌드가 깨진다.
+          context: .
           file: apps/back/Dockerfile
           platforms: linux/arm64
           push: false

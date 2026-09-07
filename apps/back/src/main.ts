@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
@@ -70,7 +71,14 @@ async function bootstrap(): Promise<void> {
   // Swagger 는 전 환경에 노출한다. 상용 환경이 하나뿐이고, API 설계를 공개하는 편이 낫다.
   // 대신 레이트리밋과 예산 가드레일이 앞단에 반드시 있어야 한다.
   const swaggerConfig = new DocumentBuilder().setTitle('nerd-back API').setVersion('0.1.0').build();
-  SwaggerModule.setup(`${API_PREFIX}/docs`, app, SwaggerModule.createDocument(app, swaggerConfig));
+  // ⚠️ zod DTO(`createZodDto`)가 만든 스키마는 후처리가 필요하다 — `cleanupOpenApiDoc` 이
+  //    빈 `type` 제거·중첩 스키마 등록·null 표현을 OpenAPI 규격에 맞게 정리한다.
+  //    빼면 문서가 뜨긴 하지만 요청 스키마가 비거나 어긋난 채로 노출된다.
+  SwaggerModule.setup(
+    `${API_PREFIX}/docs`,
+    app,
+    cleanupOpenApiDoc(SwaggerModule.createDocument(app, swaggerConfig)),
+  );
 
   const port = config.get<number>('PORT') ?? 5501;
   await app.listen(port, '0.0.0.0');

@@ -8,20 +8,28 @@ on:
     # paths-ignore 는 머지 커밋 평가에서 의도 외 트리거가 발생한다.
     #
     # ⚠️ 배포 워크플로 4개(back·front·db·redis)의 paths 는 **교집합이 0건**이어야 한다.
-    #    겹치면 한 커밋에 두 스택이 뜬다. 여기는 apps/back/ 아래만 본다.
-    # ⚠️ 루트 워크스페이스 파일(package.json · pnpm-workspace.yaml · 루트 lockfile)은
-    #    넣지 않는다. 컨테이너 빌드 컨텍스트가 apps/back 뿐이라 산출물을 바꿀 수 없다.
-    #    그 파일들의 회귀는 ci-back.yml 이 PR 에서 잡는다.
+    #    겹치면 한 커밋에 두 스택이 뜬다.
+    #
+    # ⚠️ **2026-09-04 부터 front 와 paths 가 겹친다 — 의도된 예외다.**
+    #    `packages/contracts/**` 와 루트 워크스페이스 파일은 두 이미지 산출물을 **실제로 둘 다**
+    #    바꾸므로, 한 커밋에 두 스택이 뜨는 것이 이 경우에는 올바른 동작이다.
+    #    나머지 경로는 여전히 교집합 0 이어야 한다 — 앱 코드끼리 겹치면 그건 사고다.
     paths:
       - 'apps/back/src/**'
       - 'apps/back/scripts/**'
       - 'apps/back/test/**'
       - 'apps/back/Dockerfile'
-      - 'apps/back/.dockerignore'
       - 'apps/back/package.json'
       - 'apps/back/pnpm-lock.yaml'
       - 'apps/back/tsconfig*.json'
       - 'apps/back/jest.config.js'
+      # 이미지 안에서 함께 빌드된다.
+      - 'packages/contracts/**'
+      # 워크스페이스 인식과 설치에 필요하다 — 컨텍스트에 실제로 들어간다.
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.dockerignore'
       - 'infra/prod_nerd_back.yml'
       - '.github/workflows/deploy-back.yml'
   # 코드 변경 없이 현재 main 을 다시 배포할 때 쓴다.
@@ -71,9 +79,10 @@ jobs:
       - name: 이미지 빌드 및 푸시
         uses: docker/build-push-action@v6
         with:
-          # 빌드 컨텍스트는 앱 디렉터리다. Dockerfile 은 자기 디렉터리가 곧 루트라고
-          # 가정하고 쓰여 있어 내용을 바꿀 필요가 없다.
-          context: apps/back
+          # ⚠️ 빌드 컨텍스트는 **레포 루트**다. 앱이 워크스페이스 패키지
+          # `@nerd/contracts` 에 의존하는데 그게 앱 디렉터리 밖이라 좁힐 수 없다.
+          # 제외 목록은 루트 `.dockerignore` 가 소유한다.
+          context: .
           file: apps/back/Dockerfile
           # 배포 노드가 ARM64 단일이므로 amd64 는 빌드하지 않는다.
           platforms: linux/arm64

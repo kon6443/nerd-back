@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* =============================================================================
+   디자인 토큰 — **정의는 여기 한 곳이다** (Tailwind v4 CSS-first).
+   🚫 `tailwind.config.ts` 를 만들지 않는다.
+   🚫 컴포넌트에 색 리터럴(`bg-[#5b9bd5]`)을 쓰지 않는다 — 리터럴이 퍼지면 팔레트 변경이
+      전수 수정이 된다.
+
+   ⚠️ 색 값은 **초안**이다. AI 시안 5장에서 뽑았고 UI 담당이 확정하면 이 블록을 먼저 고친다.
+   ============================================================================= */
+@theme {
+  /* 하늘색 — 헤더 바 · 얼굴 인식 CTA · 본문 말풍선 */
+  --color-primary: #5b9bd5;
+  --color-primary-strong: #3f7cb4;
+  /* 연한 하늘 — 카드 배경 · 삽화 프레임 */
+  --color-primary-soft: #dceaf7;
+  /* 크림 — 페이지 배경 */
+  --color-surface: #fdf6e8;
+  --color-surface-raised: #ffffff;
+  /* 민트 — `다음 페이지` · 비하인드 A */
+  --color-accent-a: #8fbf85;
+  --color-accent-a-soft: #e4f0e1;
+  /* 코랄 — 비하인드 B */
+  --color-accent-b: #e2848f;
+  --color-accent-b-soft: #f8e3e5;
+  /* 짙은 회청 — 본문 텍스트 */
+  --color-ink: #3f4a56;
+  --color-ink-muted: #78838f;
+
+  --radius-card: 1.25rem;
+  --radius-pill: 9999px;
+
+  /* 터치 타깃 최소 크기. WCAG 권장(44px)보다 큰 이유는 **아이 손가락이 대상**이기 때문이다.
+     시안의 버튼이 전부 크다. `h-touch` · `min-h-touch` 로 쓴다. */
+  --spacing-touch: 3.5rem;
+
+  /* ⚠️ 폰트는 **시스템 스택**이다. next/font/google 을 쓰지 않는다 —
+     `next build` 가 네트워크를 타지 않게 하려는 것이고(오프라인·프록시 빌드 실패 방지),
+     한글 서브셋 확보가 Google Fonts 경로에서 불확실하기 때문이다.
+     유아틱 라운드 폰트는 UI 담당이 정하면 여기서 교체한다. */
+  --font-sans: "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Noto Sans KR",
+    system-ui, -apple-system, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* 🚫 다크모드를 쓰지 않는다. 시안이 전부 라이트이고 파스텔 팔레트가 다크에서 성립하지 않는다.
+   `prefers-color-scheme` 블록을 되살리지 말 것. */
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }

@@ -1,14 +1,26 @@
 import { HttpStatus, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import type { ArgumentsHost } from '@nestjs/common';
-import { defineDomainError } from '../dto/define-domain-error';
+import { ApiErrorResponseDto } from '../dto/api-error.dto';
 import { HttpExceptionFilter } from './http-exception.filter';
 
-const SampleNotFoundErrorResponseDto = defineDomainError({
-  code: 'SAMPLE_NOT_FOUND',
-  status: HttpStatus.NOT_FOUND,
-  message: '샘플을 찾을 수 없습니다.',
-  name: 'SampleNotFoundErrorResponseDto',
-});
+/**
+ * 픽스처. **`defineDomainError` 를 쓰지 않는다** — 필터가 분기하는 기준은
+ * `instanceof ApiErrorResponseDto` 이고, 팩토리는 별도 spec 이 검증한다.
+ *
+ * 그리고 팩토리의 `code` 는 이제 `@nerd/contracts` 의 유니온이라 **테스트용 가짜 코드를 넣을 수
+ * 없다** — 계약에 테스트 값이 섞이는 것을 막기 위한 의도된 제약이다. 여기서는 기반 클래스를
+ * 직접 상속해 필터만 검증한다.
+ */
+class SampleNotFoundErrorResponseDto extends ApiErrorResponseDto {
+  constructor(message?: string, details?: unknown) {
+    super({
+      code: 'SAMPLE_NOT_FOUND',
+      status: HttpStatus.NOT_FOUND,
+      message: message ?? '샘플을 찾을 수 없습니다.',
+      details,
+    });
+  }
+}
 
 interface CapturedResponse {
   host: ArgumentsHost;

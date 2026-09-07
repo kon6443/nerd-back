@@ -1,0 +1,86 @@
+name: Deploy Storage
+
+# MinIO 스택은 앱과 **독립적으로** 배포된다.
+# 이 워크플로는 스토리지 스택 파일이 바뀔 때만 돈다 — 이미지 빌드도, 앱 재배포도 하지 않는다.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/prod_nerd_storage.yml'
+      - '.github/workflows/deploy-storage.yml'
+  workflow_dispatch:
+
+# 같은 스택에 동시에 배포가 겹치지 않게 줄을 세운다.
+concurrency:
+  group: deploy-storage
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04-arm
+    environment: PROD
+    steps:
+      - uses: actions/checkout@v4
+
+      # 저장소의 파일명이 이미 스택명이다 — scp 가 그대로 올리면 서버 규약
+      # (`$DEPLOY_DIR/stacks/<스택명>.yml`)이 성립한다.
+      - name: stack YAML 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          source: infra/prod_nerd_storage.yml
+          target: ${{ secrets.DEPLOY_DIR }}/stacks
+          strip_components: 1
+
+      - name: 스택 배포 (수렴까지 동기 대기)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          envs: OVERLAY_NETWORK,MINIO_DATA_DIR,MINIO_SERVER_URL,STORAGE_CORS_ORIGINS,STACK_FILE
+          script: |
+            set -e
+            # 🚫 데이터 디렉터리를 여기서 만들지 않는다. 없으면 마운트가 실패해야 한다 —
+            #    만들어 버리면 블록 볼륨이 안 붙은 채 부트 디스크에 조용히 쌓인다.
+            test -d "$MINIO_DATA_DIR" || {
+              echo "MINIO_DATA_DIR 이 없다: $MINIO_DATA_DIR — 블록 스토리지 마운트를 먼저 확인하세요"
+              exit 1
+            }
+            docker stack deploy --detach=false \
+              -c "$STACK_FILE" prod_nerd_storage
+            docker stack services prod_nerd_storage
+        env:
+          OVERLAY_NETWORK: ${{ secrets.OVERLAY_NETWORK }}
+          MINIO_DATA_DIR: ${{ secrets.MINIO_DATA_DIR }}
+          MINIO_SERVER_URL: ${{ secrets.MINIO_SERVER_URL }}
+          STORAGE_CORS_ORIGINS: ${{ secrets.STORAGE_CORS_ORIGINS }}
+          STACK_FILE: ${{ secrets.DEPLOY_DIR }}/stacks/prod_nerd_storage.yml
+
+      # ⚠️ named volume 때문에 stop-first 로 교체된다. 즉 재시작 순간 짧은 공백이 있다.
+      #    이미지 조회가 그 동안 실패하지만 본문·목록 API 는 계속 응답한다.
+      #
+      #    overlay attachable 여부에 의존하지 않도록 떠 있는 태스크 안에서 확인한다.
+      - name: 스모크 테스트 (S3 준비 상태)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_SERVER }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SWARM_MANAGER_SSH_KEY }}
+          script: |
+            set -e
+            for i in $(seq 1 20); do
+              cid=$(docker ps -q \
+                --filter "label=com.docker.stack.namespace=prod_nerd_storage" | head -1)
+              if [ -n "$cid" ] && docker exec "$cid" mc ready local 2>/dev/null; then
+                echo "MinIO 준비 확인 (시도 $i)"
+                exit 0
+              fi
+              sleep 3
+            done
+            echo "준비 확인 실패 — 배포를 실패로 처리한다"
+            docker service ps prod_nerd_storage_minio --no-trunc
+            exit 1

@@ -1,6 +1,7 @@
-import type { INestApplication } from '@nestjs/common';
+import type { INestApplication, ModuleMetadata } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
+import cookieParser from 'cookie-parser';
 import { TerminusModule } from '@nestjs/terminus';
 import { DataSource } from 'typeorm';
 import { API_PREFIX, TRUST_PROXY_HOPS } from '@common/constants/app.constants';
@@ -24,6 +25,16 @@ export interface E2eAppOptions {
   redisPing?: () => Promise<string>;
   /** DB 스텁 — `dataSource.query('SELECT 1')` 자리. 기본값은 정상 응답. */
   dbQuery?: () => Promise<unknown>;
+  /**
+   * 헬스체크 외에 추가로 마운트할 도메인 컨트롤러.
+   *
+   * ⚠️ 도메인 **모듈**을 import 하지 않는다. 모듈은 `TypeOrmModule.forFeature` 를 물고 있어
+   * 실 DataSource 를 요구한다. 컨트롤러·서비스만 올리고 Repository 는 `providers` 로 스텁한다
+   * (`getRepositoryToken(Entity)` 토큰).
+   */
+  controllers?: ModuleMetadata['controllers'];
+  /** 위 컨트롤러가 의존하는 서비스와 Repository 스텁. */
+  providers?: ModuleMetadata['providers'];
 }
 
 export async function createE2eApp(options: E2eAppOptions = {}): Promise<INestApplication> {
@@ -32,11 +43,12 @@ export async function createE2eApp(options: E2eAppOptions = {}): Promise<INestAp
 
   const moduleRef = await Test.createTestingModule({
     imports: [TerminusModule],
-    controllers: [HealthController],
+    controllers: [HealthController, ...(options.controllers ?? [])],
     providers: [
       { provide: REDIS_CLIENT, useValue: { ping } },
       // @InjectDataSource() 의 기본 토큰은 DataSource 클래스다. 실 DataSource 는 만들지 않는다.
       { provide: DataSource, useValue: { query } },
+      ...(options.providers ?? []),
     ],
   }).compile();
 
@@ -44,6 +56,10 @@ export async function createE2eApp(options: E2eAppOptions = {}): Promise<INestAp
 
   // 프로덕션과 같은 상수를 쓴다 (근거는 TRUST_PROXY_HOPS 주석).
   app.set('trust proxy', TRUST_PROXY_HOPS);
+
+  // ⚠️ 프로덕션(`main.ts`)과 **같은 미들웨어**를 붙인다. 없으면 `req.cookies` 가 undefined 라
+  //    세션 인증 E2E 가 프로덕션과 다른 것을 검증하게 된다.
+  app.use(cookieParser());
 
   app.setGlobalPrefix(API_PREFIX);
   app.useGlobalPipes(createGlobalValidationPipe());

@@ -17,7 +17,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
 
-const TARGET_DIRS = ['app', 'scripts'];
+const TARGET_DIRS = ['app', 'components', 'lib', 'scripts'];
 const EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.mjs']);
 const IGNORE_MARKER = 'check-stubs-ignore';
 
