@@ -1,0 +1,136 @@
+# 이 프로젝트 전용 오브젝트 스토리지(MinIO). 앱·DB·Redis 와 **독립된 스택**이다.
+#
+#   docker stack deploy -c prod_nerd_storage.yml prod_nerd_storage   (파일명 = 스택명)
+#
+# 서비스 DNS = `<스택>_<서비스>` → **`prod_nerd_storage_minio`**
+# 앱은 S3_ENDPOINT 로 이 이름을 받는다 (서버 .env). 리버스 프록시도 같은 망에서 이 이름으로 붙는다.
+#
+# **왜 파일시스템이 아니라 S3 인가** — 자체 호스팅으로 시작하지만 커지면 관리형(R2·S3)으로 옮긴다.
+# S3 API 로 두면 그 이전이 **엔드포인트·키 교체**로 끝난다. 파일시스템 어댑터였다면 재작성이다.
+# 결정 근거는 docs/tasks/tasks-my-story.md 「이미지 보관 (D1)」이 소유한다.
+#
+# ⚠️ **이 스택만 「스택 이름 = 노드 라벨 키」 규약의 예외다.** 새 라벨을 만들지 않고 백엔드와 같은
+#    `prod_nerd_back` 라벨을 쓴다(2026-09-07 지시) — 같은 A1 인스턴스에 묶어 두려는 것이고,
+#    노드가 하나뿐이라 라벨을 늘려도 얻는 게 없다. 노드가 늘면 이 결정을 다시 본다.
+
+services:
+  minio:
+    # MinIO 는 semver 가 아니라 날짜 기반 릴리스 태그를 쓴다. mysql:8.4 · redis:7-alpine 과 같이
+    # **여기에 고정**한다 — 태그를 env 로 빼면 무엇이 도는지 diff 에 안 보인다.
+    #
+    # ⚠️ 2026-09-07 실측: 이 태그가 Docker Hub `minio/minio` 의 **최신**이고 1년째 갱신이 없다.
+    #    커뮤니티 에디션 정책 변경의 결과로 보인다. 보안 패치가 더 오지 않는다는 뜻이므로,
+    #    대회가 끝나고 계속 쓸 거라면 그때 대안(Garage 등)을 재검토한다.
+    #    linux/arm64 지원 확인됨(58MB).
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+
+    # 🚫 root 로 돌리지 않는다. 데이터 디렉터리를 이 uid 로 미리 chown 해 두어야 한다
+    # (`chown -R 1000:1000 <MINIO_DATA_DIR>`). 호스트 계정 uid 와 같을 필요는 없다 —
+    # 컨테이너 안의 uid 가 디렉터리 소유자와 맞기만 하면 된다.
+    # ⚠️ 첫 배포에서 권한 오류로 기동하지 못하면 이 줄을 지우고 재배포한 뒤 원인을 따로 본다.
+    user: '1000:1000'
+
+    command:
+      - server
+      - /data
+
+    environment:
+      # ── 자격증명 ──────────────────────────────────────────────────────────────
+      # 시크릿을 환경변수 값으로 직접 넣지 않는다. `_FILE` 접미사는 MinIO 가 파일에서 읽는 규약이고,
+      # 아래 secrets 가 그 파일을 /run/secrets/ 에 놓는다.
+      MINIO_ROOT_USER_FILE: /run/secrets/prod_nerd_storage_root_user
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/prod_nerd_storage_root_pw
+
+      # ── 리버스 프록시 뒤에서 서명 URL 을 쓰기 위한 필수 설정 ⭐ ────────────────
+      # 🚫 **이 값을 비우면 서명 URL 이 브라우저에서 403 이 난다.** MinIO 는 요청의 Host 로 서명을
+      #    검증하는데, 내부 DNS(prod_nerd_storage_minio:9000)와 브라우저가 보는 외부 주소가 다르다.
+      #    이 값이 "외부에서 나를 부르는 이름"을 알려 준다. 값은 서버 .env 가 정한다.
+      MINIO_SERVER_URL: ${MINIO_SERVER_URL}
+
+      # 브라우저가 서명 URL 로 직접 받으므로 CORS 가 필요하다.
+      # 🚫 `*` 로 두지 않는다 — 서명 URL 이 유출됐을 때 아무 사이트나 읽어갈 수 있게 된다.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${STORAGE_CORS_ORIGINS}
+
+      # S3 SDK 는 리전을 요구한다. 명시하지 않으면 클라이언트가 가정한 리전과 서버가 어긋나
+      # SignatureDoesNotMatch 가 난다. 자체 호스팅에서는 값 자체에 의미가 없고 **일치**만 중요하다.
+      # 앱의 S3_REGION 과 같은 값이어야 한다.
+      MINIO_REGION: us-east-1
+
+      # 웹 콘솔을 끈다. 커뮤니티 에디션에서 기능이 축소됐고 우리에게 필요한 것은 S3 API 뿐이다.
+      # 켜 두면 임의 포트로 관리 UI 가 함께 뜬다 — 노출면을 늘리지 않는다. 관리는 `mc` 로 한다.
+      MINIO_BROWSER: 'off'
+
+    secrets:
+      - prod_nerd_storage_root_user
+      - prod_nerd_storage_root_pw
+
+    volumes:
+      - minio-data:/data
+
+    networks:
+      - shared
+
+    # ⚠️ **첫 배포에서 healthy 로 올라오는지 반드시 확인한다.** MinIO 이미지 구성은 릴리스마다 달라
+    #    `mc` 가 없을 수 있다. healthy 가 안 되면 재시작 루프에 빠지므로, 그때는 이 블록을 지우고
+    #    재배포한다 (미검증 — 이 레포에서 아직 배포한 적 없다).
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    # 진행 중인 업로드를 끝낼 시간을 준다. Swarm 기본 10s 는 큰 객체 쓰기 도중 잘릴 수 있다.
+    stop_grace_period: 30s
+
+    deploy:
+      replicas: 1
+
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+      update_config:
+        parallelism: 1
+        # ⚠️ start-first 를 쓰지 않는다. 같은 데이터 디렉터리에 두 프로세스가 붙으면 안 된다.
+        #    DB·Redis 와 같은 이유다.
+        order: stop-first
+
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+        window: 60s
+
+      # ⚠️ 볼륨이 **노드 로컬**이다. 재배치되면 빈 볼륨을 새로 만들어 이미지가 통째로 사라진다.
+      #    백엔드와 **같은 라벨**을 써서 같은 A1 인스턴스에 못박는다.
+      placement:
+        constraints:
+          - node.labels.prod_nerd_back == 1
+
+volumes:
+  # 블록 스토리지 위의 디렉터리에 못박는다. 경로는 배포 시점에 MINIO_DATA_DIR 로 주입한다.
+  # 순수 bind mount 를 쓰지 않는 이유: 경로가 없으면 Docker 가 만들어 버려 블록 볼륨이 안 붙은 채
+  # **부트 디스크에 조용히** 쌓인다. 이 방식은 경로가 없으면 마운트가 실패한다 (mysql-data 와 동일).
+  # ⚠️ 이미 만들어진 볼륨의 driver_opts 는 재배포로 바뀌지 않는다. 경로를 바꾸려면 볼륨을 지우고 다시 만든다.
+  minio-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${MINIO_DATA_DIR}
+
+secrets:
+  # 생성은 사람이 매니저에서 1회. 값은 다시 읽어낼 수 없다 (prod_nerd_db 시크릿과 같은 방식).
+  # 🚫 이 root 자격증명을 앱에 주지 않는다 — 앱은 버킷 하나만 접근하는 별도 액세스 키를 쓴다.
+  prod_nerd_storage_root_user:
+    external: true
+  prod_nerd_storage_root_pw:
+    external: true
+
+networks:
+  shared:
+    external: true
+    name: ${OVERLAY_NETWORK}
