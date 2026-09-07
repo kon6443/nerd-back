@@ -51,7 +51,11 @@ export function buildMigrationConnectionOptions(env: DbEnvVariables): MysqlConne
 
   if (hasUser !== hasPassword) {
     throw new Error(
-      'DB_MIGRATION_USER 와 DB_MIGRATION_PASSWORD 는 함께 채우거나 함께 비워야 한다.\n' +
+      // ⚠️ 첫 줄을 비운다 — TypeORM CLI 가 이 예외를 `Unable to open file: "...js". <메시지>`
+      // 로 감싸서 내보내기 때문이다. 줄을 바꾸지 않으면 "파일을 못 열었다" 는 **틀린 원인**과
+      // 한 줄로 붙어 보인다 (2026-09-04 실측).
+      '\n\n[.env 설정 오류]\n' +
+        'DB_MIGRATION_USER 와 DB_MIGRATION_PASSWORD 는 함께 채우거나 함께 비워야 한다.\n' +
         '  - 둘 다 채움: 그 계정(nerd_migrator)으로 붙는다. 네 명령 모두 이 상태를 요구한다.\n' +
         '  - 둘 다 비움: 앱 계정(DB_USER)으로 붙어 DDL 이 거부된다(1142). list 도 마찬가지다.\n' +
         '  apps/back/.env 를 확인하세요.',

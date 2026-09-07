@@ -76,6 +76,23 @@ describe('validateEnv', () => {
       expect(() => validateDbEnv({})).not.toThrow(/\.env\.migration/);
     });
 
+    // `.env.example` 은 채울 자리를 `DB_MIGRATION_PASSWORD=` 빈 값으로 배포한다.
+    // 이걸 형식 오류로 처리하면 zod 기본 메시지가 나가서 짝 검사 안내에 도달하지 못한다.
+    it('빈 문자열은 "안 채움" 으로 읽는다 ⭐ — .env.example 을 그대로 복사한 상태', () => {
+      const result = validateDbEnv({
+        ...DB_MINIMAL,
+        DB_MIGRATION_USER: 'nerd_migrator',
+        DB_MIGRATION_PASSWORD: '',
+      });
+
+      expect(result.DB_MIGRATION_PASSWORD).toBeUndefined();
+    });
+
+    it('필수 변수의 빈 문자열은 그대로 던진다 — optionalText 를 잘못 확대 적용하지 않았는지', () => {
+      // 위 완화가 DB_PASSWORD 까지 번지면 "채우다 만 .env" 가 조용히 통과한다.
+      expect(() => validateDbEnv({ ...DB_MINIMAL, DB_PASSWORD: '' })).toThrow(/DB_PASSWORD/);
+    });
+
     it('DB_MIGRATION_USER 만 채우면 통과한다 — 짝 검사는 data-source 가 한다', () => {
       // 스키마는 둘 다 optional 이다. 한쪽만 채운 상태를 막는 책임은
       // 실제로 그 값으로 접속하는 `config/data-source.ts` 에 있다.

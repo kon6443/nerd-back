@@ -79,4 +79,12 @@ describe('마이그레이션 CLI 접속 옵션', () => {
       /함께 채우거나 함께 비워야/,
     );
   });
+
+  it('메시지가 줄바꿈으로 시작한다 — TypeORM 이 앞에 붙이는 틀린 원인과 붙지 않게', () => {
+    // CLI 는 이 예외를 `Unable to open file: "...js". <메시지>` 로 감싼다. 한 줄로 붙으면
+    // 사람이 "빌드가 안 됐나?" 부터 확인하게 된다.
+    expect(() =>
+      buildMigrationConnectionOptions({ ...ENV, DB_MIGRATION_USER: 'nerd_migrator' }),
+    ).toThrow(/^\n\n\[\.env 설정 오류\]/);
+  });
 });

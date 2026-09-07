@@ -25,6 +25,18 @@ const port = (defaultValue: number) =>
 const requiredText = z.string().min(1);
 
 /**
+ * 선택 변수. **빈 문자열을 "안 채움" 으로 읽는다.**
+ *
+ * `.env` 에서 `KEY=` 는 빈 문자열로 들어온다 — 사람이 보기엔 안 채운 것이고, 실제로
+ * `.env.example` 도 채울 자리를 빈 값으로 배포한다. 이것을 형식 오류로 처리하면
+ * `Too small: expected string to have >=1 characters` 같은 zod 기본 메시지가 나가서,
+ * 정작 준비해 둔 안내(짝 검사)에 도달하지 못한다 (2026-09-04 실측).
+ *
+ * 🚫 필수 변수에는 쓰지 않는다 — 거기서는 빈 줄이 곧 "채우다 만 실수" 라 잡아야 한다.
+ */
+const optionalText = z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).optional());
+
+/**
  * DB 접속 변수. 앱(`envSchema`)과 마이그레이션 CLI(`config/data-source.ts`)가 **같은 스키마**를 쓴다 —
  * 둘 다 `.env` 한 파일을 읽지만 CLI 에는 Redis 등 앱 변수가 필요 없다 — 그래서 DB 부분만
  * 따로 검증할 수 있어야 한다. 계정은 `DB_MIGRATION_*` 로 갈린다.
@@ -54,8 +66,8 @@ export const dbEnvSchema = z.object({
    * `migrations` 테이블이 없으면 `CREATE TABLE` 을 먼저 던진다 — 이름과 달리 읽기 전용이 아니다.
    * 비워 두면 `ER_TABLEACCESS_DENIED_ERROR`(1142) 로 실패한다 (2026-09-04 실측).
    */
-  DB_MIGRATION_USER: z.string().min(1).optional(),
-  DB_MIGRATION_PASSWORD: z.string().min(1).optional(),
+  DB_MIGRATION_USER: optionalText,
+  DB_MIGRATION_PASSWORD: optionalText,
 });
 
 export const envSchema = dbEnvSchema.extend({
