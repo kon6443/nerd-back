@@ -14,6 +14,7 @@
     "db:migrate:generate": "pnpm --filter nerd-back run db:migrate:generate",
     "db:migrate:up": "pnpm --filter nerd-back run db:migrate:up",
     "db:migrate:revert": "pnpm --filter nerd-back run db:migrate:revert",
+    "db:seed:dev": "pnpm --filter nerd-back run db:seed:dev",
     "lint": "pnpm -r run lint",
     "ci:core": "pnpm -r run ci:core",
     "ci:all": "pnpm -r run ci:all"
