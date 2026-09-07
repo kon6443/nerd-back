@@ -46,6 +46,9 @@ export class AuthController {
       secure: this.config.get<string>('ENV') === AppEnv.PROD,
       path: '/',
       maxAge: SESSION_TTL_SECONDS * 1000,
+      // ⭐ 🚫 이 옵션을 빼지 말 것. 빼면 서명 없이 심겨 가드의 `signedCookies` 조회가 항상
+      //    비고, **로그인은 되는데 인증된 요청이 전부 401** 이 된다.
+      signed: true,
     });
   }
 
@@ -94,17 +97,14 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: '로그아웃', description: '세션을 파기하고 쿠키를 지운다. 멱등이다.' })
+  @ApiOperation({ summary: '로그아웃', description: '세션 쿠키를 지운다. 멱등이다.' })
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: '성공' })
   @ApiCommonThrottledResponse()
-  async logout(@Req() req: AuthenticatedRequest, @Res({ passthrough: true }) res: Response) {
-    const sid: unknown = req.cookies?.[SESSION_COOKIE];
-    if (typeof sid === 'string') {
-      await this.auth.logout(sid);
-    }
-
-    // ⚠️ 쿠키를 심을 때와 **같은 옵션**으로 지운다. path 가 다르면 브라우저가 다른 쿠키로
-    //    보고 지우지 않는다 — 로그아웃했는데 세션 쿠키가 남는 형태로 드러난다.
+  logout(@Res({ passthrough: true }) res: Response) {
+    // 세션이 서명 쿠키라 서버에 지울 상태가 없다. 쿠키를 지우는 것이 곧 로그아웃이다.
+    // ⚠️ 심을 때와 **같은 옵션**으로 지운다. path 가 다르면 브라우저가 다른 쿠키로 보고
+    //    지우지 않는다 — 로그아웃했는데 세션 쿠키가 남는 형태로 드러난다.
+    // 🚫 서버측 강제 만료는 없다. 훔친 쿠키는 만료까지 유효하다 (session.service 주석).
     res.clearCookie(SESSION_COOKIE, { httpOnly: true, sameSite: 'lax', path: '/' });
   }
 

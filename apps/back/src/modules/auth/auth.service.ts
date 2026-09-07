@@ -32,13 +32,20 @@ export class AuthService {
     private readonly sessions: SessionService,
   ) {}
 
-  /** 가입 후 바로 로그인 상태로 만든다. 세션 id 를 돌려준다. */
+  /**
+   * 가입 후 바로 로그인 상태로 만든다. 쿠키에 담을 세션 값을 돌려준다.
+   *
+   * ⭐ **되돌림이 필요 없다.** 세션이 서명 쿠키라 발급이 실패할 수 없기 때문이다.
+   * 서버측 세션이던 때에는 계정(MySQL) 저장 후 세션(Redis) 생성이 실패하면 **계정만 남고
+   * 호출자는 실패를 봤고**, 재시도하면 409 라 빠져나갈 길이 없었다 (2026-09-07 실측).
+   * 🚫 서버측 세션으로 돌아가면 그 보상 삭제도 함께 되살려야 한다.
+   */
   async signup(input: SignupInput): Promise<string> {
     const passwordHash = await this.passwords.hash(input.password);
 
     try {
       const saved = await this.users.save({ loginId: input.loginId, passwordHash });
-      return await this.sessions.create(saved.id);
+      return this.sessions.issue(saved.id);
     } catch (error) {
       // 🚫 "먼저 조회해서 없으면 저장" 으로 막지 않는다. 동시 요청 둘이 모두 "없음" 을 보고
       //    통과하므로 **DB 의 UNIQUE 제약이 최종 방어선**이고, 그 위반을 409 로 옮긴다.
@@ -65,10 +72,8 @@ export class AuthService {
       throw new InvalidCredentialsErrorResponseDto();
     }
 
-    return this.sessions.create(user.id);
+    return this.sessions.issue(user.id);
   }
 
-  async logout(sid: string): Promise<void> {
-    await this.sessions.destroy(sid);
-  }
+  // 🚫 logout 이 없다. 서버측 세션 상태가 없어 지울 것이 없다 — 컨트롤러가 쿠키만 지운다.
 }

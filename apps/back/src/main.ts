@@ -44,12 +44,16 @@ async function bootstrap(): Promise<void> {
   });
 
   app.use(compression());
-  app.use(cookieParser());
 
   // 롤링 업데이트 시 진행 중인 요청을 마치고 내려가게 한다.
   app.enableShutdownHooks();
 
   const config = app.get(ConfigService);
+
+  // ⭐ **서명 키를 반드시 넘긴다.** 없으면 `res.cookie(..., { signed: true })` 가 던지고,
+  //    설령 통과해도 가드의 `req.signedCookies` 가 항상 비어 인증이 전부 401 이 된다.
+  //    env 검증(`SESSION_SECRET`)이 부팅 시점에 존재를 보장한다.
+  app.use(cookieParser(config.getOrThrow<string>('SESSION_SECRET')));
 
   // 엣지 백스톱 레이트리밋 — Nest 가드가 닿지 않는 경로(Swagger UI·스펙 JSON·404)를 덮는다.
   // 기본 비활성이며, 플래그가 꺼져 있으면 미들웨어를 **아예 등록하지 않는다** (요청 경로 무변화).

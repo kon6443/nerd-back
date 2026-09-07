@@ -20,6 +20,12 @@ import { HealthController } from '@modules/health/health.controller';
  * 대신 전역 파이프·필터는 **프로덕션과 같은 것**을 붙인다. 그렇지 않으면 E2E 가
  * 프로덕션과 다른 규칙으로 검증하게 되어 통과가 아무것도 보증하지 않는다.
  */
+/**
+ * E2E 전용 서명 키. 🚫 실제 키를 쓰지 않는다 — 테스트가 env 에 의존하면 CI 에서만 깨진다.
+ * 값 자체에 의미는 없고 **길이 조건(32자)만 맞추면 된다.**
+ */
+export const E2E_SESSION_SECRET = 'e2e-session-secret-0123456789abcdef';
+
 export interface E2eAppOptions {
   /** Redis 스텁. 기본값은 정상 응답. */
   redisPing?: () => Promise<string>;
@@ -57,9 +63,11 @@ export async function createE2eApp(options: E2eAppOptions = {}): Promise<INestAp
   // 프로덕션과 같은 상수를 쓴다 (근거는 TRUST_PROXY_HOPS 주석).
   app.set('trust proxy', TRUST_PROXY_HOPS);
 
-  // ⚠️ 프로덕션(`main.ts`)과 **같은 미들웨어**를 붙인다. 없으면 `req.cookies` 가 undefined 라
+  // ⚠️ 프로덕션(`main.ts`)과 **같은 미들웨어**를 붙인다. 없으면 `req.signedCookies` 가 undefined 라
   //    세션 인증 E2E 가 프로덕션과 다른 것을 검증하게 된다.
-  app.use(cookieParser());
+  // ⭐ **서명 키를 넘기는 것까지 같아야 한다.** 키가 없으면 서명 쿠키가 아예 동작하지 않아
+  //    E2E 가 "인증이 되는 것처럼" 통과하거나 전부 401 이 된다 — 둘 다 프로덕션과 다른 검증이다.
+  app.use(cookieParser(E2E_SESSION_SECRET));
 
   app.setGlobalPrefix(API_PREFIX);
   app.useGlobalPipes(createGlobalValidationPipe());
