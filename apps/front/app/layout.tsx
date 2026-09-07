@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { AppHeader } from "@/components/layout/AppHeader";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,7 +19,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ko" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+      {/* 헤더가 sticky 라 본문이 그 아래로 흐른다. 🚫 body 에 padding-top 을 주지 않는다 —
+          헤더 높이를 두 곳에서 관리하게 되어 폰트가 바뀌면 어긋난다. */}
+      <body className="min-h-full flex flex-col">
+        <AppHeader />
+        {children}
+      </body>
     </html>
   );
 }
