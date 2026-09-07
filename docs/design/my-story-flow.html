@@ -69,9 +69,9 @@
   /* ── 전역 상단 네비 (main 의 AppHeader) ─────────────── */
   .appheader {
     position: absolute; inset: 0 0 auto 0; z-index: 6;
-    height: 66px; padding: 0 20px;
+    height: 76px; padding: 0 20px;
     display: flex; align-items: center; gap: 14px;
-    background: rgba(255,255,255,.82);
+    background: rgba(255,255,255,.86);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--color-line);
   }
@@ -83,7 +83,7 @@
   }
   .appnav { display: flex; gap: 4px; }
   .appnav button {
-    height: 40px; padding: 0 16px; border: none; border-radius: var(--radius-pill);
+    min-height: var(--spacing-touch); padding: 0 18px; border: none; border-radius: var(--radius-pill);
     background: none; font-family: var(--font-body); font-size: 15px;
     color: var(--color-ink-soft); cursor: pointer;
   }
@@ -93,11 +93,26 @@
 
   .chip {
     display: inline-flex; align-items: center; gap: 6px;
-    height: 34px; padding: 0 14px; border-radius: var(--radius-pill);
-    font-size: 13px; border: 1px solid var(--color-line); background: #fff;
+    height: 38px; padding: 0 15px; border-radius: var(--radius-pill);
+    font-size: 13.5px; border: 1px solid var(--color-line); background: #fff; white-space: nowrap;
   }
   .chip.demo { color: var(--color-accent-a-deep); background: #E8F8F8; border-color: #BCE6E5; }
   .chip.trial { color: var(--color-gold-deep); background: #FDF3E0; border-color: #F2DCB0; }
+
+  /* 시연 → 체험 전환. 콘텐츠 위에 떠 있지 않고 헤더 안에 산다. */
+  .btn-switch {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    min-height: var(--spacing-touch); padding: 0 20px;
+    border: none; border-radius: var(--radius-pill); cursor: pointer;
+    font-family: var(--font-display); font-size: 16px; white-space: nowrap;
+    background: linear-gradient(180deg, #F3BC5C, var(--color-gold-deep));
+    color: #fff; box-shadow: 0 4px 0 #A66C1E;
+    transition: transform .13s ease, box-shadow .13s ease;
+  }
+  .btn-switch:hover { filter: brightness(1.04); }
+  .btn-switch:active { transform: translateY(2px); box-shadow: 0 2px 0 #A66C1E; }
+  .btn-switch:focus-visible { outline: 3px solid var(--color-magic-deep); outline-offset: 3px; }
+  .btn-switch[hidden] { display: none; }
 
   /* ── 버튼 ──────────────────────────────────────────── */
   button { font-family: inherit; }
@@ -124,7 +139,7 @@
                  font-size: 15px; text-decoration: underline; text-underline-offset: 5px; cursor: pointer; min-height: var(--spacing-touch); padding: 0 10px; }
 
   /* ── 뷰 ────────────────────────────────────────────── */
-  .stage { position: absolute; inset: 66px 0 0 0; z-index: 4; }
+  .stage { position: absolute; inset: 76px 0 0 0; z-index: 4; }
   .view { position: absolute; inset: 0; padding: 20px 40px 32px; display: none; flex-direction: column; }
   .view.on { display: flex; animation: rise .34s cubic-bezier(.22,.9,.3,1) both; }
   @keyframes rise { from { opacity: 0; transform: translateY(14px);} to { opacity: 1; transform: none; } }
@@ -319,10 +334,6 @@
   .endcard { background: var(--color-panel); border: 2px solid var(--color-line); border-radius: var(--radius-card);
              padding: 34px 40px; text-align: center; box-shadow: 0 16px 34px rgba(35,76,119,.14); max-width: 640px; }
 
-  .float { position: absolute; top: 78px; right: 24px; z-index: 9; animation: bob 2.6s ease-in-out infinite; }
-  .float .ping { position: absolute; inset: -5px; border-radius: var(--radius-pill); border: 3px solid var(--color-gold); animation: ping 2.4s ease-out infinite; pointer-events: none; }
-  @keyframes ping { 0% { opacity:.7; transform: scale(.95);} 70%,100% { opacity:0; transform: scale(1.15);} }
-
   .toast { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 20;
            background: rgba(28,60,88,.94); color: #fff; padding: 12px 22px; border-radius: var(--radius-pill);
            font-size: 14px; display: none; max-width: 78%; }
@@ -353,12 +364,8 @@
       <nav class="appnav" id="appnav" aria-label="주요 메뉴"></nav>
       <div class="sp"></div>
       <span class="chip demo" id="modechip">✨ 시연 모드</span>
+      <button class="btn-switch" id="btn-toTrial" hidden>📷 내 얼굴로 만들기</button>
     </header>
-
-    <div class="float" id="floatbtn" hidden>
-      <span class="ping"></span>
-      <button class="btn btn-gold btn-md" id="btn-toTrial">📷 내 얼굴로 만들기</button>
-    </div>
 
     <div class="stage">
 
@@ -778,7 +785,9 @@
     el.classList.add("on");
     cur = key;
     renderNav();
-    document.getElementById("floatbtn").hidden = !(key === "reader" && S.mode === "demo");
+    // 시연 중에는 헤더에 상시 노출한다. 홈·로그인에는 이미 같은 진입점이 있어 뺀다.
+    document.getElementById("btn-toTrial").hidden =
+      !(S.mode === "demo" && key !== "home" && key !== "login");
     if (key !== "capture") stopCam();
     stopNarration();
     if (key === "library") renderLibrary();
@@ -851,7 +860,8 @@
     S.user = { loginId: id };
     setMode("trial");
     toast(signup ? "가입했어요. 이제 동화를 골라 주세요." : "반가워요, " + id + " 님!");
-    show(after);
+    // 상세로 돌아갈 때는 다시 그린다 — 모드가 바뀌어 CTA 문구와 배지가 달라진다.
+    if (after === "detail" && S.story) openDetail(); else show(after);
   });
 
   /* ── 서재 ──────────────────────────────────────────── */
@@ -1145,9 +1155,14 @@
 
   /* ── 시연 → 체험 전환 (읽던 위치 유지) ─────────────── */
   document.getElementById("btn-toTrial").addEventListener("click", function () {
-    S.resume = { slug: S.story.slug, page: S.page, phase: S.phase, branch: S.branch };
-    toast("만들고 나면 읽던 곳으로 돌아와요.");
-    if (S.user) { setMode("trial"); openDetail(); } else { openAuth("signup", "detail"); }
+    // 헤더에 상시 있으므로 서재처럼 고른 동화가 없는 화면에서도 눌린다.
+    var next = S.story ? "detail" : "library";
+    if (S.story) {
+      S.resume = { slug: S.story.slug, page: S.page, phase: S.phase, branch: S.branch };
+      if (cur === "reader") toast("만들고 나면 읽던 곳으로 돌아와요.");
+    }
+    if (S.user) { setMode("trial"); if (next === "detail") openDetail(); else show("library"); }
+    else { openAuth("signup", next); }
   });
 
   /* ── 마무리 ────────────────────────────────────────── */
