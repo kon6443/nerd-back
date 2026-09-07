@@ -47,6 +47,37 @@ const nextConfig: NextConfig = {
   deploymentId: process.env.DEPLOYMENT_VERSION,
 
   /**
+   * ⭐ **로컬 전용 백엔드 프록시.** 배포에는 Caddy 가 있지만 로컬에는 없다.
+   *
+   * 브라우저는 백엔드를 **상대경로**로 부른다(`/api/v2/...`, `lib/api/client.ts`). 배포에서는
+   * Caddy 가 그 경로만 백엔드로 분기하므로 오리진이 필요 없다. 그런데 로컬에는 그 분기가 없어
+   * 요청이 Next dev 서버로 가고 **전부 404** 가 된다 — 로그인·가입·로그아웃이 통째로 막힌다
+   * (2026-09-07 실측: `POST localhost:5502/api/v2/auth/signup` → 404,
+   *  대조군 `localhost:5501` → 200).
+   *
+   * 🚫 서버 컴포넌트는 이 경로를 타지 않는다. 그쪽은 `BACKEND_INTERNAL_URL` 로 직접 부른다.
+   *    즉 이 리라이트는 **브라우저발 요청만** 메운다.
+   *
+   * 🚫 프로덕션에서는 등록하지 않는다. Caddy 가 이미 앞단에서 분기해 Next 까지 오지 않으므로
+   *    여기 규칙이 있으면 "어느 쪽이 실제로 동작하는지" 를 헷갈리게 만드는 죽은 설정이 된다.
+   *
+   * ⚠️ 경로 접두는 `@nerd/contracts` 의 `API_PREFIX` 와 같은 값이어야 한다. next.config 는
+   *    Next 자체 로더가 읽으므로 워크스페이스 패키지를 import 하지 않고 문자열로 둔다 —
+   *    `API_PREFIX` 를 바꾸면 이 줄도 같이 고친다.
+   */
+  async rewrites() {
+    const target = process.env.BACKEND_INTERNAL_URL;
+    if (process.env.NODE_ENV !== "development" || !target) return [];
+
+    return [
+      {
+        source: "/api/v2/:path*",
+        destination: `${target.replace(/\/+$/, "")}/api/v2/:path*`,
+      },
+    ];
+  },
+
+  /**
    * 🚫 `outputFileTracingIncludes` 로 sharp 를 강제 포함하지 않는다.
    *
    * 공식 문서에 `'/*': ['node_modules/sharp/**\/*']` 예시가 있어 넣었다가 뺐다.
