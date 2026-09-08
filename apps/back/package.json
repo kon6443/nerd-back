@@ -27,6 +27,8 @@
     "db:migrate:up": "pnpm build && node --env-file=.env node_modules/typeorm/cli.js -d dist/config/data-source.js migration:run",
     "db:migrate:revert": "pnpm build && node --env-file=.env node_modules/typeorm/cli.js -d dist/config/data-source.js migration:revert",
     "db:seed:dev": "pnpm build && node --env-file=.env dist/scripts/seed-dev-fixture.js",
+    "db:seed:stories": "pnpm build && node --env-file=.env dist/scripts/seed-official-stories.js",
+    "db:clean:dev": "pnpm build && node --env-file=.env dist/scripts/delete-dev-fixture.js",
     "check:stubs": "node scripts/check-stubs.mjs",
     "check:types": "tsc --noEmit",
     "ci:core": "pnpm run lint && pnpm run test && pnpm run build",
