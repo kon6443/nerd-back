@@ -1,5 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { createSession, uploadFace } from "./session";
+import {
+  createSession,
+  fetchSessionPages,
+  personalizeSession,
+  retrySessionPage,
+  uploadFace,
+} from "./session";
 import * as client from "./client";
 
 describe("session api", () => {
@@ -43,5 +49,67 @@ describe("session api", () => {
     });
     expect(result.status).toBe("face_ready");
     expect(result.referenceImageUrl).toBe("https://storage.local/ref.png");
+  });
+
+  it("personalizeSession 은 /sessions/:id/personalize 로 POST 요청을 보낸다", async () => {
+    const apiFetchSpy = vi.spyOn(client, "apiFetch").mockResolvedValue({
+      id: "session-123",
+      status: "generating",
+      totalPages: 6,
+    });
+
+    const result = await personalizeSession("session-123");
+
+    expect(apiFetchSpy).toHaveBeenCalledWith("/sessions/session-123/personalize", {
+      method: "POST",
+    });
+    expect(result.id).toBe("session-123");
+    expect(result.status).toBe("generating");
+    expect(result.totalPages).toBe(6);
+  });
+
+  it("fetchSessionPages 는 /sessions/:id/pages 로 GET 요청을 보낸다", async () => {
+    const apiFetchSpy = vi.spyOn(client, "apiFetch").mockResolvedValue({
+      sessionId: "session-123",
+      status: "generating",
+      totalPages: 6,
+      completedPages: 3,
+      isAllCompleted: false,
+      pages: [
+        {
+          pageNo: 1,
+          status: "succeeded",
+          imageUrl: "https://storage.local/page-1.png",
+          errorMessage: null,
+          updatedAt: "2026-09-08T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const result = await fetchSessionPages("session-123");
+
+    expect(apiFetchSpy).toHaveBeenCalledWith("/sessions/session-123/pages", {
+      method: "GET",
+    });
+    expect(result.sessionId).toBe("session-123");
+    expect(result.completedPages).toBe(3);
+    expect(result.pages[0].status).toBe("succeeded");
+  });
+
+  it("retrySessionPage 는 /sessions/:id/pages/:pageNo/retry 로 POST 요청을 보낸다", async () => {
+    const apiFetchSpy = vi.spyOn(client, "apiFetch").mockResolvedValue({
+      sessionId: "session-123",
+      pageNo: 2,
+      status: "pending",
+    });
+
+    const result = await retrySessionPage("session-123", 2);
+
+    expect(apiFetchSpy).toHaveBeenCalledWith("/sessions/session-123/pages/2/retry", {
+      method: "POST",
+    });
+    expect(result.sessionId).toBe("session-123");
+    expect(result.pageNo).toBe(2);
+    expect(result.status).toBe("pending");
   });
 });

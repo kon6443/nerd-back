@@ -293,8 +293,14 @@ export default function CapturePage({ params }: PageProps) {
           </div>
 
           <div className="flex w-full flex-col gap-3">
-            <Link href={`/library/${slug}`} className={actionClass("primary", "w-full")}>
-              동화책 보러 가기
+            <Link
+              href={`/stories/${slug}/read?sessionId=${result.id}&autoStart=true`}
+              className={actionClass("primary", "w-full py-3.5 text-base font-bold shadow-md")}
+            >
+              ✨ 이 얼굴로 동화책 만들기 시작
+            </Link>
+            <Link href={`/library/${slug}`} className={actionClass("ghost", "w-full")}>
+              동화 소개로
             </Link>
           </div>
         </Card>
