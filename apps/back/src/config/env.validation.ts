@@ -107,6 +107,21 @@ export const envSchema = dbEnvSchema.extend({
   EDGE_THROTTLE_ENABLED: z
     .enum(['true', 'false'], { error: "EDGE_THROTTLE_ENABLED 는 'true' 또는 'false' 여야 한다." })
     .default('false'),
+  /** AI 이미지 생성 어댑터 공급자 (mock | openrouter) */
+  IMAGE_PROVIDER: z.enum(['mock', 'openrouter']).default('mock'),
+  /** OpenRouter API 키 */
+  OPENROUTER_API_KEY: optionalText,
+  /** OpenRouter 이미지 모델 (기본: bytedance-seed/seedream-5-0-lite) */
+  OPENROUTER_IMAGE_MODEL: z.string().default('bytedance-seed/seedream-5-0-lite'),
+  /** 스토리지 어댑터 공급자 (local | s3) */
+  STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
+  S3_ENDPOINT: optionalText,
+  S3_PUBLIC_URL: optionalText,
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET_NAME: z.string().default('nerd-storage'),
+  S3_ACCESS_KEY_ID: optionalText,
+  S3_SECRET_ACCESS_KEY: optionalText,
+  STORAGE_KEY_PREFIX: z.string().default('dev/'),
 });
 
 export type DbEnvVariables = z.infer<typeof dbEnvSchema>;

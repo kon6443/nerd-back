@@ -15,6 +15,7 @@ import { validateEnv } from '@config/env.validation';
 import { AuthModule } from '@modules/auth/auth.module';
 import { HealthModule } from '@modules/health/health.module';
 import { StoryModule } from '@modules/story/story.module';
+import { StorySessionModule } from '@modules/story-session/story-session.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { StoryModule } from '@modules/story/story.module';
     HealthModule,
     AuthModule,
     StoryModule,
+    StorySessionModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },

@@ -40,6 +40,16 @@ export const DOMAIN_ERROR_CODES = [
   'INVALID_CREDENTIALS',
   'LOGIN_ID_TAKEN',
   'UNAUTHORIZED',
+  // Slice 3 세션 및 얼굴 등록
+  'STORY_ALREADY_COMPLETED',
+  'SESSION_NOT_FOUND',
+  'INVALID_IMAGE_FORMAT',
+  'IMAGE_TOO_LARGE',
+  'FACE_REQUIRED',
+  // Slice 4 개인화 파이프라인
+  'FACE_NOT_READY',
+  'PAGE_NOT_FOUND',
+  'PAGE_NOT_FAILED',
 ] as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number];

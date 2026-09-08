@@ -18,6 +18,7 @@ import type { ObjectLiteral, Repository } from 'typeorm';
  * 필요해지면 **두 곳(타입·팩토리)에 한 줄씩** 추가한다.
  */
 interface MockedMethods {
+  create: jest.Mock;
   find: jest.Mock;
   findOne: jest.Mock;
   findOneBy: jest.Mock;
@@ -30,6 +31,7 @@ export type MockRepository<T extends ObjectLiteral> = MockedMethods & Partial<Re
 
 export function createMockRepository<T extends ObjectLiteral>(): MockRepository<T> {
   return {
+    create: jest.fn((entity?: unknown) => entity ?? {}) as unknown as jest.Mock,
     find: jest.fn(),
     findOne: jest.fn(),
     findOneBy: jest.fn(),

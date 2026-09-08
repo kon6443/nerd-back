@@ -44,9 +44,10 @@ export default async function StoryDetailPage({ params }: PageProps<"/library/[s
           </p>
 
           {story.pageCount > 0 ? (
-            <div className="pt-2">
-              <ActionLink href={`/library/${story.slug}/1`} variant="accentA">
-                읽기 시작
+            <div className="flex flex-wrap gap-3 pt-2">
+              <ActionLink href={`/library/${story.slug}/1`}>시연 동화 읽기</ActionLink>
+              <ActionLink href={`/stories/${story.slug}/capture`} variant="accentA">
+                📷 내 얼굴로 만들기
               </ActionLink>
             </div>
           ) : (
