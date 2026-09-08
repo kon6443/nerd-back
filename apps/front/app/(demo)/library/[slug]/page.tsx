@@ -34,8 +34,11 @@ export default async function StoryDetailPage({ params }: PageProps<"/library/[s
           <p className="text-ink-muted">전 {story.pageCount}장</p>
 
           {story.pageCount > 0 ? (
-            <div className="pt-2">
-              <ActionLink href={`/library/${story.slug}/1`}>읽기 시작</ActionLink>
+            <div className="flex flex-wrap gap-3 pt-2">
+              <ActionLink href={`/library/${story.slug}/1`}>시연 동화 읽기</ActionLink>
+              <ActionLink href={`/stories/${story.slug}/capture`} variant="accentA">
+                📷 내 얼굴로 만들기
+              </ActionLink>
             </div>
           ) : (
             // 페이지가 아직 안 들어온 동화다. 링크를 걸면 첫 페이지에서 404 를 만난다.

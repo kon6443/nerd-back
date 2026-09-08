@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { actionClass } from "@/components/ui/actionStyles";
 import { ApiError } from "@/lib/api";
-import { type FieldErrors, login, signup, validateLogin, validateSignup } from "@/lib/api/auth";
+import { type FieldErrors, fetchMe, login, signup, validateLogin, validateSignup } from "@/lib/api/auth";
 
 type Mode = "login" | "signup";
 
@@ -23,6 +23,25 @@ export default function LoginPage() {
   const [formError, setFormError] = useState("");
   const [pending, setPending] = useState(false);
 
+  // 이미 로그인되어 있으면 서재 또는 이전 목적지로 리다이렉트
+  useEffect(() => {
+    let active = true;
+    fetchMe()
+      .then(() => {
+        if (!active) return;
+        const search = typeof window !== "undefined" ? window.location.search : "";
+        const params = new URLSearchParams(search);
+        const redirect = params.get("redirect");
+        router.replace(redirect && redirect.startsWith("/") ? redirect : "/library");
+      })
+      .catch(() => {
+        // 미인증 상태이므로 로그인 폼 표시 유지
+      });
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
   const label = MODE_LABEL[mode];
 
   async function handleSubmit(event: React.FormEvent) {
@@ -39,7 +58,10 @@ export default function LoginPage() {
     setPending(true);
     try {
       await (mode === "signup" ? signup(input) : login(input));
-      router.push("/library");
+      const search = typeof window !== "undefined" ? window.location.search : "";
+      const params = new URLSearchParams(search);
+      const redirect = params.get("redirect");
+      router.push(redirect && redirect.startsWith("/") ? redirect : "/library");
     } catch (error) {
       // 서버가 준 메시지를 그대로 쓴다. 로그인 실패는 사유를 구분하지 않는 한 문장이다.
       setFormError(

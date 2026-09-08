@@ -81,6 +81,8 @@ async function readErrorBody(response: Response): Promise<ApiErrorBody | null> {
 export interface ApiFetchOptions extends Omit<RequestInit, "body"> {
   /** JSON 으로 직렬화해 보낼 본문. `Content-Type` 은 자동으로 붙는다. */
   json?: unknown;
+  /** FormData 등 원시 본문. FormData 일 경우 Content-Type 헤더를 비워두어야 boundary 가 자동 생성된다. */
+  body?: BodyInit;
 }
 
 /**
@@ -90,15 +92,17 @@ export interface ApiFetchOptions extends Omit<RequestInit, "body"> {
  * 성공 시 봉투의 `data` 만 돌려준다. 본문 없는 응답(204)은 `undefined` 다.
  */
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  const { json, headers, ...rest } = options;
+  const { json, body: rawBody, headers, ...rest } = options;
+  const isJson = json !== undefined;
+  const body = isJson ? JSON.stringify(json) : rawBody;
 
   const response = await fetch(`${resolveBaseUrl()}/${API_PREFIX}${path}`, {
     ...rest,
     headers: {
-      ...(json === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(isJson ? { "Content-Type": "application/json" } : {}),
       ...headers,
     },
-    body: json === undefined ? undefined : JSON.stringify(json),
+    body,
   });
 
   if (!response.ok) {

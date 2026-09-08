@@ -8,6 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "dev": "pnpm --parallel --filter nerd-back... --filter nerd-front... dev",
     "back": "pnpm --filter nerd-back...",
     "front": "pnpm --filter nerd-front...",
     "db:migrate:list": "pnpm --filter nerd-back run db:migrate:list",

@@ -47,3 +47,7 @@ export function login(input: LoginInput): Promise<Me> {
 export function logout(): Promise<void> {
   return apiFetch<void>("/auth/logout", { method: "POST" });
 }
+
+export function fetchMe(): Promise<Me> {
+  return apiFetch<Me>("/auth/me");
+}
