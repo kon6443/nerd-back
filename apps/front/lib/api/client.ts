@@ -68,8 +68,22 @@ function resolveBaseUrl(): string {
 async function readErrorBody(response: Response): Promise<ApiErrorBody | null> {
   try {
     const body: unknown = await response.json();
-    if (typeof body === "object" && body !== null && "code" in body) {
-      return body as ApiErrorBody;
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "code" in body &&
+      typeof body.code === "string" &&
+      "message" in body &&
+      typeof body.message === "string" &&
+      "timestamp" in body &&
+      typeof body.timestamp === "string"
+    ) {
+      return {
+        code: body.code,
+        message: body.message,
+        timestamp: body.timestamp,
+        ...("details" in body ? { details: body.details } : {}),
+      };
     }
     return null;
   } catch {
@@ -91,13 +105,14 @@ export interface ApiFetchOptions extends Omit<RequestInit, "body"> {
  */
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const { json, headers, ...rest } = options;
+  const requestHeaders = new Headers(headers);
+  if (json !== undefined && !requestHeaders.has("Content-Type")) {
+    requestHeaders.set("Content-Type", "application/json");
+  }
 
   const response = await fetch(`${resolveBaseUrl()}/${API_PREFIX}${path}`, {
     ...rest,
-    headers: {
-      ...(json === undefined ? {} : { "Content-Type": "application/json" }),
-      ...headers,
-    },
+    headers: requestHeaders,
     body: json === undefined ? undefined : JSON.stringify(json),
   });
 
