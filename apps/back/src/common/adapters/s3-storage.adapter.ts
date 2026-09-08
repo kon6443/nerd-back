@@ -73,6 +73,16 @@ export class S3StorageAdapter implements StoragePort {
     return signedUrl;
   }
 
+  async download(key: string): Promise<Buffer> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+    const response = await this.s3Client.send(command);
+    const byteArray = await response.Body?.transformToByteArray();
+    return Buffer.from(byteArray ?? []);
+  }
+
   async delete(key: string): Promise<void> {
     await this.s3Client.send(
       new DeleteObjectCommand({

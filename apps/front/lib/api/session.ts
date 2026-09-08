@@ -1,4 +1,11 @@
-import type { CreateSessionInput, StorySessionSummary, UploadFaceResponse } from "@nerd/contracts";
+import type {
+  CreateSessionInput,
+  PersonalizeSessionResponse,
+  RetryPageResponse,
+  SessionPagesResponse,
+  StorySessionSummary,
+  UploadFaceResponse,
+} from "@nerd/contracts";
 import { apiFetch } from "./client";
 
 /**
@@ -23,3 +30,34 @@ export async function uploadFace(
     body: formData,
   });
 }
+
+/**
+ * 동화 페이지 개인화 비동기 삽화 생성을 시작한다 (API 10: 202 Accepted).
+ */
+export async function personalizeSession(sessionId: string): Promise<PersonalizeSessionResponse> {
+  return apiFetch<PersonalizeSessionResponse>(`/sessions/${sessionId}/personalize`, {
+    method: "POST",
+  });
+}
+
+/**
+ * 세션의 페이지별 생성 진행률과 완료된 서명 URL 목록을 조회한다 (API 11: Polling).
+ */
+export async function fetchSessionPages(sessionId: string): Promise<SessionPagesResponse> {
+  return apiFetch<SessionPagesResponse>(`/sessions/${sessionId}/pages`, {
+    method: "GET",
+  });
+}
+
+/**
+ * 생성이 실패한 특정 페이지만 핀포인트로 재시도한다 (API 12).
+ */
+export async function retrySessionPage(
+  sessionId: string,
+  pageNo: number,
+): Promise<RetryPageResponse> {
+  return apiFetch<RetryPageResponse>(`/sessions/${sessionId}/pages/${pageNo}/retry`, {
+    method: "POST",
+  });
+}
+

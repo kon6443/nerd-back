@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Param,
@@ -21,8 +22,19 @@ import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { AuthGuard } from '@common/guards/auth.guard';
 import { User } from '@entities/user.entity';
 import { StorySessionService } from './story-session.service';
-import { CreateSessionRequestDto, SessionIdParamsDto } from './dto/story-session-request.dto';
-import type { ApiSuccess, StorySessionSummary, UploadFaceResponse } from '@nerd/contracts';
+import {
+  CreateSessionRequestDto,
+  SessionIdParamsDto,
+  SessionPageParamsDto,
+} from './dto/story-session-request.dto';
+import type {
+  ApiSuccess,
+  PersonalizeSessionResponse,
+  RetryPageResponse,
+  SessionPagesResponse,
+  StorySessionSummary,
+  UploadFaceResponse,
+} from '@nerd/contracts';
 
 @ApiTags('sessions')
 @Controller('sessions')
@@ -89,4 +101,78 @@ export class StorySessionController {
       message: '',
     };
   }
+
+  @Post(':id/personalize')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(AuthGuard)
+  @ApiOperation({
+    summary: '동화 페이지 개인화 비동기 파이프라인 시작 (202 Accepted)',
+    description: '동화의 전 페이지 삽화 생성을 백그라운드로 시작합니다. 멱등성을 지원합니다.',
+  })
+  @ApiCommonUnauthorizedResponse()
+  @ApiCommonValidationResponse()
+  @ApiCommonInternalServerErrorResponse()
+  @ApiResponse({ status: HttpStatus.ACCEPTED, description: '생성 작업 시작됨' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: '세션 없음' })
+  async personalize(
+    @CurrentUser() user: User,
+    @Param() params: SessionIdParamsDto,
+  ): Promise<ApiSuccess<PersonalizeSessionResponse>> {
+    const result = await this.sessionService.personalizeSession(user.id, params.id);
+    return {
+      code: SUCCESS_CODE,
+      data: result,
+      message: '',
+    };
+  }
+
+  @Get(':id/pages')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @ApiOperation({
+    summary: '페이지 개인화 진행 상태 폴링',
+    description: '세션의 페이지별 생성 상태(pending, running, succeeded, failed)와 완성된 서명 URL 목록을 조회합니다.',
+  })
+  @ApiCommonUnauthorizedResponse()
+  @ApiCommonValidationResponse()
+  @ApiCommonInternalServerErrorResponse()
+  @ApiResponse({ status: HttpStatus.OK, description: '페이지 상태 목록' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: '세션 없음' })
+  async getPages(
+    @CurrentUser() user: User,
+    @Param() params: SessionIdParamsDto,
+  ): Promise<ApiSuccess<SessionPagesResponse>> {
+    const result = await this.sessionService.getSessionPages(user.id, params.id);
+    return {
+      code: SUCCESS_CODE,
+      data: result,
+      message: '',
+    };
+  }
+
+  @Post(':id/pages/:pageNo/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(AuthGuard)
+  @ApiOperation({
+    summary: '실패한 특정 페이지 개인화 재시도',
+    description: 'failed 상태인 특정 페이지만 다시 백그라운드로 재생성합니다.',
+  })
+  @ApiCommonUnauthorizedResponse()
+  @ApiCommonValidationResponse()
+  @ApiCommonInternalServerErrorResponse()
+  @ApiResponse({ status: HttpStatus.ACCEPTED, description: '재시도 작업 시작됨' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: '실패한 페이지가 아님' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: '세션 또는 페이지 없음' })
+  async retryPage(
+    @CurrentUser() user: User,
+    @Param() params: SessionPageParamsDto,
+  ): Promise<ApiSuccess<RetryPageResponse>> {
+    const result = await this.sessionService.retryPage(user.id, params.id, params.pageNo);
+    return {
+      code: SUCCESS_CODE,
+      data: result,
+      message: '',
+    };
+  }
 }
+

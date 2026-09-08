@@ -40,6 +40,12 @@ export class LocalStorageAdapter implements StoragePort {
     }
   }
 
+  async download(key: string): Promise<Buffer> {
+    const safeKey = key.replace(/^\/+/, '');
+    const fullPath = path.join(this.baseDir, safeKey);
+    return fs.readFile(fullPath);
+  }
+
   async delete(key: string): Promise<void> {
     const safeKey = key.replace(/^\/+/, '');
     const fullPath = path.join(this.baseDir, safeKey);

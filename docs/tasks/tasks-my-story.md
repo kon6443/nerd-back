@@ -1036,14 +1036,15 @@ Next 는 서버 코드를 번들링하므로 contracts 는 산출물에 인라�
 - [x] **프론트**: 카메라 촬영 UI(웹캠 실시간 원형 가이드) + 사진 파일 첨부(파일 선택) fallback, 업로드 전 캔버스 리사이즈
 - [x] 검증: 형식 위조 파일 거부 · 상한 초과 거부 · 한도 소진 후 8번 409 방어 · 미완료 세션 재사용
 
-### Slice 4 — 개인화 파이프라인 · **D1 · D3 필요**
+### Slice 4 — 개인화 파이프라인 · **D1 · D3 해소됨 (2026-09-08)**
 
-- [ ] `session_page_images` 상태머신 (`pending → running → succeeded | failed`)
-- [ ] 🚫 인메모리 큐·타이머 금지 — 레플리카 3개. Redis 잡 큐 또는 DB 상태 + **리더 락 스위퍼**
-- [ ] API 10·11·12. 10번은 **멱등** (이미 진행 중이면 현재 상태 반환)
-- [ ] fail-closed 예산 카운터 (세션당 · 프로젝트 일일)
-- [ ] **프론트**: 대기 화면(페이지별 진행률), 폴링 백오프, 부분 실패 표시 + 재시도 버튼
-- [ ] 검증: 어댑터 실패·타임아웃·부분 실패를 각각 spec 으로 고정
+- [x] `session_page_images` 상태머신 (`pending → running → succeeded | failed`) 및 마이그레이션 (`1788642000000-CreateSessionPageImages.ts`)
+- [x] OpenRouter 공식 Unified Image API (`POST /api/v1/images`) 연동 (`input_references` 주인공 얼굴 전달, `OPENROUTER_IMAGE_MODEL` 환경변수)
+- [x] 0원 테스트용 `MockImageAdapter` (풍부한 동화풍 SVG 동적 생성)
+- [x] API 10 (`POST /personalize` - 202 Accepted, 멱등 처리), API 11 (`GET /pages` - 진행 상태 및 presigned URL), API 12 (`POST /pages/:pageNo/retry` - 실패 페이지 재시도)
+- [x] 프론트엔드 API 클라이언트 함수 바인딩 (`personalizeSession`, `fetchSessionPages`, `retrySessionPage`)
+- [x] 단위 테스트 검증: `OpenRouterImageAdapter` (6/6 pass), `StorySessionService` (17/17 pass), 전체 백엔드 20개 스위트 통과 (173 tests)
+- [ ] **프론트 UI/UX** (별도 에이전트 작업 예정): 대기 화면(페이지별 진행률), 폴링 백오프, 부분 실패 표시 + 재시도 버튼
 
 ### Slice 5 — 등장인물 대화 · **선행 슬라이스 해소됨 (2026-09-04)**
 

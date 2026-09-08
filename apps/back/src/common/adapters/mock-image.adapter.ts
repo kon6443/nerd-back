@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import type { GenerateReferenceInput, ImageGenerationPort } from '../port/image-generation.port';
+import type {
+  GeneratePageIllustrationInput,
+  GenerateReferenceInput,
+  ImageGenerationPort,
+} from '../port/image-generation.port';
 
 // 개발·테스트용 귀여운 동화 주인공 캐릭터 SVG 일러스트
 const MOCK_REFERENCE_SVG = Buffer.from(
@@ -53,13 +57,57 @@ const MOCK_REFERENCE_SVG = Buffer.from(
   'utf-8',
 );
 
+// 개발·테스트용 동화 본문 페이지 삽화 SVG 생성기
+function createMockPageSvg(prompt: string): Buffer {
+  const isBake = prompt.includes('빵') || prompt.includes('bread') || prompt.includes('오븐') || prompt.includes('굽');
+  const isNight = prompt.includes('밤') || prompt.includes('별') || prompt.includes('star');
+
+  const bgTop = isNight ? '#0F172A' : isBake ? '#FEF3C7' : '#BAE6FD';
+  const bgBottom = isNight ? '#312E81' : isBake ? '#FDE68A' : '#E0F2FE';
+  const sceneTitle = isBake ? '🥖 노릇노릇 맛있는 빵' : isNight ? '✨ 반짝이는 밤하늘 모험' : '☁️ 둥실둥실 구름 마을';
+
+  return Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+      <defs>
+        <linearGradient id="pageBg" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="${bgTop}"/>
+          <stop offset="100%" stop-color="${bgBottom}"/>
+        </linearGradient>
+      </defs>
+      <!-- 배경 -->
+      <rect width="800" height="600" rx="24" fill="url(#pageBg)"/>
+      <!-- 뭉게구름 -->
+      <ellipse cx="200" cy="180" rx="90" ry="50" fill="#FFFFFF" opacity="0.85"/>
+      <ellipse cx="260" cy="160" rx="70" ry="45" fill="#FFFFFF" opacity="0.85"/>
+      <ellipse cx="600" cy="220" rx="110" ry="60" fill="#FFFFFF" opacity="0.8"/>
+      <!-- 중앙 캐릭터 -->
+      <g transform="translate(320, 220) scale(0.4)">
+        <circle cx="200" cy="180" r="115" fill="#78350F"/>
+        <circle cx="200" cy="200" r="95" fill="#FED7AA"/>
+        <path d="M 140 120 L 170 80 L 200 105 L 230 80 L 260 120 Z" fill="#F59E0B" stroke="#D97706" stroke-width="4"/>
+        <circle cx="155" cy="190" r="10" fill="#1E293B"/>
+        <circle cx="245" cy="190" r="10" fill="#1E293B"/>
+        <path d="M 175 225 Q 200 255 225 225" fill="none" stroke="#E11D48" stroke-width="6" stroke-linecap="round"/>
+      </g>
+      <!-- 장면 뱃지 -->
+      <rect x="150" y="480" width="500" height="60" rx="30" fill="#1E293B" opacity="0.85"/>
+      <text x="400" y="518" font-size="22" font-weight="bold" fill="#FFFFFF" text-anchor="middle" font-family="sans-serif">${sceneTitle}</text>
+    </svg>`,
+    'utf-8',
+  );
+}
+
 /**
  * 개발·테스트 전용 Mock 이미지 어댑터.
- * 외부 AI API 호출 비용(0원) 및 네트워크 지연 없이 사랑스러운 주인공 캐릭터 레퍼런스 일러스트를 반환한다.
+ * 외부 AI API 호출 비용(0원) 및 네트워크 지연 없이 동화 캐릭터와 본문 삽화 일러스트를 반환한다.
  */
 @Injectable()
 export class MockImageAdapter implements ImageGenerationPort {
   async generateReference(_input: GenerateReferenceInput): Promise<Buffer> {
     return Buffer.from(MOCK_REFERENCE_SVG);
+  }
+
+  async generatePageIllustration(input: GeneratePageIllustrationInput): Promise<Buffer> {
+    return createMockPageSvg(input.prompt);
   }
 }

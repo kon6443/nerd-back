@@ -34,3 +34,24 @@ export const FaceRequiredErrorResponseDto = defineDomainError({
   message: '정면 얼굴 사진은 필수입니다.',
   name: 'FaceRequiredErrorResponseDto',
 });
+
+export const FaceNotReadyErrorResponseDto = defineDomainError({
+  code: 'FACE_NOT_READY',
+  status: 400,
+  message: '얼굴 사진을 먼저 등록해 주세요.',
+  name: 'FaceNotReadyErrorResponseDto',
+});
+
+export const PageNotFoundErrorResponseDto = defineDomainError({
+  code: 'PAGE_NOT_FOUND',
+  status: 404,
+  message: '요청한 페이지를 찾을 수 없습니다.',
+  name: 'PageNotFoundErrorResponseDto',
+});
+
+export const PageNotFailedErrorResponseDto = defineDomainError({
+  code: 'PAGE_NOT_FAILED',
+  status: 400,
+  message: '실패한 페이지만 재시도할 수 있습니다.',
+  name: 'PageNotFailedErrorResponseDto',
+});

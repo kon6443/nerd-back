@@ -56,3 +56,61 @@ export interface UploadFaceResponse {
   status: 'face_ready';
   referenceImageUrl: string;
 }
+
+/** 페이지 개인화 생성 상태 */
+export const sessionPageStatusSchema = z.enum([
+  'pending',
+  'running',
+  'succeeded',
+  'failed',
+]);
+
+export type SessionPageStatus = z.infer<typeof sessionPageStatusSchema>;
+
+/** 개별 페이지 상태 정보 */
+export const sessionPageItemSchema = z.object({
+  pageNo: z.number().int().min(1),
+  status: sessionPageStatusSchema,
+  imageUrl: z.string().nullable(),
+  errorMessage: z.string().nullable().optional(),
+  updatedAt: z.string(),
+});
+
+export type SessionPageItem = z.infer<typeof sessionPageItemSchema>;
+
+/** 세션 페이지 진행률 목록 응답 (API 11 폴링) */
+export const sessionPagesResponseSchema = z.object({
+  sessionId: z.string().uuid(),
+  status: storySessionStatusSchema,
+  totalPages: z.number().int().min(1),
+  completedPages: z.number().int().min(0),
+  isAllCompleted: z.boolean(),
+  pages: z.array(sessionPageItemSchema),
+});
+
+export type SessionPagesResponse = z.infer<typeof sessionPagesResponseSchema>;
+
+/** 개인화 생성 시작 응답 (API 10: 202 Accepted) */
+export const personalizeSessionResponseSchema = z.object({
+  id: z.string().uuid(),
+  status: z.enum(['generating', 'completed']),
+  totalPages: z.number().int().min(1),
+});
+
+export type PersonalizeSessionResponse = z.infer<typeof personalizeSessionResponseSchema>;
+
+/** 세션 ID + 페이지 번호 경로 파라미터 */
+export const sessionPageParamsSchema = sessionIdParamsSchema.extend({
+  pageNo: z.coerce.number().int().min(1),
+});
+
+export type SessionPageParams = z.infer<typeof sessionPageParamsSchema>;
+
+/** 페이지 재시도 응답 (API 12) */
+export const retryPageResponseSchema = z.object({
+  sessionId: z.string().uuid(),
+  pageNo: z.number().int().min(1),
+  status: sessionPageStatusSchema,
+});
+
+export type RetryPageResponse = z.infer<typeof retryPageResponseSchema>;

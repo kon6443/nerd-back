@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate } from '@entities/story-template.entity';
+import { StoryPage } from '@entities/story-page.entity';
+import { SessionPageImage } from '@entities/session-page-image.entity';
 import { User } from '@entities/user.entity';
 import { AuthModule } from '@modules/auth/auth.module';
 import { StorySessionController } from './story-session.controller';
@@ -16,7 +18,13 @@ import { LocalStorageAdapter } from '../../common/adapters/local-storage.adapter
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([StorySession, StoryTemplate, User]),
+    TypeOrmModule.forFeature([
+      StorySession,
+      StoryTemplate,
+      StoryPage,
+      SessionPageImage,
+      User,
+    ]),
     ConfigModule,
     AuthModule,
   ],

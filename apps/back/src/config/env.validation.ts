@@ -111,6 +111,8 @@ export const envSchema = dbEnvSchema.extend({
   IMAGE_PROVIDER: z.enum(['mock', 'openrouter']).default('mock'),
   /** OpenRouter API 키 */
   OPENROUTER_API_KEY: optionalText,
+  /** OpenRouter 이미지 모델 (기본: bytedance-seed/seedream-5-0-lite) */
+  OPENROUTER_IMAGE_MODEL: z.string().default('bytedance-seed/seedream-5-0-lite'),
   /** 스토리지 어댑터 공급자 (local | s3) */
   STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
   S3_ENDPOINT: optionalText,

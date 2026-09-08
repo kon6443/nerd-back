@@ -4,9 +4,14 @@ import { Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
+import { StoryPage } from '@entities/story-page.entity';
+import { SessionPageImage } from '@entities/session-page-image.entity';
 import { StoryNotFoundErrorResponseDto } from '@modules/story/dto/story.error.dto';
 import {
+  FaceNotReadyErrorResponseDto,
   FaceRequiredErrorResponseDto,
+  PageNotFailedErrorResponseDto,
+  PageNotFoundErrorResponseDto,
   SessionNotFoundErrorResponseDto,
   StoryAlreadyCompletedErrorResponseDto,
 } from './dto/story-session-error.dto';
@@ -16,7 +21,14 @@ import {
 } from '../../common/port/image-generation.port';
 import { STORAGE_PORT, type StoragePort } from '../../common/port/storage.port';
 import { validateImageBuffer } from '../../common/utils/image-validator';
-import type { StorySessionSummary, UploadFaceResponse } from '@nerd/contracts';
+import type {
+  PersonalizeSessionResponse,
+  RetryPageResponse,
+  SessionPageItem,
+  SessionPagesResponse,
+  StorySessionSummary,
+  UploadFaceResponse,
+} from '@nerd/contracts';
 
 @Injectable()
 export class StorySessionService {
@@ -27,6 +39,10 @@ export class StorySessionService {
     private readonly sessionRepo: Repository<StorySession>,
     @InjectRepository(StoryTemplate)
     private readonly templateRepo: Repository<StoryTemplate>,
+    @InjectRepository(StoryPage)
+    private readonly pageRepo: Repository<StoryPage>,
+    @InjectRepository(SessionPageImage)
+    private readonly pageImageRepo: Repository<SessionPageImage>,
     @Inject(IMAGE_GENERATION_PORT)
     private readonly imagePort: ImageGenerationPort,
     @Inject(STORAGE_PORT)
@@ -183,5 +199,291 @@ export class StorySessionService {
       status: 'face_ready',
       referenceImageUrl,
     };
+  }
+
+  /**
+   * 동화 페이지 개인화 비동기 파이프라인 시작 (API 10: 202 Accepted).
+   * - 멱등성: 이미 generating 이거나 completed 이면 현재 상태 반환
+   */
+  async personalizeSession(userId: number, sessionId: string): Promise<PersonalizeSessionResponse> {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session || session.userId !== userId) {
+      throw new SessionNotFoundErrorResponseDto();
+    }
+
+    if (session.status === 'draft') {
+      throw new FaceNotReadyErrorResponseDto();
+    }
+
+    const templatePages = await this.pageRepo.find({
+      where: { templateId: session.templateId },
+      order: { pageNo: 'ASC' },
+    });
+
+    const totalPages = templatePages.length;
+
+    if (session.status === 'completed') {
+      return { id: session.id, status: 'completed', totalPages };
+    }
+
+    if (session.status === 'generating') {
+      return { id: session.id, status: 'generating', totalPages };
+    }
+
+    // face_ready 또는 failed 상태: 개별 페이지 엔티티 초기화 및 비동기 작업 기동
+    const existingImages = await this.pageImageRepo.find({ where: { sessionId } });
+
+    for (const page of templatePages) {
+      const existing = existingImages.find((img) => img.pageNo === page.pageNo);
+      if (existing) {
+        if (existing.status !== 'succeeded') {
+          existing.status = 'pending';
+          existing.errorMessage = null;
+          await this.pageImageRepo.save(existing);
+        }
+      } else {
+        const newPageImage = this.pageImageRepo.create({
+          id: randomUUID(),
+          sessionId: session.id,
+          pageNo: page.pageNo,
+          status: 'pending',
+          imageKey: null,
+          errorMessage: null,
+        });
+        await this.pageImageRepo.save(newPageImage);
+      }
+    }
+
+    session.status = 'generating';
+    await this.sessionRepo.save(session);
+
+    // 비동기 백그라운드 파이프라인 시작 (요청 블로킹 방지)
+    void this.executePersonalizationPipeline(session.id);
+
+    return {
+      id: session.id,
+      status: 'generating',
+      totalPages,
+    };
+  }
+
+  /**
+   * 세션의 페이지별 생성 진행률 및 서명 URL 목록 조회 (API 11: 폴링 경로).
+   */
+  async getSessionPages(userId: number, sessionId: string): Promise<SessionPagesResponse> {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session || session.userId !== userId) {
+      throw new SessionNotFoundErrorResponseDto();
+    }
+
+    const templatePages = await this.pageRepo.find({
+      where: { templateId: session.templateId },
+      order: { pageNo: 'ASC' },
+    });
+
+    const pageImages = await this.pageImageRepo.find({
+      where: { sessionId },
+      order: { pageNo: 'ASC' },
+    });
+
+    const pages: SessionPageItem[] = await Promise.all(
+      templatePages.map(async (tplPage) => {
+        const pageImg = pageImages.find((img) => img.pageNo === tplPage.pageNo);
+        let imageUrl: string | null = null;
+        if (pageImg?.imageKey && pageImg.status === 'succeeded') {
+          imageUrl = await this.storagePort.getPresignedUrl(pageImg.imageKey);
+        }
+
+        return {
+          pageNo: tplPage.pageNo,
+          status: pageImg?.status || 'pending',
+          imageUrl,
+          errorMessage: pageImg?.errorMessage || null,
+          updatedAt: pageImg?.updatedAt
+            ? pageImg.updatedAt.toISOString()
+            : session.updatedAt.toISOString(),
+        };
+      }),
+    );
+
+    const completedPages = pages.filter((p) => p.status === 'succeeded').length;
+    const isAllCompleted = session.status === 'completed';
+
+    return {
+      sessionId: session.id,
+      status: session.status,
+      totalPages: templatePages.length,
+      completedPages,
+      isAllCompleted,
+      pages,
+    };
+  }
+
+  /**
+   * 실패한 특정 페이지 핀포인트 재시도 (API 12).
+   */
+  async retryPage(userId: number, sessionId: string, pageNo: number): Promise<RetryPageResponse> {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session || session.userId !== userId) {
+      throw new SessionNotFoundErrorResponseDto();
+    }
+
+    const pageImg = await this.pageImageRepo.findOne({
+      where: { sessionId, pageNo },
+    });
+
+    if (!pageImg) {
+      throw new PageNotFoundErrorResponseDto();
+    }
+
+    if (pageImg.status !== 'failed') {
+      throw new PageNotFailedErrorResponseDto();
+    }
+
+    pageImg.status = 'pending';
+    pageImg.errorMessage = null;
+    await this.pageImageRepo.save(pageImg);
+
+    session.status = 'generating';
+    await this.sessionRepo.save(session);
+
+    // 해당 페이지만 비동기 재실행
+    void this.executeSinglePagePersonalization(session.id, pageNo);
+
+    return {
+      sessionId: session.id,
+      pageNo,
+      status: 'pending',
+    };
+  }
+
+  /**
+   * 전체 페이지 개인화 파이프라인 백그라운드 순차 처리
+   */
+  async executePersonalizationPipeline(sessionId: string): Promise<void> {
+    try {
+      const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+      if (!session || !session.referenceImageKey) {
+        this.logger.error(`파이프라인 중단: 세션(${sessionId}) 또는 레퍼런스 이미지 부재`);
+        return;
+      }
+
+      const refBuffer = await this.storagePort.download(session.referenceImageKey);
+      const templatePages = await this.pageRepo.find({
+        where: { templateId: session.templateId },
+        order: { pageNo: 'ASC' },
+      });
+
+      for (const tplPage of templatePages) {
+        const pageImg = await this.pageImageRepo.findOne({
+          where: { sessionId, pageNo: tplPage.pageNo },
+        });
+
+        if (!pageImg || pageImg.status === 'succeeded') {
+          continue;
+        }
+
+        pageImg.status = 'running';
+        await this.pageImageRepo.save(pageImg);
+
+        try {
+          const generatedBuffer = await this.imagePort.generatePageIllustration({
+            referenceImage: refBuffer,
+            prompt: tplPage.bodyText,
+          });
+
+          const key = `personalizations/${sessionId}/page-${tplPage.pageNo}-${randomUUID()}.png`;
+          const s3Key = await this.storagePort.upload(key, generatedBuffer, 'image/png');
+
+          pageImg.imageKey = s3Key;
+          pageImg.status = 'succeeded';
+          pageImg.errorMessage = null;
+          await this.pageImageRepo.save(pageImg);
+          this.logger.log(`페이지 ${tplPage.pageNo} 삽화 개인화 완료: ${s3Key}`);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          pageImg.status = 'failed';
+          pageImg.errorMessage = msg;
+          await this.pageImageRepo.save(pageImg);
+          this.logger.error(`페이지 ${tplPage.pageNo} 삽화 개인화 실패: ${msg}`);
+        }
+      }
+
+      await this.checkAndUpdateSessionCompletion(session.id);
+    } catch (error: unknown) {
+      this.logger.error(`개인화 파이프라인 전체 오류: ${error}`);
+    }
+  }
+
+  /**
+   * 단일 페이지 재시도 비동기 실행
+   */
+  async executeSinglePagePersonalization(sessionId: string, pageNo: number): Promise<void> {
+    try {
+      const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+      if (!session || !session.referenceImageKey) return;
+
+      const pageImg = await this.pageImageRepo.findOne({ where: { sessionId, pageNo } });
+      if (!pageImg) return;
+
+      const tplPage = await this.pageRepo.findOne({
+        where: { templateId: session.templateId, pageNo },
+      });
+      if (!tplPage) return;
+
+      pageImg.status = 'running';
+      await this.pageImageRepo.save(pageImg);
+
+      const refBuffer = await this.storagePort.download(session.referenceImageKey);
+      try {
+        const generatedBuffer = await this.imagePort.generatePageIllustration({
+          referenceImage: refBuffer,
+          prompt: tplPage.bodyText,
+        });
+
+        const key = `personalizations/${sessionId}/page-${tplPage.pageNo}-${randomUUID()}.png`;
+        const s3Key = await this.storagePort.upload(key, generatedBuffer, 'image/png');
+
+        pageImg.imageKey = s3Key;
+        pageImg.status = 'succeeded';
+        pageImg.errorMessage = null;
+        await this.pageImageRepo.save(pageImg);
+        this.logger.log(`단일 페이지 ${pageNo} 재시도 완료: ${s3Key}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        pageImg.status = 'failed';
+        pageImg.errorMessage = msg;
+        await this.pageImageRepo.save(pageImg);
+        this.logger.error(`단일 페이지 ${pageNo} 재시도 실패: ${msg}`);
+      }
+
+      await this.checkAndUpdateSessionCompletion(session.id);
+    } catch (error: unknown) {
+      this.logger.error(`단일 페이지 재시도 오류: ${error}`);
+    }
+  }
+
+  private async checkAndUpdateSessionCompletion(sessionId: string): Promise<void> {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session) return;
+
+    const templatePages = await this.pageRepo.find({ where: { templateId: session.templateId } });
+    const pageImages = await this.pageImageRepo.find({ where: { sessionId } });
+
+    const allSucceeded =
+      pageImages.length === templatePages.length &&
+      pageImages.every((img) => img.status === 'succeeded');
+
+    if (allSucceeded) {
+      session.status = 'completed';
+      await this.sessionRepo.save(session);
+      this.logger.log(`동화 세션 전체 완료 (completed): 세션 ${sessionId}`);
+    } else {
+      const anyFailed = pageImages.some((img) => img.status === 'failed');
+      if (anyFailed) {
+        session.status = 'failed';
+        await this.sessionRepo.save(session);
+      }
+    }
   }
 }

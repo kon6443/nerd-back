@@ -10,6 +10,11 @@ export interface StoragePort {
   getPresignedUrl(key: string, expiresInSeconds?: number): Promise<string>;
 
   /**
+   * 객체를 다운로드하여 버퍼로 반환한다 (레퍼런스 이미지 참조용).
+   */
+  download(key: string): Promise<Buffer>;
+
+  /**
    * 객체를 삭제한다.
    */
   delete(key: string): Promise<void>;
