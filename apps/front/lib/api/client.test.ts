@@ -14,7 +14,8 @@ function errorResponse(status: number, body: unknown): Response {
   return {
     ok: false,
     status,
-    json: () => (body === undefined ? Promise.reject(new Error("not json")) : Promise.resolve(body)),
+    json: () =>
+      body === undefined ? Promise.reject(new Error("not json")) : Promise.resolve(body),
   } as unknown as Response;
 }
 
@@ -90,9 +91,44 @@ describe("apiFetch — 성공 응답", () => {
 
     await apiFetch("/auth/login", { method: "POST", json: { loginId: "a" } });
 
-    const init = fetchMock.mock.calls[0][1] as RequestInit & { headers: Record<string, string> };
-    expect(init.headers["Content-Type"]).toBe("application/json");
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(new Headers(init.headers).get("Content-Type")).toBe("application/json");
     expect(init.body).toBe('{"loginId":"a"}');
+  });
+
+  it("Headers 인스턴스의 사용자 헤더와 Content-Type 을 보존한다", async () => {
+    process.env.BACKEND_INTERNAL_URL = "http://backend:5501";
+    const fetchMock = mockFetch(okResponse(null, 201));
+
+    await apiFetch("/auth/login", {
+      method: "POST",
+      json: { loginId: "a" },
+      headers: new Headers({
+        "X-Request-Id": "request-123",
+        "Content-Type": "application/vnd.nerd+json",
+      }),
+    });
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-Request-Id")).toBe("request-123");
+    expect(headers.get("Content-Type")).toBe("application/vnd.nerd+json");
+  });
+
+  it("튜플 배열 헤더를 fetch 에 전달한다", async () => {
+    process.env.BACKEND_INTERNAL_URL = "http://backend:5501";
+    const fetchMock = mockFetch(okResponse(null, 201));
+
+    await apiFetch("/auth/login", {
+      method: "POST",
+      json: { loginId: "a" },
+      headers: [["X-Request-Id", "tuple-456"]],
+    });
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-Request-Id")).toBe("tuple-456");
+    expect(headers.get("Content-Type")).toBe("application/json");
   });
 });
 
@@ -113,6 +149,7 @@ describe("apiFetch — 에러 응답", () => {
     const typed = error as ApiError;
     expect(typed.status).toBe(404);
     expect(typed.code).toBe("STORY_NOT_FOUND");
+    expect(typed.message).toBe("동화를 찾을 수 없습니다.");
     expect(typed.isNotFound).toBe(true);
   });
 
@@ -133,6 +170,27 @@ describe("apiFetch — 에러 응답", () => {
     expect(error.details).toEqual(["slug: slug 형식이 올바르지 않습니다."]);
   });
 
+  it.each([
+    { code: { value: "UPSTREAM_ERROR" } },
+    { message: { value: "업스트림 오류" } },
+    { timestamp: null },
+  ])("형식이 잘못된 에러 봉투는 안전한 fallback 으로 바꾼다: %j", async (invalidField) => {
+    process.env.BACKEND_INTERNAL_URL = "http://backend:5501";
+    mockFetch(
+      errorResponse(502, {
+        code: "UPSTREAM_ERROR",
+        message: "업스트림 오류",
+        timestamp: "2026-09-04T00:00:00.000Z",
+        ...invalidField,
+      }),
+    );
+
+    const error = (await apiFetch("/stories").catch((e: unknown) => e)) as ApiError;
+
+    expect(error.code).toBe("UNKNOWN_ERROR");
+    expect(error.message).toBe("요청을 처리하지 못했습니다.");
+  });
+
   it("JSON 이 아닌 에러 본문도 ApiError 로 감싼다 ⭐", async () => {
     // 프록시가 만든 502 처럼 우리 봉투가 아닐 수 있다. 여기서 파싱 예외가 새면
     // 화면은 "알 수 없는 오류" 대신 스택을 본다.
@@ -150,10 +208,15 @@ describe("apiFetch — 에러 응답", () => {
     // 화면마다 401 을 처리하면 빠뜨린 화면이 곧 구멍이다. 한 곳에 모은다.
     const dispatchEvent = vi.fn();
     vi.stubGlobal("window", { dispatchEvent });
-    vi.stubGlobal("CustomEvent", class {
-      constructor(readonly type: string) {}
-    });
-    mockFetch(errorResponse(401, { code: "UNAUTHORIZED", message: "인증이 필요하다", timestamp: "" }));
+    vi.stubGlobal(
+      "CustomEvent",
+      class {
+        constructor(readonly type: string) {}
+      },
+    );
+    mockFetch(
+      errorResponse(401, { code: "UNAUTHORIZED", message: "인증이 필요하다", timestamp: "" }),
+    );
 
     await apiFetch("/me").catch(() => undefined);
 
