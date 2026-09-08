@@ -1,4 +1,10 @@
-import { type LoginInput, type Me, type SignupInput, loginSchema, signupSchema } from "@nerd/contracts";
+import {
+  type LoginInput,
+  type Me,
+  type SignupInput,
+  loginSchema,
+  signupSchema,
+} from "@nerd/contracts";
 import { apiFetch } from "./client";
 
 /**
@@ -33,7 +39,13 @@ export function validateSignup(input: unknown): FieldErrors {
  */
 export function validateLogin(input: unknown): FieldErrors {
   const result = loginSchema.safeParse(input);
-  return result.success ? {} : toFieldErrors(result.error.issues);
+  if (result.success) return {};
+
+  // 검증 규칙은 공유 스키마를 따르고, 기본 영문 오류 문구만 화면 언어로 바꾼다.
+  const errors = toFieldErrors(result.error.issues);
+  if (errors.loginId) errors.loginId = "아이디를 입력해 주세요.";
+  if (errors.password) errors.password = "비밀번호를 입력해 주세요.";
+  return errors;
 }
 
 export function signup(input: SignupInput): Promise<Me> {

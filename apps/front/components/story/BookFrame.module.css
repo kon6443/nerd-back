@@ -1,0 +1,87 @@
+.book {
+  padding: 0;
+  border: 3px solid var(--color-surface-raised);
+  border-radius: 1rem;
+  background: var(--color-surface);
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--color-ink) 18%, transparent);
+  overflow: hidden;
+}
+
+.spread {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.art {
+  min-inline-size: 0;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+
+.page {
+  display: flex;
+  min-inline-size: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.75rem;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--color-surface),
+    var(--color-surface) 43px,
+    color-mix(in srgb, var(--color-paper-line) 30%, var(--color-surface)) 43px,
+    color-mix(in srgb, var(--color-paper-line) 30%, var(--color-surface)) 44px
+  );
+}
+
+.text {
+  white-space: pre-line;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+  font-family: "Iowan Old Style", "AppleMyungjo", "Batang", serif;
+  font-size: 1.25rem;
+  line-height: 1.95;
+}
+
+.pageNumber {
+  padding-block-start: 1.5rem;
+  text-align: end;
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+}
+
+@media (min-width: 48rem) {
+  .spread {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-block-size: 25rem;
+  }
+
+  .spread::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 50%;
+    inline-size: 28px;
+    transform: translateX(-50%);
+    pointer-events: none;
+    background: linear-gradient(
+      to right,
+      transparent,
+      color-mix(in srgb, var(--color-ink) 12%, transparent),
+      transparent
+    );
+  }
+
+  .art {
+    aspect-ratio: auto;
+  }
+
+  .page {
+    padding: 2.5rem;
+  }
+
+  .text {
+    font-size: 1.5rem;
+  }
+}

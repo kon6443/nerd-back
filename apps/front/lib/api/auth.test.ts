@@ -34,7 +34,7 @@ describe("validateLogin — 가입 규칙을 적용하지 않는다 ⭐", () => 
   it("비어 있는 것만 잡는다", () => {
     const errors = validateLogin({ loginId: "", password: "" });
 
-    expect(errors.loginId).toBeTruthy();
-    expect(errors.password).toBeTruthy();
+    expect(errors.loginId).toBe("아이디를 입력해 주세요.");
+    expect(errors.password).toBe("비밀번호를 입력해 주세요.");
   });
 });

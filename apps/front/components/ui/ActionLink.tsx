@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ComponentProps } from "react";
-import { type ActionVariant, actionClass } from "./actionStyles";
+import { type ActionSize, type ActionVariant, actionClass } from "./actionStyles";
 
 /**
  * 화면을 이동하는 CTA. 스타일은 `actionStyles` 가 소유한다.
@@ -11,11 +11,12 @@ import { type ActionVariant, actionClass } from "./actionStyles";
  */
 interface ActionLinkProps extends Omit<ComponentProps<typeof Link>, "className"> {
   variant?: ActionVariant;
+  size?: ActionSize;
   className?: string;
 }
 
-export function ActionLink({ variant = "primary", className = "", ...props }: ActionLinkProps) {
+export function ActionLink({ variant = "primary", size = "default", className = "", ...props }: ActionLinkProps) {
   // ⚠️ 스프레드를 **먼저** 둔다. 뒤에 두면 런타임에 흘러든 className 이 스타일을 통째로
   //    덮어쓴다(타입은 막지만 느슨하게 스프레드된 객체는 못 막는다).
-  return <Link {...props} className={actionClass(variant, className)} />;
+  return <Link {...props} className={actionClass(variant, className, size)} />;
 }

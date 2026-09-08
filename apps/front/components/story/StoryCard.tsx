@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
+import { StoryArtwork } from "@/components/story/StoryArtwork";
 
 /**
  * 동화 카드.
@@ -21,7 +22,7 @@ const variantTone = {
 
 const variantLayout: Record<Variant, string> = {
   album: "w-44",
-  library: "w-64",
+  library: "h-full w-full",
   choice: "w-full max-w-sm",
 };
 
@@ -52,27 +53,24 @@ export function StoryCard({
 }: StoryCardProps) {
   return (
     <Card tone={tone ?? variantTone[variant]} className={variantLayout[variant]}>
-      <div className="flex flex-col gap-3">
+      <div className="flex h-full flex-col gap-4">
         {imageUrl ? (
-          // 오브젝트 스토리지가 미확정(D1)이라 next/image 의 도메인 허용 목록을 아직 정할 수
-          // 없다. 확정되면 next/image 로 교체한다.
+          // 표시 URL의 호스트 허용 목록은 이미지 URL 연결 작업에서 확정한다.
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageUrl}
-            alt=""
-            className="aspect-4/3 w-full rounded-card object-cover"
-          />
+          <img src={imageUrl} alt="" className="aspect-4/3 w-full rounded-card object-cover" />
         ) : (
-          <div className="aspect-4/3 w-full rounded-card bg-primary-soft" aria-hidden="true" />
+          <StoryArtwork className="aspect-4/3 w-full rounded-xl" />
         )}
 
         <div className="flex flex-col gap-1">
           {subtitle ? <p className="text-sm font-bold text-ink-muted">{subtitle}</p> : null}
-          <h3 className="text-lg font-bold text-ink">{title}</h3>
-          {description ? <p className="text-sm text-ink-muted">{description}</p> : null}
+          <h2 className="break-keep text-xl font-bold text-balance wrap-anywhere text-ink">{title}</h2>
+          {description ? (
+            <p className="break-keep text-sm leading-relaxed wrap-anywhere text-ink-muted">{description}</p>
+          ) : null}
         </div>
 
-        {action ? <div className="pt-1">{action}</div> : null}
+        {action ? <div className="mt-auto pt-1">{action}</div> : null}
       </div>
     </Card>
   );
