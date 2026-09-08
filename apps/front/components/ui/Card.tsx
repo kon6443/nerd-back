@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 type Tone = "neutral" | "accentA" | "accentB";
 
 const toneStyles: Record<Tone, string> = {
-  neutral: "border-primary-soft",
+  neutral: "border-line bg-surface-raised",
   accentA: "border-accent-a bg-accent-a-soft",
   accentB: "border-accent-b bg-accent-b-soft",
 };
@@ -23,7 +23,7 @@ export interface CardProps {
 export function Card({ tone = "neutral", className = "", children }: CardProps) {
   return (
     <div
-      className={`rounded-card border-2 bg-surface-raised p-5 shadow-sm ${toneStyles[tone]} ${className}`}
+      className={`rounded-card border-2 p-5 shadow-sm ${toneStyles[tone]} ${className}`}
     >
       {children}
     </div>

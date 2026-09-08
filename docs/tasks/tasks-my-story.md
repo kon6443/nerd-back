@@ -173,7 +173,7 @@ type ApiError      = { code: string; message: string; timestamp: string; details
 
 ## 디자인 시스템
 
-AI 시안 5장(홈·리더·비하인드 선택·생성 대기·개인화 결과)에서 도출했다. **색 값은 초안이다** — UI 담당이 확정하면 이 표를 먼저 고친다.
+AI 시안 5장(홈·리더·비하인드 선택·생성 대기·개인화 결과)에서 도출했다. 2026-09-08 UI 적용은 PR #22의 `docs/design/my-story-flow.html`을 기준으로 한다. 기존 화면에 아래 값을 적용하되 작은 글자·버튼 글자는 대비가 확보되는 짙은 색을 사용한다.
 
 ### 기준 뷰포트 — 태블릿 가로 우선 ⭐
 
@@ -184,22 +184,27 @@ AI 시안 5장(홈·리더·비하인드 선택·생성 대기·개인화 결과
 - 대신 규약으로 정한다: **완성형 레이아웃은 `md:` 이상에서 만들고, base(모바일)는 축소 대응**이다
 - 🚫 모바일에서 픽셀 단위로 완벽할 것을 요구하지 않는다. 시연 대상이 태블릿이다
 
-### 토큰 (초안)
+### 토큰 (PR #22 UI 적용)
 
-| 토큰 | 값(초안) | 쓰이는 곳 |
+| 토큰 | 적용 값 | 쓰이는 곳 |
 |---|---|---|
-| `--color-primary` | 하늘색 | 헤더 바 · 얼굴 인식 CTA · 본문 말풍선 |
-| `--color-primary-soft` | 연한 하늘 | 카드 배경 · 삽화 프레임 |
-| `--color-surface` | 크림 | 페이지 배경 |
-| `--color-accent-a` | 민트/세이지 | `다음 페이지` · 비하인드 **A** |
-| `--color-accent-b` | 코랄/핑크 | 비하인드 **B** |
-| `--color-ink` | 짙은 회청 | 본문 텍스트 |
-| `--radius-card` | 20~24px | 카드 |
+| `--color-primary` / `--color-primary-strong` | `#3F92D6` / `#2E77B6` | 하늘색 강조 · CTA |
+| `--color-primary-soft` / `--color-primary-tint` | `#CDE7F6` / `#EAF7FD` | 삽화 프레임 · 하늘 배경 |
+| `--color-surface` / `--color-surface-raised` | `#FFF9EC` / `#FFFFFF` | 책 지면 · 카드 |
+| `--color-line` / `--color-paper-line` | `#DCEAF4` / `#EBDCBE` | UI 테두리 · 책 지면 선 |
+| `--color-accent-a` / `--color-accent-a-strong` / `--color-accent-a-soft` | `#57C1C0` / `#287F80` / `#E8F8F8` | 다음 페이지 · 민트 강조 |
+| `--color-accent-b` / `--color-accent-b-strong` / `--color-accent-b-soft` | `#EE8FA3` / `#AD405E` / `#F8E3E5` | 코랄 강조 · 오류 |
+| `--color-ink` / `--color-ink-muted` | `#234C77` / `#426F96` | 본문 · 보조 텍스트 |
+| `--color-gold` / `--color-gold-strong` | `#E9A93C` / `#96621E` | 보조 CTA |
+| `--color-magic` / `--color-magic-strong` | `#B79BE8` / `#7753B0` | 포커스 |
+| `--radius-card` | 22px | 카드 |
 | `--radius-pill` | 999px | 버튼 |
-| `--touch-min` | **56px** | 모든 터치 타깃 |
+| `--spacing-touch` | **56px** | 모든 터치 타깃 |
 
-- `--touch-min` 이 WCAG 권장(44px)보다 큰 이유: **아이 손가락이 대상**이다. 시안의 버튼이 전부 크다
-- 정의 위치는 `app/globals.css` 의 `@theme inline` **한 곳**이다 (Tailwind v4 CSS-first). 🚫 `tailwind.config.ts` 를 만들지 않는다
+현재 시스템 폰트 스택과 실제 API 콘텐츠를 유지한다. 시안의 카메라·생성·오디오·앨범은 해당 기능 구현과 함께 적용하며, 이번 기존 화면 UI 적용에서 동작을 모사하지 않는다.
+
+- `--spacing-touch`가 WCAG 권장(44px)보다 큰 이유: **아이 손가락이 대상**이다. 시안의 버튼이 전부 크다
+- 정의 위치는 `app/globals.css`의 `@theme` **한 곳**이다 (Tailwind v4 CSS-first). 🚫 `tailwind.config.ts`를 만들지 않는다
 - 🚫 컴포넌트에 색 리터럴(`bg-[#6BA3D6]`)을 쓰지 않는다. 토큰만 쓴다
 
 ### 지금 고쳐야 하는 스캐폴드 잔재 ⚠️

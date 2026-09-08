@@ -1,33 +1,31 @@
 @import "tailwindcss";
 
-/* =============================================================================
-   디자인 토큰 — **정의는 여기 한 곳이다** (Tailwind v4 CSS-first).
-   🚫 `tailwind.config.ts` 를 만들지 않는다.
-   🚫 컴포넌트에 색 리터럴(`bg-[#5b9bd5]`)을 쓰지 않는다 — 리터럴이 퍼지면 팔레트 변경이
-      전수 수정이 된다.
-
-   ⚠️ 색 값은 **초안**이다. AI 시안 5장에서 뽑았고 UI 담당이 확정하면 이 블록을 먼저 고친다.
-   ============================================================================= */
+/* 디자인 토큰의 정의는 이 파일 한 곳에 둔다. */
 @theme {
-  /* 하늘색 — 헤더 바 · 얼굴 인식 CTA · 본문 말풍선 */
-  --color-primary: #5b9bd5;
-  --color-primary-strong: #3f7cb4;
-  /* 연한 하늘 — 카드 배경 · 삽화 프레임 */
-  --color-primary-soft: #dceaf7;
-  /* 크림 — 페이지 배경 */
-  --color-surface: #fdf6e8;
+  --color-primary: #3f92d6;
+  --color-primary-strong: #2e77b6;
+  --color-primary-soft: #cde7f6;
+  --color-primary-tint: #eaf7fd;
+  --color-surface: #fff9ec;
   --color-surface-raised: #ffffff;
-  /* 민트 — `다음 페이지` · 비하인드 A */
-  --color-accent-a: #8fbf85;
-  --color-accent-a-soft: #e4f0e1;
-  /* 코랄 — 비하인드 B */
-  --color-accent-b: #e2848f;
+  --color-line: #dceaf4;
+  --color-paper-line: #ebdcbe;
+  --color-accent-a: #57c1c0;
+  --color-accent-a-strong: #287f80;
+  --color-accent-a-soft: #e8f8f8;
+  --color-accent-b: #ee8fa3;
+  --color-accent-b-strong: #ad405e;
   --color-accent-b-soft: #f8e3e5;
-  /* 짙은 회청 — 본문 텍스트 */
-  --color-ink: #3f4a56;
-  --color-ink-muted: #78838f;
+  --color-ink: #234c77;
+  --color-ink-muted: #426f96;
+  --color-gold: #e9a93c;
+  --color-gold-strong: #96621e;
+  --color-magic: #b79be8;
+  --color-magic-strong: #7753b0;
+  --color-hill-1: #a9d8a2;
+  --color-hill-2: #8ac888;
 
-  --radius-card: 1.25rem;
+  --radius-card: 1.375rem;
   --radius-pill: 9999px;
 
   /* 터치 타깃 최소 크기. WCAG 권장(44px)보다 큰 이유는 **아이 손가락이 대상**이기 때문이다.
@@ -48,8 +46,30 @@ html {
   color-scheme: light;
 }
 
+html,
 body {
-  background: var(--color-surface);
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-primary-tint);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-magic-strong);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
