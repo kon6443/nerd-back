@@ -107,6 +107,10 @@ export const envSchema = dbEnvSchema.extend({
   EDGE_THROTTLE_ENABLED: z
     .enum(['true', 'false'], { error: "EDGE_THROTTLE_ENABLED 는 'true' 또는 'false' 여야 한다." })
     .default('false'),
+  /** 회원가입 허용 여부 ('true' | 'false'). 미설정 시 환경 기본값(LOCAL: true, PROD: false)을 따른다. */
+  SIGNUP_ENABLED: z
+    .enum(['true', 'false'], { error: "SIGNUP_ENABLED 는 'true' 또는 'false' 여야 한다." })
+    .optional(),
   /** AI 이미지 생성 어댑터 공급자 (mock | openrouter) */
   IMAGE_PROVIDER: z.enum(['mock', 'openrouter']).default('mock'),
   /** OpenRouter API 키 */

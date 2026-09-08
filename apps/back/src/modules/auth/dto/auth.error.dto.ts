@@ -31,3 +31,14 @@ export const UnauthorizedErrorResponseDto = defineDomainError({
   message: '로그인이 필요합니다.',
   name: 'UnauthorizedErrorResponseDto',
 });
+
+/**
+ * 회원가입 비활성화 (내부 테스트 기간 등).
+ */
+export const SignupDisabledErrorResponseDto = defineDomainError({
+  code: 'SIGNUP_DISABLED',
+  status: HttpStatus.FORBIDDEN,
+  message: '현재 내부 테스트 기간으로 신규 회원가입이 제한되어 있습니다.',
+  name: 'SignupDisabledErrorResponseDto',
+});
+

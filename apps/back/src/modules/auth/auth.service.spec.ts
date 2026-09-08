@@ -7,6 +7,7 @@ import {
 } from '@common/__spec__/mock-repository';
 import { createUser } from '@entities/__spec__/entity.factory';
 import type { User } from '@entities/user.entity';
+import type { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { PasswordService } from './password.service';
 import { SessionService } from './session.service';
@@ -22,17 +23,25 @@ describe('AuthService', () => {
   let users: MockRepository<User>;
   let passwords: { hash: jest.Mock; verify: jest.Mock };
   let sessions: { issue: jest.Mock };
+  let config: { get: jest.Mock };
   let service: AuthService;
 
   beforeEach(() => {
     users = createMockRepository<User>();
     passwords = { hash: jest.fn().mockResolvedValue('scrypt$hash'), verify: jest.fn() };
     sessions = { issue: jest.fn().mockReturnValue('42:9999999999999') };
+    config = {
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'ENV') return 'LOCAL';
+        return undefined;
+      }),
+    };
 
     service = new AuthService(
       asRepository(users),
       passwords as unknown as PasswordService,
       sessions as unknown as SessionService,
+      config as unknown as ConfigService,
     );
   });
 
@@ -59,6 +68,48 @@ describe('AuthService', () => {
         service.signup({ loginId: 'tester', password: 'pw12345678' }),
         'LOGIN_ID_TAKEN',
         HttpStatus.CONFLICT,
+      );
+    });
+
+    it('PROD 환경에서는 가입이 비활성화되어 403 · SIGNUP_DISABLED 이다 ⭐', async () => {
+      config.get.mockImplementation((key: string) => {
+        if (key === 'ENV') return 'PROD';
+        return undefined;
+      });
+
+      await expectDomainError(
+        service.signup({ loginId: 'tester', password: 'pw12345678' }),
+        'SIGNUP_DISABLED',
+        HttpStatus.FORBIDDEN,
+      );
+      expect(users.save).not.toHaveBeenCalled();
+    });
+
+    it('SIGNUP_ENABLED=false 오버라이드 시 LOCAL 환경이어도 차단된다', async () => {
+      config.get.mockImplementation((key: string) => {
+        if (key === 'ENV') return 'LOCAL';
+        if (key === 'SIGNUP_ENABLED') return 'false';
+        return undefined;
+      });
+
+      await expectDomainError(
+        service.signup({ loginId: 'tester', password: 'pw12345678' }),
+        'SIGNUP_DISABLED',
+        HttpStatus.FORBIDDEN,
+      );
+      expect(users.save).not.toHaveBeenCalled();
+    });
+
+    it('PROD 환경이라도 SIGNUP_ENABLED=true 오버라이드 시 가입이 허용된다', async () => {
+      config.get.mockImplementation((key: string) => {
+        if (key === 'ENV') return 'PROD';
+        if (key === 'SIGNUP_ENABLED') return 'true';
+        return undefined;
+      });
+      users.save.mockResolvedValue(createUser({ id: 9 }));
+
+      await expect(service.signup({ loginId: 'tester', password: 'pw12345678' })).resolves.toBe(
+        '42:9999999999999',
       );
     });
 

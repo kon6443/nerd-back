@@ -61,6 +61,11 @@ export class AuthController {
     description: '아이디 중복 (code: `LOGIN_ID_TAKEN`)',
     type: ApiErrorBodyDto,
   })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: '회원가입 비활성화 (code: `SIGNUP_DISABLED`)',
+    type: ApiErrorBodyDto,
+  })
   @ApiCommonValidationResponse()
   @ApiCommonThrottledResponse()
   @ApiCommonInternalServerErrorResponse()

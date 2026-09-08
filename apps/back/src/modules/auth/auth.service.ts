@@ -1,9 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { LoginInput, SignupInput } from '@nerd/contracts';
 import { Repository } from 'typeorm';
+import { AppEnv } from '@config/env.validation';
 import { User } from '@entities/user.entity';
-import { InvalidCredentialsErrorResponseDto, LoginIdTakenErrorResponseDto } from './dto/auth.error.dto';
+import { determineSignupEnabled } from './auth.constants';
+import {
+  InvalidCredentialsErrorResponseDto,
+  LoginIdTakenErrorResponseDto,
+  SignupDisabledErrorResponseDto,
+} from './dto/auth.error.dto';
 import { PasswordService } from './password.service';
 import { SessionService } from './session.service';
 
@@ -30,7 +37,17 @@ export class AuthService {
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly passwords: PasswordService,
     private readonly sessions: SessionService,
+    private readonly config: ConfigService,
   ) {}
+
+  /**
+   * 환경 및 설정을 바탕으로 현재 회원가입이 허용되는지 확인한다.
+   */
+  isSignupAllowed(): boolean {
+    const appEnv = this.config.get<AppEnv>('ENV') || AppEnv.LOCAL;
+    const envOverride = this.config.get<string>('SIGNUP_ENABLED');
+    return determineSignupEnabled(appEnv, envOverride);
+  }
 
   /**
    * 가입 후 바로 로그인 상태로 만든다. 쿠키에 담을 세션 값을 돌려준다.
@@ -41,6 +58,10 @@ export class AuthService {
    * 🚫 서버측 세션으로 돌아가면 그 보상 삭제도 함께 되살려야 한다.
    */
   async signup(input: SignupInput): Promise<string> {
+    if (!this.isSignupAllowed()) {
+      throw new SignupDisabledErrorResponseDto();
+    }
+
     const passwordHash = await this.passwords.hash(input.password);
 
     try {
