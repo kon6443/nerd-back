@@ -39,6 +39,7 @@ export const DOMAIN_ERROR_CODES = [
   // 나누면 그 차이가 곧 계정 존재 여부다.
   'INVALID_CREDENTIALS',
   'LOGIN_ID_TAKEN',
+  'SIGNUP_DISABLED',
   'UNAUTHORIZED',
   // Slice 3 세션 및 얼굴 등록
   'STORY_ALREADY_COMPLETED',

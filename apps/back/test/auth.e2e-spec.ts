@@ -114,6 +114,39 @@ describe('인증 (E2E)', () => {
 
       const res = await signup().expect(409);
       expect(res.body.code).toBe('LOGIN_ID_TAKEN');
+      expect(stores.rowCount()).toBe(1);
+    });
+
+    it('PROD 환경에서는 403 · SIGNUP_DISABLED 로 가입이 차단된다 ⭐', async () => {
+      const prodApp = await createE2eApp({
+        controllers: [AuthController],
+        providers: [
+          AuthService,
+          PasswordService,
+          SessionService,
+          { provide: getRepositoryToken(User), useValue: stores.users },
+          {
+            provide: ConfigService,
+            useValue: {
+              get: (key: string) => {
+                if (key === 'ENV') return 'PROD';
+                if (key === 'PORT') return 5501;
+                return undefined;
+              },
+            },
+          },
+        ],
+      });
+
+      const res = await request(server(prodApp))
+        .post(`/${API_PREFIX}/auth/signup`)
+        .send({ loginId: 'prod_user', password: 'pw12345678' })
+        .expect(403);
+
+      expect(res.body.code).toBe('SIGNUP_DISABLED');
+      expect(res.body.message).toContain('회원가입이 제한');
+
+      await prodApp.close();
     });
   });
 
