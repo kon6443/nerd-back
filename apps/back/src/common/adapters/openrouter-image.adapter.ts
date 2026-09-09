@@ -63,8 +63,12 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
       });
     }
 
+    const costumeDesc = input.characterPrompt
+      ? ` The character is ${input.characterPrompt}.`
+      : '';
+
     const prompt =
-      "A delightful children's fairy tale book character sheet. Create a warm, friendly storybook protagonist illustration based on the facial features in the reference photo. Clear character design, soft pastel watercolor storybook aesthetic, front-facing view, clean white background.";
+      `A delightful children's fairy tale book character sheet. Create a warm, friendly storybook protagonist illustration${costumeDesc} based on the facial features in the reference photo. Clear character design, soft pastel watercolor storybook aesthetic, front-facing view, clean white background.`;
 
     return this.callImageApi({
       prompt,
@@ -77,17 +81,29 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
   /**
    * 캐릭터 레퍼런스 이미지와 페이지별 장면 프롬프트를 합성하여
    * 동화 본문 페이지 삽화를 생성한다.
+   * 템플릿 기본 삽화(baseImage)가 제공되면 구도와 배경 참조용으로 함께 주입한다.
    */
   async generatePageIllustration(input: GeneratePageIllustrationInput): Promise<Buffer> {
-    const inputReferences = [
+    const inputReferences: Array<{ type: string; image_url: { url: string } }> = [
       {
         type: 'image_url',
         image_url: { url: `data:image/png;base64,${input.referenceImage.toString('base64')}` },
       },
     ];
 
+    if (input.baseImage) {
+      inputReferences.push({
+        type: 'image_url',
+        image_url: { url: `data:image/png;base64,${input.baseImage.toString('base64')}` },
+      });
+    }
+
     const style = input.style || 'gentle warm watercolor fairy tale storybook illustration';
-    const prompt = `A full scene illustration for a children's storybook. Scene: ${input.prompt}. Style: ${style}. Featuring the protagonist character from the reference image, preserving the character's facial features and cheerful expression. Rich atmospheric lighting, whimsical storybook detail.`;
+    const costumeInstruction = input.characterPrompt
+      ? `The main protagonist MUST wear ${input.characterPrompt}.`
+      : "Featuring the protagonist character from the reference image, preserving the character's facial features and cheerful expression.";
+
+    const prompt = `A full scene illustration for a children's storybook. Scene: ${input.prompt}. Style: ${style}. ${costumeInstruction} Rich atmospheric lighting, whimsical storybook detail, consistent character appearance across scenes.`;
 
     return this.callImageApi({
       prompt,

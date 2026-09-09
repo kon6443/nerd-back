@@ -156,6 +156,7 @@ describe('StorySessionService', () => {
         front: VALID_JPEG,
         left: undefined,
         right: undefined,
+        characterPrompt: 'the charming protagonist storybook outfit',
       });
       expect(mockStoragePort.upload).toHaveBeenCalled();
       expect(mockStoragePort.getPresignedUrl).toHaveBeenCalled();
