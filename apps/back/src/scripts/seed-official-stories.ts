@@ -56,6 +56,7 @@ async function upsertOfficialStory(
         templateId: template.id,
         pageNo: page.pageNo,
         bodyText: page.bodyText,
+        illustrationPrompt: page.illustrationPrompt ?? null,
         baseImageKey: page.baseImageKey ?? null,
         personaTargetRole: page.personaTargetRole,
       }),

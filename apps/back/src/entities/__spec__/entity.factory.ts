@@ -49,6 +49,7 @@ export const createStoryPage = (overrides: Partial<StoryPage> = {}): StoryPage =
   bodyText: '늑대가 숲에서 빨간 모자를 만났습니다.',
   baseImageKey: 'pages/lrrh-1.png',
   personaTargetRole: 'protagonist',
+  illustrationPrompt: null,
   ...overrides,
 });
 
