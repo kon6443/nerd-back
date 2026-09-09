@@ -144,13 +144,15 @@ export default function MyPage() {
                       <div className="flex items-center gap-2">
                         <span
                           className={`rounded-pill px-2.5 py-0.5 text-xs font-bold ${
+                            // 🚫 원색 유틸리티(emerald·amber·rose)를 쓰지 않는다 — 팔레트를 바꾸면
+                            //    이 배지만 옛 색으로 남는다. 🚫 dark: 도 쓰지 않는다(다크모드 미사용).
                             isCompleted
-                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                              ? "bg-primary-tint text-primary-strong"
                               : isGenerating
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                              ? "bg-accent-a-soft text-accent-a-strong"
                               : isFailed
-                              ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                              : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                              ? "bg-danger-soft text-danger-strong"
+                              : "bg-surface text-ink-muted"
                           }`}
                         >
                           {isCompleted
