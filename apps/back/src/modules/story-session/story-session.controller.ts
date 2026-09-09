@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -12,7 +13,9 @@ import {
 } from '@nestjs/common';
 import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { SkipThrottle } from '@nestjs/throttler';
 import { SUCCESS_CODE } from '@common/constants/app.constants';
+import { SKIP_ALL_THROTTLERS } from '@common/constants/throttle.constants';
 import {
   ApiCommonInternalServerErrorResponse,
   ApiCommonUnauthorizedResponse,
@@ -29,6 +32,7 @@ import {
 } from './dto/story-session-request.dto';
 import type {
   ApiSuccess,
+  MyStorySessionItem,
   PersonalizeSessionResponse,
   RetryPageResponse,
   SessionPagesResponse,
@@ -60,6 +64,26 @@ export class StorySessionController {
     return {
       code: SUCCESS_CODE,
       data: session,
+      message: '',
+    };
+  }
+
+  @Get('my')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @ApiOperation({
+    summary: '사용자의 동화 세션 목록 조회',
+    description: '사용자가 생성했거나 생성 중인 동화 세션 목록을 반환합니다.',
+  })
+  @ApiCommonUnauthorizedResponse()
+  @ApiCommonInternalServerErrorResponse()
+  async getMySessions(
+    @CurrentUser() user: User,
+  ): Promise<ApiSuccess<MyStorySessionItem[]>> {
+    const list = await this.sessionService.getMySessions(user.id);
+    return {
+      code: SUCCESS_CODE,
+      data: list,
       message: '',
     };
   }
@@ -127,6 +151,7 @@ export class StorySessionController {
   }
 
   @Get(':id/pages')
+  @SkipThrottle(SKIP_ALL_THROTTLERS)
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
   @ApiOperation({
@@ -173,6 +198,25 @@ export class StorySessionController {
       data: result,
       message: '',
     };
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(AuthGuard)
+  @ApiOperation({
+    summary: '동화 세션 삭제 (재생성을 위한 리셋)',
+    description: '세션 및 관련 생성 이미지를 삭제하여 다른 얼굴로 다시 제작할 수 있도록 합니다.',
+  })
+  @ApiCommonUnauthorizedResponse()
+  @ApiCommonValidationResponse()
+  @ApiCommonInternalServerErrorResponse()
+  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: '세션 삭제 완료' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: '세션 없음' })
+  async deleteSession(
+    @CurrentUser() user: User,
+    @Param() params: SessionIdParamsDto,
+  ): Promise<void> {
+    await this.sessionService.deleteSession(user.id, params.id);
   }
 }
 

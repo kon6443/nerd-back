@@ -115,6 +115,53 @@ describe('StorySessionService', () => {
     });
   });
 
+  describe('getMySessions', () => {
+    it('사용자의 모든 세션을 조회하고 S3 서명 URL과 함께 반환한다', async () => {
+      sessionRepo.find.mockResolvedValue([
+        {
+          id: 'session-1',
+          userId: 1,
+          templateId: 10,
+          status: 'completed',
+          referenceImageKey: 'references/session-1/ref.png',
+          template: { id: 10, slug: 'red-riding-hood', title: '빨간 모자' } as unknown as StoryTemplate,
+          createdAt: new Date('2026-09-08T00:00:00Z'),
+          updatedAt: new Date('2026-09-08T01:00:00Z'),
+        } as unknown as StorySession,
+      ]);
+
+      const result = await service.getMySessions(1);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('session-1');
+      expect(result[0].templateSlug).toBe('red-riding-hood');
+      expect(result[0].referenceImageUrl).toBe('https://storage.local/references/session-1/ref.png');
+      expect(mockStoragePort.getPresignedUrl).toHaveBeenCalledWith('references/session-1/ref.png');
+    });
+  });
+
+  describe('deleteSession', () => {
+    it('세션이 존재하지 않거나 소유자가 다르면 SessionNotFoundErrorResponseDto(404)를 던진다', async () => {
+      sessionRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.deleteSession(1, 'non-existent')).rejects.toThrow(
+        SessionNotFoundErrorResponseDto,
+      );
+    });
+
+    it('세션이 존재하면 페이지 이미지와 세션을 삭제한다', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: 'session-1',
+        userId: 1,
+      } as unknown as StorySession);
+
+      await service.deleteSession(1, 'session-1');
+
+      expect(pageImageRepo.delete).toHaveBeenCalledWith({ sessionId: 'session-1' });
+      expect(sessionRepo.delete).toHaveBeenCalledWith({ id: 'session-1' });
+    });
+  });
+
   describe('uploadFace', () => {
     it('정면 사진이 없으면 FaceRequiredErrorResponseDto(400)를 던진다', async () => {
       await expect(
@@ -156,6 +203,7 @@ describe('StorySessionService', () => {
         front: VALID_JPEG,
         left: undefined,
         right: undefined,
+        characterPrompt: 'the charming protagonist storybook outfit',
       });
       expect(mockStoragePort.upload).toHaveBeenCalled();
       expect(mockStoragePort.getPresignedUrl).toHaveBeenCalled();

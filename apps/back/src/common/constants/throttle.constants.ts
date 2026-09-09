@@ -7,8 +7,8 @@
  * ⚠️ 레플리카가 3개이므로 **스토리지가 Redis 여야 한다.**
  *    메모리 스토리지를 쓰면 레플리카별로 따로 세어 실효 한도가 3배가 된다.
  */
-export const THROTTLE_SHORT = { name: 'short', ttl: 1_000, limit: 5 } as const;
-export const THROTTLE_LONG = { name: 'long', ttl: 60_000, limit: 60 } as const;
+export const THROTTLE_SHORT = { name: 'short', ttl: 1_000, limit: 20 } as const;
+export const THROTTLE_LONG = { name: 'long', ttl: 60_000, limit: 120 } as const;
 
 /**
  * 엣지 백스톱 한도.
