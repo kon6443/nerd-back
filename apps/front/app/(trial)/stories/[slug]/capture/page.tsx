@@ -4,6 +4,7 @@ import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
 import { actionClass } from "@/components/ui/actionStyles";
 import { ApiError, createSession, uploadFace } from "@/lib/api";
 import type { UploadFaceResponse } from "@nerd/contracts";
@@ -268,9 +269,9 @@ export default function CapturePage({ params }: PageProps) {
         <Link href={`/library/${slug}`} className="text-sm font-semibold text-primary hover:underline">
           ← 동화로 돌아가기
         </Link>
-        <span className="rounded-pill bg-primary-soft px-3 py-1 text-xs font-bold text-primary">
+        <Badge>
           Slice 3: 얼굴 등록
-        </span>
+        </Badge>
       </div>
 
       {/* 완료 화면 */}

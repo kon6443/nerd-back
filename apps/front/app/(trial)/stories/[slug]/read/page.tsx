@@ -4,6 +4,9 @@ import { Suspense, use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { CenteredPage } from "@/components/ui/CenteredPage";
+import { LoadingView } from "@/components/ui/LoadingView";
 import { actionClass } from "@/components/ui/actionStyles";
 import { BookFrame } from "@/components/story/BookFrame";
 import {
@@ -188,7 +191,7 @@ function StoryReadContent({ params }: PageProps) {
   // ==========================================
   if (activeError) {
     return (
-      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center p-6 text-center">
+      <CenteredPage>
         <Card className="flex flex-col items-center gap-4">
           <div className="rounded-full bg-red-100 p-4 text-3xl">⚠️</div>
           <h1 className="text-xl font-bold text-ink">문제가 발생했어요</h1>
@@ -202,18 +205,13 @@ function StoryReadContent({ params }: PageProps) {
             </Link>
           </div>
         </Card>
-      </main>
+      </CenteredPage>
     );
   }
 
   if (viewState === "loading" || !story) {
     return (
-      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center p-6 text-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="font-bold text-ink">동화 정보를 준비하고 있어요...</p>
-        </div>
-      </main>
+      <LoadingView message="동화 정보를 준비하고 있어요..." />
     );
   }
 
@@ -358,9 +356,9 @@ function StoryReadContent({ params }: PageProps) {
         </div>
 
         <div>
-          <span className="rounded-pill bg-primary-soft px-3 py-1 text-xs font-bold text-primary">
+          <Badge>
             특별 수록: 비하인드 스토리
-          </span>
+          </Badge>
           <h1 className="mt-3 text-3xl font-bold text-ink">
             그날 밤, 이야기는 어떻게 되었을까요?
           </h1>
@@ -565,14 +563,10 @@ function StoryReadContent({ params }: PageProps) {
 }
 
 export default function StoryReadPage({ params }: PageProps) {
+  // ⚠️ 폴백에 스피너만 두면 화면을 못 보는 사용자에게는 **아무 일도 안 일어난 것**과 같다.
+  //    `LoadingView` 가 `role="status"` 문구를 함께 준다.
   return (
-    <Suspense
-      fallback={
-        <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center p-6 text-center">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </main>
-      }
-    >
+    <Suspense fallback={<LoadingView message="동화를 준비하고 있어요..." />}>
       <StoryReadContent params={params} />
     </Suspense>
   );
