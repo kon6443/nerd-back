@@ -33,11 +33,33 @@ npx serve docs/design   # 또는 python3 -m http.server
 React·Tailwind 규약과 맞지 않는다. 가져갈 것은 **색·타이포·삽화·카피**이고,
 구조는 `components/` 의 기존 컴포넌트 위에서 다시 짠다.
 
+## 화면 ↔ 라우트
+
+프로토타입의 각 화면은 실제 라우트에 1:1 로 대응한다. 어긋나면 **코드가 정본**이다.
+
+| 프로토타입 화면 | 라우트 |
+|---|---|
+| 홈 · 로그인 | `/` · `/login` |
+| 서재 · 상세 · 시연 리더 | `/library` · `/library/[slug]` · `/library/[slug]/[pageNo]` |
+| 촬영 · 캐릭터 완성 · 이미 만든 책(409) | `/stories/[slug]/capture` 의 세 상태 |
+| 제작 진행 · 부분 실패 재시도 | `/stories/[slug]/read` |
+| 마이페이지 | `/me` |
+
+세션 상태는 `packages/contracts/src/session.ts` 의 상태머신을 그대로 따른다 —
+`draft → face_ready → generating → completed | failed`.
+
 ## 토큰
 
 프로토타입의 CSS 변수 이름은 `apps/front/app/globals.css` 의 `@theme` 과 **의도적으로 같다**
-(`--color-primary` · `--color-accent-a` · `--radius-card` · `--spacing-touch` …).
-값이 확정되면 옮겨 적을 때 이름을 바꾸지 않아도 된다.
+(`--color-primary-strong` · `--color-accent-a-soft` · `--color-ink-muted` · `--color-surface-raised` …).
+이름을 바꾸지 않고 **값만** 옮기면 된다.
+
+색은 **듀오링고 팔레트**를 참조했다(`abc.duolingo.com` 의 CSS 실측):
+Feather Green `#58CC02`, Macaw `#1CB0F6`, Beetle `#CE82FF`, Eel `#4B4B4B`, Swan `#E5E5E5`.
+
+⚠️ **버튼 형태가 다르다.** 프로토타입은 `border-radius: 16px` + 아래쪽 립
+(`box-shadow: 0 4px 0 <진한색>`)인데, 현재 `components/ui/actionStyles.ts` 는 `rounded-pill` +
+`shadow-sm` 이다. 톤을 옮기려면 **그 파일 한 곳**만 고치면 전체 버튼에 퍼진다.
 
 색 값은 여전히 **초안**이다. 확정 절차는 `tasks-my-story.md` 의 「디자인 시스템」이 소유한다 —
 표를 먼저 고치고 `globals.css` 를 고친다.
