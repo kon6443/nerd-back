@@ -44,7 +44,23 @@ pnpm dev                  # http://localhost:5501/api/v2
 
 Swagger: `http://localhost:5501/api/v2/docs`
 
-### 로컬 Redis
+### 로컬 보조 서비스 (Redis)
+
+```bash
+docker compose -f docker-compose.local.yml up -d     # 레포 루트에서
+docker compose -f docker-compose.local.yml down
+```
+
+데이터는 `./.local-data/` 에 쌓이고 `.gitignore` 가 막는다.
+
+⚠️ **Redis 는 이제 선택이다.** 세션이 서명 쿠키라 **인증이 Redis 를 쓰지 않는다** — 없어도
+로그인·가입·조회가 전부 동작하고 레이트리밋만 fail-open 으로 느슨해진다.
+
+🚫 **오브젝트 스토리지는 로컬에 띄우지 않는다.** 전 환경이 **DB 를 공유**하기 때문에, 로컬
+스토리지에 넣은 파일은 DB 행만 공유되고 실제 객체는 노트북에만 남아 배포 쪽에서 열면
+깨진 이미지가 된다. Swarm 의 것을 함께 쓰고 키 접두사로 가른다.
+
+### 로컬 Redis (컨테이너를 직접 띄우는 방법)
 
 배포와 같은 이미지·정책으로 띄운다.
 
