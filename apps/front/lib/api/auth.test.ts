@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { validateLogin, validateSignup } from "./auth";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { SESSION_CHANGED_EVENT } from "./client";
+import { logout, validateLogin, validateSignup } from "./auth";
 
 describe("validateSignup — 백엔드와 같은 스키마", () => {
   it("올바른 입력은 오류가 없다", () => {
@@ -36,5 +37,40 @@ describe("validateLogin — 가입 규칙을 적용하지 않는다 ⭐", () => 
 
     expect(errors.loginId).toBe("아이디를 입력해 주세요.");
     expect(errors.password).toBe("비밀번호를 입력해 주세요.");
+  });
+});
+
+describe("logout — 세션 변경 신호", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function stubBrowser(fetchImpl: () => Promise<Response>) {
+    const dispatchEvent = vi.fn();
+    // vitest 환경이 node 라 window 가 없다. 신호가 브라우저에서만 나가는 것도 함께 검증된다.
+    vi.stubGlobal("window", { dispatchEvent });
+    vi.stubGlobal("fetch", fetchImpl);
+    return dispatchEvent;
+  }
+
+  it("성공하면 SESSION_CHANGED 를 발행한다 ⭐", async () => {
+    // 🚫 이 신호가 없으면 로그아웃 후에도 네비가 「마이페이지」로 남는다 —
+    //    AppHeader 가 루트 레이아웃의 클라이언트 컴포넌트라 다시 조회하지 않기 때문이다.
+    const dispatchEvent = stubBrowser(() => Promise.resolve(new Response(null, { status: 204 })));
+
+    await logout();
+
+    const types = dispatchEvent.mock.calls.map((c) => (c[0] as { type: string }).type);
+    expect(types).toContain(SESSION_CHANGED_EVENT);
+  });
+
+  it("실패해도 발행한다 — 화면이 갇히지 않게", async () => {
+    const dispatchEvent = stubBrowser(() => Promise.resolve(new Response(null, { status: 500 })));
+
+    await expect(logout()).rejects.toThrow();
+
+    const types = dispatchEvent.mock.calls.map((c) => (c[0] as { type: string }).type);
+    expect(types).toContain(SESSION_CHANGED_EVENT);
   });
 });
