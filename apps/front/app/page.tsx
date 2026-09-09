@@ -1,3 +1,4 @@
+import { AuthCta } from "@/components/layout/AuthCta";
 import { ActionLink } from "@/components/ui/ActionLink";
 
 export default function Home() {
@@ -18,9 +19,9 @@ export default function Home() {
         <ActionLink href="/library" variant="accentA" className="w-full sm:w-auto">
           시연 동화 보기
         </ActionLink>
-        <ActionLink href="/login" variant="gold" className="w-full sm:w-auto">
-          로그인하기
-        </ActionLink>
+        {/* 로그인 상태에 따라 「로그인하기」 ↔ 「마이페이지」로 갈린다.
+            🚫 문구를 여기 적지 않는다 — `authLinks.ts` 가 소스다. */}
+        <AuthCta className="w-full sm:w-auto" />
       </div>
       <p className="mt-4 text-sm font-medium text-ink-muted">시연은 로그인 없이 바로 볼 수 있어요.</p>
     </main>

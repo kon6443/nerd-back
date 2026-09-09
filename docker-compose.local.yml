@@ -1,0 +1,40 @@
+# 로컬 개발용 보조 서비스. **배포와 무관하다** — 배포 스택은 `infra/` 가 소유한다.
+#
+#   docker compose -f docker-compose.local.yml up -d
+#   docker compose -f docker-compose.local.yml down
+#
+# 🚫 이 파일을 `infra/` 에 두지 않는다. 그 디렉터리는 "배포되는 스택 YAML" 만 담는 약속이고,
+#    로컬 파일이 섞이면 무엇이 서버로 가는지 헷갈린다.
+#
+# ⚠️ **오브젝트 스토리지(MinIO)는 여기 없다.** 전 환경이 **DB 를 공유**하기 때문이다 —
+#    로컬 스토리지에 파일을 넣으면 DB 행은 공유되는데 그 키를 가리키는 실제 객체는
+#    노트북에만 있어, 배포 쪽에서 열면 **깨진 이미지**가 된다. 그래서 스토리지는
+#    Swarm 의 것을 함께 쓰고 키 접두사로 가른다 (docs/tasks/tasks-my-story.md 「이미지 보관」).
+
+services:
+  redis:
+    # 배포(`infra/prod_nerd_cache.yml`)와 **같은 태그**를 쓴다. 다르면 로컬에서 안 나던 문제가
+    # 배포에서만 난다.
+    image: redis:7-alpine
+    container_name: nerd-local-redis
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --maxmemory
+      - 128mb
+      # 배포와 같은 정책. volatile-lru 는 TTL 이 있는 키만 evict 대상으로 둔다.
+      - --maxmemory-policy
+      - volatile-lru
+    ports:
+      # 앱의 `.env` 가 127.0.0.1:6379 를 본다.
+      - '127.0.0.1:6379:6379'
+    volumes:
+      # 프로젝트 안에 둔다 — `.gitignore` 가 `.local-data/` 를 통째로 막는다.
+      - ./.local-data/redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped

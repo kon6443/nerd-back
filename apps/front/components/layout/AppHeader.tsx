@@ -2,23 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ActionLink } from "@/components/ui/ActionLink";
+import { useSession } from "@/lib/api/useSession";
+import { AUTH_LINK } from "./authLinks";
+import { AuthCta } from "./AuthCta";
 
 /**
  * 전역 상단 네비게이션.
  *
- * `'use client'` 인 이유는 **현재 위치 표시 하나뿐이다**(`usePathname`). 데이터를 부르지 않으므로
- * 클라이언트 번들에 얹히는 비용이 작다. 🚫 여기에 데이터 조회를 넣지 않는다 — 넣는 순간
- * 모든 화면이 그 요청을 기다린다.
+ * `'use client'` 인 이유는 두 가지다 — 현재 위치 표시(`usePathname`)와 **로그인 상태**(`useSession`).
  *
- * ⭐ **실제로 존재하는 라우트만 넣는다.** 시안에는 `설정`·`내 프로필` 탭이 있지만 그 화면이 아직
- * 없다 — 링크를 먼저 만들면 눌렀을 때 404 다. 화면이 생기는 슬라이스에서 함께 추가한다.
+ * ⚠️ 후자는 요청을 하나 만든다(`GET /auth/me`). 전 화면에 걸리므로 늘리지 않는다 —
+ * 🚫 여기에 다른 데이터 조회를 추가하지 않는다. 렌더를 막지는 않는다: 확인 전에는 인증 칸만
+ * 비우고 나머지는 그대로 그린다.
+ *
+ * ⭐ **실제로 존재하는 라우트만 넣는다.** 시안의 `설정` 탭은 그 화면이 없어 넣지 않았다 —
+ * 링크를 먼저 만들면 눌렀을 때 404 다.
  */
-const LINKS = [
+const COMMON_LINKS = [
   { href: "/", label: "홈" },
   { href: "/library", label: "서재" },
-  { href: "/login", label: "로그인" },
 ] as const;
+
 
 /**
  * `/library` 는 하위 경로(`/library/[slug]/...`)에서도 활성으로 본다.
@@ -31,6 +35,12 @@ function isActive(pathname: string, href: string): boolean {
 
 export function AppHeader() {
   const pathname = usePathname();
+  const session = useSession();
+
+  // 확인 전에는 인증 칸을 그리지 않는다. 곧바로 「로그인」을 그리면 이미 로그인한 사용자에게
+  // 로그아웃된 화면이 깜빡 보인다.
+  const authLink = session.status === "unknown" ? null : AUTH_LINK[session.status];
+  const links = authLink ? [...COMMON_LINKS, authLink] : COMMON_LINKS;
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-surface-raised/90 shadow-sm backdrop-blur-sm">
@@ -52,10 +62,13 @@ export function AppHeader() {
         </Link>
 
         <ul className="order-3 flex w-full items-center gap-1 sm:order-none sm:w-auto">
-          {LINKS.map((link) => {
+          {links.map((link) => {
             const active = isActive(pathname, link.href);
             return (
-              <li key={link.href} className={link.href === "/login" ? "lg:hidden" : undefined}>
+              // ⚠️ 넓은 화면에서는 오른쪽 CTA 가 같은 역할을 하므로 인증 칸만 숨긴다.
+              //    🚫 `href === "/login"` 으로 판정하지 않는다 — 로그인하면 href 가 `/me` 로
+              //    바뀌어 조건이 빗나가고 **네비와 CTA 가 둘 다 보인다.**
+              <li key={link.href} className={link.href === authLink?.href ? "lg:hidden" : undefined}>
                 <Link
                   href={link.href}
                   // 현재 위치를 보조기술에도 알린다. 색만으로 표시하면 화면을 못 보는 사용자에게는 없는 정보다.
@@ -80,14 +93,13 @@ export function AppHeader() {
           </svg>
           시연 모드
         </span>
+        {/* ⭐ 이 CTA 가 넓은 화면에서 **유일하게 보이는 인증 UI** 다. 하드코딩해 두면 로그인한
+            뒤에도 「로그인하기」가 남아 "로그인이 안 됐나?" 로 읽힌다 — 실제로 그렇게 보고됐다.
+            확인 전(`unknown`)에는 그리지 않아 상태가 깜빡이지 않게 한다. */}
+        {/* 🚫 여기서 CTA 를 다시 그리지 않는다 — `AuthCta` 가 상태·문구·aria-current 를 모두
+            소유한다. 두 곳에서 그리면 한쪽만 고쳐져 갈린다. */}
         <div className="hidden lg:block">
-          <ActionLink
-            href="/login"
-            variant="gold"
-            aria-current={pathname === "/login" ? "page" : undefined}
-          >
-            로그인하기
-          </ActionLink>
+          <AuthCta />
         </div>
       </nav>
     </header>

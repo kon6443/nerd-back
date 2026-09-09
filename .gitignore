@@ -55,3 +55,7 @@ next-env.d.ts
 
 # pnpm 이 전역 store 를 못 쓸 때 만드는 폴백 store — 커밋 금지
 .pnpm-store/
+
+# 로컬 개발 서비스의 데이터 (docker-compose.local.yml). 🚫 커밋하지 않는다 —
+# 컨테이너가 만드는 바이너리라 diff 가 무의미하고 용량만 늘어난다.
+.local-data/
