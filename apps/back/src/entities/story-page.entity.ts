@@ -41,4 +41,11 @@ export class StoryPage {
    */
   @Column({ name: 'persona_target_role', type: 'varchar', length: 64, nullable: true })
   personaTargetRole: string | null;
+
+  /**
+   * AI 이미지 생성 모델에 전달할 페이지별 맞춤 삽화 지시문.
+   * `null` 이면 `bodyText` 기반 기본 프롬프트로 생성된다.
+   */
+  @Column({ name: 'illustration_prompt', type: 'text', nullable: true })
+  illustrationPrompt: string | null;
 }

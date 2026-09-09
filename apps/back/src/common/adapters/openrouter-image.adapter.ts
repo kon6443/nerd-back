@@ -34,7 +34,7 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
     this.apiKey = this.configService.get<string>('OPENROUTER_API_KEY');
     this.defaultModel =
       this.configService.get<string>('OPENROUTER_IMAGE_MODEL') ||
-      'bytedance-seed/seedream-5-0-lite';
+      'qwen/qwen-image-3';
   }
 
   /**
@@ -84,26 +84,84 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
    * 템플릿 기본 삽화(baseImage)가 제공되면 구도와 배경 참조용으로 함께 주입한다.
    */
   async generatePageIllustration(input: GeneratePageIllustrationInput): Promise<Buffer> {
-    const inputReferences: Array<{ type: string; image_url: { url: string } }> = [
-      {
-        type: 'image_url',
-        image_url: { url: `data:image/png;base64,${input.referenceImage.toString('base64')}` },
-      },
-    ];
+    const inputReferences: Array<{ type: string; image_url: { url: string } }> = [];
 
+    const getMime = (buf: Buffer) =>
+      buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : 'image/png';
+
+    // 동화 템플릿 기본 삽화가 제공되면 첫 번째 이미지로 주입 (프롬프트의 "Input image 1" 지침과 일치)
     if (input.baseImage) {
       inputReferences.push({
         type: 'image_url',
-        image_url: { url: `data:image/png;base64,${input.baseImage.toString('base64')}` },
+        image_url: { url: `data:${getMime(input.baseImage)};base64,${input.baseImage.toString('base64')}` },
       });
     }
 
-    const style = input.style || 'gentle warm watercolor fairy tale storybook illustration';
-    const costumeInstruction = input.characterPrompt
-      ? `The main protagonist MUST wear ${input.characterPrompt}.`
-      : "Featuring the protagonist character from the reference image, preserving the character's facial features and cheerful expression.";
+    // 사용자 얼굴 레퍼런스는 두 번째 이미지로 주입 (프롬프트의 "Input image 2" 지침과 일치)
+    inputReferences.push({
+      type: 'image_url',
+      image_url: { url: `data:${getMime(input.referenceImage)};base64,${input.referenceImage.toString('base64')}` },
+    });
 
-    const prompt = `A full scene illustration for a children's storybook. Scene: ${input.prompt}. Style: ${style}. ${costumeInstruction} Rich atmospheric lighting, whimsical storybook detail, consistent character appearance across scenes.`;
+    let prompt: string;
+    if (
+      input.prompt.includes('<base_scene_template>') ||
+      input.prompt.includes('IMAGE EDITING') ||
+      input.prompt.includes('Input image 1')
+    ) {
+      // 1. 이미 명시적인 변수 태그나 편집 지시문이 포함되어 있으면 그대로 사용
+      prompt = input.prompt;
+    } else if (
+      input.prompt.includes('첫 번째 이미지') ||
+      input.prompt.includes('두 번째 이미지')
+    ) {
+      // 2. 레거시 '첫 번째 이미지/두 번째 이미지' 프롬프트가 들어온 경우 모델이 인식할 수 있는 XML 태그 변수로 자동 정규화
+      prompt = input.prompt
+        .replace(/첫\s*번째\s*이미지/g, '<base_scene_template>')
+        .replace(/두\s*번째\s*이미지/g, '<protagonist_identity>');
+    } else if (input.baseImage) {
+      // 2. 템플릿 삽화(baseImage)가 제공된 경우: Gemini 공식 권장 XML 태그 기반 이미지 합성·치환 지시문 생성
+      // 사용자 얼굴은 실제 사진(photo) 또는 사전 생성된 캐릭터 일러스트 시트(character sheet) 모두 유연하게 인식
+      const costumeRequirement = input.characterPrompt
+        ? `4. COSTUME REQUIREMENT: The main protagonist MUST wear ${input.characterPrompt}.`
+        : '4. COSTUME REQUIREMENT: The main protagonist MUST wear the exact costume and clothing illustrated in <base_scene_template>.';
+
+      prompt = [
+        '<task_specification>',
+        '<context>',
+        "You are an expert children's fairy tale book illustrator. Your task is to compose a personalized storybook scene by integrating the protagonist's identity into an existing scene template.",
+        '</context>',
+        '',
+        '<inputs>',
+        '  <base_scene_template>',
+        "    Attached Image 1 (first image): The complete storybook illustration template defining the background scenery, composition, lighting, artistic watercolor style, and the character's clothing.",
+        '  </base_scene_template>',
+        '  <protagonist_identity>',
+        "    Attached Image 2 (second image): The facial identity and character reference for the protagonist. (This reference may be provided as either a real human portrait photo or a pre-designed fairy tale character illustration sheet). Extract and use the protagonist's unique facial features, eye shape, nose, expression, and hairstyle from this image.",
+        '  </protagonist_identity>',
+        '</inputs>',
+        '',
+        '<instructions>',
+        '1. CANVAS & BACKGROUND: Use <base_scene_template> as the exact base canvas. PRESERVE 100% of the background environment, scenery layout, and whimsical watercolor art style from <base_scene_template>.',
+        "2. FACE REPLACEMENT: Locate the main protagonist in <base_scene_template>. Replace ONLY the protagonist's face and hair with the facial identity and features from <protagonist_identity>.",
+        '3. SEAMLESS BLENDING: Seamlessly adapt and paint the face from <protagonist_identity> to match the hand-drawn pastel watercolor storybook aesthetic, lighting, and soft skin tone of <base_scene_template>.',
+        costumeRequirement,
+        '</instructions>',
+        '',
+        '<scene_story>',
+        input.prompt,
+        '</scene_story>',
+        '</task_specification>',
+      ].join('\n');
+    } else {
+      // 3. 템플릿 삽화가 없는 경우: 단일 레퍼런스 기반 신규 장면 생성(T2I)
+      const style = input.style || 'gentle warm watercolor fairy tale storybook illustration';
+      const costumeInstruction = input.characterPrompt
+        ? `The main protagonist MUST wear ${input.characterPrompt}.`
+        : "Featuring the protagonist character from the reference image, preserving the character's facial features and cheerful expression.";
+
+      prompt = `A full scene illustration for a children's storybook. Scene: ${input.prompt}. Style: ${style}. ${costumeInstruction} Rich atmospheric lighting, whimsical storybook detail, consistent character appearance across scenes.`;
+    }
 
     return this.callImageApi({
       prompt,
@@ -129,7 +187,9 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
     }
 
     this.logger.log(
-      `OpenRouter ${params.actionName} 시작 (모델: ${this.defaultModel}, 비율: ${params.aspectRatio})...`,
+      `[OpenRouter 요청] ${params.actionName} | 모델: ${this.defaultModel} | 레퍼런스 이미지: ${params.inputReferences.length}장\n` +
+        `>>> [전송된 프롬프트]\n${params.prompt}\n` +
+        `<<< [프롬프트 끝]`,
     );
 
     const response = await fetch('https://openrouter.ai/api/v1/images', {
@@ -150,6 +210,10 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
     });
 
     const json = (await response.json().catch(() => null)) as OpenRouterImageResponse | null;
+
+    this.logger.log(
+      `[OpenRouter 응답] HTTP ${response.status} | 비용: $${json?.usage?.cost ?? 'N/A'} | 이미지 데이터 수신: ${json?.data?.[0]?.b64_json ? '정상 (' + json.data[0].b64_json.length + '자)' : '누락/없음'}`,
+    );
 
     if (!response.ok) {
       if (response.status === 402) {

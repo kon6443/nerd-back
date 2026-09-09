@@ -1,4 +1,5 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
@@ -48,6 +49,8 @@ export class StorySessionService {
     private readonly imagePort: ImageGenerationPort,
     @Inject(STORAGE_PORT)
     private readonly storagePort: StoragePort,
+    @Optional()
+    private readonly configService?: ConfigService,
   ) {}
 
   /** 현재 프로세스에서 비동기로 실행 중인 파이프라인 세션 ID 추적 (중복 실행 방지 및 서버 재시작 시 고아 세션 복구용) */
@@ -225,20 +228,39 @@ export class StorySessionService {
       throw new StoryAlreadyCompletedErrorResponseDto();
     }
 
-    // 3. 캐릭터 레퍼런스 생성 (원본은 generateReference 직후 어디에도 저장되지 않고 폐기)
-    const template = await this.templateRepo.findOne({ where: { id: session.templateId } });
-    const referenceCostume = this.getCostumePrompt(template?.slug);
+    // 3. 캐릭터 레퍼런스 준비
+    // DIRECT_FACE_MODE=true 인 경우 (테스트 모드): AI 1차 캐릭터 생성을 건너뛰고 사용자의 실제 얼굴 사진을 직접 템플릿 합성에 사용
+    let referenceBuffer: Buffer;
+    const isDirectFaceMode =
+      this.configService?.get<string>('DIRECT_FACE_MODE') === 'true' ||
+      process.env.DIRECT_FACE_MODE === 'true';
 
-    const referenceBuffer = await this.imagePort.generateReference({
-      front: frontFile.buffer,
-      left: leftFile?.buffer,
-      right: rightFile?.buffer,
-      characterPrompt: referenceCostume,
-    });
+    if (isDirectFaceMode) {
+      this.logger.log(
+        `[DIRECT_FACE_MODE] 1차 캐릭터 생성을 건너뛰고 실제 얼굴 사진을 직접 레퍼런스로 등록합니다: 세션 ${session.id}`,
+      );
+      referenceBuffer = frontFile.buffer;
+    } else {
+      const template = await this.templateRepo.findOne({ where: { id: session.templateId } });
+      const referenceCostume = this.getCostumePrompt(template?.slug);
+
+      referenceBuffer = await this.imagePort.generateReference({
+        front: frontFile.buffer,
+        left: leftFile?.buffer,
+        right: rightFile?.buffer,
+        characterPrompt: referenceCostume,
+      });
+    }
 
     // 4. 레퍼런스 이미지 S3/스토리지 업로드
-    const key = `references/${session.id}/${randomUUID()}.png`;
-    const s3Key = await this.storagePort.upload(key, referenceBuffer, 'image/png');
+    const ext =
+      frontFile.mimetype?.includes('jpeg') || frontFile.mimetype?.includes('jpg') ? 'jpg' : 'png';
+    const key = `references/${session.id}/${randomUUID()}.${ext}`;
+    const s3Key = await this.storagePort.upload(
+      key,
+      referenceBuffer,
+      frontFile.mimetype || 'image/png',
+    );
 
     // 5. 서명 URL 발급
     const referenceImageUrl = await this.storagePort.getPresignedUrl(s3Key);
@@ -248,7 +270,7 @@ export class StorySessionService {
     session.referenceImageKey = s3Key;
     await this.sessionRepo.save(session);
 
-    this.logger.log(`얼굴 업로드 및 레퍼런스 생성 완료: 세션 ${session.id}`);
+    this.logger.log(`얼굴 업로드 및 레퍼런스 등록 완료: 세션 ${session.id}`);
 
     return {
       id: session.id,
@@ -454,57 +476,61 @@ export class StorySessionService {
         order: { pageNo: 'ASC' },
       });
 
-      // 전체 페이지를 비동기 병렬(Promise.all)로 동시 생성
-      await Promise.all(
-        templatePages.map(async (tplPage) => {
-          const pageImg = await this.pageImageRepo.findOne({
-            where: { sessionId, pageNo: tplPage.pageNo },
-          });
-
-          if (!pageImg || pageImg.status === 'succeeded') {
-            return;
-          }
-
-          pageImg.status = 'running';
-          await this.pageImageRepo.save(pageImg);
-
-          try {
-            // 템플릿 기본 삽화가 등록되어 있으면 참조용으로 주입
-            let baseImageBuffer: Buffer | undefined;
-            if (tplPage.baseImageKey) {
-              try {
-                baseImageBuffer = await this.storagePort.download(tplPage.baseImageKey);
-              } catch {
-                // 다운로드 실패 시에도 페이지 생성은 계속 진행
-              }
-            }
-
-            const characterCostume = this.getCostumePrompt(tplPage.personaTargetRole);
-
-            const generatedBuffer = await this.imagePort.generatePageIllustration({
-              referenceImage: refBuffer,
-              baseImage: baseImageBuffer,
-              prompt: tplPage.bodyText,
-              characterPrompt: characterCostume,
+      // 업스트림(OpenRouter/Gemini)의 동시성 슬롯(최대 5개) 초과 및 큐 지연을 방지하기 위해 3장씩 배치 분할 병렬 처리
+      const CHUNK_SIZE = 3;
+      for (let i = 0; i < templatePages.length; i += CHUNK_SIZE) {
+        const chunk = templatePages.slice(i, i + CHUNK_SIZE);
+        await Promise.all(
+          chunk.map(async (tplPage) => {
+            const pageImg = await this.pageImageRepo.findOne({
+              where: { sessionId, pageNo: tplPage.pageNo },
             });
 
-            const key = `personalizations/${sessionId}/page-${tplPage.pageNo}-${randomUUID()}.png`;
-            const s3Key = await this.storagePort.upload(key, generatedBuffer, 'image/png');
+            if (!pageImg || pageImg.status === 'succeeded') {
+              return;
+            }
 
-            pageImg.imageKey = s3Key;
-            pageImg.status = 'succeeded';
-            pageImg.errorMessage = null;
+            pageImg.status = 'running';
             await this.pageImageRepo.save(pageImg);
-            this.logger.log(`페이지 ${tplPage.pageNo} 삽화 개인화 완료: ${s3Key}`);
-          } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            pageImg.status = 'failed';
-            pageImg.errorMessage = msg;
-            await this.pageImageRepo.save(pageImg);
-            this.logger.error(`페이지 ${tplPage.pageNo} 삽화 개인화 실패: ${msg}`);
-          }
-        }),
-      );
+
+            try {
+              // 템플릿 기본 삽화가 등록되어 있으면 참조용으로 주입
+              let baseImageBuffer: Buffer | undefined;
+              if (tplPage.baseImageKey) {
+                try {
+                  baseImageBuffer = await this.storagePort.download(tplPage.baseImageKey);
+                } catch {
+                  // 다운로드 실패 시에도 페이지 생성은 계속 진행
+                }
+              }
+
+              const characterCostume = this.getCostumePrompt(tplPage.personaTargetRole);
+
+              const generatedBuffer = await this.imagePort.generatePageIllustration({
+                referenceImage: refBuffer,
+                baseImage: baseImageBuffer,
+                prompt: tplPage.illustrationPrompt || tplPage.bodyText,
+                characterPrompt: characterCostume,
+              });
+
+              const key = `personalizations/${sessionId}/page-${tplPage.pageNo}-${randomUUID()}.png`;
+              const s3Key = await this.storagePort.upload(key, generatedBuffer, 'image/png');
+
+              pageImg.imageKey = s3Key;
+              pageImg.status = 'succeeded';
+              pageImg.errorMessage = null;
+              await this.pageImageRepo.save(pageImg);
+              this.logger.log(`페이지 ${tplPage.pageNo} 삽화 개인화 완료: ${s3Key}`);
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : String(err);
+              pageImg.status = 'failed';
+              pageImg.errorMessage = msg;
+              await this.pageImageRepo.save(pageImg);
+              this.logger.error(`페이지 ${tplPage.pageNo} 삽화 개인화 실패: ${msg}`);
+            }
+          }),
+        );
+      }
 
       await this.checkAndUpdateSessionCompletion(session.id);
     } catch (error: unknown) {
@@ -556,7 +582,7 @@ export class StorySessionService {
         const generatedBuffer = await this.imagePort.generatePageIllustration({
           referenceImage: refBuffer,
           baseImage: baseImageBuffer,
-          prompt: tplPage.bodyText,
+          prompt: tplPage.illustrationPrompt || tplPage.bodyText,
           characterPrompt: characterCostume,
         });
 
