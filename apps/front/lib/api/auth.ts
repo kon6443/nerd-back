@@ -5,7 +5,7 @@ import {
   loginSchema,
   signupSchema,
 } from "@nerd/contracts";
-import { apiFetch } from "./client";
+import { apiFetch, notifySessionChanged } from "./client";
 
 /**
  * 인증 호출.
@@ -48,16 +48,30 @@ export function validateLogin(input: unknown): FieldErrors {
   return errors;
 }
 
-export function signup(input: SignupInput): Promise<Me> {
-  return apiFetch<Me>("/auth/signup", { method: "POST", json: input });
+/**
+ * ⭐ 성공하면 **세션 변경을 알린다.** 로그아웃만 알리고 로그인은 안 알리면 대칭이 깨져,
+ * 로그인 직후 헤더가 「로그인하기」 그대로 남는다 — 브라우저 실측으로 확인했다(2026-09-09).
+ */
+export async function signup(input: SignupInput): Promise<Me> {
+  const me = await apiFetch<Me>("/auth/signup", { method: "POST", json: input });
+  notifySessionChanged();
+  return me;
 }
 
-export function login(input: LoginInput): Promise<Me> {
-  return apiFetch<Me>("/auth/login", { method: "POST", json: input });
+export async function login(input: LoginInput): Promise<Me> {
+  const me = await apiFetch<Me>("/auth/login", { method: "POST", json: input });
+  notifySessionChanged();
+  return me;
 }
 
-export function logout(): Promise<void> {
-  return apiFetch<void>("/auth/logout", { method: "POST" });
+export async function logout(): Promise<void> {
+  try {
+    await apiFetch<void>("/auth/logout", { method: "POST" });
+  } finally {
+    // 🚫 실패해도 알린다. 서버가 쿠키를 못 지웠더라도 화면은 갱신되어야 하고,
+    //    실제 인증은 어차피 백엔드가 401 로 판정한다.
+    notifySessionChanged();
+  }
 }
 
 export function fetchMe(): Promise<Me> {

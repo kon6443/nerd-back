@@ -10,6 +10,24 @@ import { API_PREFIX, type ApiErrorBody, type ApiSuccess, type ErrorCode } from "
 /** 401 을 화면마다 처리하지 않는다. 전역 이벤트로 올려 로그아웃을 한 곳에 모은다. */
 export const UNAUTHORIZED_EVENT = "backend:unauthorized";
 
+/**
+ * 로그인 상태가 바뀌었다는 신호.
+ *
+ * ⭐ **필요한 이유**: `AppHeader` 는 루트 레이아웃의 클라이언트 컴포넌트라 앱 내 이동에서
+ * 언마운트되지 않는다. 그래서 로그아웃해도 마운트 시 한 번 조회한 상태가 그대로 남아
+ * **네비가 계속 「마이페이지」를 보여준다**(로그인↔로그아웃 대칭 검증에서 발견).
+ *
+ * 🚫 전체 새로고침(`window.location`)으로 때우지 않는다 — SPA 이동을 버리게 되고 Next 린트도 막는다.
+ * 🚫 매 화면 이동마다 재조회하지도 않는다 — 요청이 화면 수만큼 는다.
+ */
+export const SESSION_CHANGED_EVENT = "backend:session-changed";
+
+/** 브라우저에서만 의미가 있다. 서버 렌더 중 호출되면 아무 일도 하지 않는다. */
+export function notifySessionChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(SESSION_CHANGED_EVENT));
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
