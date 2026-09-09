@@ -30,7 +30,8 @@ describe('validateEnv', () => {
     it('없으면 기동을 막는다 ⭐', () => {
       // 🚫 기본값을 주지 않는다. 기본값이 있으면 **모든 배포가 같은 키**를 쓰게 되어
       //    누구나 남의 세션 쿠키를 만들 수 있다. 없으면 부팅이 실패하는 쪽이 안전하다.
-      const { SESSION_SECRET: _omitted, ...withoutSecret } = MINIMAL;
+      const withoutSecret: Record<string, unknown> = { ...MINIMAL };
+      delete withoutSecret.SESSION_SECRET;
 
       expect(() => validateEnv(withoutSecret)).toThrow(/SESSION_SECRET/);
     });

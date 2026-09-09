@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -14,7 +14,6 @@ import {
 } from '@common/decorators/api-error-response.decorator';
 import { ApiSuccessResponse } from '@common/decorators/api-success-response.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
-import type { AuthenticatedRequest } from '@common/decorators/current-user.decorator';
 import { ApiErrorBodyDto } from '@common/dto/api-error.dto';
 import { AuthGuard } from '@common/guards/auth.guard';
 import { AppEnv } from '@config/env.validation';
