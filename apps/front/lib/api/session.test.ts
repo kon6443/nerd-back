@@ -1,7 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   createSession,
+  deleteSession,
   fetchSessionPages,
+  getMySessions,
   personalizeSession,
   retrySessionPage,
   uploadFace,
@@ -111,5 +113,38 @@ describe("session api", () => {
     expect(result.sessionId).toBe("session-123");
     expect(result.pageNo).toBe(2);
     expect(result.status).toBe("pending");
+  });
+
+  it("getMySessions 는 /sessions/my 로 GET 요청을 보낸다", async () => {
+    const apiFetchSpy = vi.spyOn(client, "apiFetch").mockResolvedValue([
+      {
+        id: "session-123",
+        templateId: 1,
+        templateSlug: "red-riding-hood",
+        templateTitle: "빨간 모자",
+        status: "completed",
+        referenceImageUrl: "https://storage.local/ref.png",
+        createdAt: "2026-09-08T00:00:00.000Z",
+        updatedAt: "2026-09-08T00:00:00.000Z",
+      },
+    ]);
+
+    const result = await getMySessions();
+
+    expect(apiFetchSpy).toHaveBeenCalledWith("/sessions/my", {
+      method: "GET",
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].templateSlug).toBe("red-riding-hood");
+  });
+
+  it("deleteSession 은 /sessions/:id 로 DELETE 요청을 보낸다", async () => {
+    const apiFetchSpy = vi.spyOn(client, "apiFetch").mockResolvedValue(undefined);
+
+    await deleteSession("session-123");
+
+    expect(apiFetchSpy).toHaveBeenCalledWith("/sessions/session-123", {
+      method: "DELETE",
+    });
   });
 });

@@ -2,6 +2,7 @@ import { storySlugParamsSchema } from "@nerd/contracts";
 import { notFound } from "next/navigation";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { StoryArtwork } from "@/components/story/StoryArtwork";
+import { StorySessionActions } from "@/components/story/StorySessionActions";
 import { fetchStoryDetail, orNotFound } from "@/lib/api";
 
 /**
@@ -44,12 +45,7 @@ export default async function StoryDetailPage({ params }: PageProps<"/library/[s
           </p>
 
           {story.pageCount > 0 ? (
-            <div className="flex flex-wrap gap-3 pt-2">
-              <ActionLink href={`/library/${story.slug}/1`}>시연 동화 읽기</ActionLink>
-              <ActionLink href={`/stories/${story.slug}/capture`} variant="accentA">
-                📷 내 얼굴로 만들기
-              </ActionLink>
-            </div>
+            <StorySessionActions slug={story.slug} />
           ) : (
             // 페이지가 아직 안 들어온 동화다. 링크를 걸면 첫 페이지에서 404 를 만난다.
             <p className="pt-2 text-ink-muted">아직 페이지가 준비되지 않았어요.</p>

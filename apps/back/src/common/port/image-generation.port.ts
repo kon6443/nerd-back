@@ -2,11 +2,14 @@ export interface GenerateReferenceInput {
   front: Buffer;
   left?: Buffer;
   right?: Buffer;
+  characterPrompt?: string;
 }
 
 export interface GeneratePageIllustrationInput {
   referenceImage: Buffer;
+  baseImage?: Buffer;
   prompt: string;
+  characterPrompt?: string;
   style?: string;
   aspectRatio?: string;
 }

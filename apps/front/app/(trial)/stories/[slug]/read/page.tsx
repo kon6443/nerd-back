@@ -44,6 +44,7 @@ function StoryReadContent({ params }: PageProps) {
   const [currentPageNo, setCurrentPageNo] = useState(1);
   const [retryingPageNo, setRetryingPageNo] = useState<number | null>(null);
   const [isReadyToRead, setIsReadyToRead] = useState(false);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -65,14 +66,13 @@ function StoryReadContent({ params }: PageProps) {
         if (!active) return;
         setStory(detail);
 
-        // 2. 동화 전체 페이지 본문 병렬 로드 (1..pageCount)
-        const pageCount = detail.pageCount || 6;
-        const pagePromises = Array.from({ length: pageCount }, (_, idx) =>
-          fetchStoryPage(slug, idx + 1),
-        );
-        const pages = await Promise.all(pagePromises);
-        if (!active) return;
-        setStoryPages(pages);
+        // 2. 1페이지 본문 우선 로드 (전체 페이지 동시 호출로 인한 429 방지)
+        try {
+          const page1 = await fetchStoryPage(slug, 1);
+          if (active) setStoryPages([page1]);
+        } catch (err) {
+          console.warn("1페이지 사전 로드 지연:", err);
+        }
 
         // 3. autoStart 플래그가 있으면 개인화 생성 시작 호출 (API 10, 멱등성 보장)
         if (autoStart) {
@@ -116,7 +116,7 @@ function StoryReadContent({ params }: PageProps) {
     return () => {
       active = false;
     };
-  }, [slug, sessionId, autoStart, router]);
+  }, [slug, sessionId, autoStart, router, retryTrigger]);
 
   // 진행 상태 3초 주기 폴링 (generating 상태일 때)
   useEffect(() => {
@@ -158,6 +158,27 @@ function StoryReadContent({ params }: PageProps) {
     };
   }, [sessionId, viewState]);
 
+  // 독서 중 현재 페이지 본문 온디맨드 로드
+  useEffect(() => {
+    if (viewState !== "reader" || !story) return;
+    if (storyPages.some((p) => p.pageNo === currentPageNo)) return;
+
+    let active = true;
+    async function loadPage() {
+      try {
+        const page = await fetchStoryPage(slug, currentPageNo);
+        if (!active) return;
+        setStoryPages((prev) => [...prev.filter((p) => p.pageNo !== currentPageNo), page]);
+      } catch (err) {
+        console.error(`${currentPageNo}페이지 로드 오류:`, err);
+      }
+    }
+    void loadPage();
+    return () => {
+      active = false;
+    };
+  }, [slug, currentPageNo, viewState, story, storyPages]);
+
   // 특정 실패 페이지 단독 재시도
   async function handleRetry(pageNo: number) {
     if (!sessionId) return;
@@ -196,8 +217,23 @@ function StoryReadContent({ params }: PageProps) {
           <div className="rounded-full bg-red-100 p-4 text-3xl">⚠️</div>
           <h1 className="text-xl font-bold text-ink">문제가 발생했어요</h1>
           <p className="text-sm text-neutral-600">{activeError}</p>
-          <div className="flex gap-3 pt-2">
-            <Link href={`/stories/${slug}/capture`} className={actionClass("primary")}>
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
+            {errorMsg && (
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMsg("");
+                  setRetryTrigger((prev) => prev + 1);
+                }}
+                className={actionClass("primary")}
+              >
+                다시 시도하기
+              </button>
+            )}
+            <Link
+              href={`/stories/${slug}/capture`}
+              className={actionClass(errorMsg ? "ghost" : "primary")}
+            >
               얼굴 다시 등록하기
             </Link>
             <Link href={`/library/${slug}`} className={actionClass("ghost")}>

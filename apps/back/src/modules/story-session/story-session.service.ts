@@ -28,6 +28,7 @@ import type {
   SessionPagesResponse,
   StorySessionSummary,
   UploadFaceResponse,
+  MyStorySessionItem,
 } from '@nerd/contracts';
 
 @Injectable()
@@ -48,6 +49,9 @@ export class StorySessionService {
     @Inject(STORAGE_PORT)
     private readonly storagePort: StoragePort,
   ) {}
+
+  /** 현재 프로세스에서 비동기로 실행 중인 파이프라인 세션 ID 추적 (중복 실행 방지 및 서버 재시작 시 고아 세션 복구용) */
+  private readonly activePipelines = new Set<string>();
 
   /**
    * 세션 생성 또는 미완료 세션 재사용 (Idempotent resume).
@@ -131,6 +135,54 @@ export class StorySessionService {
   }
 
   /**
+   * 사용자의 모든 동화 제작 세션 목록 조회 (마이페이지 / 서재 연동)
+   */
+  async getMySessions(userId: number): Promise<MyStorySessionItem[]> {
+    const sessions = await this.sessionRepo.find({
+      where: { userId },
+      relations: ['template'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return Promise.all(
+      sessions.map(async (s) => {
+        let referenceImageUrl: string | null = null;
+        if (s.referenceImageKey) {
+          referenceImageUrl = await this.storagePort.getPresignedUrl(s.referenceImageKey);
+        }
+        return {
+          id: s.id,
+          templateId: s.templateId,
+          templateSlug: s.template?.slug ?? '',
+          templateTitle: s.template?.title ?? '',
+          status: s.status,
+          referenceImageUrl,
+          createdAt: s.createdAt.toISOString(),
+          updatedAt: s.updatedAt.toISOString(),
+        };
+      }),
+    );
+  }
+
+  /**
+   * 세션 삭제 (초기화 및 다른 얼굴로 새로 만들기용)
+   */
+  async deleteSession(userId: number, sessionId: string): Promise<void> {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session || session.userId !== userId) {
+      throw new SessionNotFoundErrorResponseDto();
+    }
+
+    // 1. 해당 세션의 페이지 이미지 레코드 삭제
+    await this.pageImageRepo.delete({ sessionId });
+
+    // 2. 세션 레코드 삭제
+    await this.sessionRepo.delete({ id: sessionId });
+
+    this.logger.log(`동화 세션 삭제 완료: ${sessionId} (사용자 ${userId})`);
+  }
+
+  /**
    * 얼굴 사진 1~3장 업로드 → 매직바이트 검증 → 레퍼런스 생성 → 원본 폐기 → S3 저장
    */
   async uploadFace(
@@ -174,10 +226,14 @@ export class StorySessionService {
     }
 
     // 3. 캐릭터 레퍼런스 생성 (원본은 generateReference 직후 어디에도 저장되지 않고 폐기)
+    const template = await this.templateRepo.findOne({ where: { id: session.templateId } });
+    const referenceCostume = this.getCostumePrompt(template?.slug);
+
     const referenceBuffer = await this.imagePort.generateReference({
       front: frontFile.buffer,
       left: leftFile?.buffer,
       right: rightFile?.buffer,
+      characterPrompt: referenceCostume,
     });
 
     // 4. 레퍼런스 이미지 S3/스토리지 업로드
@@ -226,11 +282,13 @@ export class StorySessionService {
       return { id: session.id, status: 'completed', totalPages };
     }
 
-    if (session.status === 'generating') {
+    // 이미 백그라운드 파이프라인이 현재 프로세스에서 정상 동작 중이면 중복 시작 방지 (멱등성)
+    if (session.status === 'generating' && this.activePipelines.has(session.id)) {
       return { id: session.id, status: 'generating', totalPages };
     }
 
-    // face_ready 또는 failed 상태: 개별 페이지 엔티티 초기화 및 비동기 작업 기동
+    // face_ready, failed 상태이거나, 서버 재시작 등으로 generating 상태인데 실제 파이프라인이 멈춘 경우:
+    // 개별 페이지 엔티티 초기화 및 비동기 작업 기동
     const existingImages = await this.pageImageRepo.find({ where: { sessionId } });
 
     for (const page of templatePages) {
@@ -336,7 +394,7 @@ export class StorySessionService {
       throw new PageNotFoundErrorResponseDto();
     }
 
-    if (pageImg.status !== 'failed') {
+    if (pageImg.status !== 'failed' && pageImg.status !== 'running') {
       throw new PageNotFailedErrorResponseDto();
     }
 
@@ -358,9 +416,31 @@ export class StorySessionService {
   }
 
   /**
-   * 전체 페이지 개인화 파이프라인 백그라운드 순차 처리
+   * 동화 주인공 배역별 시그니처 의상 고정 프롬프트
+   */
+  private getCostumePrompt(roleOrSlug?: string | null): string {
+    switch (roleOrSlug) {
+      case 'red-hood':
+      case 'red-riding-hood':
+        return 'an iconic vibrant bright red hooded cape (Red Riding Hood cloak) with the hood up, consistent red fairy tale dress';
+      case 'jack':
+      case 'jack-and-beanstalk':
+        return 'an adventurous young peasant boy outfit with brown suspenders and rolled sleeves';
+      default:
+        return 'the charming protagonist storybook outfit';
+    }
+  }
+
+  /**
+   * 전체 페이지 개인화 파이프라인 백그라운드 병렬(Parallel) 처리
    */
   async executePersonalizationPipeline(sessionId: string): Promise<void> {
+    if (this.activePipelines.has(sessionId)) {
+      this.logger.warn(`이미 진행 중인 파이프라인 무시: 세션 ${sessionId}`);
+      return;
+    }
+    this.activePipelines.add(sessionId);
+
     try {
       const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
       if (!session || !session.referenceImageKey) {
@@ -374,44 +454,63 @@ export class StorySessionService {
         order: { pageNo: 'ASC' },
       });
 
-      for (const tplPage of templatePages) {
-        const pageImg = await this.pageImageRepo.findOne({
-          where: { sessionId, pageNo: tplPage.pageNo },
-        });
-
-        if (!pageImg || pageImg.status === 'succeeded') {
-          continue;
-        }
-
-        pageImg.status = 'running';
-        await this.pageImageRepo.save(pageImg);
-
-        try {
-          const generatedBuffer = await this.imagePort.generatePageIllustration({
-            referenceImage: refBuffer,
-            prompt: tplPage.bodyText,
+      // 전체 페이지를 비동기 병렬(Promise.all)로 동시 생성
+      await Promise.all(
+        templatePages.map(async (tplPage) => {
+          const pageImg = await this.pageImageRepo.findOne({
+            where: { sessionId, pageNo: tplPage.pageNo },
           });
 
-          const key = `personalizations/${sessionId}/page-${tplPage.pageNo}-${randomUUID()}.png`;
-          const s3Key = await this.storagePort.upload(key, generatedBuffer, 'image/png');
+          if (!pageImg || pageImg.status === 'succeeded') {
+            return;
+          }
 
-          pageImg.imageKey = s3Key;
-          pageImg.status = 'succeeded';
-          pageImg.errorMessage = null;
+          pageImg.status = 'running';
           await this.pageImageRepo.save(pageImg);
-          this.logger.log(`페이지 ${tplPage.pageNo} 삽화 개인화 완료: ${s3Key}`);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          pageImg.status = 'failed';
-          pageImg.errorMessage = msg;
-          await this.pageImageRepo.save(pageImg);
-          this.logger.error(`페이지 ${tplPage.pageNo} 삽화 개인화 실패: ${msg}`);
-        }
-      }
+
+          try {
+            // 템플릿 기본 삽화가 등록되어 있으면 참조용으로 주입
+            let baseImageBuffer: Buffer | undefined;
+            if (tplPage.baseImageKey) {
+              try {
+                baseImageBuffer = await this.storagePort.download(tplPage.baseImageKey);
+              } catch {
+                // 다운로드 실패 시에도 페이지 생성은 계속 진행
+              }
+            }
+
+            const characterCostume = this.getCostumePrompt(tplPage.personaTargetRole);
+
+            const generatedBuffer = await this.imagePort.generatePageIllustration({
+              referenceImage: refBuffer,
+              baseImage: baseImageBuffer,
+              prompt: tplPage.bodyText,
+              characterPrompt: characterCostume,
+            });
+
+            const key = `personalizations/${sessionId}/page-${tplPage.pageNo}-${randomUUID()}.png`;
+            const s3Key = await this.storagePort.upload(key, generatedBuffer, 'image/png');
+
+            pageImg.imageKey = s3Key;
+            pageImg.status = 'succeeded';
+            pageImg.errorMessage = null;
+            await this.pageImageRepo.save(pageImg);
+            this.logger.log(`페이지 ${tplPage.pageNo} 삽화 개인화 완료: ${s3Key}`);
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            pageImg.status = 'failed';
+            pageImg.errorMessage = msg;
+            await this.pageImageRepo.save(pageImg);
+            this.logger.error(`페이지 ${tplPage.pageNo} 삽화 개인화 실패: ${msg}`);
+          }
+        }),
+      );
 
       await this.checkAndUpdateSessionCompletion(session.id);
     } catch (error: unknown) {
       this.logger.error(`개인화 파이프라인 전체 오류: ${error}`);
+    } finally {
+      this.activePipelines.delete(sessionId);
     }
   }
 
@@ -419,6 +518,13 @@ export class StorySessionService {
    * 단일 페이지 재시도 비동기 실행
    */
   async executeSinglePagePersonalization(sessionId: string, pageNo: number): Promise<void> {
+    const pipelineKey = `${sessionId}:${pageNo}`;
+    if (this.activePipelines.has(pipelineKey)) {
+      this.logger.warn(`이미 진행 중인 단일 페이지 재시도 무시: ${pipelineKey}`);
+      return;
+    }
+    this.activePipelines.add(pipelineKey);
+
     try {
       const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
       if (!session || !session.referenceImageKey) return;
@@ -436,9 +542,22 @@ export class StorySessionService {
 
       const refBuffer = await this.storagePort.download(session.referenceImageKey);
       try {
+        let baseImageBuffer: Buffer | undefined;
+        if (tplPage.baseImageKey) {
+          try {
+            baseImageBuffer = await this.storagePort.download(tplPage.baseImageKey);
+          } catch {
+            // 무시하고 진행
+          }
+        }
+
+        const characterCostume = this.getCostumePrompt(tplPage.personaTargetRole);
+
         const generatedBuffer = await this.imagePort.generatePageIllustration({
           referenceImage: refBuffer,
+          baseImage: baseImageBuffer,
           prompt: tplPage.bodyText,
+          characterPrompt: characterCostume,
         });
 
         const key = `personalizations/${sessionId}/page-${tplPage.pageNo}-${randomUUID()}.png`;
@@ -460,6 +579,8 @@ export class StorySessionService {
       await this.checkAndUpdateSessionCompletion(session.id);
     } catch (error: unknown) {
       this.logger.error(`단일 페이지 재시도 오류: ${error}`);
+    } finally {
+      this.activePipelines.delete(pipelineKey);
     }
   }
 

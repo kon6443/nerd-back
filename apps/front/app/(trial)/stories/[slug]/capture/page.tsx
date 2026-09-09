@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { actionClass } from "@/components/ui/actionStyles";
-import { ApiError, createSession, uploadFace } from "@/lib/api";
-import type { UploadFaceResponse } from "@nerd/contracts";
+import { ApiError, createSession, deleteSession, getMySessions, uploadFace } from "@/lib/api";
+import type { MyStorySessionItem, UploadFaceResponse } from "@nerd/contracts";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -32,6 +32,8 @@ export default function CapturePage({ params }: PageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [result, setResult] = useState<UploadFaceResponse | null>(null);
+  const [existingSession, setExistingSession] = useState<MyStorySessionItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -122,6 +124,62 @@ export default function CapturePage({ params }: PageProps) {
       stopWebcam();
     };
   }, []);
+
+  // 기존 세션 복원 또는 완성된 세션 확인
+  useEffect(() => {
+    let active = true;
+    async function checkExistingSession() {
+      try {
+        const sessions = await getMySessions();
+        if (!active) return;
+        const matched = sessions.find((s) => s.templateSlug === slug);
+        if (matched) {
+          if (matched.status === "completed") {
+            setExistingSession(matched);
+            stopWebcam();
+            return;
+          }
+          if (matched.status === "face_ready" && matched.referenceImageUrl) {
+            setResult({
+              id: matched.id,
+              status: "face_ready",
+              referenceImageUrl: matched.referenceImageUrl,
+            });
+            stopWebcam();
+            return;
+          }
+        }
+      } catch {
+        // 미로그인 상태 등은 정상 진행
+      }
+    }
+    void checkExistingSession();
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
+  // 기존 완성 세션 삭제 및 새로 만들기
+  async function handleDeleteAndReset() {
+    if (!existingSession) return;
+    const ok = window.confirm(
+      "기존에 제작된 동화책과 삽화가 영구 삭제됩니다.\n새로운 얼굴로 다시 제작하시겠습니까?",
+    );
+    if (!ok) return;
+
+    setIsDeleting(true);
+    setErrorMsg("");
+    try {
+      await deleteSession(existingSession.id);
+      setExistingSession(null);
+      await startWebcam();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "동화책 삭제에 실패했습니다.";
+      setErrorMsg(msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   // 비디오 노드 마운트 또는 슬롯 전환 시 스트림 연결 보장
   useEffect(() => {
@@ -250,7 +308,16 @@ export default function CapturePage({ params }: PageProps) {
           return;
         }
         if (err.status === 409) {
-          setErrorMsg("이미 제작이 완료된 동화책입니다. 서재에서 동화책을 확인해 보세요.");
+          getMySessions()
+            .then((sessions) => {
+              const matched = sessions.find((s) => s.templateSlug === slug);
+              if (matched) {
+                setExistingSession(matched);
+                stopWebcam();
+              }
+            })
+            .catch(() => {});
+          setErrorMsg("이미 제작이 완료된 동화책이 있습니다.");
           return;
         }
         setErrorMsg(err.message);
@@ -274,8 +341,48 @@ export default function CapturePage({ params }: PageProps) {
         </Badge>
       </div>
 
-      {/* 완료 화면 */}
-      {result ? (
+      {/* 완료 화면 또는 기존 동화 안내 */}
+      {existingSession ? (
+        <Card className="flex flex-col items-center gap-6 text-center">
+          <div className="rounded-full bg-amber-100 p-4 text-3xl">📚</div>
+          <h1 className="text-2xl font-bold text-ink">이미 완성된 동화책이 있습니다!</h1>
+          <p className="text-sm text-neutral-600">
+            회원님께서 이미 얼굴을 등록하여 완성하신 동화책이 존재합니다.<br />
+            완성된 동화책을 바로 읽으시거나, 기존 동화를 삭제하고 새로운 얼굴로 다시 만드실 수 있습니다.
+          </p>
+
+          {existingSession.referenceImageUrl && (
+            <div className="relative h-48 w-48 overflow-hidden rounded-card border-4 border-primary shadow-md">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={existingSession.referenceImageUrl}
+                alt="기존 주인공 캐릭터"
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )}
+
+          <div className="flex w-full flex-col gap-3">
+            <Link
+              href={`/stories/${slug}/read?sessionId=${existingSession.id}`}
+              className={actionClass("gold", "w-full py-3.5 text-base font-bold shadow-md")}
+            >
+              📖 내 동화책 바로 읽기
+            </Link>
+            <button
+              type="button"
+              onClick={handleDeleteAndReset}
+              disabled={isDeleting}
+              className={actionClass("ghost", "w-full text-rose-600 hover:border-rose-400")}
+            >
+              {isDeleting ? "삭제 중..." : "🔄 기존 동화 삭제하고 새 얼굴로 만들기"}
+            </button>
+            <Link href={`/library/${slug}`} className={actionClass("ghost", "w-full")}>
+              동화 소개로 돌아가기
+            </Link>
+          </div>
+        </Card>
+      ) : result ? (
         <Card className="flex flex-col items-center gap-6 text-center">
           <div className="rounded-full bg-emerald-100 p-4 text-3xl">✨</div>
           <h1 className="text-2xl font-bold text-ink">주인공 캐릭터가 완성되었어요!</h1>
@@ -303,6 +410,16 @@ export default function CapturePage({ params }: PageProps) {
             <Link href={`/library/${slug}`} className={actionClass("ghost", "w-full")}>
               동화 소개로
             </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setResult(null);
+                startWebcam();
+              }}
+              className={actionClass("ghost", "w-full text-xs text-neutral-500")}
+            >
+              다른 사진으로 다시 찍기
+            </button>
           </div>
         </Card>
       ) : (
