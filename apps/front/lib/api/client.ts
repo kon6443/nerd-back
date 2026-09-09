@@ -67,7 +67,20 @@ export class ApiError extends Error {
  * 환경에 묶인다.
  */
 function resolveBaseUrl(): string {
-  if (typeof window !== "undefined") return "";
+  if (typeof window !== "undefined") {
+    // Next.js dev 서버의 rewrites 프록시는 30초 소켓 타임아웃이 하드코딩되어 있습니다.
+    // 로컬 브라우저 개발 환경에서는 1분 이상 걸리는 AI 모델(qwen-image-3 등)의
+    // 요청이 중단되지 않도록 백엔드 포트(5501)로 직접 연결합니다.
+    if (
+      process.env.NODE_ENV === "development" &&
+      typeof window.location !== "undefined" &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+      window.location.port === "5502"
+    ) {
+      return "http://localhost:5501";
+    }
+    return "";
+  }
 
   const internal = process.env.BACKEND_INTERNAL_URL;
   if (!internal) {
@@ -134,6 +147,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
 
   const response = await fetch(`${resolveBaseUrl()}/${API_PREFIX}${path}`, {
     ...rest,
+    credentials: rest.credentials ?? "include",
     headers: requestHeaders,
     body,
   });

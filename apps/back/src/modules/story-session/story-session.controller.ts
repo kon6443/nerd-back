@@ -12,7 +12,9 @@ import {
 } from '@nestjs/common';
 import { ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { SkipThrottle } from '@nestjs/throttler';
 import { SUCCESS_CODE } from '@common/constants/app.constants';
+import { SKIP_ALL_THROTTLERS } from '@common/constants/throttle.constants';
 import {
   ApiCommonInternalServerErrorResponse,
   ApiCommonUnauthorizedResponse,
@@ -127,6 +129,7 @@ export class StorySessionController {
   }
 
   @Get(':id/pages')
+  @SkipThrottle(SKIP_ALL_THROTTLERS)
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
   @ApiOperation({

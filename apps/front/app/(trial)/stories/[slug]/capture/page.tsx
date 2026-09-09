@@ -123,6 +123,26 @@ export default function CapturePage({ params }: PageProps) {
     };
   }, []);
 
+  // 기존 세션 복원 확인 (이미 얼굴 등록이 완료된 세션이 있는 경우 복원)
+  useEffect(() => {
+    async function checkExistingSession() {
+      try {
+        const session = await createSession({ templateSlug: slug });
+        if (session.status === "face_ready" && session.referenceImageUrl) {
+          setResult({
+            id: session.id,
+            status: "face_ready",
+            referenceImageUrl: session.referenceImageUrl,
+          });
+          stopWebcam();
+        }
+      } catch {
+        // 미로그인 또는 미생성 상태는 정상 진행
+      }
+    }
+    void checkExistingSession();
+  }, [slug]);
+
   // 비디오 노드 마운트 또는 슬롯 전환 시 스트림 연결 보장
   useEffect(() => {
     const video = videoRef.current;
@@ -303,6 +323,16 @@ export default function CapturePage({ params }: PageProps) {
             <Link href={`/library/${slug}`} className={actionClass("ghost", "w-full")}>
               동화 소개로
             </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setResult(null);
+                startWebcam();
+              }}
+              className={actionClass("ghost", "w-full text-xs text-neutral-500")}
+            >
+              다른 사진으로 다시 찍기
+            </button>
           </div>
         </Card>
       ) : (
