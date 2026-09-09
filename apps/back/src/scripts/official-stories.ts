@@ -14,6 +14,7 @@ export interface StoryPageCharacterData {
 export interface StoryPageData {
   pageNo: number;
   bodyText: string;
+  baseImageKey?: string | null;
   personaTargetRole: string | null;
   characters: StoryPageCharacterData[];
 }
@@ -22,6 +23,7 @@ export interface OfficialStoryData {
   slug: string;
   title: string;
   summary: string;
+  coverImageKey?: string | null;
   characters: StoryCharacterData[];
   pages: StoryPageData[];
 }
@@ -137,6 +139,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
   slug: 'red-riding-hood',
   title: '빨간 모자',
   summary: '착하고 순수한 빨간 모자가 깊은 숲속 할머니 댁을 찾아가며 겪는 아슬아슬한 모험 이야기',
+  coverImageKey: 'templates/red-riding-hood/page-1.png',
   characters: [
     {
       role: 'red-hood',
@@ -178,6 +181,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
         '바구니에는 갓 구운 달콤한 빵과 버터가 가득했지요.\n' +
         '"절대로 다른 길로 새면 안 된다!"\n' +
         '엄마의 당부를 되새기며 빨간 모자는 씩씩하게 숲길을 걸어갔어요.',
+      baseImageKey: 'templates/red-riding-hood/page-1.png',
       personaTargetRole: 'red-hood',
       characters: [{ role: 'red-hood', hitbox: { x: 0.36, y: 0.36, width: 0.26, height: 0.48 } }],
     },
@@ -187,6 +191,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
         '알록달록한 들꽃에 마음을 빼앗긴 빨간 모자 앞에 잿빛 늑대가 슬그머니 나타났어요.\n' +
         '"귀여운 꼬마야, 어디 가니?"\n' +
         '상냥한 척하는 목소리에 속은 빨간 모자는 깊은 숲속 할머니 오두막에 간다는 사실을 순진하게 털어놓고 말았어요.',
+      baseImageKey: 'templates/red-riding-hood/page-2.png',
       personaTargetRole: 'red-hood',
       characters: [
         { role: 'red-hood', hitbox: { x: 0.26, y: 0.4, width: 0.24, height: 0.46 } },
@@ -202,6 +207,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
         '"그런데 입은 왜 이렇게 커요?"\n' +
         '"그건 널 꿀꺽 삼키기 위해서지!"\n' +
         '늑대가 이불을 걷어차며 사납게 달려들었어요!',
+      baseImageKey: 'templates/red-riding-hood/page-3.png',
       personaTargetRole: 'red-hood',
       characters: [
         { role: 'red-hood', hitbox: { x: 0.24, y: 0.42, width: 0.26, height: 0.46 } },
@@ -214,6 +220,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
         '"어림없다, 못된 늑대야!"\n' +
         '비명을 듣고 달려온 용감한 사냥꾼이 늑대를 단숨에 제압하고 벽장 속 할머니를 무사히 구해냈어요.\n' +
         '빨간 모자는 할머니의 품에 안겨 다시는 한눈팔지 않겠다고 눈물을 글썽이며 굳게 약속했답니다.',
+      baseImageKey: 'templates/red-riding-hood/page-4.png',
       personaTargetRole: 'red-hood',
       characters: [
         { role: 'red-hood', hitbox: { x: 0.28, y: 0.4, width: 0.24, height: 0.46 } },
@@ -227,6 +234,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
       bodyText:
         '소동이 지나간 뒤, 오두막 창가로 아기 다람쥐와 새들이 쪼르르 찾아왔어요.\n' +
         '늑대가 사라진 숲은 평화를 되찾았고, 동물 친구들은 빨간 모자에게 감사의 뜻으로 향긋한 산딸기와 솔방울을 건넸지요.',
+      baseImageKey: 'templates/red-riding-hood/page-5.png',
       personaTargetRole: 'red-hood',
       characters: [{ role: 'red-hood', hitbox: { x: 0.36, y: 0.34, width: 0.28, height: 0.5 } }],
     },
@@ -235,6 +243,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
       bodyText:
         '사냥꾼 아저씨와 함께 집으로 돌아오는 길, 빨간 모자는 이제 숲의 모든 길을 씩씩하게 기억할 수 있게 되었어요.\n' +
         '"앞으로는 내가 할머니와 숲을 지키는 용감한 파수꾼이 될래요!"',
+      baseImageKey: 'templates/red-riding-hood/page-6.png',
       personaTargetRole: 'red-hood',
       characters: [
         { role: 'red-hood', hitbox: { x: 0.3, y: 0.36, width: 0.26, height: 0.5 } },

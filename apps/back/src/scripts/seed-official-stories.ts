@@ -29,7 +29,7 @@ async function upsertOfficialStory(
       slug: story.slug,
       title: story.title,
       summary: story.summary,
-      coverImageKey: null,
+      coverImageKey: story.coverImageKey ?? null,
       status,
     }),
   );
@@ -56,7 +56,7 @@ async function upsertOfficialStory(
         templateId: template.id,
         pageNo: page.pageNo,
         bodyText: page.bodyText,
-        baseImageKey: null,
+        baseImageKey: page.baseImageKey ?? null,
         personaTargetRole: page.personaTargetRole,
       }),
     ),
