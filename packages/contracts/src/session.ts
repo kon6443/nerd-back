@@ -114,3 +114,15 @@ export const retryPageResponseSchema = z.object({
 });
 
 export type RetryPageResponse = z.infer<typeof retryPageResponseSchema>;
+
+/** 내 동화 제작 세션 목록 항목 */
+export interface MyStorySessionItem {
+  id: string;
+  templateId: number;
+  templateSlug: string;
+  templateTitle: string;
+  status: StorySessionStatus;
+  referenceImageUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

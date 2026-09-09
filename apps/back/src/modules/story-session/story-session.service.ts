@@ -28,6 +28,7 @@ import type {
   SessionPagesResponse,
   StorySessionSummary,
   UploadFaceResponse,
+  MyStorySessionItem,
 } from '@nerd/contracts';
 
 @Injectable()
@@ -131,6 +132,54 @@ export class StorySessionService {
       }
       throw error;
     }
+  }
+
+  /**
+   * 사용자의 모든 동화 제작 세션 목록 조회 (마이페이지 / 서재 연동)
+   */
+  async getMySessions(userId: number): Promise<MyStorySessionItem[]> {
+    const sessions = await this.sessionRepo.find({
+      where: { userId },
+      relations: ['template'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return Promise.all(
+      sessions.map(async (s) => {
+        let referenceImageUrl: string | null = null;
+        if (s.referenceImageKey) {
+          referenceImageUrl = await this.storagePort.getPresignedUrl(s.referenceImageKey);
+        }
+        return {
+          id: s.id,
+          templateId: s.templateId,
+          templateSlug: s.template?.slug ?? '',
+          templateTitle: s.template?.title ?? '',
+          status: s.status,
+          referenceImageUrl,
+          createdAt: s.createdAt.toISOString(),
+          updatedAt: s.updatedAt.toISOString(),
+        };
+      }),
+    );
+  }
+
+  /**
+   * 세션 삭제 (초기화 및 다른 얼굴로 새로 만들기용)
+   */
+  async deleteSession(userId: number, sessionId: string): Promise<void> {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session || session.userId !== userId) {
+      throw new SessionNotFoundErrorResponseDto();
+    }
+
+    // 1. 해당 세션의 페이지 이미지 레코드 삭제
+    await this.pageImageRepo.delete({ sessionId });
+
+    // 2. 세션 레코드 삭제
+    await this.sessionRepo.delete({ id: sessionId });
+
+    this.logger.log(`동화 세션 삭제 완료: ${sessionId} (사용자 ${userId})`);
   }
 
   /**

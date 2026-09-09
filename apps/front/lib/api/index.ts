@@ -10,7 +10,9 @@ export { orNotFound } from "./notFound";
 export { fetchStories, fetchStoryDetail, fetchStoryPage } from "./story";
 export {
   createSession,
+  deleteSession,
   fetchSessionPages,
+  getMySessions,
   personalizeSession,
   retrySessionPage,
   uploadFace,
