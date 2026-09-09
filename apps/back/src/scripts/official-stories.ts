@@ -32,13 +32,13 @@ export interface OfficialStoryData {
 export const buildJackPrompt = (sceneStory: string, expressionInstruction: string): string =>
   `<inputs>\n` +
   `  <base_scene_template>배경과 구도, 소년 잭의 의상을 완벽히 유지할 원본 동화 템플릿 삽화 (Attached Image 1)</base_scene_template>\n` +
-  `  <protagonist_identity>주인공 얼굴에 반영할 인물 레퍼런스 (사용자의 실제 얼굴 사진 또는 사전 제작된 캐릭터 디자인 시트) (Attached Image 2)</protagonist_identity>\n` +
+  `  <protagonist_identity>주인공 얼굴 및 헤어스타일에 반영할 인물 레퍼런스 (사용자의 실제 얼굴 사진 또는 사전 제작된 캐릭터 디자인 시트) (Attached Image 2)</protagonist_identity>\n` +
   `</inputs>\n\n` +
   `<instructions>\n` +
-  `1. [필수 - 템플릿 이목구비 완전 삭제 및 얼굴 교체]: <base_scene_template>에 이미 그려진 서양 만화 캐릭터의 큰 눈망울, 코, 입, 얼굴 윤곽선을 100% 완전히 지워내세요. 템플릿 원본의 가상 캐릭터 생김새가 조금이라도 남아있으면 안 됩니다. 소년 잭의 얼굴 전체(눈매, 쌍꺼풀 유무, 눈 크기 및 눈꼬리 모양, 눈썹, 콧대, 입술, 턱선, 얼굴형)를 <protagonist_identity> 속 인물의 실제 고유한 생김새로 100% 확실하게 교체해야 합니다. (엄마, 노인, 거인 등 다른 등장인물의 얼굴과 요술 거위는 절대 변경하지 마세요.)\n` +
-  `2. [3D 각도 회전 & 시선 맞춤 필수]: <protagonist_identity>의 인물이 정면 사진이더라도, 이를 3차원 공간에서 회전시켜 <base_scene_template>의 고개 각도(정면, 3/4 측면, 반측면 등)와 시선 방향에 맞추어 새로 그려야 합니다. 각도가 돌아가더라도 <protagonist_identity> 인물 고유의 이목구비 정체성을 잃지 않아야 합니다.\n` +
-  `3. [화풍 일치]: 얼굴 이목구비의 정체성은 <protagonist_identity>를 그대로 구현하되, 채색 질감만 <base_scene_template> 원본 삽화의 따뜻한 수채화·과슈 동화 일러스트 질감으로 조화롭게 일치시켜주세요.\n` +
-  `4. [보존 및 블렌딩 영역]: 소년 잭의 모자, 의상, 체형, 자세, 손, 소품 및 모든 배경 풍경은 <base_scene_template> 그대로 완벽하게 유지해주세요. 모자 안쪽의 얼굴 전체는 <protagonist_identity>의 인물 특징으로 완전히 대체하되, 얼굴과 목·모자 경계는 자연스럽게 블렌딩해주세요.\n` +
+  `1. [필수 - 템플릿 이목구비 및 헤어스타일 완전 삭제 & 인물 교체]: <base_scene_template>에 이미 그려진 서양 만화 캐릭터의 헤어스타일(머리카락 색상, 모질, 컬, 모양)과 큰 눈망울, 코, 입, 얼굴 윤곽선을 100% 완전히 지워내세요. 템플릿 원본의 가상 소년 잭 생김새와 머리카락이 조금이라도 남아있으면 안 됩니다. 소년 잭의 머리카락과 얼굴 전체(헤어스타일, 가르마, 앞머리 형태, 머리 기장, 머리색, 눈매, 쌍꺼풀 유무, 눈 크기 및 눈꼬리 모양, 눈썹, 콧대, 입술, 턱선, 얼굴형)를 <protagonist_identity> 속 인물의 고유한 헤어스타일 및 생김새로 100% 확실하게 교체해야 합니다. (엄마, 노인, 거인 등 다른 등장인물의 얼굴과 요술 거위는 절대 변경하지 마세요.)\n` +
+  `2. [3D 각도 회전 & 헤어스타일 일관성 유지 필수]: <protagonist_identity>의 인물이 정면 사진이더라도, 이를 3차원 공간에서 회전시켜 <base_scene_template>의 고개 각도(정면, 3/4 측면, 반측면 등)와 시선 방향에 맞추어 새로 그려야 합니다. 각도가 돌아가더라도 템플릿의 머리카락으로 되돌아가지 말고, <protagonist_identity> 인물 고유의 헤어스타일(형태, 결, 볼륨)과 이목구비 정체성을 해당 3D 각도에 맞게 정확히 입체적으로 유지해야 합니다.\n` +
+  `3. [동화 화풍 일치 & 그림체 보존 필수]: 실사 사진의 피부 질감이나 머리카락을 이질감 있게 그대로 오려 붙이지 마세요. <protagonist_identity> 인물의 얼굴 이목구비 특징과 헤어스타일 형태(앞머리 모양, 기장, 가르마, 색상)를 정확히 추출하여 구현하되, 채색과 선화 질감은 <base_scene_template> 원본 삽화의 따뜻한 수채화·과슈 동화 일러스트 그림체(부드러운 손그림 윤곽선, 파스텔 톤 수채화 붓 터치)로 100% 완벽하게 녹아들도록 자연스럽게 일러스트화하여 그려주세요. 전체 동화 삽화의 그림체와 화풍을 절대 해치지 않아야 합니다.\n` +
+  `4. [보존 및 블렌딩 영역]: 소년 잭의 의상(멜빵바지와 롤업 셔츠), 체형, 자세, 손, 소품 및 모든 배경 풍경은 <base_scene_template> 그대로 완벽하게 유지해주세요. 머리카락과 얼굴 전체는 <protagonist_identity>의 인물 특징으로 완전히 대체하되, 헤어라인과 이마, 얼굴 윤곽선, 목과 옷깃 경계는 동화 삽화 화풍에 맞춰 자연스럽게 블렌딩해주세요.\n` +
   `5. 현재 장면 스토리: ${sceneStory}\n` +
   `6. 장면별 각도 및 표정 지시: ${expressionInstruction}\n` +
   `7. 빛의 방향, 색온도, 명암은 <base_scene_template> 원본 장면에 맞춰 조화롭게 합성해주세요.\n` +
@@ -110,7 +110,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '잭은 두 눈을 반짝이며 젖소와 마법의 콩을 맞바꾸었어요.',
       illustrationPrompt: buildJackPrompt(
         '가난하지만 호기심 많은 잭이 마지막 남은 젖소를 팔러 장터로 가던 중 신비한 노인의 마법의 콩과 맞바꾸는 장면',
-        '[정면 및 아래 시선]: 손바닥의 콩을 내려다보는 호기심과 기대감. <protagonist_identity> 인물의 고유 눈매를 살려 눈을 생기 있게 뜨고 눈썹을 살짝 올린 밝은 미소. 아래를 보는 원본 시선 유지.',
+        '[정면 및 아래 시선]: 손바닥의 콩을 내려다보는 호기심과 기대감. <protagonist_identity> 인물의 고유 헤어스타일과 눈매를 살려 눈을 생기 있게 뜨고 눈썹을 살짝 올린 밝은 미소. 아래를 보는 원본 시선 유지.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-1.png',
       personaTargetRole: 'jack',
@@ -124,7 +124,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '안개 낀 꼭대기에는 땅에서는 본 적도 없는 거대하고 신비로운 거인의 성이 솟아 있었답니다.',
       illustrationPrompt: buildJackPrompt(
         '하늘 끝까지 자라난 거대한 콩나무 줄기를 타고 올라가 구름 위 신비로운 거인의 성을 발견한 장면',
-        '[3/4 측면 각도 회전 필수]: 콩나무 줄기에 매달려 고개를 위로 45도 돌려 거인의 성을 올려다보는 3/4 쿼터 뷰 각도로 새로 그려야 합니다. 템플릿의 만화 눈을 완전히 지우고, <protagonist_identity> 인물의 실제 눈매(무쌍, 눈 크기, 눈꼬리 형태), 콧날, 입술로 거대한 성을 발견한 경이로움과 감탄의 미소를 표현하세요.',
+        '[3/4 측면 각도 회전 필수]: 콩나무 줄기에 매달려 고개를 위로 45도 돌려 거인의 성을 올려다보는 3/4 쿼터 뷰 각도로 새로 그려야 합니다. 템플릿의 만화 눈과 템플릿 헤어스타일을 완전히 지우고, <protagonist_identity> 인물의 실제 헤어스타일(3D 각도 반영)과 눈매(무쌍, 눈 크기, 눈꼬리 형태), 콧날, 입술로 거대한 성을 발견한 경이로움과 감탄의 미소를 표현하세요.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-2.png',
       personaTargetRole: 'jack',
@@ -139,7 +139,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '번쩍 눈을 뜬 무시무시한 거인이 쿵쾅거리며 쫓아오기 시작했어요.',
       illustrationPrompt: buildJackPrompt(
         '황금 알을 낳는 요술 거위를 품에 안고, 뒤쫓아오는 무시무시한 거인을 피해 필사적으로 달아나는 장면',
-        '[반측면 긴박한 도망 필수]: 거위를 안고 고개를 뒤로 돌려 거인을 확인하는 반측면(Semi-profile, 60도) 각도로 회전시켜 그려야 합니다. 템플릿의 서양 만화 눈을 완전히 지우고, <protagonist_identity> 인물 고유의 실제 눈매와 눈썹, 얼굴형을 정확히 유지하면서 눈을 크게 뜨고 눈썹을 긴장시킨 다급함과 공포 표정을 표현하세요.',
+        '[반측면 긴박한 도망 필수]: 거위를 안고 고개를 뒤로 돌려 거인을 확인하는 반측면(Semi-profile, 60도) 각도로 회전시켜 그려야 합니다. 템플릿의 서양 만화 눈과 머리카락을 완전히 지우고, <protagonist_identity> 인물 고유의 실제 헤어스타일과 눈매, 눈썹, 얼굴형을 정확히 유지하면서 눈을 크게 뜨고 눈썹을 긴장시킨 다급함과 공포 표정을 표현하세요.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-3.png',
       personaTargetRole: 'jack',
@@ -156,7 +156,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '위기를 이겨낸 잭은 달려 나온 엄마를 꼭 끌어안으며 환하게 웃었답니다.',
       illustrationPrompt: buildJackPrompt(
         '콩나무를 쓰러뜨려 위기를 넘긴 후, 마당으로 달려 나온 엄마를 끌어안고 안도하는 장면',
-        '[정면 포옹]: 엄마를 안으며 짓는 환한 기쁨과 안도의 웃음. <protagonist_identity> 인물의 이목구비로 눈가의 긴장이 풀리고 입가가 크게 올라간 뿌듯한 표정. 엄마의 얼굴과 포옹 자세는 그대로 유지.',
+        '[정면 포옹]: 엄마를 안으며 짓는 환한 기쁨과 안도의 웃음. <protagonist_identity> 인물의 헤어스타일과 이목구비로 눈가의 긴장이 풀리고 입가가 크게 올라간 뿌듯한 표정. 엄마의 얼굴과 포옹 자세는 그대로 유지.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-4.png',
       personaTargetRole: 'jack',
@@ -173,7 +173,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '거위의 둥지에는 황금 알 대신 밤하늘의 별처럼 영롱하게 빛나는 "별빛 씨앗"이 놓여 있었지요.',
       illustrationPrompt: buildJackPrompt(
         '한밤중 잠에서 깨어 요술 거위의 둥지에 놓인 영롱한 별빛 씨앗을 신비롭게 내려다보는 장면',
-        '[내려다보는 시선]: 둥지를 내려다보며 신비한 씨앗을 발견한 순수한 놀라움. <protagonist_identity> 인물의 눈매로 반짝이는 눈과 조용히 감탄하듯 열린 입과 부드러운 미소.',
+        '[내려다보는 시선]: 둥지를 내려다보며 신비한 씨앗을 발견한 순수한 놀라움. <protagonist_identity> 인물의 헤어스타일과 눈매로 반짝이는 눈과 조용히 감탄하듯 열린 입과 부드러운 미소.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-5.png',
       personaTargetRole: 'jack',
@@ -190,7 +190,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '"고마워, 내 작은 친구야!"',
       illustrationPrompt: buildJackPrompt(
         '마당으로 나가 별빛 씨앗을 밤하늘로 날려 보내고, 밤하늘에 떠오른 따뜻한 별을 바라보는 장면',
-        '[밤하늘 올려다보기]: 밤하늘로 떠오른 별을 올려다보는 경이로움과 고마움. <protagonist_identity> 인물의 고개 각도와 밝은 눈빛, 입을 자연스럽게 연 행복한 미소.',
+        '[밤하늘 올려다보기]: 밤하늘로 떠오른 별을 올려다보는 경이로움과 고마움. <protagonist_identity> 인물의 고개 각도와 헤어스타일, 밝은 눈빛, 입을 자연스럽게 연 행복한 미소.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-6.png',
       personaTargetRole: 'jack',
