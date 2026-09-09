@@ -32,6 +32,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
   slug: 'jack-and-beanstalk',
   title: '잭과 콩나무',
   summary: '마법의 콩을 심고 구름 위 거인의 성으로 떠나는 잭의 용감한 모험 이야기',
+  coverImageKey: 'templates/jack-and-beanstalk/page-1.png',
   characters: [
     {
       role: 'jack',
@@ -74,6 +75,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '길에서 만난 신비한 노인이 반짝이는 콩을 건네며 속삭였지요.\n' +
         '"이건 밤새 자라는 마법의 콩이란다."\n' +
         '잭은 두 눈을 반짝이며 젖소와 마법의 콩을 맞바꾸었어요.',
+      baseImageKey: 'templates/jack-and-beanstalk/page-1.png',
       personaTargetRole: 'jack',
       characters: [{ role: 'jack', hitbox: { x: 0.35, y: 0.38, width: 0.28, height: 0.48 } }],
     },
@@ -83,6 +85,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '엄마가 던져버린 콩은 하룻밤 새 구름을 뚫고 하늘 끝까지 자라났어요!\n' +
         '잭은 굵은 줄기를 타고 용감하게 하늘 높이 올라갔지요.\n' +
         '안개 낀 꼭대기에는 땅에서는 본 적도 없는 거대하고 신비로운 거인의 성이 솟아 있었답니다.',
+      baseImageKey: 'templates/jack-and-beanstalk/page-2.png',
       personaTargetRole: 'jack',
       characters: [{ role: 'jack', hitbox: { x: 0.3, y: 0.34, width: 0.26, height: 0.5 } }],
     },
@@ -93,6 +96,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '잭이 조심스레 거위를 품에 안는 순간, 요술 하프가 외쳤어요!\n' +
         '"도둑이야!"\n' +
         '번쩍 눈을 뜬 무시무시한 거인이 쿵쾅거리며 쫓아오기 시작했어요.',
+      baseImageKey: 'templates/jack-and-beanstalk/page-3.png',
       personaTargetRole: 'jack',
       characters: [
         { role: 'jack', hitbox: { x: 0.22, y: 0.4, width: 0.25, height: 0.46 } },
@@ -105,6 +109,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '번개처럼 땅에 내려온 잭은 도끼로 콩나무 밑동을 힘차게 내리찍었어요!\n' +
         '거대한 콩나무가 쓰러지며 거인은 깊은 땅속으로 사라졌지요.\n' +
         '위기를 이겨낸 잭은 달려 나온 엄마를 꼭 끌어안으며 환하게 웃었답니다.',
+      baseImageKey: 'templates/jack-and-beanstalk/page-4.png',
       personaTargetRole: 'jack',
       characters: [
         { role: 'jack', hitbox: { x: 0.3, y: 0.36, width: 0.28, height: 0.48 } },
@@ -117,6 +122,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       bodyText:
         '모두가 잠든 고요한 밤, 잭의 침대 옆에서 잠자던 요술 거위가 반짝이는 깃털을 퍼덕이며 잭을 가만히 깨웠어요.\n' +
         '거위의 둥지에는 황금 알 대신 밤하늘의 별처럼 영롱하게 빛나는 "별빛 씨앗"이 놓여 있었지요.',
+      baseImageKey: 'templates/jack-and-beanstalk/page-5.png',
       personaTargetRole: 'jack',
       characters: [
         { role: 'jack', hitbox: { x: 0.28, y: 0.34, width: 0.28, height: 0.48 } },
@@ -129,6 +135,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '잭은 마당으로 나가 별빛 씨앗을 밤하늘을 향해 높이 날려 보냈어요.\n' +
         '씨앗은 은은한 빛을 내며 하늘 높이 떠올라 잭의 집을 따뜻하게 비추는 작은 별이 되었답니다.\n' +
         '"고마워, 내 작은 친구야!"',
+      baseImageKey: 'templates/jack-and-beanstalk/page-6.png',
       personaTargetRole: 'jack',
       characters: [{ role: 'jack', hitbox: { x: 0.38, y: 0.34, width: 0.26, height: 0.5 } }],
     },
