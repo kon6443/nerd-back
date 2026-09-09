@@ -77,7 +77,7 @@ function resolveBaseUrl(): string {
       (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
       window.location.port === "5502"
     ) {
-      return "http://localhost:5501";
+      return `http://${window.location.hostname}:5501`;
     }
     return "";
   }

@@ -44,6 +44,7 @@ function StoryReadContent({ params }: PageProps) {
   const [currentPageNo, setCurrentPageNo] = useState(1);
   const [retryingPageNo, setRetryingPageNo] = useState<number | null>(null);
   const [isReadyToRead, setIsReadyToRead] = useState(false);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -115,7 +116,7 @@ function StoryReadContent({ params }: PageProps) {
     return () => {
       active = false;
     };
-  }, [slug, sessionId, autoStart, router]);
+  }, [slug, sessionId, autoStart, router, retryTrigger]);
 
   // 진행 상태 3초 주기 폴링 (generating 상태일 때)
   useEffect(() => {
@@ -216,8 +217,23 @@ function StoryReadContent({ params }: PageProps) {
           <div className="rounded-full bg-red-100 p-4 text-3xl">⚠️</div>
           <h1 className="text-xl font-bold text-ink">문제가 발생했어요</h1>
           <p className="text-sm text-neutral-600">{activeError}</p>
-          <div className="flex gap-3 pt-2">
-            <Link href={`/stories/${slug}/capture`} className={actionClass("primary")}>
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
+            {errorMsg && (
+              <button
+                type="button"
+                onClick={() => {
+                  setErrorMsg("");
+                  setRetryTrigger((prev) => prev + 1);
+                }}
+                className={actionClass("primary")}
+              >
+                다시 시도하기
+              </button>
+            )}
+            <Link
+              href={`/stories/${slug}/capture`}
+              className={actionClass(errorMsg ? "ghost" : "primary")}
+            >
               얼굴 다시 등록하기
             </Link>
             <Link href={`/library/${slug}`} className={actionClass("ghost")}>

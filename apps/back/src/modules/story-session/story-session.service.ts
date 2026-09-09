@@ -49,6 +49,9 @@ export class StorySessionService {
     private readonly storagePort: StoragePort,
   ) {}
 
+  /** 현재 프로세스에서 비동기로 실행 중인 파이프라인 세션 ID 추적 (중복 실행 방지 및 서버 재시작 시 고아 세션 복구용) */
+  private readonly activePipelines = new Set<string>();
+
   /**
    * 세션 생성 또는 미완료 세션 재사용 (Idempotent resume).
    * - 이미 완성된 동화(completed): 409 Conflict (1인 1권 제한)
@@ -226,11 +229,13 @@ export class StorySessionService {
       return { id: session.id, status: 'completed', totalPages };
     }
 
-    if (session.status === 'generating') {
+    // 이미 백그라운드 파이프라인이 현재 프로세스에서 정상 동작 중이면 중복 시작 방지 (멱등성)
+    if (session.status === 'generating' && this.activePipelines.has(session.id)) {
       return { id: session.id, status: 'generating', totalPages };
     }
 
-    // face_ready 또는 failed 상태: 개별 페이지 엔티티 초기화 및 비동기 작업 기동
+    // face_ready, failed 상태이거나, 서버 재시작 등으로 generating 상태인데 실제 파이프라인이 멈춘 경우:
+    // 개별 페이지 엔티티 초기화 및 비동기 작업 기동
     const existingImages = await this.pageImageRepo.find({ where: { sessionId } });
 
     for (const page of templatePages) {
@@ -336,7 +341,7 @@ export class StorySessionService {
       throw new PageNotFoundErrorResponseDto();
     }
 
-    if (pageImg.status !== 'failed') {
+    if (pageImg.status !== 'failed' && pageImg.status !== 'running') {
       throw new PageNotFailedErrorResponseDto();
     }
 
@@ -361,6 +366,12 @@ export class StorySessionService {
    * 전체 페이지 개인화 파이프라인 백그라운드 순차 처리
    */
   async executePersonalizationPipeline(sessionId: string): Promise<void> {
+    if (this.activePipelines.has(sessionId)) {
+      this.logger.warn(`이미 진행 중인 파이프라인 무시: 세션 ${sessionId}`);
+      return;
+    }
+    this.activePipelines.add(sessionId);
+
     try {
       const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
       if (!session || !session.referenceImageKey) {
@@ -412,6 +423,8 @@ export class StorySessionService {
       await this.checkAndUpdateSessionCompletion(session.id);
     } catch (error: unknown) {
       this.logger.error(`개인화 파이프라인 전체 오류: ${error}`);
+    } finally {
+      this.activePipelines.delete(sessionId);
     }
   }
 
@@ -419,6 +432,13 @@ export class StorySessionService {
    * 단일 페이지 재시도 비동기 실행
    */
   async executeSinglePagePersonalization(sessionId: string, pageNo: number): Promise<void> {
+    const pipelineKey = `${sessionId}:${pageNo}`;
+    if (this.activePipelines.has(pipelineKey)) {
+      this.logger.warn(`이미 진행 중인 단일 페이지 재시도 무시: ${pipelineKey}`);
+      return;
+    }
+    this.activePipelines.add(pipelineKey);
+
     try {
       const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
       if (!session || !session.referenceImageKey) return;
@@ -460,6 +480,8 @@ export class StorySessionService {
       await this.checkAndUpdateSessionCompletion(session.id);
     } catch (error: unknown) {
       this.logger.error(`단일 페이지 재시도 오류: ${error}`);
+    } finally {
+      this.activePipelines.delete(pipelineKey);
     }
   }
 
