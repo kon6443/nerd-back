@@ -392,9 +392,8 @@ function StoryReadContent({ params }: PageProps) {
         </div>
 
         <div>
-          <Badge>
-            특별 수록: 비하인드 스토리
-          </Badge>
+          {/* 톤을 적어 둔다 — 기본값에 기대면 `Badge` 기본이 바뀔 때 이 화면 색이 조용히 따라 바뀐다. */}
+          <Badge tone="info">특별 수록: 비하인드 스토리</Badge>
           <h1 className="mt-3 text-3xl font-bold text-ink">
             그날 밤, 이야기는 어떻게 되었을까요?
           </h1>

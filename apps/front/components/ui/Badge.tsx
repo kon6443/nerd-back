@@ -7,25 +7,36 @@ import type { ReactNode } from "react";
  * 직접 쓰지 않는다 — 마이페이지가 그렇게 배지를 손으로 다시 그리고 있었고, 다크모드 클래스까지
  * 딸려 왔다(2026-09-09 전수조사). 색은 `globals.css` 토큰만 쓴다.
  */
-export type BadgeTone = "primary" | "success" | "progress" | "danger" | "muted";
+export type BadgeTone = "info" | "success" | "danger" | "muted";
 
 /**
- * 값은 듀오링고 톤 전환(2026-09-09) 때 마이페이지가 인라인으로 고른 것과 같다 — 그 화면을
- * 이 컴포넌트로 바꾸면서 색 선택만 여기로 옮겼다. 화면은 이제 톤 이름만 고른다.
+ * ⭐ **색은 디자이너가 정한 값이다. 여기서 바꾸지 않는다.**
+ * 출처는 두 곳이고 서로 일치한다 — 프로토타입 `docs/design/my-story-flow.html` 의 `.badge` 규칙과,
+ * 그것을 화면에 적용한 커밋 `7b91280`(듀오링고 톤 전환)이다.
  *
- * ⚠️ `accent-*` 는 강조색이고 `danger` 는 의미색이다. 실패를 강조색으로 칠하지 않는다 —
- * 팔레트가 바뀌면 강조색은 따라 바뀌지만 "실패는 빨강" 은 바뀌면 안 된다.
+ * | 톤 | 디자이너 정의 |
+ * |---|---|
+ * | `info` | `.badge` 기본 — 파랑(Macaw). 팔레트 교체 전 기본 배지도 파랑이었다 |
+ * | `success` | `.badge.ok` — 초록 |
+ * | `danger` | `.badge.bad` — 빨강. 의미색이라 강조색과 역할이 다르다 |
+ * | `muted` | `.badge.mute` — 중립 |
+ *
+ * ⚠️ **대비가 WCAG AA(4.5:1)에 못 미치는 톤이 있다** (`info` 2.8:1 · `success` 2.7:1 · `muted` 4.2:1).
+ * 12px 굵은 글씨는 「큰 글자」 예외에 해당하지 않는다. 🚫 그렇다고 여기서 임의로 글자색을 바꾸지
+ * 않는다 — 색은 디자이너 결정이다. 프로토타입에는 각 톤에 **2px 테두리**가 있어 색면이 더 또렷한데,
+ * 화면에 적용된 쪽에는 그것이 빠져 있다. 대비를 손보게 되면 그 테두리부터 디자이너와 맞춘다.
  */
 const toneStyles: Record<BadgeTone, string> = {
-  primary: "bg-primary-soft text-primary",
+  info: "bg-accent-a-soft text-accent-a-strong",
   success: "bg-primary-tint text-primary-strong",
-  progress: "bg-accent-a-soft text-accent-a-strong",
   danger: "bg-danger-soft text-danger-strong",
   muted: "bg-surface text-ink-muted",
 };
 
-export function Badge({ tone = "primary", children }: { tone?: BadgeTone; children: ReactNode }) {
+export function Badge({ tone = "info", children }: { tone?: BadgeTone; children: ReactNode }) {
   return (
-    <span className={`rounded-pill px-3 py-1 text-xs font-bold ${toneStyles[tone]}`}>{children}</span>
+    // 여백도 디자이너가 화면에 적용한 값(`7b91280`)을 따른다. 색만 맞추고 크기가 갈리면
+    // 같은 배지가 화면마다 다른 크기가 된다.
+    <span className={`rounded-pill px-2.5 py-0.5 text-xs font-bold ${toneStyles[tone]}`}>{children}</span>
   );
 }

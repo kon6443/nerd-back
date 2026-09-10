@@ -334,9 +334,9 @@ export default function CapturePage({ params }: PageProps) {
         <Link href={`/library/${slug}`} className="text-sm font-semibold text-primary hover:underline">
           ← 동화로 돌아가기
         </Link>
-        <Badge>
-          Slice 3: 얼굴 등록
-        </Badge>
+        {/* 톤을 적어 둔다. 기본값에 기대면 `Badge` 의 기본이 바뀔 때 이 화면 색이 조용히 따라 바뀐다
+            — 실제로 팔레트 교체 때 초록으로 바뀌었다가 파랑으로 되돌아왔다(2026-09-10). */}
+        <Badge tone="info">Slice 3: 얼굴 등록</Badge>
       </div>
 
       {/* 완료 화면 또는 기존 동화 안내 */}
