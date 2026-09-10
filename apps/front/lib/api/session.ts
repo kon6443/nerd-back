@@ -80,6 +80,8 @@ export async function personalizeSession(sessionId: string): Promise<Personalize
 export async function fetchSessionPages(sessionId: string): Promise<SessionPagesResponse> {
   return apiFetch<SessionPagesResponse>(`/sessions/${sessionId}/pages`, {
     method: "GET",
+    // 진행률 폴링은 매번 최신 상태여야 한다. 이전 응답을 재사용하면 완료 시점을 놓칠 수 있다.
+    cache: "no-store",
   });
 }
 

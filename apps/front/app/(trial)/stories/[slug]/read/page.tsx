@@ -9,6 +9,7 @@ import { CenteredPage } from "@/components/ui/CenteredPage";
 import { LoadingView } from "@/components/ui/LoadingView";
 import { actionClass } from "@/components/ui/actionStyles";
 import { BookFrame } from "@/components/story/BookFrame";
+import { isReaderReady } from "./readiness";
 import {
   ApiError,
   fetchAfterStory,
@@ -53,7 +54,6 @@ function StoryReadContent({ params }: PageProps) {
   const [isSelectingBranch, setIsSelectingBranch] = useState<StoryBranchKey | null>(null);
   const [afterStoryError, setAfterStoryError] = useState("");
   const [retryingPageNo, setRetryingPageNo] = useState<number | null>(null);
-  const [isReadyToRead, setIsReadyToRead] = useState(false);
   const [retryTrigger, setRetryTrigger] = useState(0);
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -101,8 +101,7 @@ function StoryReadContent({ params }: PageProps) {
         if (!active) return;
         setSessionPages(sessionData);
 
-        if (sessionData.isMainStoryReady || sessionData.isAllCompleted || sessionData.status === "completed") {
-          setIsReadyToRead(true);
+        if (isReaderReady(sessionData)) {
           setViewState("reader");
         } else {
           setViewState("generating");
@@ -145,8 +144,10 @@ function StoryReadContent({ params }: PageProps) {
         const data = await fetchSessionPages(currentSessionId);
         setSessionPages(data);
 
-        if (data.isMainStoryReady || data.isAllCompleted || data.status === "completed") {
-          setIsReadyToRead(true);
+        if (isReaderReady(data)) {
+          // 폴링으로 본편 완료를 처음 받는 경로도 초기 조회와 똑같이 독서 화면으로 전환한다.
+          // 이 전환이 없으면 5/7 상태에서 폴링만 멈춰 생성 화면이 그대로 남는다.
+          setViewState("reader");
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
@@ -226,7 +227,6 @@ function StoryReadContent({ params }: PageProps) {
           ),
         };
       });
-      setIsReadyToRead(false);
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         alert(`재시도 실패: ${err.message}`);
@@ -376,15 +376,9 @@ function StoryReadContent({ params }: PageProps) {
         </div>
 
         <div>
-          <h1 className="text-2xl font-bold text-ink md:text-3xl">
-            {isReadyToRead
-              ? "동화책이 모두 완성되었어요! 🎉"
-              : "나만의 동화책을 만들고 있어요"}
-          </h1>
+          <h1 className="text-2xl font-bold text-ink md:text-3xl">나만의 동화책을 만들고 있어요</h1>
           <p className="mt-2 text-sm text-ink-muted">
-            {isReadyToRead
-              ? "아이의 얼굴이 담긴 특별한 이야기책이 준비되었습니다."
-              : "AI가 동화 속 장면에 아이의 얼굴과 표정을 마법처럼 합성하고 있어요."}
+            AI가 동화 속 장면에 아이의 얼굴과 표정을 마법처럼 합성하고 있어요.
           </p>
         </div>
 
@@ -468,21 +462,9 @@ function StoryReadContent({ params }: PageProps) {
 
         {/* 완료 액션 버튼 */}
         <div className="flex w-full max-w-md flex-col gap-3">
-          {isReadyToRead ? (
-            <button
-              onClick={() => {
-                setCurrentPageNo(1);
-                setViewState("reader");
-              }}
-              className={actionClass("primary", "w-full py-4 text-lg font-bold shadow-lg")}
-            >
-              📖 동화책 읽으러 가기
-            </button>
-          ) : (
-            <p className="text-xs text-ink-muted">
-              잠시만 기다려 주세요. 한 장이 실패하더라도 해당 페이지만 다시 만들 수 있습니다.
-            </p>
-          )}
+          <p className="text-xs text-ink-muted">
+            본편 5장이 준비되면 바로 읽을 수 있어요. 한 장이 실패하더라도 해당 페이지만 다시 만들 수 있습니다.
+          </p>
 
           <Link href={`/library/${slug}`} className={actionClass("ghost", "w-full")}>
             동화 소개로 돌아가기
