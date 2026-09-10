@@ -33,6 +33,16 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/**
+ * 인증 칸의 두 자리. 클래스 이름을 **리터럴로 적는다** — `` `session-${status}` `` 처럼 조립하면
+ * `session-guest` 로 전수 검색해도 이 파일이 안 잡혀, 스타일시트의 클래스를 바꿀 때 헤더만
+ * 조용히 깨진다(2026-09-10 리뷰에서 실제로 이 파일이 검색에서 빠졌다).
+ */
+const AUTH_NAV_SLOTS = [
+  { status: "guest", className: "session-guest" },
+  { status: "authenticated", className: "session-authenticated" },
+] as const;
+
 /** 네비 항목 한 칸의 스타일. 실제 링크와 확인 전 자리표시가 **같은 폭**이어야 해서 한 곳에 둔다. */
 function navLinkClass(active: boolean): string {
   return `flex min-h-touch min-w-touch items-center justify-center rounded-pill px-3 text-sm font-bold transition-colors motion-reduce:transition-none sm:px-4 sm:text-base ${
@@ -81,7 +91,7 @@ export function AppHeader() {
           {/* ⚠️ 넓은 화면에서는 오른쪽 CTA 가 같은 역할을 하므로 인증 칸만 숨긴다.
               칸은 항상 있다 — 응답 뒤에 `<li>` 를 추가하면 네비 폭이 바뀌어 「시연 모드」까지 밀린다. */}
           <li className="lg:hidden">
-            {(["guest", "authenticated"] as const).map((status) => {
+            {AUTH_NAV_SLOTS.map(({ status, className }) => {
               const link = AUTH_LINK[status];
               const active = isActive(pathname, link.href);
               return (
@@ -89,7 +99,7 @@ export function AppHeader() {
                   key={status}
                   href={link.href}
                   aria-current={active ? "page" : undefined}
-                  className={`session-${status} ${navLinkClass(active)}`}
+                  className={`${className} ${navLinkClass(active)}`}
                 >
                   {link.label}
                 </Link>
