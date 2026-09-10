@@ -43,3 +43,24 @@ describe("세션 조회 합치기", () => {
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("parseCachedSession — 기억해 둔 상태 복원", () => {
+  // 🚫 저장된 값을 그대로 믿지 않는다. 낡은 버전이 남긴 형식이면 `null` 로 버리고 서버 확인을 기다린다.
+  it("게스트·인증 상태는 그대로 복원한다", async () => {
+    const { parseCachedSession } = await import("./useSession");
+    expect(parseCachedSession(JSON.stringify({ status: "guest" }))).toEqual({ status: "guest" });
+    expect(parseCachedSession(JSON.stringify({ status: "authenticated", me: { loginId: "t" } }))).toEqual({
+      status: "authenticated",
+      me: { loginId: "t" },
+    });
+  });
+
+  it("없거나 깨졌거나 형식이 다르면 null 이다", async () => {
+    const { parseCachedSession } = await import("./useSession");
+    expect(parseCachedSession(null)).toBeNull();
+    expect(parseCachedSession("{not json")).toBeNull();
+    expect(parseCachedSession(JSON.stringify({ status: "unknown" }))).toBeNull();
+    expect(parseCachedSession(JSON.stringify({ status: "authenticated" }))).toBeNull();
+    expect(parseCachedSession(JSON.stringify({ status: "authenticated", me: { loginId: 1 } }))).toBeNull();
+  });
+});
