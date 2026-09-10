@@ -26,6 +26,34 @@ export interface BookFrameProps {
   footer?: ReactNode;
 }
 
+/**
+ * 본문이 도착하기 전의 책 프레임.
+ *
+ * ⭐ **같은 CSS 모듈을 쓴다.** 대기 화면을 Tailwind 로 따로 그리면 책의 테두리·반경·그림자·최소
+ * 높이가 두 벌이 되어 한쪽만 바뀐다. 틀이 그대로 있어야 본문이 들어올 때 화면이 튀지 않는다.
+ */
+export function BookFrameSkeleton() {
+  return (
+    <div
+      aria-hidden="true"
+      className="flex w-full animate-pulse flex-col gap-4 motion-reduce:animate-none"
+    >
+      <div className={styles.book}>
+        <div className={styles.spread}>
+          <div className={`${styles.art} bg-line`} />
+          <div className={styles.page}>
+            <div className="flex flex-col gap-5">
+              <div className="h-6 w-full rounded bg-line" />
+              <div className="h-6 w-11/12 rounded bg-line" />
+              <div className="h-6 w-4/5 rounded bg-line" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function BookFrame({ pageNo, imageUrl, children, footer }: BookFrameProps) {
   return (
     <div className="flex w-full flex-col gap-4">
