@@ -12,18 +12,31 @@
 export type ActionVariant = "primary" | "accentA" | "accentB" | "ghost" | "gold";
 export type ActionSize = "default" | "compact";
 
-/** 시안의 색 배정 — 기본은 하늘색, 비하인드 A 는 민트, B 는 코랄. */
+/**
+ * 색 배정 — 주 동작은 그린, 보조는 블루, 비하인드 B 는 퍼플.
+ *
+ * ⭐ `--btn-lip` 은 **버튼 아래 그림자(립) 색**이다. variant 마다 자기 짙은 색을 넣고
+ * `BASE` 가 그것으로 그림자를 그린다. 색과 립이 갈리면 눌린 느낌이 깨지므로 **같이 정한다.**
+ *
+ * 🚫 `gold` 에 흰 글자를 쓰지 않는다 — 노랑 위 흰 글자는 읽히지 않는다.
+ * 듀오링고도 노란 면에는 진한 글자를 얹는다.
+ */
 const variantStyles: Record<ActionVariant, string> = {
-  primary: "bg-primary-strong text-white hover:brightness-90",
-  accentA: "bg-accent-a-strong text-white hover:brightness-90",
-  accentB: "bg-accent-b-strong text-white hover:brightness-90",
-  ghost: "border-2 border-primary bg-surface-raised text-ink hover:bg-primary-tint",
-  gold: "bg-gold-strong text-white hover:brightness-90",
+  primary: "bg-primary text-white [--btn-lip:var(--color-primary-strong)] hover:brightness-105",
+  accentA: "bg-accent-a text-white [--btn-lip:var(--color-accent-a-strong)] hover:brightness-105",
+  accentB: "bg-accent-b text-white [--btn-lip:var(--color-accent-b-strong)] hover:brightness-105",
+  ghost: "border-2 border-line bg-surface-raised text-ink [--btn-lip:#d4d4d4] hover:bg-surface",
+  gold: "bg-gold text-ink [--btn-lip:var(--color-gold-strong)] hover:brightness-105",
 };
 
-/** 터치 타깃 최소 56px(`--spacing-touch`). 아이 손가락이 대상이라 WCAG 권장(44px)보다 크다. */
+/**
+ * 터치 타깃 최소 56px(`--spacing-touch`). 아이 손가락이 대상이라 WCAG 권장(44px)보다 크다.
+ *
+ * ⭐ 형태가 듀오링고의 정체성이다 — **pill 이 아니라 16px 라운드 사각형 + 아래쪽 립**이고,
+ * 누르면 립 두께(4px)만큼 내려앉으며 그림자가 사라진다. `shadow-sm` 으로 바꾸지 말 것.
+ */
 const BASE =
-  "inline-flex min-h-touch items-center justify-center rounded-pill font-bold shadow-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-magic-strong focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex min-h-touch items-center justify-center rounded-btn font-extrabold shadow-[0_4px_0_var(--btn-lip)] transition-[filter,transform,box-shadow] active:translate-y-1 active:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-magic-strong focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0";
 
 const sizeStyles: Record<ActionSize, string> = {
   default: "px-8 text-lg",

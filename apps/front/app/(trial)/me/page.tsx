@@ -152,6 +152,8 @@ export default function MyPage() {
 
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex items-center gap-2">
+                        {/* 색은 `Badge` 가 톤으로 소유한다. main 이 같은 자리에서 원색 유틸리티를
+                            토큰으로 바꿨고(듀오링고 톤), 그 색 선택을 톤 정의로 옮겼다. */}
                         <Badge tone={badge.tone}>{badge.label}</Badge>
                       </div>
                       <h3 className="truncate text-lg font-bold text-ink">{s.templateTitle}</h3>

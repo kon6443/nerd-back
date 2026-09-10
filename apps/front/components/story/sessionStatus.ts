@@ -29,7 +29,7 @@ export function classifySessionStatus(status: StorySessionStatus): SessionStage 
 /** 단계별 배지 문구와 색. 색은 토큰 톤이다 — 🚫 여기서 팔레트 클래스를 직접 적지 않는다. */
 export const SESSION_STAGE_BADGE: Record<SessionStage, { label: string; tone: BadgeTone }> = {
   completed: { label: "완성됨", tone: "success" },
-  generating: { label: "제작 중", tone: "warning" },
+  generating: { label: "제작 중", tone: "progress" },
   failed: { label: "제작 실패", tone: "danger" },
   draft: { label: "등록 중", tone: "muted" },
 };

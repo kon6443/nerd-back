@@ -36,6 +36,7 @@ coverage/
 *.pid
 *.seed
 tmp/
+uploads
 uploads/
 
 # 세션 스냅샷 (PreCompact 훅 생성 — 정본 아님, docs/tasks/ 로 옮긴 뒤 삭제)

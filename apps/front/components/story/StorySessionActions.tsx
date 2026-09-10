@@ -78,7 +78,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
   return (
     <div className="flex flex-col gap-3 pt-2">
       {errorMsg && (
-        <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">{errorMsg}</p>
+        <p className="text-sm font-semibold text-danger-strong">{errorMsg}</p>
       )}
 
       <div className="flex flex-wrap items-center gap-3">

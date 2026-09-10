@@ -1,31 +1,41 @@
 @import "tailwindcss";
 
 /* 디자인 토큰의 정의는 이 파일 한 곳에 둔다. */
+/* 팔레트는 듀오링고를 참조했다(abc.duolingo.com CSS 실측, 2026-09-09).
+   🚫 색 리터럴을 컴포넌트에 쓰지 않는다 — 여기 값만 바꾸면 전체가 따라온다. */
 @theme {
-  --color-primary: #3f92d6;
-  --color-primary-strong: #2e77b6;
-  --color-primary-soft: #cde7f6;
-  --color-primary-tint: #eaf7fd;
-  --color-surface: #fff9ec;
-  --color-surface-raised: #ffffff;
-  --color-line: #dceaf4;
-  --color-paper-line: #ebdcbe;
-  --color-accent-a: #57c1c0;
-  --color-accent-a-strong: #287f80;
-  --color-accent-a-soft: #e8f8f8;
-  --color-accent-b: #ee8fa3;
-  --color-accent-b-strong: #ad405e;
-  --color-accent-b-soft: #f8e3e5;
-  --color-ink: #234c77;
-  --color-ink-muted: #426f96;
-  --color-gold: #e9a93c;
-  --color-gold-strong: #96621e;
-  --color-magic: #b79be8;
-  --color-magic-strong: #7753b0;
-  --color-hill-1: #a9d8a2;
-  --color-hill-2: #8ac888;
+  --color-primary: #58cc02; /* Feather Green */
+  --color-primary-strong: #58a700; /* 버튼 립·눌린 상태 */
+  --color-primary-soft: #a5ed6e;
+  --color-primary-tint: #d7feb9;
+  --color-surface: #f7f7f7; /* Polar — 한 단계 낮은 면 */
+  --color-surface-raised: #ffffff; /* Snow */
+  --color-line: #e5e5e5; /* Swan — 모든 테두리 */
+  --color-paper-line: #ededed;
+  --color-accent-a: #1cb0f6; /* Macaw — 보조 CTA·비하인드 A */
+  --color-accent-a-strong: #1899d6;
+  --color-accent-a-soft: #ddf4ff;
+  --color-accent-b: #ce82ff; /* Beetle — 비하인드 B */
+  --color-accent-b-strong: #9069cd;
+  --color-accent-b-soft: #f3e8ff;
+  --color-ink: #4b4b4b; /* Eel — 본문. 순검정을 쓰지 않는다 */
+  --color-ink-muted: #777777; /* Wolf */
+  --color-gold: #ffc800; /* Bee — 노랑 위에는 ink 를 얹는다 */
+  --color-gold-strong: #e5a700;
+  --color-magic: #ce82ff;
+  --color-magic-strong: #9069cd;
+  /* 실패·오류. 의미색이라 강조색(accent)과 역할이 다르다 — 섞어 쓰지 않는다.
+     `danger` 는 면, `danger-strong` 은 글자(연한 면 위 대비 확보), `danger-soft` 는 배경. */
+  --color-danger: #ff4b4b; /* Cardinal */
+  --color-danger-strong: #c1272d;
+  --color-danger-soft: #ffdfe0;
+  --color-hill-1: #a5ed6e;
+  --color-hill-2: #58cc02;
 
-  --radius-card: 1.375rem;
+  /* ⭐ 버튼은 pill 이 아니라 16px 라운드 사각형이다 (듀오링고 실측: 12~16px).
+     `rounded-btn` 으로 쓴다. `--radius-pill` 은 탭·칩·배지에만 남긴다. */
+  --radius-btn: 1rem;
+  --radius-card: 1rem;
   --radius-pill: 9999px;
 
   /* 터치 타깃 최소 크기. WCAG 권장(44px)보다 큰 이유는 **아이 손가락이 대상**이기 때문이다.
@@ -53,7 +63,9 @@ body {
 
 body {
   margin: 0;
-  background: var(--color-primary-tint);
+  /* 🚫 primary-tint 를 쓰지 않는다 — 주색이 초록이라 배경이 초록으로 깔린다.
+     배경 일러스트(StoryBackground)가 하늘을 그리므로 바탕은 중립이어야 한다. */
+  background: var(--color-surface);
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
