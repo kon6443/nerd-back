@@ -96,6 +96,7 @@ describe("session api", () => {
 
     expect(apiFetchSpy).toHaveBeenCalledWith("/sessions/session-123/pages", {
       method: "GET",
+      cache: "no-store",
     });
     expect(result.sessionId).toBe("session-123");
     expect(result.completedPages).toBe(3);
