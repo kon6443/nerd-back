@@ -19,6 +19,17 @@ export async function getMySessions(): Promise<MyStorySessionItem[]> {
 }
 
 /**
+ * 이 동화(slug)에 대한 내 세션 하나. 없으면 `null`.
+ *
+ * ⭐ 사용자 × 동화 1권당 세션은 최대 1개다(`UNIQUE(user_id, template_id)`). 서재 상세·촬영 화면이
+ * 같은 "목록에서 slug 로 찾기"를 각자 적고 있었다 — 한 곳으로 모은다.
+ */
+export async function findMySessionBySlug(slug: string): Promise<MyStorySessionItem | null> {
+  const sessions = await getMySessions();
+  return sessions.find((s) => s.templateSlug === slug) ?? null;
+}
+
+/**
  * 동화 세션을 삭제한다 (초기화 및 다른 얼굴로 새로 만들기).
  */
 export async function deleteSession(sessionId: string): Promise<void> {

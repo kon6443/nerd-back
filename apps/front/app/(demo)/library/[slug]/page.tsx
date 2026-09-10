@@ -45,7 +45,8 @@ export default async function StoryDetailPage({ params }: PageProps<"/library/[s
           </p>
 
           {story.pageCount > 0 ? (
-            <StorySessionActions slug={story.slug} />
+            // `key` 로 동화가 바뀌면 새로 마운트시킨다 — 이전 동화의 세션이 남지 않게.
+            <StorySessionActions key={story.slug} slug={story.slug} />
           ) : (
             // 페이지가 아직 안 들어온 동화다. 링크를 걸면 첫 페이지에서 404 를 만난다.
             <p className="pt-2 text-ink-muted">아직 페이지가 준비되지 않았어요.</p>

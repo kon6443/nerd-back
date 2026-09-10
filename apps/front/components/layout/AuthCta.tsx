@@ -2,35 +2,38 @@
 
 import { usePathname } from "next/navigation";
 import { ActionLink } from "@/components/ui/ActionLink";
-import { useSession } from "@/lib/api/useSession";
 import { AUTH_LINK } from "./authLinks";
 
 /**
  * 로그인 상태를 따르는 주요 CTA — 헤더와 홈 화면이 **같은 것**을 쓴다.
  *
- * ⭐ **서버 컴포넌트 화면에서도 쓸 수 있도록 이것만 클라이언트다.** 홈 전체를 `'use client'` 로
- * 바꾸면 버튼 하나 때문에 히어로까지 클라이언트 번들에 실린다.
+ * ⭐ **두 문구를 다 렌더하고 CSS 가 하나만 보인다** (`globals.css` 의 `.session-*`, `<html data-session>`).
+ * 세션 값으로 분기해 한쪽만 그리면 JS 가 로드될 때까지 칸이 비고, 새로고침마다 깜빡인다
+ * (2026-09-09 배포 환경 보고). 속성은 첫 페인트 전에 `layout.tsx` 의 스크립트가 올린다.
  *
- * `aria-current` 를 **스스로 계산한다.** 호출부가 넘기게 두면 헤더만 넘기고 홈은 빠지는 식으로
- * 갈린다 — 실제로 그렇게 두 벌이 될 뻔했다.
- *
- * 확인 전(`unknown`)에는 아무것도 그리지 않는다. 곧바로 「로그인하기」를 그리면 이미 로그인한
- * 사용자에게 그 문구가 깜빡 보이고, 그게 "로그인이 안 됐나?" 로 읽힌다.
+ * `'use client'` 인 이유는 `aria-current` 계산(`usePathname`) 하나다. 호출부가 넘기게 두면 헤더만 넘기고
+ * 홈은 빠지는 식으로 갈린다 — 실제로 그렇게 두 벌이 될 뻔했다.
  */
-export function AuthCta({ className }: { className?: string }) {
+export function AuthCta({ className = "" }: { className?: string }) {
   const pathname = usePathname();
-  const session = useSession();
-  if (session.status === "unknown") return null;
-
-  const link = AUTH_LINK[session.status];
   return (
-    <ActionLink
-      href={link.href}
-      variant="gold"
-      className={className}
-      aria-current={pathname === link.href ? "page" : undefined}
-    >
-      {link.cta}
-    </ActionLink>
+    <>
+      <ActionLink
+        href={AUTH_LINK.guest.href}
+        variant="gold"
+        className={`session-guest ${className}`}
+        aria-current={pathname === AUTH_LINK.guest.href ? "page" : undefined}
+      >
+        {AUTH_LINK.guest.cta}
+      </ActionLink>
+      <ActionLink
+        href={AUTH_LINK.authenticated.href}
+        variant="gold"
+        className={`session-authenticated ${className}`}
+        aria-current={pathname === AUTH_LINK.authenticated.href ? "page" : undefined}
+      >
+        {AUTH_LINK.authenticated.cta}
+      </ActionLink>
+    </>
   );
 }

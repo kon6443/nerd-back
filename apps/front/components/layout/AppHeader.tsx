@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "@/lib/api/useSession";
 import { AUTH_LINK } from "./authLinks";
 import { AuthCta } from "./AuthCta";
 
 /**
  * 전역 상단 네비게이션.
  *
- * `'use client'` 인 이유는 두 가지다 — 현재 위치 표시(`usePathname`)와 **로그인 상태**(`useSession`).
+ * `'use client'` 인 이유는 현재 위치 표시(`usePathname`) 하나다.
  *
- * ⚠️ 후자는 요청을 하나 만든다(`GET /auth/me`). 전 화면에 걸리므로 늘리지 않는다 —
- * 🚫 여기에 다른 데이터 조회를 추가하지 않는다. 렌더를 막지는 않는다: 확인 전에는 인증 칸만
- * 비우고 나머지는 그대로 그린다.
+ * ⭐ **로그인 상태를 여기서 읽지 않는다.** 인증 칸은 두 문구를 다 렌더하고 CSS 가 `<html data-session>`
+ * 으로 하나만 보인다(`globals.css`). 상태로 분기해 한쪽만 그리면 JS 로드 전까지 칸이 비어
+ * 새로고침마다 깜빡인다(2026-09-09). 확인 요청은 `SessionSync` 가 한 번 낸다 —
+ * 🚫 여기에 데이터 조회를 추가하지 않는다. 전 화면에 걸린다.
  *
  * ⭐ **실제로 존재하는 라우트만 넣는다.** 시안의 `설정` 탭은 그 화면이 없어 넣지 않았다 —
  * 링크를 먼저 만들면 눌렀을 때 404 다.
@@ -33,14 +33,25 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/**
+ * 인증 칸의 두 자리. 클래스 이름을 **리터럴로 적는다** — `` `session-${status}` `` 처럼 조립하면
+ * `session-guest` 로 전수 검색해도 이 파일이 안 잡혀, 스타일시트의 클래스를 바꿀 때 헤더만
+ * 조용히 깨진다(2026-09-10 리뷰에서 실제로 이 파일이 검색에서 빠졌다).
+ */
+const AUTH_NAV_SLOTS = [
+  { status: "guest", className: "session-guest" },
+  { status: "authenticated", className: "session-authenticated" },
+] as const;
+
+/** 네비 항목 한 칸의 스타일. 실제 링크와 확인 전 자리표시가 **같은 폭**이어야 해서 한 곳에 둔다. */
+function navLinkClass(active: boolean): string {
+  return `flex min-h-touch min-w-touch items-center justify-center rounded-pill px-3 text-sm font-bold transition-colors motion-reduce:transition-none sm:px-4 sm:text-base ${
+    active ? "bg-primary-strong text-white" : "text-ink-muted hover:bg-primary-tint hover:text-ink"
+  }`;
+}
+
 export function AppHeader() {
   const pathname = usePathname();
-  const session = useSession();
-
-  // 확인 전에는 인증 칸을 그리지 않는다. 곧바로 「로그인」을 그리면 이미 로그인한 사용자에게
-  // 로그아웃된 화면이 깜빡 보인다.
-  const authLink = session.status === "unknown" ? null : AUTH_LINK[session.status];
-  const links = authLink ? [...COMMON_LINKS, authLink] : COMMON_LINKS;
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-surface-raised/90 shadow-sm backdrop-blur-sm">
@@ -62,28 +73,39 @@ export function AppHeader() {
         </Link>
 
         <ul className="order-3 flex w-full items-center gap-1 sm:order-none sm:w-auto">
-          {links.map((link) => {
+          {COMMON_LINKS.map((link) => {
             const active = isActive(pathname, link.href);
             return (
-              // ⚠️ 넓은 화면에서는 오른쪽 CTA 가 같은 역할을 하므로 인증 칸만 숨긴다.
-              //    🚫 `href === "/login"` 으로 판정하지 않는다 — 로그인하면 href 가 `/me` 로
-              //    바뀌어 조건이 빗나가고 **네비와 CTA 가 둘 다 보인다.**
-              <li key={link.href} className={link.href === authLink?.href ? "lg:hidden" : undefined}>
+              <li key={link.href}>
                 <Link
                   href={link.href}
                   // 현재 위치를 보조기술에도 알린다. 색만으로 표시하면 화면을 못 보는 사용자에게는 없는 정보다.
                   aria-current={active ? "page" : undefined}
-                  className={`flex min-h-touch min-w-touch items-center justify-center rounded-pill px-3 text-sm font-bold transition-colors motion-reduce:transition-none sm:px-4 sm:text-base ${
-                    active
-                      ? "bg-primary-strong text-white"
-                      : "text-ink-muted hover:bg-primary-tint hover:text-ink"
-                  }`}
+                  className={navLinkClass(active)}
                 >
                   {link.label}
                 </Link>
               </li>
             );
           })}
+          {/* ⚠️ 넓은 화면에서는 오른쪽 CTA 가 같은 역할을 하므로 인증 칸만 숨긴다.
+              칸은 항상 있다 — 응답 뒤에 `<li>` 를 추가하면 네비 폭이 바뀌어 「시연 모드」까지 밀린다. */}
+          <li className="lg:hidden">
+            {AUTH_NAV_SLOTS.map(({ status, className }) => {
+              const link = AUTH_LINK[status];
+              const active = isActive(pathname, link.href);
+              return (
+                <Link
+                  key={status}
+                  href={link.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`${className} ${navLinkClass(active)}`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </li>
         </ul>
 
         <span className="inline-flex h-9 items-center gap-1.5 rounded-pill border border-accent-a bg-accent-a-soft px-3 text-sm font-semibold text-ink">

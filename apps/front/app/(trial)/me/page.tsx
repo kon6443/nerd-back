@@ -3,14 +3,47 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
-import { LoadingView } from "@/components/ui/LoadingView";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { actionClass } from "@/components/ui/actionStyles";
+import { SESSION_STAGE_BADGE, classifySessionStatus } from "@/components/story/sessionStatus";
 import { deleteSession, getMySessions } from "@/lib/api";
 import { logout } from "@/lib/api/auth";
 import { useSession } from "@/lib/api/useSession";
 import type { MyStorySessionItem } from "@nerd/contracts";
+
+/**
+ * 목록 격자. ⭐ **스켈레톤과 실제 목록이 같은 값을 쓰도록 한 곳에 둔다** — 한쪽만 고치면
+ * 자리가 어긋나고, 그 어긋남이 곧 깜빡임이다(서재의 `STORY_GRID` 와 같은 이유).
+ */
+const SESSION_GRID = "grid grid-cols-1 gap-4 sm:grid-cols-2";
+
+/**
+ * 목록이 도착하기 전 자리를 지키는 카드.
+ *
+ * ⭐ **실제 카드와 같은 구조·같은 크기여야 한다.** 문구 한 줄만 두면 목록이 채워지는 순간 아래가
+ * 통째로 밀려 내려가고, 그것이 새로고침마다 보이는 깜빡임의 정체다(2026-09-10).
+ * 🚫 이 파일 밖으로 올리지 않는다 — 두 번째 화면이 쓰는 순간 `components/` 로 옮긴다.
+ */
+function SessionCardSkeleton() {
+  return (
+    <Card className="flex animate-pulse flex-col justify-between gap-4 p-5 shadow-sm motion-reduce:animate-none">
+      <div className="flex gap-4">
+        <div className="h-20 w-20 shrink-0 rounded-lg bg-line" />
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="h-5 w-16 rounded-pill bg-line" />
+          <div className="h-6 w-3/4 rounded bg-line" />
+          <div className="h-4 w-1/2 rounded bg-line" />
+        </div>
+      </div>
+      <div className="flex items-center justify-end gap-2 pt-2">
+        <div className="min-h-touch w-28 rounded-btn bg-line" />
+        <div className="min-h-touch w-20 rounded-btn bg-line" />
+      </div>
+    </Card>
+  );
+}
 
 export default function MyPage() {
   const router = useRouter();
@@ -25,8 +58,11 @@ export default function MyPage() {
     if (session.status === "guest") router.replace("/login?redirect=/me");
   }, [session.status, router, loggingOut]);
 
+  // ⭐ **세션 확인을 기다리지 않는다.** 기다리면 `GET /auth/me` 다음에 `GET /sessions/my` 가 도는
+  //    직렬이 되어 화면이 두 번 바뀐다. 목록은 인증이 필요하지만, 비로그인이면 401 이 오고 위
+  //    effect 가 로그인 화면으로 보내므로 잃는 것이 없다. 🚫 `session.status` 를 의존성에 넣지 않는다 —
+  //    넣으면 상태가 정해지는 순간 한 번 더 요청이 나간다.
   useEffect(() => {
-    if (session.status !== "authenticated") return;
     let active = true;
     getMySessions()
       .then((data) => {
@@ -41,7 +77,7 @@ export default function MyPage() {
     return () => {
       active = false;
     };
-  }, [session.status]);
+  }, []);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -69,9 +105,12 @@ export default function MyPage() {
     }
   }
 
-  if (session.status !== "authenticated") {
-    return <LoadingView message="확인하고 있어요..." />;
-  }
+  // ⭐ 골격(제목·로그아웃·아이디 카드·목록 제목)은 세션 확인 전에도 그린다.
+  //    확인 전에 전체 화면 로딩을 보이고 그 뒤 페이지를 통째로 갈아끼우면 새로고침마다 크게 튄다.
+  //    🚫 **비어 있는 칸을 두지 않는다** — 값이 들어오는 순간 주변이 밀리면 그것이 곧 깜빡임이다.
+  //    사용자 데이터가 들어갈 자리에는 **최종 모양과 같은 크기의 스켈레톤**을 둔다(2026-09-10).
+  const authenticated = session.status === "authenticated";
+  const loading = !authenticated || loadingSessions;
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 p-6 md:p-8">
@@ -80,6 +119,8 @@ export default function MyPage() {
         <button
           type="button"
           onClick={handleLogout}
+          // 🚫 확인 전이라고 비활성으로 두지 않는다 — 확인이 끝나는 순간 흐렸다가 진해져 깜빡인다.
+          //    이 화면은 비로그인이면 어차피 로그인으로 보내므로 누를 사람은 로그인한 사용자뿐이다.
           disabled={loggingOut}
           className={actionClass("ghost", "text-sm disabled:opacity-60", "compact")}
         >
@@ -90,7 +131,16 @@ export default function MyPage() {
       <Card>
         <dl className="flex items-center gap-4">
           <dt className="text-ink-muted">아이디</dt>
-          <dd className="text-lg font-bold text-ink">{session.me.loginId}</dd>
+          <dd className="flex min-h-7 items-center text-lg font-bold text-ink">
+            {authenticated ? (
+              session.me.loginId
+            ) : (
+              <span
+                aria-hidden="true"
+                className="inline-block h-5 w-24 animate-pulse rounded bg-line motion-reduce:animate-none"
+              />
+            )}
+          </dd>
         </dl>
       </Card>
 
@@ -102,8 +152,19 @@ export default function MyPage() {
           </ActionLink>
         </div>
 
-        {loadingSessions ? (
-          <p className="text-sm text-ink-muted">동화 목록을 불러오는 중입니다...</p>
+        {loading ? (
+          <>
+            {/* 스켈레톤은 눈으로만 읽히는 신호다. 화면을 못 보는 사용자에게는 이 문구가 그 역할을 한다. */}
+            <p role="status" className="sr-only">
+              동화 목록을 불러오는 중입니다.
+            </p>
+            {/* ⚠️ **한 장만 그린다.** 여러 장을 그려 놓으면 동화를 아직 안 만든 사람에게 없는
+                내용을 약속했다가 안내 카드 하나로 줄어든다 — 그 줄어듦이 곧 깜빡임이다
+                (2026-09-10 실측: 스켈레톤 2장 → 안내 카드 1장). 늘어나는 쪽은 덜 튄다. */}
+            <div className={SESSION_GRID} aria-hidden="true">
+              <SessionCardSkeleton />
+            </div>
+          </>
         ) : mySessions.length === 0 ? (
           <Card className="flex flex-col items-center gap-4 py-8 text-center">
             <p className="text-lg font-bold text-ink">아직 만든 나만의 동화책이 없어요.</p>
@@ -115,12 +176,14 @@ export default function MyPage() {
             </ActionLink>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className={SESSION_GRID}>
             {mySessions.map((s) => {
-              const isCompleted = s.status === "completed";
-              const isGenerating = s.status === "generating" || s.status === "face_ready";
-              const isFailed = s.status === "failed";
+              const stage = classifySessionStatus(s.status);
+              const isCompleted = stage === "completed";
+              const isGenerating = stage === "generating";
+              const isFailed = stage === "failed";
               const isDeleting = deletingSessionId === s.id;
+              const badge = SESSION_STAGE_BADGE[stage];
 
               return (
                 <Card key={s.id} className="flex flex-col justify-between gap-4 p-5 shadow-sm">
@@ -142,27 +205,9 @@ export default function MyPage() {
 
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded-pill px-2.5 py-0.5 text-xs font-bold ${
-                            // 🚫 원색 유틸리티(emerald·amber·rose)를 쓰지 않는다 — 팔레트를 바꾸면
-                            //    이 배지만 옛 색으로 남는다. 🚫 dark: 도 쓰지 않는다(다크모드 미사용).
-                            isCompleted
-                              ? "bg-primary-tint text-primary-strong"
-                              : isGenerating
-                              ? "bg-accent-a-soft text-accent-a-strong"
-                              : isFailed
-                              ? "bg-danger-soft text-danger-strong"
-                              : "bg-surface text-ink-muted"
-                          }`}
-                        >
-                          {isCompleted
-                            ? "완성됨"
-                            : isGenerating
-                            ? "제작 중"
-                            : isFailed
-                            ? "제작 실패"
-                            : "등록 중"}
-                        </span>
+                        {/* 색은 `Badge` 가 톤으로 소유한다. main 이 같은 자리에서 원색 유틸리티를
+                            토큰으로 바꿨고(듀오링고 톤), 그 색 선택을 톤 정의로 옮겼다. */}
+                        <Badge tone={badge.tone}>{badge.label}</Badge>
                       </div>
                       <h3 className="truncate text-lg font-bold text-ink">{s.templateTitle}</h3>
                       <p className="text-xs text-ink-muted">

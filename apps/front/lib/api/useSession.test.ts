@@ -43,3 +43,47 @@ describe("세션 조회 합치기", () => {
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("브라우저에 남기는 값 ⭐", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  /**
+   * 🚫 **아이디가 저장되면 안 된다.** 로그아웃 없이 브라우저를 닫으면 다음 사람이 마이페이지를
+   * 열자마자 앞사람의 아이디가 먼저 그려진다(2026-09-10 리뷰). 남기는 것은 로그인 여부뿐이다.
+   */
+  it("로그인 여부만 남기고 아이디는 남기지 않는다", async () => {
+    const stored = new Map<string, string>();
+    vi.stubGlobal("window", {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      localStorage: {
+        getItem: (k: string) => stored.get(k) ?? null,
+        setItem: (k: string, v: string) => void stored.set(k, v),
+        removeItem: (k: string) => void stored.delete(k),
+      },
+    });
+    vi.stubGlobal("document", { documentElement: { dataset: {} } });
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ code: "SUCCESS", data: { loginId: "userA" }, message: "" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    process.env.BACKEND_INTERNAL_URL = "http://backend:5501";
+
+    const { __loadForTest } = (await import("./useSession")) as unknown as {
+      __loadForTest: () => Promise<void>;
+    };
+    await __loadForTest();
+
+    const raw = stored.get("nerd:session");
+    expect(raw).toBeDefined();
+    expect(JSON.parse(raw as string)).toEqual({ status: "authenticated" });
+    expect(raw).not.toContain("userA");
+  });
+});

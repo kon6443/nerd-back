@@ -3,6 +3,7 @@ import {
   createSession,
   deleteSession,
   fetchSessionPages,
+  findMySessionBySlug,
   getMySessions,
   personalizeSession,
   retrySessionPage,
@@ -146,5 +147,23 @@ describe("session api", () => {
     expect(apiFetchSpy).toHaveBeenCalledWith("/sessions/session-123", {
       method: "DELETE",
     });
+  });
+  /**
+   * ⭐ 이 헬퍼는 서재 상세·촬영 화면 **세 곳**이 각자 적던 "목록에서 slug 로 찾기" 를 모은 것이다.
+   * 없을 때 `undefined` 가 아니라 `null` 을 주기로 했으므로 그 계약을 고정한다.
+   */
+  it("findMySessionBySlug 는 목록에서 slug 가 같은 세션을 찾는다", async () => {
+    vi.spyOn(client, "apiFetch").mockResolvedValue([
+      { id: "s1", templateId: 1, templateSlug: "jack", templateTitle: "잭", status: "completed", referenceImageUrl: null, createdAt: "", updatedAt: "" },
+      { id: "s2", templateId: 2, templateSlug: "hood", templateTitle: "모자", status: "draft", referenceImageUrl: null, createdAt: "", updatedAt: "" },
+    ]);
+
+    await expect(findMySessionBySlug("hood")).resolves.toMatchObject({ id: "s2" });
+  });
+
+  it("findMySessionBySlug 는 없으면 undefined 가 아니라 null 을 준다", async () => {
+    vi.spyOn(client, "apiFetch").mockResolvedValue([]);
+
+    await expect(findMySessionBySlug("없는-동화")).resolves.toBeNull();
   });
 });

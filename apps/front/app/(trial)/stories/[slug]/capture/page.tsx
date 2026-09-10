@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { actionClass } from "@/components/ui/actionStyles";
-import { ApiError, createSession, deleteSession, getMySessions, uploadFace } from "@/lib/api";
+import { ApiError, createSession, deleteSession, findMySessionBySlug, uploadFace } from "@/lib/api";
 import type { MyStorySessionItem, UploadFaceResponse } from "@nerd/contracts";
 
 interface PageProps {
@@ -130,9 +130,8 @@ export default function CapturePage({ params }: PageProps) {
     let active = true;
     async function checkExistingSession() {
       try {
-        const sessions = await getMySessions();
+        const matched = await findMySessionBySlug(slug);
         if (!active) return;
-        const matched = sessions.find((s) => s.templateSlug === slug);
         if (matched) {
           if (matched.status === "completed") {
             setExistingSession(matched);
@@ -308,9 +307,8 @@ export default function CapturePage({ params }: PageProps) {
           return;
         }
         if (err.status === 409) {
-          getMySessions()
-            .then((sessions) => {
-              const matched = sessions.find((s) => s.templateSlug === slug);
+          findMySessionBySlug(slug)
+            .then((matched) => {
               if (matched) {
                 setExistingSession(matched);
                 stopWebcam();
@@ -336,9 +334,9 @@ export default function CapturePage({ params }: PageProps) {
         <Link href={`/library/${slug}`} className="text-sm font-semibold text-primary hover:underline">
           ← 동화로 돌아가기
         </Link>
-        <Badge>
-          Slice 3: 얼굴 등록
-        </Badge>
+        {/* 톤을 적어 둔다. 기본값에 기대면 `Badge` 의 기본이 바뀔 때 이 화면 색이 조용히 따라 바뀐다
+            — 실제로 팔레트 교체 때 초록으로 바뀌었다가 파랑으로 되돌아왔다(2026-09-10). */}
+        <Badge tone="info">Slice 3: 얼굴 등록</Badge>
       </div>
 
       {/* 완료 화면 또는 기존 동화 안내 */}

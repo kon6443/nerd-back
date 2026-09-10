@@ -85,3 +85,24 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * 로그인 상태에 따라 갈리는 문구(헤더 네비 · CTA).
+ *
+ * ⭐ React 가 아니라 **`<html data-session>` 속성이 정한다.** 서버 HTML 은 로그인 상태를 모르고,
+ * React 가 상태를 알게 되는 시점은 JS 가 로드되어 하이드레이션된 뒤라 그 사이 인증 칸이 비어
+ * 보이며 새로고침마다 깜빡였다(2026-09-09). `layout.tsx` 의 블로킹 인라인 스크립트가 첫 페인트 전에
+ * 기억해 둔 상태를 속성으로 올리고, `useSession` 이 확인 뒤 같은 속성을 동기화한다.
+ * 두 문구를 항상 렌더하고 여기서 하나만 보인다. 🚫 컴포넌트에서 상태로 분기해 한쪽만 그리지 않는다.
+ *
+ * 속성이 없으면(첫 방문·기억 없음) 「마이페이지」 폭의 자리만 잡는다 — 응답이 와도 주변이 밀리지 않게.
+ */
+html:not([data-session="guest"]) .session-guest {
+  display: none;
+}
+html[data-session="guest"] .session-authenticated {
+  display: none;
+}
+html:not([data-session]) .session-authenticated {
+  visibility: hidden;
+}
