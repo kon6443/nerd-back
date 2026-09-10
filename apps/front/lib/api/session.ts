@@ -1,9 +1,13 @@
 import type {
+  AfterStoryResponse,
   CreateSessionInput,
   MyStorySessionItem,
   PersonalizeSessionResponse,
   RetryPageResponse,
+  RetryAfterStoryResponse,
+  SelectAfterStoryChoiceResponse,
   SessionPagesResponse,
+  StoryBranchKey,
   StorySessionSummary,
   UploadFaceResponse,
 } from "@nerd/contracts";
@@ -91,3 +95,30 @@ export async function retrySessionPage(
   });
 }
 
+/** 비하인드 A/B 선택지와 각 결과 페이지의 준비 상태를 조회한다. */
+export async function fetchAfterStory(sessionId: string): Promise<AfterStoryResponse> {
+  return apiFetch<AfterStoryResponse>(`/sessions/${sessionId}/after-story`, {
+    method: "GET",
+  });
+}
+
+/** 아직 선택하지 않은 세션의 첫 A/B 선택을 영구 기록한다. */
+export async function selectAfterStoryChoice(
+  sessionId: string,
+  branchKey: StoryBranchKey,
+): Promise<SelectAfterStoryChoiceResponse> {
+  return apiFetch<SelectAfterStoryChoiceResponse>(`/sessions/${sessionId}/after-story/choice`, {
+    method: "POST",
+    json: { branchKey },
+  });
+}
+
+/** 실패한 비하인드 A/B 결과 6쪽을 다시 생성한다. */
+export async function retryAfterStoryPage(
+  sessionId: string,
+  branchKey: StoryBranchKey,
+): Promise<RetryAfterStoryResponse> {
+  return apiFetch<RetryAfterStoryResponse>(`/sessions/${sessionId}/after-story/${branchKey}/retry`, {
+    method: "POST",
+  });
+}

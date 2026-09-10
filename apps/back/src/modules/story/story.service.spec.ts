@@ -135,7 +135,11 @@ describe('StoryService', () => {
         HttpStatus.NOT_FOUND,
       );
 
-      expect(pages.findOneBy).toHaveBeenCalledWith({ templateId: 7, pageNo: 99 });
+      expect(pages.findOneBy).toHaveBeenCalledWith({
+        templateId: 7,
+        pageNo: 99,
+        branchKey: 'common',
+      });
     });
 
     it('본문·개인화 대상 배역·대화 가능 캐릭터를 매핑한다', async () => {

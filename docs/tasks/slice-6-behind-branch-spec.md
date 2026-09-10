@@ -1,8 +1,9 @@
 # Slice 6: 비하인드 A/B 분기 상세 설계서
 
-> 작성일: 2026-09-10  
-> 상태: **설계 확정 (`/grill-me`) · 구현 대기**  
+> 작성일: 2026-09-10
+> 상태: **설계 확정 (`/grill-me`) · 구현 및 DB 반영 완료**
 > 상위 문서: [`docs/tasks/tasks-my-story.md`](tasks-my-story.md)
+> 확정 원고: [`slice-6-behind-manuscript.md`](slice-6-behind-manuscript.md)
 
 ---
 
@@ -139,6 +140,7 @@ pages/{sessionId}/b/page-6.png
       "title": "...",
       "description": "...",
       "pageNo": 6,
+      "bodyText": "...",
       "status": "succeeded",
       "imageUrl": "https://..."
     },
@@ -154,7 +156,7 @@ pages/{sessionId}/b/page-6.png
 }
 ```
 
-`firstBranchChoice`는 선택 전 또는 건너뛴 세션에서 `null`이다. 결과의 본문은 일반 페이지 조회 응답에 포함시키거나 이 응답에 포함시키되, 구현 때 계약 하나로 고정한다.
+`firstBranchChoice`는 선택 전 또는 건너뛴 세션에서 `null`이다. 결과의 본문은 이 응답의 `bodyText`로 함께 반환한다.
 
 ### `POST /sessions/:id/after-story/choice`
 
@@ -168,6 +170,14 @@ pages/{sessionId}/b/page-6.png
 - 같은 값의 반복 요청은 현재 기록을 반환하는 멱등 성공으로 처리한다.
 - 다른 값의 재요청은 `409 FIRST_BRANCH_ALREADY_CHOSEN`을 반환한다.
 - 재독 중 다른 결과를 보는 경우 이 API를 호출하지 않는다.
+
+### `POST /sessions/:id/after-story/:branchKey/retry`
+
+`failed` 상태의 분기 결과 6쪽 하나만 다시 생성한다.
+
+- `branchKey`는 `a` 또는 `b`다.
+- 성공 시 `202 Accepted`와 `{ sessionId, pageNo: 6, branchKey, status: "pending" }`를 반환한다.
+- 본편 재시도 경로(`POST /sessions/:id/pages/:pageNo/retry`)와 분리해, 같은 6쪽 번호의 A/B 결과가 혼동되지 않게 한다.
 
 ## 7. 수용 기준과 검증
 

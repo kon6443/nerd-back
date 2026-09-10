@@ -11,14 +11,19 @@ import { actionClass } from "@/components/ui/actionStyles";
 import { BookFrame } from "@/components/story/BookFrame";
 import {
   ApiError,
+  fetchAfterStory,
   fetchStoryDetail,
   fetchStoryPage,
   fetchSessionPages,
   personalizeSession,
+  retryAfterStoryPage,
   retrySessionPage,
+  selectAfterStoryChoice,
 } from "@/lib/api";
 import type {
+  AfterStoryResponse,
   SessionPagesResponse,
+  StoryBranchKey,
   StoryDetail,
   StoryPageView,
 } from "@nerd/contracts";
@@ -41,7 +46,12 @@ function StoryReadContent({ params }: PageProps) {
   const [story, setStory] = useState<StoryDetail | null>(null);
   const [storyPages, setStoryPages] = useState<StoryPageView[]>([]);
   const [sessionPages, setSessionPages] = useState<SessionPagesResponse | null>(null);
+  const [afterStory, setAfterStory] = useState<AfterStoryResponse | null>(null);
   const [currentPageNo, setCurrentPageNo] = useState(1);
+  const [activeBranchKey, setActiveBranchKey] = useState<StoryBranchKey | null>(null);
+  const [isAfterStoryLoading, setIsAfterStoryLoading] = useState(false);
+  const [isSelectingBranch, setIsSelectingBranch] = useState<StoryBranchKey | null>(null);
+  const [afterStoryError, setAfterStoryError] = useState("");
   const [retryingPageNo, setRetryingPageNo] = useState<number | null>(null);
   const [isReadyToRead, setIsReadyToRead] = useState(false);
   const [retryTrigger, setRetryTrigger] = useState(0);
@@ -91,7 +101,7 @@ function StoryReadContent({ params }: PageProps) {
         if (!active) return;
         setSessionPages(sessionData);
 
-        if (sessionData.isAllCompleted || sessionData.status === "completed") {
+        if (sessionData.isMainStoryReady || sessionData.isAllCompleted || sessionData.status === "completed") {
           setIsReadyToRead(true);
           setViewState("reader");
         } else {
@@ -135,7 +145,7 @@ function StoryReadContent({ params }: PageProps) {
         const data = await fetchSessionPages(currentSessionId);
         setSessionPages(data);
 
-        if (data.isAllCompleted || data.status === "completed") {
+        if (data.isMainStoryReady || data.isAllCompleted || data.status === "completed") {
           setIsReadyToRead(true);
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
@@ -179,6 +189,23 @@ function StoryReadContent({ params }: PageProps) {
     };
   }, [slug, currentPageNo, viewState, story, storyPages]);
 
+  // 비하인드 선택 화면에서는 A/B 결과의 생성 상태만 가볍게 갱신한다.
+  useEffect(() => {
+    if (!sessionId || viewState !== "branch" || !afterStory) return;
+    const isGenerating = afterStory.choices.some(
+      (choice) => choice.status === "pending" || choice.status === "running",
+    );
+    if (!isGenerating) return;
+
+    const intervalId = setInterval(() => {
+      void fetchAfterStory(sessionId)
+        .then(setAfterStory)
+        .catch(() => undefined);
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [sessionId, viewState, afterStory]);
+
   // 특정 실패 페이지 단독 재시도
   async function handleRetry(pageNo: number) {
     if (!sessionId) return;
@@ -193,7 +220,9 @@ function StoryReadContent({ params }: PageProps) {
           status: "generating",
           isAllCompleted: false,
           pages: prev.pages.map((p) =>
-            p.pageNo === pageNo ? { ...p, status: "pending", errorMessage: null } : p,
+            p.pageNo === pageNo && p.branchKey === "common"
+              ? { ...p, status: "pending", errorMessage: null }
+              : p,
           ),
         };
       });
@@ -204,6 +233,79 @@ function StoryReadContent({ params }: PageProps) {
       }
     } finally {
       setRetryingPageNo(null);
+    }
+  }
+
+  async function loadAfterStory() {
+    if (!sessionId) return;
+    setIsAfterStoryLoading(true);
+    setAfterStoryError("");
+    try {
+      setAfterStory(await fetchAfterStory(sessionId));
+    } catch (err: unknown) {
+      setAfterStoryError(err instanceof ApiError ? err.message : "비하인드 이야기를 불러오지 못했어요.");
+    } finally {
+      setIsAfterStoryLoading(false);
+    }
+  }
+
+  function openBranchScreen() {
+    setActiveBranchKey(null);
+    setViewState("branch");
+    void loadAfterStory();
+  }
+
+  async function handleBranchChoice(branchKey: StoryBranchKey) {
+    if (!afterStory) return;
+    const choice = afterStory.choices.find((item) => item.branchKey === branchKey);
+    if (!choice || choice.status !== "succeeded") return;
+
+    setIsSelectingBranch(branchKey);
+    setAfterStoryError("");
+    try {
+      if (afterStory.firstBranchChoice === null) {
+        const result = await selectAfterStoryChoice(sessionId!, branchKey);
+        setAfterStory((previous) =>
+          previous ? { ...previous, firstBranchChoice: result.branchKey } : previous,
+        );
+      }
+      setActiveBranchKey(branchKey);
+      setCurrentPageNo(6);
+      setViewState("reader");
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 409) {
+        setAfterStoryError("첫 선택이 이미 저장되었어요. 저장된 결과를 불러옵니다.");
+        await loadAfterStory();
+        return;
+      }
+      setAfterStoryError(err instanceof ApiError ? err.message : "선택을 저장하지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      setIsSelectingBranch(null);
+    }
+  }
+
+  async function handleAfterStoryRetry(branchKey: StoryBranchKey) {
+    if (!sessionId) return;
+    setIsSelectingBranch(branchKey);
+    setAfterStoryError("");
+    try {
+      await retryAfterStoryPage(sessionId, branchKey);
+      setAfterStory((previous) =>
+        previous
+          ? {
+              ...previous,
+              choices: previous.choices.map((choice) =>
+                choice.branchKey === branchKey
+                  ? { ...choice, status: "pending", errorMessage: null, imageUrl: null }
+                  : choice,
+              ) as AfterStoryResponse["choices"],
+            }
+          : previous,
+      );
+    } catch (err: unknown) {
+      setAfterStoryError(err instanceof ApiError ? err.message : "다시 만들기를 시작하지 못했어요.");
+    } finally {
+      setIsSelectingBranch(null);
     }
   }
 
@@ -255,9 +357,10 @@ function StoryReadContent({ params }: PageProps) {
   // 2. 생성 중 대기 화면 (v-generating)
   // ==========================================
   if (viewState === "generating") {
-    const total = sessionPages?.totalPages || story.pageCount || 6;
+    const total = sessionPages?.totalPages || 7;
     const completed = sessionPages?.completedPages || 0;
     const progressPercent = Math.min(100, Math.round((completed / total) * 100));
+    const generationPages = sessionPages?.pages ?? [];
 
     return (
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-6 px-4 py-8 text-center">
@@ -305,19 +408,21 @@ function StoryReadContent({ params }: PageProps) {
             페이지별 제작 현황
           </h2>
           <div className="flex flex-col gap-2">
-            {Array.from({ length: total }, (_, i) => i + 1).map((pageNo) => {
-              const item = sessionPages?.pages.find((p) => p.pageNo === pageNo);
-              const isBehind = pageNo > 4;
+            {generationPages.map((item) => {
+              const isBehind = item.branchKey !== "common";
+              const pageLabel = isBehind
+                ? `6쪽 비하인드 ${item.branchKey.toUpperCase()}`
+                : `${item.pageNo}쪽`;
               const status = item?.status || "pending";
 
               return (
                 <div
-                  key={pageNo}
+                  key={`${item.branchKey}-${item.pageNo}`}
                   className="flex items-center justify-between rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm"
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-ink">
-                      {pageNo}쪽 {isBehind ? "(비하인드)" : ""}
+                      {pageLabel}
                     </span>
                     {item?.imageUrl && (
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
@@ -341,11 +446,17 @@ function StoryReadContent({ params }: PageProps) {
                     )}
                     {status === "failed" && (
                       <button
-                        onClick={() => void handleRetry(pageNo)}
-                        disabled={retryingPageNo === pageNo}
+                        onClick={() =>
+                          void (isBehind
+                            ? handleAfterStoryRetry(item.branchKey as StoryBranchKey)
+                            : handleRetry(item.pageNo))
+                        }
+                        disabled={retryingPageNo === item.pageNo || isSelectingBranch !== null}
                         className="rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-200"
                       >
-                        {retryingPageNo === pageNo ? "재시도 중..." : "다시 만들기"}
+                        {retryingPageNo === item.pageNo || isSelectingBranch === item.branchKey
+                          ? "재시도 중..."
+                          : "다시 만들기"}
                       </button>
                     )}
                   </div>
@@ -385,6 +496,8 @@ function StoryReadContent({ params }: PageProps) {
   // 3. 비하인드 이야기 분기 화면 (v-branch)
   // ==========================================
   if (viewState === "branch") {
+    const savedChoice = afterStory?.firstBranchChoice;
+
     return (
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-6 px-4 py-8 text-center">
         <div className="rounded-full bg-magic-strong/10 p-5 text-4xl shadow-inner">
@@ -398,37 +511,84 @@ function StoryReadContent({ params }: PageProps) {
             그날 밤, 이야기는 어떻게 되었을까요?
           </h1>
           <p className="mt-2 text-base text-ink-muted">
-            본편의 모험이 무사히 끝나고, 밤하늘 아래 펼쳐지는 신비로운 뒷이야기가 이어집니다.
+            마음에 드는 선택지를 눌러 뒷이야기를 만나 보세요.
           </p>
         </div>
 
-        <Card className="w-full max-w-md border-2 border-magic/40 bg-surface text-left">
-          <h2 className="text-lg font-bold text-ink">✨ 이어지는 이야기 (5~6쪽)</h2>
-          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-            주인공의 용기 있는 행동 뒤에 찾아온 따스한 기적과 비밀스러운 모험을 확인해 보세요.
-          </p>
-          <div className="mt-4 flex justify-end">
-            <button
-              onClick={() => {
-                setCurrentPageNo(5);
-                setViewState("reader");
-              }}
-              className={actionClass("accentA", "w-full py-3")}
-            >
-              비하인드 이야기 읽기 →
-            </button>
+        {isAfterStoryLoading ? (
+          <Card className="w-full max-w-md text-ink-muted">
+            <p role="status">선택지를 준비하고 있어요...</p>
+          </Card>
+        ) : afterStory ? (
+          <div className="flex w-full max-w-md flex-col gap-3">
+            {savedChoice && (
+              <p className="rounded-lg bg-primary-soft px-3 py-2 text-sm font-semibold text-ink">
+                처음 고른 이야기는 {savedChoice.toUpperCase()}예요. 다시 읽을 때는 두 결과를 모두 볼 수 있어요.
+              </p>
+            )}
+            {afterStory.choices.map((choice) => {
+              const isReady = choice.status === "succeeded";
+              const isSelecting = isSelectingBranch === choice.branchKey;
+              return (
+                <Card key={choice.branchKey} className="border-2 border-magic/40 bg-surface text-left">
+                  <p className="text-xs font-bold tracking-wider text-magic-strong">선택 {choice.branchKey.toUpperCase()}</p>
+                  <h2 className="mt-1 text-lg font-bold text-ink">{choice.title}</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-muted">{choice.description}</p>
+                  {choice.status === "failed" && (
+                    <div className="mt-3 flex flex-col gap-2">
+                      <p className="text-sm font-medium text-red-600">
+                        이 이야기를 아직 준비하지 못했어요. 다시 만들 수 있어요.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void handleAfterStoryRetry(choice.branchKey)}
+                        disabled={isSelectingBranch !== null}
+                        className={actionClass("ghost", "w-full py-2 text-base disabled:pointer-events-none disabled:opacity-45")}
+                      >
+                        {isSelecting ? "다시 만드는 중..." : "이 결과 다시 만들기"}
+                      </button>
+                    </div>
+                  )}
+                  {choice.status === "pending" || choice.status === "running" ? (
+                    <p className="mt-3 text-sm font-medium text-ink-muted">삽화를 준비하고 있어요...</p>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void handleBranchChoice(choice.branchKey)}
+                    disabled={!isReady || isSelectingBranch !== null}
+                    className={actionClass("accentA", "mt-4 w-full py-3 disabled:pointer-events-none disabled:opacity-45")}
+                  >
+                    {isSelecting ? "선택 저장 중..." : `${choice.title} →`}
+                  </button>
+                </Card>
+              );
+            })}
           </div>
-        </Card>
+        ) : (
+          <Card className="w-full max-w-md border-red-200 text-red-700">
+            비하인드 선택지를 준비하지 못했어요.
+          </Card>
+        )}
 
-        <button
-          onClick={() => {
-            setCurrentPageNo(4);
-            setViewState("reader");
-          }}
-          className={actionClass("ghost")}
-        >
-          ← 4쪽으로 돌아가기
-        </button>
+        {afterStoryError && (
+          <p className="max-w-md text-sm font-medium text-red-600" role="alert">{afterStoryError}</p>
+        )}
+
+        <div className="flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={() => setViewState("end")} className={actionClass("ghost")}>
+            건너뛰기
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCurrentPageNo(5);
+              setViewState("reader");
+            }}
+            className={actionClass("ghost")}
+          >
+            ← 5쪽으로 돌아가기
+          </button>
+        </div>
       </main>
     );
   }
@@ -478,11 +638,15 @@ function StoryReadContent({ params }: PageProps) {
   // ==========================================
   // 5. 개인화 동화 리더 화면 (v-reader)
   // ==========================================
-  const currentPageData = storyPages.find((p) => p.pageNo === currentPageNo);
-  const currentSessionPage = sessionPages?.pages.find((p) => p.pageNo === currentPageNo);
-  const totalPages = story.pageCount || 6;
+  const activeAfterStory = activeBranchKey
+    ? afterStory?.choices.find((choice) => choice.branchKey === activeBranchKey)
+    : undefined;
+  const currentStoryPage = storyPages.find((p) => p.pageNo === currentPageNo);
+  const currentPageData = currentPageNo === 6 ? activeAfterStory : currentStoryPage;
+  const currentSessionPage = currentPageNo === 6 ? activeAfterStory : sessionPages?.pages.find((p) => p.pageNo === currentPageNo);
+  const totalPages = 6;
   const isFirstPage = currentPageNo <= 1;
-  const isBehindPage = currentPageNo > 4;
+  const isBehindPage = currentPageNo === 6;
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 py-5 md:px-8 md:py-6">
@@ -524,6 +688,10 @@ function StoryReadContent({ params }: PageProps) {
               >
                 이전
               </span>
+            ) : currentPageNo === 6 ? (
+              <button onClick={openBranchScreen} className={actionClass("ghost")}>
+                선택지로
+              </button>
             ) : (
               <button
                 onClick={() => setCurrentPageNo((prev) => Math.max(1, prev - 1))}
@@ -541,7 +709,14 @@ function StoryReadContent({ params }: PageProps) {
                 return (
                   <button
                     key={num}
-                    onClick={() => setCurrentPageNo(num)}
+                    onClick={() => {
+                      if (num === 6) {
+                        openBranchScreen();
+                        return;
+                      }
+                      setActiveBranchKey(null);
+                      setCurrentPageNo(num);
+                    }}
                     title={`${num}쪽`}
                     className={`h-2.5 w-2.5 rounded-full transition-all ${
                       isCur
@@ -556,12 +731,12 @@ function StoryReadContent({ params }: PageProps) {
             </div>
 
             {/* 다음 버튼 분기 처리 */}
-            {currentPageNo === 4 ? (
+            {currentPageNo === 5 ? (
               <button
-                onClick={() => setViewState("branch")}
+                onClick={openBranchScreen}
                 className={actionClass("accentA", "font-bold")}
               >
-                비하인드 이야기 보기 →
+                비하인드 선택하기 →
               </button>
             ) : currentPageNo >= totalPages ? (
               <button
@@ -585,11 +760,11 @@ function StoryReadContent({ params }: PageProps) {
       </BookFrame>
 
       {/* 등장인물 안내 */}
-      {currentPageData?.characters && currentPageData.characters.length > 0 ? (
+      {currentPageNo !== 6 && currentStoryPage?.characters && currentStoryPage.characters.length > 0 ? (
         <p className="text-center text-xs text-ink-muted">
           이 장면에 등장하는 인물:{" "}
           <span className="font-semibold text-ink">
-            {currentPageData.characters.map((c) => c.displayName).join(" · ")}
+            {currentStoryPage.characters.map((c) => c.displayName).join(" · ")}
           </span>
         </p>
       ) : null}

@@ -19,9 +19,13 @@ export class StoryPage {
   @JoinColumn({ name: 'template_id' })
   template: StoryTemplate;
 
-  /** 1부터 시작하는 본편 페이지 번호. `(template_id, page_no)` 가 유일하다. */
+  /** 1부터 시작하는 페이지 번호. 분기 결과는 같은 6쪽 번호를 공유한다. */
   @Column({ name: 'page_no', type: 'smallint', unsigned: true })
   pageNo: number;
+
+  /** `common`은 본편, `a`·`b`는 서로 다른 비하인드 결과다. */
+  @Column({ name: 'branch_key', type: 'varchar', length: 16, default: 'common' })
+  branchKey: 'common' | 'a' | 'b';
 
   @Column({ name: 'body_text', type: 'text' })
   bodyText: string;

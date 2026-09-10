@@ -7,6 +7,8 @@ import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
+import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
+import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
 import { StoryNotFoundErrorResponseDto } from '@modules/story/dto/story.error.dto';
 import {
   FaceNotReadyErrorResponseDto,
@@ -15,6 +17,7 @@ import {
   PageNotFoundErrorResponseDto,
   SessionNotFoundErrorResponseDto,
   StoryAlreadyCompletedErrorResponseDto,
+  FirstBranchAlreadyChosenErrorResponseDto,
 } from './dto/story-session-error.dto';
 import {
   IMAGE_GENERATION_PORT,
@@ -25,11 +28,16 @@ import { validateImageBuffer } from '../../common/utils/image-validator';
 import type {
   PersonalizeSessionResponse,
   RetryPageResponse,
+  RetryAfterStoryResponse,
   SessionPageItem,
   SessionPagesResponse,
   StorySessionSummary,
   UploadFaceResponse,
   MyStorySessionItem,
+  AfterStoryResponse,
+  SelectAfterStoryChoiceInput,
+  SelectAfterStoryChoiceResponse,
+  StoryBranchKey,
 } from '@nerd/contracts';
 
 @Injectable()
@@ -51,10 +59,85 @@ export class StorySessionService {
     private readonly storagePort: StoragePort,
     @Optional()
     private readonly configService?: ConfigService,
+    @Optional()
+    @InjectRepository(StoryAfterStoryChoice)
+    private readonly afterStoryChoiceRepo?: Repository<StoryAfterStoryChoice>,
+    @Optional()
+    @InjectRepository(SessionBranchChoice)
+    private readonly branchChoiceRepo?: Repository<SessionBranchChoice>,
   ) {}
 
   /** 현재 프로세스에서 비동기로 실행 중인 파이프라인 세션 ID 추적 (중복 실행 방지 및 서버 재시작 시 고아 세션 복구용) */
   private readonly activePipelines = new Set<string>();
+
+  async getAfterStory(userId: number, sessionId: string): Promise<AfterStoryResponse> {
+    const session = await this.getOwnedSessionOrThrow(userId, sessionId);
+    const choiceRepo = this.requireAfterStoryChoiceRepo();
+    const branchRepo = this.requireBranchChoiceRepo();
+    const [choices, pages, images, firstChoice] = await Promise.all([
+      choiceRepo.find({ where: { templateId: session.templateId }, order: { branchKey: 'ASC' } }),
+      this.pageRepo.find({ where: { templateId: session.templateId }, order: { pageNo: 'ASC' } }),
+      this.pageImageRepo.find({ where: { sessionId } }),
+      branchRepo.findOne({ where: { sessionId } }),
+    ]);
+
+    const byBranch = new Map(choices.map((choice) => [choice.branchKey, choice]));
+    const result = (['a', 'b'] as const).map(async (branchKey) => {
+      const choice = byBranch.get(branchKey);
+      const page = pages.find((item) => item.pageNo === 6 && item.branchKey === branchKey);
+      if (!choice || !page) throw new Error(`비하인드 콘텐츠 누락: ${branchKey}`);
+      const image = images.find((item) => item.pageNo === 6 && item.branchKey === branchKey);
+      return {
+        branchKey,
+        title: choice.title,
+        description: choice.description,
+        pageNo: 6 as const,
+        bodyText: page.bodyText,
+        status: image?.status ?? 'pending',
+        imageUrl: image?.status === 'succeeded' && image.imageKey ? await this.storagePort.getPresignedUrl(image.imageKey) : null,
+        errorMessage: image?.errorMessage ?? null,
+      };
+    });
+
+    return {
+      sessionId,
+      firstBranchChoice: firstChoice?.branchKey ?? null,
+      choices: (await Promise.all(result)) as AfterStoryResponse['choices'],
+    };
+  }
+
+  async selectAfterStoryChoice(
+    userId: number,
+    sessionId: string,
+    input: SelectAfterStoryChoiceInput,
+  ): Promise<SelectAfterStoryChoiceResponse> {
+    await this.getOwnedSessionOrThrow(userId, sessionId);
+    const branchRepo = this.requireBranchChoiceRepo();
+    const existing = await branchRepo.findOne({ where: { sessionId } });
+    if (existing) {
+      if (existing.branchKey !== input.branchKey) throw new FirstBranchAlreadyChosenErrorResponseDto();
+      return { sessionId, branchKey: existing.branchKey, isFirstChoice: false };
+    }
+    const created = branchRepo.create({ id: randomUUID(), sessionId, branchKey: input.branchKey });
+    await branchRepo.save(created);
+    return { sessionId, branchKey: input.branchKey, isFirstChoice: true };
+  }
+
+  private async getOwnedSessionOrThrow(userId: number, sessionId: string): Promise<StorySession> {
+    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    if (!session || session.userId !== userId) throw new SessionNotFoundErrorResponseDto();
+    return session;
+  }
+
+  private requireAfterStoryChoiceRepo(): Repository<StoryAfterStoryChoice> {
+    if (!this.afterStoryChoiceRepo) throw new Error('StoryAfterStoryChoice repository is not configured');
+    return this.afterStoryChoiceRepo;
+  }
+
+  private requireBranchChoiceRepo(): Repository<SessionBranchChoice> {
+    if (!this.branchChoiceRepo) throw new Error('SessionBranchChoice repository is not configured');
+    return this.branchChoiceRepo;
+  }
 
   /**
    * 세션 생성 또는 미완료 세션 재사용 (Idempotent resume).
@@ -314,7 +397,9 @@ export class StorySessionService {
     const existingImages = await this.pageImageRepo.find({ where: { sessionId } });
 
     for (const page of templatePages) {
-      const existing = existingImages.find((img) => img.pageNo === page.pageNo);
+      const existing = existingImages.find(
+        (img) => img.pageNo === page.pageNo && img.branchKey === page.branchKey,
+      );
       if (existing) {
         if (existing.status !== 'succeeded') {
           existing.status = 'pending';
@@ -326,6 +411,7 @@ export class StorySessionService {
           id: randomUUID(),
           sessionId: session.id,
           pageNo: page.pageNo,
+          branchKey: page.branchKey,
           status: 'pending',
           imageKey: null,
           errorMessage: null,
@@ -356,10 +442,12 @@ export class StorySessionService {
       throw new SessionNotFoundErrorResponseDto();
     }
 
-    const templatePages = await this.pageRepo.find({
-      where: { templateId: session.templateId },
-      order: { pageNo: 'ASC' },
-    });
+    const templatePages = await this.pageRepo.find({ where: { templateId: session.templateId } });
+    templatePages.sort((left, right) =>
+      left.pageNo === right.pageNo
+        ? left.branchKey.localeCompare(right.branchKey)
+        : left.pageNo - right.pageNo,
+    );
 
     const pageImages = await this.pageImageRepo.find({
       where: { sessionId },
@@ -368,7 +456,9 @@ export class StorySessionService {
 
     const pages: SessionPageItem[] = await Promise.all(
       templatePages.map(async (tplPage) => {
-        const pageImg = pageImages.find((img) => img.pageNo === tplPage.pageNo);
+        const pageImg = pageImages.find(
+          (img) => img.pageNo === tplPage.pageNo && img.branchKey === tplPage.branchKey,
+        );
         let imageUrl: string | null = null;
         if (pageImg?.imageKey && pageImg.status === 'succeeded') {
           imageUrl = await this.storagePort.getPresignedUrl(pageImg.imageKey);
@@ -376,6 +466,7 @@ export class StorySessionService {
 
         return {
           pageNo: tplPage.pageNo,
+          branchKey: tplPage.branchKey,
           status: pageImg?.status || 'pending',
           imageUrl,
           errorMessage: pageImg?.errorMessage || null,
@@ -387,13 +478,17 @@ export class StorySessionService {
     );
 
     const completedPages = pages.filter((p) => p.status === 'succeeded').length;
-    const isAllCompleted = session.status === 'completed';
+    const mainStoryPages = pages.filter((page) => page.branchKey === 'common');
+    const isMainStoryReady =
+      mainStoryPages.length > 0 && mainStoryPages.every((page) => page.status === 'succeeded');
+    const isAllCompleted = pages.length > 0 && pages.every((page) => page.status === 'succeeded');
 
     return {
       sessionId: session.id,
       status: session.status,
       totalPages: templatePages.length,
       completedPages,
+      isMainStoryReady,
       isAllCompleted,
       pages,
     };
@@ -403,13 +498,33 @@ export class StorySessionService {
    * 실패한 특정 페이지 핀포인트 재시도 (API 12).
    */
   async retryPage(userId: number, sessionId: string, pageNo: number): Promise<RetryPageResponse> {
+    const result = await this.retryStoryPage(userId, sessionId, pageNo, 'common');
+    return { sessionId: result.sessionId, pageNo: result.pageNo, status: result.status };
+  }
+
+  /** 실패한 A/B 결과 6쪽만 비동기로 다시 생성한다. */
+  async retryAfterStoryPage(
+    userId: number,
+    sessionId: string,
+    branchKey: StoryBranchKey,
+  ): Promise<RetryAfterStoryResponse> {
+    const result = await this.retryStoryPage(userId, sessionId, 6, branchKey);
+    return { sessionId: result.sessionId, pageNo: 6, branchKey, status: result.status };
+  }
+
+  private async retryStoryPage(
+    userId: number,
+    sessionId: string,
+    pageNo: number,
+    branchKey: 'common' | StoryBranchKey,
+  ): Promise<{ sessionId: string; pageNo: number; status: 'pending' }> {
     const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
     if (!session || session.userId !== userId) {
       throw new SessionNotFoundErrorResponseDto();
     }
 
     const pageImg = await this.pageImageRepo.findOne({
-      where: { sessionId, pageNo },
+      where: { sessionId, pageNo, branchKey },
     });
 
     if (!pageImg) {
@@ -428,13 +543,9 @@ export class StorySessionService {
     await this.sessionRepo.save(session);
 
     // 해당 페이지만 비동기 재실행
-    void this.executeSinglePagePersonalization(session.id, pageNo);
+    void this.executeSinglePagePersonalization(session.id, pageNo, branchKey);
 
-    return {
-      sessionId: session.id,
-      pageNo,
-      status: 'pending',
-    };
+    return { sessionId: session.id, pageNo, status: 'pending' };
   }
 
   /**
@@ -447,7 +558,7 @@ export class StorySessionService {
         return 'an iconic vibrant bright red hooded cape (Red Riding Hood cloak) with the hood up, consistent red fairy tale dress';
       case 'jack':
       case 'jack-and-beanstalk':
-        return 'an adventurous young peasant boy outfit with brown suspenders and rolled sleeves';
+        return 'an adventurous young peasant boy outfit: a dark green vest, loose ivory shirt with rolled sleeves, brown trousers, and sturdy brown boots';
       default:
         return 'the charming protagonist storybook outfit';
     }
@@ -476,14 +587,15 @@ export class StorySessionService {
         order: { pageNo: 'ASC' },
       });
 
-      // 업스트림(OpenRouter/Gemini)의 동시성 슬롯(최대 5개) 초과 및 큐 지연을 방지하기 위해 3장씩 배치 분할 병렬 처리
-      const CHUNK_SIZE = 3;
+      // Qwen Image 3 요청 하나는 템플릿+인물 레퍼런스 2장만 사용한다.
+      // 업스트림 동시성 슬롯(최대 5개)을 넘지 않도록, 최대 4개 요청만 함께 실행한다.
+      const CHUNK_SIZE = 4;
       for (let i = 0; i < templatePages.length; i += CHUNK_SIZE) {
         const chunk = templatePages.slice(i, i + CHUNK_SIZE);
         await Promise.all(
           chunk.map(async (tplPage) => {
             const pageImg = await this.pageImageRepo.findOne({
-              where: { sessionId, pageNo: tplPage.pageNo },
+            where: { sessionId, pageNo: tplPage.pageNo, branchKey: tplPage.branchKey },
             });
 
             if (!pageImg || pageImg.status === 'succeeded') {
@@ -513,7 +625,7 @@ export class StorySessionService {
                 characterPrompt: characterCostume,
               });
 
-              const key = `personalizations/${sessionId}/page-${tplPage.pageNo}-${randomUUID()}.png`;
+              const key = `personalizations/${sessionId}/${tplPage.branchKey}/page-${tplPage.pageNo}-${randomUUID()}.png`;
               const s3Key = await this.storagePort.upload(key, generatedBuffer, 'image/png');
 
               pageImg.imageKey = s3Key;
@@ -543,8 +655,12 @@ export class StorySessionService {
   /**
    * 단일 페이지 재시도 비동기 실행
    */
-  async executeSinglePagePersonalization(sessionId: string, pageNo: number): Promise<void> {
-    const pipelineKey = `${sessionId}:${pageNo}`;
+  async executeSinglePagePersonalization(
+    sessionId: string,
+    pageNo: number,
+    branchKey: 'common' | StoryBranchKey = 'common',
+  ): Promise<void> {
+    const pipelineKey = `${sessionId}:${branchKey}:${pageNo}`;
     if (this.activePipelines.has(pipelineKey)) {
       this.logger.warn(`이미 진행 중인 단일 페이지 재시도 무시: ${pipelineKey}`);
       return;
@@ -555,11 +671,13 @@ export class StorySessionService {
       const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
       if (!session || !session.referenceImageKey) return;
 
-      const pageImg = await this.pageImageRepo.findOne({ where: { sessionId, pageNo } });
+      const pageImg = await this.pageImageRepo.findOne({
+        where: { sessionId, pageNo, branchKey },
+      });
       if (!pageImg) return;
 
       const tplPage = await this.pageRepo.findOne({
-        where: { templateId: session.templateId, pageNo },
+        where: { templateId: session.templateId, pageNo, branchKey },
       });
       if (!tplPage) return;
 
@@ -586,7 +704,7 @@ export class StorySessionService {
           characterPrompt: characterCostume,
         });
 
-        const key = `personalizations/${sessionId}/page-${tplPage.pageNo}-${randomUUID()}.png`;
+        const key = `personalizations/${sessionId}/${tplPage.branchKey}/page-${tplPage.pageNo}-${randomUUID()}.png`;
         const s3Key = await this.storagePort.upload(key, generatedBuffer, 'image/png');
 
         pageImg.imageKey = s3Key;

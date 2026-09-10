@@ -70,6 +70,7 @@ export type SessionPageStatus = z.infer<typeof sessionPageStatusSchema>;
 /** 개별 페이지 상태 정보 */
 export const sessionPageItemSchema = z.object({
   pageNo: z.number().int().min(1),
+  branchKey: z.enum(['common', 'a', 'b']),
   status: sessionPageStatusSchema,
   imageUrl: z.string().nullable(),
   errorMessage: z.string().nullable().optional(),
@@ -84,6 +85,8 @@ export const sessionPagesResponseSchema = z.object({
   status: storySessionStatusSchema,
   totalPages: z.number().int().min(1),
   completedPages: z.number().int().min(0),
+  /** 공통 본편 1~5쪽이 준비되어 리더 진입 가능한지 여부 */
+  isMainStoryReady: z.boolean(),
   isAllCompleted: z.boolean(),
   pages: z.array(sessionPageItemSchema),
 });
@@ -106,6 +109,15 @@ export const sessionPageParamsSchema = sessionIdParamsSchema.extend({
 
 export type SessionPageParams = z.infer<typeof sessionPageParamsSchema>;
 
+export const storyBranchKeySchema = z.enum(['a', 'b']);
+export type StoryBranchKey = z.infer<typeof storyBranchKeySchema>;
+
+export const afterStoryRetryParamsSchema = sessionIdParamsSchema.extend({
+  branchKey: z.enum(['a', 'b']),
+});
+
+export type AfterStoryRetryParams = z.infer<typeof afterStoryRetryParamsSchema>;
+
 /** 페이지 재시도 응답 (API 12) */
 export const retryPageResponseSchema = z.object({
   sessionId: z.string().uuid(),
@@ -114,6 +126,43 @@ export const retryPageResponseSchema = z.object({
 });
 
 export type RetryPageResponse = z.infer<typeof retryPageResponseSchema>;
+
+export const retryAfterStoryResponseSchema = z.object({
+  sessionId: z.string().uuid(),
+  pageNo: z.literal(6),
+  branchKey: storyBranchKeySchema,
+  status: sessionPageStatusSchema,
+});
+
+export type RetryAfterStoryResponse = z.infer<typeof retryAfterStoryResponseSchema>;
+
+export const selectAfterStoryChoiceSchema = z.object({ branchKey: storyBranchKeySchema }).strict();
+export type SelectAfterStoryChoiceInput = z.infer<typeof selectAfterStoryChoiceSchema>;
+
+export const afterStoryChoiceSchema = z.object({
+  branchKey: storyBranchKeySchema,
+  title: z.string(),
+  description: z.string(),
+  pageNo: z.literal(6),
+  bodyText: z.string(),
+  status: sessionPageStatusSchema,
+  imageUrl: z.string().nullable(),
+  errorMessage: z.string().nullable(),
+});
+
+export const afterStoryResponseSchema = z.object({
+  sessionId: z.string().uuid(),
+  firstBranchChoice: storyBranchKeySchema.nullable(),
+  choices: z.tuple([afterStoryChoiceSchema, afterStoryChoiceSchema]),
+});
+export type AfterStoryResponse = z.infer<typeof afterStoryResponseSchema>;
+
+export const selectAfterStoryChoiceResponseSchema = z.object({
+  sessionId: z.string().uuid(),
+  branchKey: storyBranchKeySchema,
+  isFirstChoice: z.boolean(),
+});
+export type SelectAfterStoryChoiceResponse = z.infer<typeof selectAfterStoryChoiceResponseSchema>;
 
 /** 내 동화 제작 세션 목록 항목 */
 export interface MyStorySessionItem {

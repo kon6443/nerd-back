@@ -55,3 +55,10 @@ export const PageNotFailedErrorResponseDto = defineDomainError({
   message: '실패한 페이지만 재시도할 수 있습니다.',
   name: 'PageNotFailedErrorResponseDto',
 });
+
+export const FirstBranchAlreadyChosenErrorResponseDto = defineDomainError({
+  code: 'FIRST_BRANCH_ALREADY_CHOSEN',
+  status: 409,
+  message: '첫 비하인드 선택은 변경할 수 없습니다.',
+  name: 'FirstBranchAlreadyChosenErrorResponseDto',
+});

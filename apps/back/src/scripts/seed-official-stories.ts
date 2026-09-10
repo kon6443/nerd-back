@@ -4,6 +4,7 @@ import { validateDbEnv } from '../config/env.validation';
 import { StoryCharacter } from '../entities/story-character.entity';
 import { StoryPageCharacter } from '../entities/story-page-character.entity';
 import { StoryPage } from '../entities/story-page.entity';
+import { StoryAfterStoryChoice } from '../entities/story-after-story-choice.entity';
 import { STORY_TEMPLATE_STATUS, StoryTemplate } from '../entities/story-template.entity';
 import { OFFICIAL_STORIES, type OfficialStoryData } from './official-stories';
 
@@ -34,8 +35,9 @@ async function upsertOfficialStory(
     }),
   );
 
-  // 하위 행 교체: 기존 페이지와 등장인물 삭제
+  // 하위 행 교체: 기존 페이지·선택지·등장인물 삭제
   await manager.getRepository(StoryPage).delete({ templateId: template.id });
+  await manager.getRepository(StoryAfterStoryChoice).delete({ templateId: template.id });
   await manager.getRepository(StoryCharacter).delete({ templateId: template.id });
 
   const characters = await manager.getRepository(StoryCharacter).save(
@@ -50,11 +52,28 @@ async function upsertOfficialStory(
   );
   const characterIdByRole = new Map(characters.map((character) => [character.role, character.id]));
 
+  const pagesWithBranch = [
+    ...story.pages.map((page) => ({ page, branchKey: 'common' as const })),
+    ...story.afterStory.choices.map((choice) => ({ page: choice.page, branchKey: choice.branchKey })),
+  ];
+
+  await manager.getRepository(StoryAfterStoryChoice).save(
+    story.afterStory.choices.map((choice) =>
+      manager.getRepository(StoryAfterStoryChoice).create({
+        templateId: template.id,
+        branchKey: choice.branchKey,
+        title: choice.title,
+        description: choice.description,
+      }),
+    ),
+  );
+
   const pages = await manager.getRepository(StoryPage).save(
-    story.pages.map((page) =>
+    pagesWithBranch.map(({ page, branchKey }) =>
       manager.getRepository(StoryPage).create({
         templateId: template.id,
         pageNo: page.pageNo,
+        branchKey,
         bodyText: page.bodyText,
         illustrationPrompt: page.illustrationPrompt ?? null,
         baseImageKey: page.baseImageKey ?? null,
@@ -62,15 +81,15 @@ async function upsertOfficialStory(
       }),
     ),
   );
-  const pageIdByNo = new Map(pages.map((page) => [page.pageNo, page.id]));
+  const pageIdByKey = new Map(pages.map((page) => [`${page.branchKey}:${page.pageNo}`, page.id]));
 
-  const links = story.pages.flatMap((page) =>
+  const links = pagesWithBranch.flatMap(({ page, branchKey }) =>
     page.characters.map((appearance) => {
-      const pageId = pageIdByNo.get(page.pageNo);
+      const pageId = pageIdByKey.get(`${branchKey}:${page.pageNo}`);
       const characterId = characterIdByRole.get(appearance.role);
 
       if (pageId === undefined || characterId === undefined) {
-        throw new Error(`정식 동화 정합성 오류 — page ${page.pageNo} 의 배역 ${appearance.role}`);
+        throw new Error(`정식 동화 정합성 오류 — ${branchKey} page ${page.pageNo} 의 배역 ${appearance.role}`);
       }
 
       return manager
@@ -90,7 +109,7 @@ async function main(): Promise<void> {
 
   const dataSource = new DataSource({
     ...buildMysqlConnectionOptions(validateDbEnv(process.env)),
-    entities: [StoryTemplate, StoryPage, StoryCharacter, StoryPageCharacter],
+    entities: [StoryTemplate, StoryPage, StoryAfterStoryChoice, StoryCharacter, StoryPageCharacter],
   });
 
   await dataSource.initialize();

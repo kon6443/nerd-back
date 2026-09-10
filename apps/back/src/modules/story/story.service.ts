@@ -44,7 +44,7 @@ export class StoryService {
     const template = await this.findPublishedOrThrow(slug);
 
     const [pageCount, characters] = await Promise.all([
-      this.pages.countBy({ templateId: template.id }),
+      this.pages.countBy({ templateId: template.id, branchKey: 'common' }),
       this.characters.find({ where: { templateId: template.id }, order: { id: 'ASC' } }),
     ]);
 
@@ -62,7 +62,11 @@ export class StoryService {
   async getPublishedPage(slug: string, pageNo: number): Promise<StoryPageView> {
     const template = await this.findPublishedOrThrow(slug);
 
-    const page = await this.pages.findOneBy({ templateId: template.id, pageNo });
+    const page = await this.pages.findOneBy({
+      templateId: template.id,
+      pageNo,
+      branchKey: 'common',
+    });
     if (!page) {
       throw new StoryPageNotFoundErrorResponseDto();
     }

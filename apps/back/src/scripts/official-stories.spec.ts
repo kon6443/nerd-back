@@ -14,9 +14,19 @@ describe('정식 동화 데이터셋 (잭과 콩나무, 빨간 모자)', () => {
         expect(() => storySlugSchema.parse(story.slug)).not.toThrow();
       });
 
-      it('페이지 번호가 1부터 6까지 빈틈없이 이어진다 (본편 4 + 비하인드 2)', () => {
+      it('공통 본편은 1부터 5까지 빈틈없이 이어진다', () => {
         const pageNumbers = story.pages.map((page) => page.pageNo);
-        expect(pageNumbers).toEqual([1, 2, 3, 4, 5, 6]);
+        expect(pageNumbers).toEqual([1, 2, 3, 4, 5]);
+      });
+
+      it('비하인드는 서로 다른 A/B 결과 6쪽과 선택지 메타를 가진다', () => {
+        expect(story.afterStory.choices).toHaveLength(2);
+        expect(story.afterStory.choices.map((choice) => choice.branchKey)).toEqual(['a', 'b']);
+        expect(story.afterStory.choices.map((choice) => choice.page.pageNo)).toEqual([6, 6]);
+        story.afterStory.choices.forEach((choice) => {
+          expect(choice.title.trim()).not.toHaveLength(0);
+          expect(choice.description.trim()).not.toHaveLength(0);
+        });
       });
 
       it('배역 키가 중복되지 않는다', () => {
@@ -24,7 +34,7 @@ describe('정식 동화 데이터셋 (잭과 콩나무, 빨간 모자)', () => {
       });
 
       it('personaTargetRole 이 실제 존재하는 배역을 가리킨다', () => {
-        const targets = story.pages
+        const targets = [...story.pages, ...story.afterStory.choices.map((choice) => choice.page)]
           .map((page) => page.personaTargetRole)
           .filter((role): role is string => role !== null);
 
@@ -33,13 +43,13 @@ describe('정식 동화 데이터셋 (잭과 콩나무, 빨간 모자)', () => {
       });
 
       it('페이지에 등장하는 배역도 전부 정의되어 있다', () => {
-        story.pages.forEach((page) => {
+        [...story.pages, ...story.afterStory.choices.map((choice) => choice.page)].forEach((page) => {
           page.characters.forEach((character) => expect(roles).toContain(character.role));
         });
       });
 
       it('개인화 대상이 그 페이지에 실제로 등장한다', () => {
-        story.pages.forEach((page) => {
+        [...story.pages, ...story.afterStory.choices.map((choice) => choice.page)].forEach((page) => {
           if (page.personaTargetRole === null) return;
 
           const appearing = page.characters.map((character) => character.role);
@@ -48,7 +58,7 @@ describe('정식 동화 데이터셋 (잭과 콩나무, 빨간 모자)', () => {
       });
 
       it('hitbox 가 0~1 정규 좌표이고 화면을 벗어나지 않는다', () => {
-        story.pages.forEach((page) => {
+        [...story.pages, ...story.afterStory.choices.map((choice) => choice.page)].forEach((page) => {
           page.characters.forEach(({ hitbox }) => {
             if (hitbox === null) return;
 
@@ -63,7 +73,7 @@ describe('정식 동화 데이터셋 (잭과 콩나무, 빨간 모자)', () => {
       });
 
       it('본문과 persona, displayName 이 모두 채워져 있다', () => {
-        story.pages.forEach((page) => expect(page.bodyText.trim().length).toBeGreaterThan(0));
+        [...story.pages, ...story.afterStory.choices.map((choice) => choice.page)].forEach((page) => expect(page.bodyText.trim().length).toBeGreaterThan(0));
         story.characters.forEach((character) => {
           expect(character.persona.trim().length).toBeGreaterThan(0);
           expect(character.displayName.trim().length).toBeGreaterThan(0);
