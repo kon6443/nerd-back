@@ -12,6 +12,7 @@ export {
   createSession,
   deleteSession,
   fetchSessionPages,
+  findMySessionBySlug,
   getMySessions,
   personalizeSession,
   retrySessionPage,

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { actionClass } from "@/components/ui/actionStyles";
-import { ApiError, createSession, deleteSession, getMySessions, uploadFace } from "@/lib/api";
+import { ApiError, createSession, deleteSession, findMySessionBySlug, uploadFace } from "@/lib/api";
 import type { MyStorySessionItem, UploadFaceResponse } from "@nerd/contracts";
 
 interface PageProps {
@@ -130,9 +130,8 @@ export default function CapturePage({ params }: PageProps) {
     let active = true;
     async function checkExistingSession() {
       try {
-        const sessions = await getMySessions();
+        const matched = await findMySessionBySlug(slug);
         if (!active) return;
-        const matched = sessions.find((s) => s.templateSlug === slug);
         if (matched) {
           if (matched.status === "completed") {
             setExistingSession(matched);
@@ -308,9 +307,8 @@ export default function CapturePage({ params }: PageProps) {
           return;
         }
         if (err.status === 409) {
-          getMySessions()
-            .then((sessions) => {
-              const matched = sessions.find((s) => s.templateSlug === slug);
+          findMySessionBySlug(slug)
+            .then((matched) => {
               if (matched) {
                 setExistingSession(matched);
                 stopWebcam();

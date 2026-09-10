@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { actionClass } from "@/components/ui/actionStyles";
-import { deleteSession, getMySessions } from "@/lib/api";
+import { deleteSession, findMySessionBySlug } from "@/lib/api";
 import { useSession } from "@/lib/api/useSession";
 import type { MyStorySessionItem } from "@nerd/contracts";
+import { classifySessionStatus } from "./sessionStatus";
 
 interface StorySessionActionsProps {
   slug: string;
@@ -16,6 +17,8 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
   const router = useRouter();
   const authSession = useSession();
   const [mySession, setMySession] = useState<MyStorySessionItem | null>(null);
+  // `null` 은 "아직 모른다"와 "없다"를 구분하지 못한다. 조회가 끝났는지를 따로 든다.
+  const [sessionsLoaded, setSessionsLoaded] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -26,14 +29,15 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
 
     let active = true;
 
-    getMySessions()
-      .then((sessions) => {
-        if (!active) return;
-        const matched = sessions.find((s) => s.templateSlug === slug) ?? null;
-        setMySession(matched);
+    findMySessionBySlug(slug)
+      .then((matched) => {
+        if (active) setMySession(matched);
       })
       .catch((err) => {
         console.warn("내 세션 조회 실패:", err);
+      })
+      .finally(() => {
+        if (active) setSessionsLoaded(true);
       });
 
     return () => {
@@ -42,6 +46,14 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
   }, [authSession.status, slug]);
 
   const currentSession = authSession.status === "authenticated" ? mySession : null;
+  // 🚫 `status === "generating" || status === "face_ready"` 를 여기서 다시 적지 않는다 — 분류는 `sessionStatus.ts` 가 소유한다.
+  const stage = currentSession ? classifySessionStatus(currentSession.status) : null;
+
+  // ⭐ 어떤 버튼 세트를 보일지 정해지기 전에는 **자리만** 잡는다. 먼저 「내 얼굴로 만들기」를
+  //    그려 놓고 조회가 끝나면 「내 얼굴 동화 읽기」로 갈아끼우면, 새로고침마다 버튼이 바뀌고
+  //    바뀌는 순간 잘못 누를 수 있다(2026-09-09 헤더와 같은 증상). 비로그인은 확인 즉시 정해진다.
+  const resolving =
+    authSession.status === "unknown" || (authSession.status === "authenticated" && !sessionsLoaded);
 
   async function handleResetAndRecreate() {
     if (!currentSession) return;
@@ -70,8 +82,18 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {/* 1. 이미 완성된 동화가 있는 경우 */}
-        {currentSession?.status === "completed" ? (
+        {resolving ? (
+          /* 0. 확인 중 — 기본 세트와 같은 높이의 투명 자리표시. 눌리지 않고 보조기술에도 안 읽힌다. */
+          <>
+            <span aria-hidden="true" className={actionClass("primary", "invisible")}>
+              시연 동화 읽기
+            </span>
+            <span aria-hidden="true" className={actionClass("accentA", "invisible")}>
+              📷 내 얼굴로 만들기
+            </span>
+          </>
+        ) : /* 1. 이미 완성된 동화가 있는 경우 */
+        currentSession && stage === "completed" ? (
           <>
             <ActionLink
               href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
@@ -97,7 +119,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
               {isDeleting ? "초기화 중..." : "🔄 다른 얼굴로 다시 만들기"}
             </button>
           </>
-        ) : currentSession?.status === "generating" || currentSession?.status === "face_ready" ? (
+        ) : currentSession && stage === "generating" ? (
           /* 2. 현재 생성 중인 경우 */
           <>
             <ActionLink
@@ -124,7 +146,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
               {isDeleting ? "취소 중..." : "취소하고 새로 만들기"}
             </button>
           </>
-        ) : currentSession?.status === "failed" ? (
+        ) : currentSession && stage === "failed" ? (
           /* 3. 생성이 실패한 경우 */
           <>
             <ActionLink
