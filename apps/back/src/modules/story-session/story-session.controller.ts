@@ -27,17 +27,22 @@ import { User } from '@entities/user.entity';
 import { StorySessionService } from './story-session.service';
 import {
   CreateSessionRequestDto,
+  AfterStoryRetryParamsDto,
   SessionIdParamsDto,
   SessionPageParamsDto,
+  SelectAfterStoryChoiceDto,
 } from './dto/story-session-request.dto';
 import type {
   ApiSuccess,
   MyStorySessionItem,
   PersonalizeSessionResponse,
   RetryPageResponse,
+  RetryAfterStoryResponse,
   SessionPagesResponse,
   StorySessionSummary,
   UploadFaceResponse,
+  AfterStoryResponse,
+  SelectAfterStoryChoiceResponse,
 } from '@nerd/contracts';
 
 @ApiTags('sessions')
@@ -175,6 +180,45 @@ export class StorySessionController {
     };
   }
 
+  @Get(':id/after-story')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: '비하인드 A/B 선택지와 결과 생성 상태 조회' })
+  async getAfterStory(
+    @CurrentUser() user: User,
+    @Param() params: SessionIdParamsDto,
+  ): Promise<ApiSuccess<AfterStoryResponse>> {
+    const result = await this.sessionService.getAfterStory(user.id, params.id);
+    return { code: SUCCESS_CODE, data: result, message: '' };
+  }
+
+  @Post(':id/after-story/choice')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: '비하인드 최초 A/B 선택 저장' })
+  @ApiResponse({ status: HttpStatus.CONFLICT, description: '최초 선택이 이미 다른 값으로 저장됨' })
+  async selectAfterStoryChoice(
+    @CurrentUser() user: User,
+    @Param() params: SessionIdParamsDto,
+    @Body() body: SelectAfterStoryChoiceDto,
+  ): Promise<ApiSuccess<SelectAfterStoryChoiceResponse>> {
+    const result = await this.sessionService.selectAfterStoryChoice(user.id, params.id, body);
+    return { code: SUCCESS_CODE, data: result, message: '' };
+  }
+
+  @Post(':id/after-story/:branchKey/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: '실패한 비하인드 A/B 결과 재시도' })
+  @ApiResponse({ status: HttpStatus.ACCEPTED, description: '분기 결과 재시도 작업 시작됨' })
+  async retryAfterStoryPage(
+    @CurrentUser() user: User,
+    @Param() params: AfterStoryRetryParamsDto,
+  ): Promise<ApiSuccess<RetryAfterStoryResponse>> {
+    const result = await this.sessionService.retryAfterStoryPage(user.id, params.id, params.branchKey);
+    return { code: SUCCESS_CODE, data: result, message: '' };
+  }
+
   @Post(':id/pages/:pageNo/retry')
   @HttpCode(HttpStatus.ACCEPTED)
   @UseGuards(AuthGuard)
@@ -219,4 +263,3 @@ export class StorySessionController {
     await this.sessionService.deleteSession(user.id, params.id);
   }
 }
-

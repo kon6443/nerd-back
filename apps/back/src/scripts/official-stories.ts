@@ -20,13 +20,29 @@ export interface StoryPageData {
   characters: StoryPageCharacterData[];
 }
 
+export type StoryBranchKey = 'a' | 'b';
+
+export interface AfterStoryChoiceData {
+  branchKey: StoryBranchKey;
+  title: string;
+  description: string;
+  page: StoryPageData;
+}
+
+export interface AfterStoryData {
+  choices: readonly [AfterStoryChoiceData, AfterStoryChoiceData];
+}
+
 export interface OfficialStoryData {
   slug: string;
   title: string;
   summary: string;
   coverImageKey?: string | null;
   characters: StoryCharacterData[];
+  /** 공통 본편. 비하인드 선택 UI는 페이지가 아니므로 여기에 넣지 않는다. */
   pages: StoryPageData[];
+  /** A/B 결과 페이지와 선택지 메타데이터. */
+  afterStory: AfterStoryData;
 }
 
 export const buildJackPrompt = (sceneStory: string, expressionInstruction: string): string =>
@@ -38,7 +54,7 @@ export const buildJackPrompt = (sceneStory: string, expressionInstruction: strin
   `1. [필수 - 템플릿 이목구비 및 헤어스타일 완전 삭제 & 인물 교체]: <base_scene_template>에 이미 그려진 서양 만화 캐릭터의 헤어스타일(머리카락 색상, 모질, 컬, 모양)과 큰 눈망울, 코, 입, 얼굴 윤곽선을 100% 완전히 지워내세요. 템플릿 원본의 가상 소년 잭 생김새와 머리카락이 조금이라도 남아있으면 안 됩니다. 소년 잭의 머리카락과 얼굴 전체(헤어스타일, 가르마, 앞머리 형태, 머리 기장, 머리색, 눈매, 쌍꺼풀 유무, 눈 크기 및 눈꼬리 모양, 눈썹, 콧대, 입술, 턱선, 얼굴형)를 <protagonist_identity> 속 인물의 고유한 헤어스타일 및 생김새로 100% 확실하게 교체해야 합니다. (엄마, 노인, 거인 등 다른 등장인물의 얼굴과 요술 거위는 절대 변경하지 마세요.)\n` +
   `2. [3D 각도 회전 & 헤어스타일 일관성 유지 필수]: <protagonist_identity>의 인물이 정면 사진이더라도, 이를 3차원 공간에서 회전시켜 <base_scene_template>의 고개 각도(정면, 3/4 측면, 반측면 등)와 시선 방향에 맞추어 새로 그려야 합니다. 각도가 돌아가더라도 템플릿의 머리카락으로 되돌아가지 말고, <protagonist_identity> 인물 고유의 헤어스타일(형태, 결, 볼륨)과 이목구비 정체성을 해당 3D 각도에 맞게 정확히 입체적으로 유지해야 합니다.\n` +
   `3. [동화 화풍 일치 & 그림체 보존 필수]: 실사 사진의 피부 질감이나 머리카락을 이질감 있게 그대로 오려 붙이지 마세요. <protagonist_identity> 인물의 얼굴 이목구비 특징과 헤어스타일 형태(앞머리 모양, 기장, 가르마, 색상)를 정확히 추출하여 구현하되, 채색과 선화 질감은 <base_scene_template> 원본 삽화의 따뜻한 수채화·과슈 동화 일러스트 그림체(부드러운 손그림 윤곽선, 파스텔 톤 수채화 붓 터치)로 100% 완벽하게 녹아들도록 자연스럽게 일러스트화하여 그려주세요. 전체 동화 삽화의 그림체와 화풍을 절대 해치지 않아야 합니다.\n` +
-  `4. [보존 및 블렌딩 영역]: 소년 잭의 의상(멜빵바지와 롤업 셔츠), 체형, 자세, 손, 소품 및 모든 배경 풍경은 <base_scene_template> 그대로 완벽하게 유지해주세요. 머리카락과 얼굴 전체는 <protagonist_identity>의 인물 특징으로 완전히 대체하되, 헤어라인과 이마, 얼굴 윤곽선, 목과 옷깃 경계는 동화 삽화 화풍에 맞춰 자연스럽게 블렌딩해주세요.\n` +
+  `4. [보존 및 블렌딩 영역]: 소년 잭의 초록 조끼, 흰 셔츠, 갈색 바지와 장화, 체형, 자세, 손, 소품 및 모든 배경 풍경은 <base_scene_template> 그대로 완벽하게 유지해주세요. 머리카락과 얼굴 전체는 <protagonist_identity>의 인물 특징으로 완전히 대체하되, 헤어라인과 이마, 얼굴 윤곽선, 목과 옷깃 경계는 동화 삽화 화풍에 맞춰 자연스럽게 블렌딩해주세요.\n` +
   `5. 현재 장면 스토리: ${sceneStory}\n` +
   `6. 장면별 각도 및 표정 지시: ${expressionInstruction}\n` +
   `7. 빛의 방향, 색온도, 명암은 <base_scene_template> 원본 장면에 맞춰 조화롭게 합성해주세요.\n` +
@@ -54,7 +70,7 @@ export const buildRedRidingHoodPrompt = (sceneStory: string, expressionInstructi
   `1. [필수 - 템플릿 이목구비 완전 삭제 및 얼굴 교체]: <base_scene_template>에 이미 그려진 서양 만화 캐릭터의 큰 눈망울, 코, 입, 얼굴 윤곽선을 100% 완전히 지워내세요. 템플릿 원본의 가상 캐릭터 생김새가 조금이라도 남아있으면 안 됩니다. 빨간 두건을 쓴 소녀의 얼굴 전체(눈매, 쌍꺼풀 유무, 눈 크기 및 눈꼬리 모양, 눈썹, 콧대, 입술, 턱선, 얼굴형)를 <protagonist_identity> 속 인물의 실제 고유한 생김새로 100% 확실하게 교체해야 합니다. (할머니, 사냥꾼 등 다른 등장인물의 얼굴은 절대 변경하지 마세요.)\n` +
   `2. [3D 각도 회전 & 시선 맞춤 필수]: <protagonist_identity>의 인물이 정면 사진이더라도, 이를 3차원 공간에서 회전시켜 <base_scene_template>의 고개 각도(정면, 3/4 측면, 반측면 등)와 시선 방향에 맞추어 새로 그려야 합니다. 각도가 돌아가더라도 <protagonist_identity> 인물 고유의 이목구비 정체성을 잃지 않아야 합니다.\n` +
   `3. [화풍 일치]: 얼굴 이목구비의 정체성은 <protagonist_identity>를 그대로 구현하되, 채색 질감만 <base_scene_template> 원본 삽화의 따뜻한 수채화·과슈 동화 일러스트 질감으로 조화롭게 일치시켜주세요.\n` +
-  `4. [보존 및 블렌딩 영역]: 빨간 두건, 의상, 체형, 자세, 손, 바구니 및 모든 숲 배경 풍경은 <base_scene_template> 그대로 완벽하게 유지해주세요. 두건 안쪽의 얼굴 전체는 <protagonist_identity>의 인물 특징으로 완전히 대체하되, 얼굴과 목·두건 경계는 자연스럽게 블렌딩해주세요.\n` +
+  `4. [보존 및 블렌딩 영역]: 빨간 두건, 의상, 체형, 자세, 손, 페이지별 템플릿에 있는 소품과 배경은 <base_scene_template> 그대로 완벽하게 유지해주세요. 두건 안쪽의 얼굴 전체는 <protagonist_identity>의 인물 특징으로 완전히 대체하되, 얼굴과 목·두건 경계는 자연스럽게 블렌딩해주세요.\n` +
   `5. 현재 장면 스토리: ${sceneStory}\n` +
   `6. 장면별 각도 및 표정 지시: ${expressionInstruction}\n` +
   `7. 빛의 방향, 밝기, 색감은 <base_scene_template> 원본 장면에 맞춰 조화롭게 합성해주세요.\n` +
@@ -100,103 +116,102 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
     },
   ],
   pages: [
-    // [본편: 1~4장]
+    // [본편: 1~5장]
     {
       pageNo: 1,
       bodyText:
-        '가난하지만 호기심 많은 잭은 마지막 남은 젖소를 팔러 장터로 향했어요.\n' +
-        '길에서 만난 신비한 노인이 반짝이는 콩을 건네며 속삭였지요.\n' +
+        '가난하지만 호기심 많은 잭은 마지막 남은 젖소를 팔러 장터로 갔어요.\n' +
+        '가는 길에 신비한 노인이 반짝이는 콩 몇 알을 내밀었지요.\n' +
         '"이건 밤새 자라는 마법의 콩이란다."\n' +
-        '잭은 두 눈을 반짝이며 젖소와 마법의 콩을 맞바꾸었어요.',
+        '잭은 젖소와 콩을 바꾸었어요.',
       illustrationPrompt: buildJackPrompt(
-        '가난하지만 호기심 많은 잭이 마지막 남은 젖소를 팔러 장터로 가던 중 신비한 노인의 마법의 콩과 맞바꾸는 장면',
-        '[정면 및 아래 시선]: 손바닥의 콩을 내려다보는 호기심과 기대감. <protagonist_identity> 인물의 고유 헤어스타일과 눈매를 살려 눈을 생기 있게 뜨고 눈썹을 살짝 올린 밝은 미소. 아래를 보는 원본 시선 유지.',
+        '젖소를 데리고 장터로 가던 잭이 시골길에서 신비한 노인이 내민 반짝이는 마법의 콩을 받는 장면',
+        '[오른쪽 위 시선]: 노인의 손바닥 위 콩을 올려다보는 호기심과 기대감. 원본의 오른쪽을 향한 고개와 손 뻗는 자세를 유지.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-1.png',
       personaTargetRole: 'jack',
-      characters: [{ role: 'jack', hitbox: { x: 0.35, y: 0.38, width: 0.28, height: 0.48 } }],
+      characters: [{ role: 'jack', hitbox: { x: 0.29, y: 0.31, width: 0.31, height: 0.6 } }],
     },
     {
       pageNo: 2,
       bodyText:
-        '엄마가 던져버린 콩은 하룻밤 새 구름을 뚫고 하늘 끝까지 자라났어요!\n' +
-        '잭은 굵은 줄기를 타고 용감하게 하늘 높이 올라갔지요.\n' +
-        '안개 낀 꼭대기에는 땅에서는 본 적도 없는 거대하고 신비로운 거인의 성이 솟아 있었답니다.',
+        '엄마가 창밖으로 던진 콩은 하룻밤 새 하늘 끝까지 자라났어요.\n' +
+        '잭은 굵은 콩나무 줄기를 타고 구름 위로 올라갔지요.\n' +
+        '안개 너머에는 아주 크고 낯선 성이 서 있었답니다.',
       illustrationPrompt: buildJackPrompt(
         '하늘 끝까지 자라난 거대한 콩나무 줄기를 타고 올라가 구름 위 신비로운 거인의 성을 발견한 장면',
-        '[3/4 측면 각도 회전 필수]: 콩나무 줄기에 매달려 고개를 위로 45도 돌려 거인의 성을 올려다보는 3/4 쿼터 뷰 각도로 새로 그려야 합니다. 템플릿의 만화 눈과 템플릿 헤어스타일을 완전히 지우고, <protagonist_identity> 인물의 실제 헤어스타일(3D 각도 반영)과 눈매(무쌍, 눈 크기, 눈꼬리 형태), 콧날, 입술로 거대한 성을 발견한 경이로움과 감탄의 미소를 표현하세요.',
+        '[왼쪽 위 시선]: 콩나무를 붙잡은 채 구름 위 성을 올려다보는 경이롭고 들뜬 미소. 원본의 왼쪽 배치와 위로 향한 시선을 유지.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-2.png',
       personaTargetRole: 'jack',
-      characters: [{ role: 'jack', hitbox: { x: 0.3, y: 0.34, width: 0.26, height: 0.5 } }],
+      characters: [{ role: 'jack', hitbox: { x: 0.12, y: 0.18, width: 0.42, height: 0.62 } }],
     },
     {
       pageNo: 3,
       bodyText:
-        '성 안으로 몰래 들어간 잭은 황금 알을 낳는 요술 거위를 발견했어요.\n' +
-        '잭이 조심스레 거위를 품에 안는 순간, 요술 하프가 외쳤어요!\n' +
+        '성 안에서 잭은 황금 알을 낳는 요술 거위를 만났어요.\n' +
+        '잭이 거위를 조심스레 안아 드는 순간, 요술 하프가 큰 소리로 외쳤지요.\n' +
         '"도둑이야!"\n' +
-        '번쩍 눈을 뜬 무시무시한 거인이 쿵쾅거리며 쫓아오기 시작했어요.',
+        '잠에서 깬 거인이 쿵쾅거리며 잭을 뒤쫓기 시작했어요.',
       illustrationPrompt: buildJackPrompt(
         '황금 알을 낳는 요술 거위를 품에 안고, 뒤쫓아오는 무시무시한 거인을 피해 필사적으로 달아나는 장면',
-        '[반측면 긴박한 도망 필수]: 거위를 안고 고개를 뒤로 돌려 거인을 확인하는 반측면(Semi-profile, 60도) 각도로 회전시켜 그려야 합니다. 템플릿의 서양 만화 눈과 머리카락을 완전히 지우고, <protagonist_identity> 인물 고유의 실제 헤어스타일과 눈매, 눈썹, 얼굴형을 정확히 유지하면서 눈을 크게 뜨고 눈썹을 긴장시킨 다급함과 공포 표정을 표현하세요.',
+        '[오른쪽 뒤 시선]: 거위를 안고 달아나며 뒤의 거인을 돌아보는 다급하고 놀란 표정. 원본의 오른쪽 아래로 달리는 자세를 유지.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-3.png',
       personaTargetRole: 'jack',
       characters: [
-        { role: 'jack', hitbox: { x: 0.22, y: 0.4, width: 0.25, height: 0.46 } },
-        { role: 'giant', hitbox: { x: 0.58, y: 0.2, width: 0.36, height: 0.62 } },
+        { role: 'jack', hitbox: { x: 0.48, y: 0.38, width: 0.34, height: 0.5 } },
+        { role: 'giant', hitbox: { x: 0.26, y: 0.09, width: 0.42, height: 0.48 } },
       ],
     },
     {
       pageNo: 4,
       bodyText:
-        '번개처럼 땅에 내려온 잭은 도끼로 콩나무 밑동을 힘차게 내리찍었어요!\n' +
-        '거대한 콩나무가 쓰러지며 거인은 깊은 땅속으로 사라졌지요.\n' +
-        '위기를 이겨낸 잭은 달려 나온 엄마를 꼭 끌어안으며 환하게 웃었답니다.',
+        '잭은 콩나무를 타고 번개처럼 내려왔어요.\n' +
+        '그리고 도끼를 들어 콩나무 밑동을 힘껏 내리쳤지요.\n' +
+        '쿵!\n' +
+        '콩나무가 쓰러지자 거인은 더는 마을로 내려올 수 없었어요.',
       illustrationPrompt: buildJackPrompt(
-        '콩나무를 쓰러뜨려 위기를 넘긴 후, 마당으로 달려 나온 엄마를 끌어안고 안도하는 장면',
-        '[정면 포옹]: 엄마를 안으며 짓는 환한 기쁨과 안도의 웃음. <protagonist_identity> 인물의 헤어스타일과 이목구비로 눈가의 긴장이 풀리고 입가가 크게 올라간 뿌듯한 표정. 엄마의 얼굴과 포옹 자세는 그대로 유지.',
+        '집 앞 언덕에서 잭이 도끼로 거대한 콩나무 밑동을 힘껏 내리치는 장면',
+        '[힘주는 표정]: 양손으로 도끼를 잡고 콩나무를 향해 내리치며 굳게 다문 입과 결연한 눈빛. 원본의 왼쪽 아래 자세와 도끼를 유지.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-4.png',
       personaTargetRole: 'jack',
       characters: [
-        { role: 'jack', hitbox: { x: 0.3, y: 0.36, width: 0.28, height: 0.48 } },
-        { role: 'mother', hitbox: { x: 0.64, y: 0.34, width: 0.26, height: 0.5 } },
+        { role: 'jack', hitbox: { x: 0.15, y: 0.36, width: 0.32, height: 0.44 } },
       ],
     },
-    // [비하인드: 5~6장]
     {
       pageNo: 5,
       bodyText:
-        '모두가 잠든 고요한 밤, 잭의 침대 옆에서 잠자던 요술 거위가 반짝이는 깃털을 퍼덕이며 잭을 가만히 깨웠어요.\n' +
-        '거위의 둥지에는 황금 알 대신 밤하늘의 별처럼 영롱하게 빛나는 "별빛 씨앗"이 놓여 있었지요.',
+        '엄마는 무사히 돌아온 잭을 꼭 안아 주었어요.\n' +
+        '요술 거위도 잭 곁에서 날개를 퍼덕였지요.\n' +
+        '잭은 황금 알을 혼자 가지지 않았어요.\n' +
+        '마을 사람들과 나누며, 이제는 서로 도우며 살겠다고 약속했답니다.',
       illustrationPrompt: buildJackPrompt(
-        '한밤중 잠에서 깨어 요술 거위의 둥지에 놓인 영롱한 별빛 씨앗을 신비롭게 내려다보는 장면',
-        '[내려다보는 시선]: 둥지를 내려다보며 신비한 씨앗을 발견한 순수한 놀라움. <protagonist_identity> 인물의 헤어스타일과 눈매로 반짝이는 눈과 조용히 감탄하듯 열린 입과 부드러운 미소.',
+        '엄마와 요술 거위 곁에서 마을 사람들과 황금 알을 나누며 서로 돕겠다고 약속하는 장면',
+        '[정면의 따뜻한 미소]: 황금 알을 두 손으로 건네며 엄마와 마을 사람들을 바라보는 뿌듯하고 기쁜 표정. 원본의 중앙 배치와 손 자세를 유지.',
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-5.png',
       personaTargetRole: 'jack',
       characters: [
-        { role: 'jack', hitbox: { x: 0.28, y: 0.34, width: 0.28, height: 0.48 } },
-        { role: 'magical-goose', hitbox: { x: 0.65, y: 0.48, width: 0.22, height: 0.36 } },
+        { role: 'jack', hitbox: { x: 0.3, y: 0.31, width: 0.29, height: 0.48 } },
+        { role: 'magical-goose', hitbox: { x: 0.03, y: 0.47, width: 0.27, height: 0.34 } },
       ],
     },
-    {
-      pageNo: 6,
-      bodyText:
-        '잭은 마당으로 나가 별빛 씨앗을 밤하늘을 향해 높이 날려 보냈어요.\n' +
-        '씨앗은 은은한 빛을 내며 하늘 높이 떠올라 잭의 집을 따뜻하게 비추는 작은 별이 되었답니다.\n' +
-        '"고마워, 내 작은 친구야!"',
-      illustrationPrompt: buildJackPrompt(
-        '마당으로 나가 별빛 씨앗을 밤하늘로 날려 보내고, 밤하늘에 떠오른 따뜻한 별을 바라보는 장면',
-        '[밤하늘 올려다보기]: 밤하늘로 떠오른 별을 올려다보는 경이로움과 고마움. <protagonist_identity> 인물의 고개 각도와 헤어스타일, 밝은 눈빛, 입을 자연스럽게 연 행복한 미소.',
-      ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-6.png',
-      personaTargetRole: 'jack',
-      characters: [{ role: 'jack', hitbox: { x: 0.38, y: 0.34, width: 0.26, height: 0.5 } }],
-    },
   ],
+  afterStory: {
+    choices: [
+      {
+        branchKey: 'a', title: '별빛 씨앗을 하늘로 돌려보내요', description: '거위의 둥지에서 발견한 반짝이는 씨앗을 밤하늘에 띄워 보내요.',
+        page: { pageNo: 6, bodyText: '그날 밤, 요술 거위의 둥지에서 별빛 씨앗 하나가 반짝였어요.\n잭은 씨앗을 두 손에 올리고 하늘을 향해 살며시 불었지요.\n씨앗은 별이 되어 마을 위에 머물렀어요.\n늦은 밤 길을 걷는 사람들은 그 별을 보며 집으로 돌아갈 수 있었답니다.', illustrationPrompt: buildJackPrompt('밤의 집 앞에서 잭이 두 손의 별빛 씨앗을 하늘로 불어 보내고, 곁의 요술 거위가 이를 바라보는 장면', '[오른쪽 위 시선]: 손 위의 빛과 밤하늘을 올려다보는 경이롭고 따뜻한 미소. 원본의 두 손과 옆의 거위 위치를 유지.'), baseImageKey: 'templates/jack-and-beanstalk/page-6-a.png', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.2, y: 0.3, width: 0.3, height: 0.54 } }, { role: 'magical-goose', hitbox: { x: 0.42, y: 0.53, width: 0.2, height: 0.31 } }] },
+      },
+      {
+        branchKey: 'b', title: '별빛 씨앗을 마을에 심어요', description: '마을 사람들이 함께 볼 수 있는 작은 빛을 키워요.',
+        page: { pageNo: 6, bodyText: '잭은 별빛 씨앗을 마을 한가운데에 심었어요.\n다음 날, 작은 싹이 돋더니 밤마다 은은한 빛을 내기 시작했지요.\n사람들은 그 나무 아래에 모여 이야기를 나눴어요.\n요술 거위는 날개를 퍼덕이며, 환한 마을을 바라보았답니다.', illustrationPrompt: buildJackPrompt('밤의 마을 광장에서 별빛 씨앗이 환하게 빛나는 큰 나무가 되고, 잭과 요술 거위, 마을 사람들이 그 아래 모인 장면', '[위쪽 시선]: 빛나는 나무를 올려다보는 기쁘고 편안한 미소. 원본의 나무 아래 중앙 배치와 앉은 자세를 유지.'), baseImageKey: 'templates/jack-and-beanstalk/page-6-b.png', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.35, y: 0.42, width: 0.2, height: 0.27 } }, { role: 'magical-goose', hitbox: { x: 0.05, y: 0.61, width: 0.29, height: 0.3 } }] },
+      },
+    ],
+  },
 };
 
 export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
@@ -237,11 +252,11 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
     },
   ],
   pages: [
-    // [본편: 1~4장]
+    // [본편: 1~5장]
     {
       pageNo: 1,
       bodyText:
-        '햇살이 눈부신 아침, 빨간 모자는 편찮으신 할머니를 위해 길을 나섰어요.\n' +
+        '햇살이 눈부신 아침, 빨간 모자는 편찮으신 할머니 댁으로 길을 나섰어요.\n' +
         '바구니에는 갓 구운 달콤한 빵과 버터가 가득했지요.\n' +
         '"절대로 다른 길로 새면 안 된다!"\n' +
         '엄마의 당부를 되새기며 빨간 모자는 씩씩하게 숲길을 걸어갔어요.',
@@ -251,94 +266,97 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
       ),
       baseImageKey: 'templates/red-riding-hood/page-1.png',
       personaTargetRole: 'red-hood',
-      characters: [{ role: 'red-hood', hitbox: { x: 0.36, y: 0.36, width: 0.26, height: 0.48 } }],
+      characters: [{ role: 'red-hood', hitbox: { x: 0.21, y: 0.2, width: 0.36, height: 0.61 } }],
     },
     {
       pageNo: 2,
       bodyText:
-        '알록달록한 들꽃에 마음을 빼앗긴 빨간 모자 앞에 잿빛 늑대가 슬그머니 나타났어요.\n' +
+        '알록달록한 들꽃을 구경하던 빨간 모자 앞에 잿빛 늑대가 나타났어요.\n' +
         '"귀여운 꼬마야, 어디 가니?"\n' +
-        '상냥한 척하는 목소리에 속은 빨간 모자는 깊은 숲속 할머니 오두막에 간다는 사실을 순진하게 털어놓고 말았어요.',
+        '늑대의 다정한 목소리에 빨간 모자는 할머니 댁으로 간다고 말해 버렸어요.\n' +
+        '늑대는 씩 웃으며 숲속으로 사라졌지요.',
       illustrationPrompt: buildRedRidingHoodPrompt(
         '들꽃에 마음을 빼앗긴 빨간 모자 앞에 나타난 상냥한 척하는 늑대에게 순진하게 할머니 댁을 말해주는 장면',
-        '[3/4 측면 각도 회전 필수]: 고개를 오른쪽 위로 45도 돌려 늑대를 올려다보는 3/4 쿼터 뷰 각도로 새로 그려야 합니다. 템플릿의 동그랗고 큰 서양 만화 눈을 완전히 지우고, <protagonist_identity> 인물 고유의 실제 눈매(무쌍, 눈 크기, 눈꼬리 형태), 콧날, 입술로 늑대를 순진하게 바라보는 천진난만한 미소를 지어주세요.',
+        '[오른쪽 위 시선]: 커다란 늑대를 올려다보며 순진하게 말을 건네는 천진난만한 미소. 원본의 왼쪽 배치와 바구니 든 손을 유지.',
       ),
       baseImageKey: 'templates/red-riding-hood/page-2.png',
       personaTargetRole: 'red-hood',
       characters: [
-        { role: 'red-hood', hitbox: { x: 0.26, y: 0.4, width: 0.24, height: 0.46 } },
-        { role: 'wolf', hitbox: { x: 0.6, y: 0.3, width: 0.32, height: 0.54 } },
+        { role: 'red-hood', hitbox: { x: 0.15, y: 0.25, width: 0.34, height: 0.61 } },
+        { role: 'wolf', hitbox: { x: 0.46, y: 0.13, width: 0.48, height: 0.7 } },
       ],
     },
     {
       pageNo: 3,
       bodyText:
-        '할머니 오두막에 도착해 침대를 본 빨간 모자는 고개를 갸웃했어요.\n' +
-        '"할머니, 귀가 왜 이리 크세요?"\n' +
+        '할머니 오두막에 도착한 빨간 모자는 침대에 누운 할머니를 보고 고개를 갸웃했어요.\n' +
+        '"할머니, 귀가 왜 이렇게 크세요?"\n' +
         '"네 목소리를 잘 들으려고 그렇단다."\n' +
         '"그런데 입은 왜 이렇게 커요?"\n' +
         '"그건 널 꿀꺽 삼키기 위해서지!"\n' +
         '늑대가 이불을 걷어차며 사납게 달려들었어요!',
       illustrationPrompt: buildRedRidingHoodPrompt(
         '할머니 오두막 침대에서 이불을 걷어차며 달려드는 늑대를 보고 깜짝 놀라는 장면',
-        '[반측면 공포 표정 변환 필수]: 몸은 앞으로 피하며 고개를 오른쪽 뒤로 60도 돌려 늑대를 돌아보는 반측면(Semi-profile) 각도로 회전시켜 그려야 합니다. 템플릿의 서양 만화식 동그란 왕눈이를 절대 남기지 말고, <protagonist_identity> 인물 고유의 실제 눈매와 짙은 눈썹, 얼굴형을 정확히 유지하면서 늑대를 보고 소스라치게 놀라 눈을 치켜뜨고 입을 벌린 생생한 공포·경악 표정을 지어주세요.',
+        '[오른쪽 뒤 시선]: 늑대가 이불을 걷어차고 일어나는 모습을 보며 놀라 입을 벌린 표정. 원본의 오른쪽 아래로 달아나는 자세를 유지.',
       ),
       baseImageKey: 'templates/red-riding-hood/page-3.png',
       personaTargetRole: 'red-hood',
       characters: [
-        { role: 'red-hood', hitbox: { x: 0.24, y: 0.42, width: 0.26, height: 0.46 } },
-        { role: 'wolf', hitbox: { x: 0.56, y: 0.26, width: 0.36, height: 0.58 } },
+        { role: 'red-hood', hitbox: { x: 0.07, y: 0.22, width: 0.37, height: 0.59 } },
+        { role: 'wolf', hitbox: { x: 0.46, y: 0.11, width: 0.49, height: 0.64 } },
       ],
     },
     {
       pageNo: 4,
       bodyText:
-        '"어림없다, 못된 늑대야!"\n' +
-        '비명을 듣고 달려온 용감한 사냥꾼이 늑대를 단숨에 제압하고 벽장 속 할머니를 무사히 구해냈어요.\n' +
-        '빨간 모자는 할머니의 품에 안겨 다시는 한눈팔지 않겠다고 눈물을 글썽이며 굳게 약속했답니다.',
+        '빨간 모자가 소리치자 사냥꾼 아저씨가 오두막으로 달려왔어요.\n' +
+        '사냥꾼은 늑대를 쫓아내고 벽장에 갇혀 있던 할머니를 구해 주었지요.\n' +
+        '빨간 모자는 할머니 품에 꼭 안겼어요.\n' +
+        '"이제 낯선 사람 말은 쉽게 믿지 않을게요."',
       illustrationPrompt: buildRedRidingHoodPrompt(
         '용감한 사냥꾼이 늑대를 제압한 뒤, 빨간 모자가 안전하게 구출된 할머니 품에 안겨 안도하는 장면',
-        '[정면/반측면 포옹]: <protagonist_identity> 인물의 이목구비로 할머니 품에 안겨 안도하는 따뜻하고 편안한 미소. 정면을 응시하며 두려움이 사라지고 안심한 미소에 진심 어린 다짐이 담긴 표정.',
+        '[왼쪽을 향한 안도]: 할머니와 꼭 안겨 눈을 감고 환하게 웃는 안도한 표정. 원본의 포옹 자세와 열린 문 쪽으로 나가는 사냥꾼·늑대를 유지.',
       ),
       baseImageKey: 'templates/red-riding-hood/page-4.png',
       personaTargetRole: 'red-hood',
       characters: [
-        { role: 'red-hood', hitbox: { x: 0.28, y: 0.4, width: 0.24, height: 0.46 } },
-        { role: 'grandmother', hitbox: { x: 0.54, y: 0.36, width: 0.24, height: 0.48 } },
-        { role: 'hunter', hitbox: { x: 0.74, y: 0.24, width: 0.22, height: 0.6 } },
+        { role: 'red-hood', hitbox: { x: 0.17, y: 0.25, width: 0.34, height: 0.56 } },
+        { role: 'grandmother', hitbox: { x: 0.24, y: 0.18, width: 0.4, height: 0.66 } },
+        { role: 'hunter', hitbox: { x: 0.57, y: 0.1, width: 0.31, height: 0.52 } },
+        { role: 'wolf', hitbox: { x: 0.75, y: 0.29, width: 0.15, height: 0.28 } },
       ],
     },
-    // [비하인드: 5~6장]
     {
       pageNo: 5,
       bodyText:
-        '소동이 지나간 뒤, 오두막 창가로 아기 다람쥐와 새들이 쪼르르 찾아왔어요.\n' +
-        '늑대가 사라진 숲은 평화를 되찾았고, 동물 친구들은 빨간 모자에게 감사의 뜻으로 향긋한 산딸기와 솔방울을 건넸지요.',
+        '소동이 지나간 뒤, 숲의 동물 친구들이 오두막 창가로 찾아왔어요.\n' +
+        '다람쥐는 산딸기를, 작은 새는 솔방울을 선물했지요.\n' +
+        '빨간 모자는 할머니와 동물 친구들에게 고맙다고 인사했어요.\n' +
+        '그리고 숲길을 걸을 때는 늘 조심하고, 도움이 필요한 친구는 살피겠다고 약속했답니다.',
       illustrationPrompt: buildRedRidingHoodPrompt(
-        '평화를 되찾은 숲에서 동물 친구들이 빨간 모자에게 감사의 선물로 산딸기와 솔방울을 건네는 장면',
-        '[3/4 측면 창가]: <protagonist_identity> 인물의 이목구비로 창가 동물 친구들을 부드럽게 바라보는 다정하고 감탄 어린 미소. 선물에 기뻐 눈이 반짝이고 감탄과 고마움이 담긴 표정.',
+        '평화를 되찾은 오두막에서 빨간 모자가 할머니와 함께 창가를 찾아온 다람쥐와 새들에게 고마워하는 장면',
+        '[왼쪽을 향한 다정한 미소]: 할머니와 함께 창가 동물 친구들을 보며 따뜻하게 웃는 표정. 원본의 창가 구도와 두 인물의 포옹 자세를 유지.',
       ),
       baseImageKey: 'templates/red-riding-hood/page-5.png',
       personaTargetRole: 'red-hood',
-      characters: [{ role: 'red-hood', hitbox: { x: 0.36, y: 0.34, width: 0.28, height: 0.5 } }],
-    },
-    {
-      pageNo: 6,
-      bodyText:
-        '사냥꾼 아저씨와 함께 집으로 돌아오는 길, 빨간 모자는 이제 숲의 모든 길을 씩씩하게 기억할 수 있게 되었어요.\n' +
-        '"앞으로는 내가 할머니와 숲을 지키는 용감한 파수꾼이 될래요!"',
-      illustrationPrompt: buildRedRidingHoodPrompt(
-        '사냥꾼 아저씨와 함께 집으로 돌아오며 용감하게 숲을 지키는 파수꾼이 되겠다고 다짐하는 장면',
-        '[정면 전신 행진]: <protagonist_identity> 인물의 이목구비로 사냥꾼 아저씨와 함께 숲길을 씩씩하게 걸어가는 밝고 희망찬 미소. 또렷한 눈빛과 자연스럽게 올라간 입가로 용기와 뿌듯함을 표현.',
-      ),
-      baseImageKey: 'templates/red-riding-hood/page-6.png',
-      personaTargetRole: 'red-hood',
       characters: [
-        { role: 'red-hood', hitbox: { x: 0.3, y: 0.36, width: 0.26, height: 0.5 } },
-        { role: 'hunter', hitbox: { x: 0.64, y: 0.26, width: 0.26, height: 0.6 } },
+        { role: 'red-hood', hitbox: { x: 0.18, y: 0.25, width: 0.33, height: 0.55 } },
+        { role: 'grandmother', hitbox: { x: 0.39, y: 0.18, width: 0.34, height: 0.6 } },
       ],
     },
   ],
+  afterStory: {
+    choices: [
+      {
+        branchKey: 'a', title: '아기 다람쥐를 집으로 데려다줘요', description: '길을 잃고 울고 있는 아기 다람쥐를 만났어요.',
+        page: { pageNo: 6, bodyText: '다음 날, 빨간 모자는 풀숲에서 훌쩍이는 아기 다람쥐를 만났어요.\n아기 다람쥐는 집으로 가는 길을 잊어버렸다고 했지요.\n빨간 모자는 천천히 주변을 살피며 다람쥐와 함께 걸었어요.\n커다란 참나무 아래에서 엄마 다람쥐를 찾자, 숲에는 기쁜 인사가 가득 울려 퍼졌답니다.', illustrationPrompt: buildRedRidingHoodPrompt('커다란 참나무 아래에서 빨간 모자가 아기 다람쥐와 엄마 다람쥐가 다시 만나는 모습을 다정하게 바라보는 장면', '[오른쪽 아래 시선]: 아기 다람쥐를 바라보며 눈을 감고 환하게 웃는 따뜻한 표정. 원본의 앉은 자세와 빨간 두건을 유지.'), baseImageKey: 'templates/red-riding-hood/page-6-a.png', personaTargetRole: 'red-hood', characters: [{ role: 'red-hood', hitbox: { x: 0.09, y: 0.27, width: 0.37, height: 0.42 } }] },
+      },
+      {
+        branchKey: 'b', title: '숲길에 빨간 리본을 달아요', description: '누구나 길을 잃지 않도록 숲길 표지를 만들어요.',
+        page: { pageNo: 6, bodyText: '빨간 모자는 할머니와 함께 숲길의 갈림길마다 빨간 리본을 달았어요.\n동물 친구들도 솔방울과 나뭇잎으로 작은 표지를 만들었지요.\n이제 숲에 오는 누구나 길을 쉽게 찾을 수 있었어요.\n빨간 모자는 바람에 흔들리는 리본을 보며 환하게 웃었답니다.', illustrationPrompt: buildRedRidingHoodPrompt('숲길의 큰 참나무에 빨간 모자와 할머니가 길을 알리는 빨간 리본을 함께 다는 장면', '[위쪽 시선]: 리본을 묶으며 눈을 감고 환하게 웃는 뿌듯한 표정. 원본의 나무, 리본, 할머니의 손 위치를 유지.'), baseImageKey: 'templates/red-riding-hood/page-6-b.png', personaTargetRole: 'red-hood', characters: [{ role: 'red-hood', hitbox: { x: 0.17, y: 0.17, width: 0.28, height: 0.49 } }, { role: 'grandmother', hitbox: { x: 0.31, y: 0.07, width: 0.3, height: 0.56 } }] },
+      },
+    ],
+  },
 };
 
 export const OFFICIAL_STORIES: OfficialStoryData[] = [

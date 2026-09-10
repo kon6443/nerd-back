@@ -14,10 +14,10 @@ import type { SessionPageStatus } from '@nerd/contracts';
 /**
  * 개인화 동화책의 페이지별 생성된 삽화 (Slice 4).
  *
- * 한 세션 안에서 페이지 번호는 유일하다: UNIQUE(session_id, page_no).
+ * 한 세션 안에서 `(page_no, branch_key)`가 유일하다. A/B 결과는 모두 6쪽이다.
  */
 @Entity('session_page_images')
-@Unique('uq_session_page_images_session_page', ['sessionId', 'pageNo'])
+@Unique('uq_session_page_images_session_page_branch', ['sessionId', 'pageNo', 'branchKey'])
 export class SessionPageImage {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -27,6 +27,9 @@ export class SessionPageImage {
 
   @Column({ name: 'page_no', type: 'smallint', unsigned: true })
   pageNo: number;
+
+  @Column({ name: 'branch_key', type: 'varchar', length: 16, default: 'common' })
+  branchKey: 'common' | 'a' | 'b';
 
   @Column({
     type: 'enum',

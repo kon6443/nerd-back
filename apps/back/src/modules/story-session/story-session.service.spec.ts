@@ -3,6 +3,8 @@ import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
+import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
+import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
 import { StoryNotFoundErrorResponseDto } from '@modules/story/dto/story.error.dto';
 import {
   FaceNotReadyErrorResponseDto,
@@ -12,6 +14,7 @@ import {
   PageNotFailedErrorResponseDto,
   SessionNotFoundErrorResponseDto,
   StoryAlreadyCompletedErrorResponseDto,
+  FirstBranchAlreadyChosenErrorResponseDto,
 } from './dto/story-session-error.dto';
 import { StorySessionService } from './story-session.service';
 import type { ImageGenerationPort } from '../../common/port/image-generation.port';
@@ -24,6 +27,8 @@ describe('StorySessionService', () => {
   let templateRepo: MockRepository<StoryTemplate>;
   let pageRepo: MockRepository<StoryPage>;
   let pageImageRepo: MockRepository<SessionPageImage>;
+  let afterStoryChoiceRepo: MockRepository<StoryAfterStoryChoice>;
+  let branchChoiceRepo: MockRepository<SessionBranchChoice>;
   let mockImagePort: jest.Mocked<ImageGenerationPort>;
   let mockStoragePort: jest.Mocked<StoragePort>;
   let service: StorySessionService;
@@ -33,6 +38,8 @@ describe('StorySessionService', () => {
     templateRepo = createMockRepository<StoryTemplate>();
     pageRepo = createMockRepository<StoryPage>();
     pageImageRepo = createMockRepository<SessionPageImage>();
+    afterStoryChoiceRepo = createMockRepository<StoryAfterStoryChoice>();
+    branchChoiceRepo = createMockRepository<SessionBranchChoice>();
 
     mockImagePort = {
       generateReference: jest.fn().mockResolvedValue(Buffer.from('mock-reference-image-bytes')),
@@ -53,7 +60,54 @@ describe('StorySessionService', () => {
       asRepository(pageImageRepo),
       mockImagePort,
       mockStoragePort,
+      undefined,
+      asRepository(afterStoryChoiceRepo),
+      asRepository(branchChoiceRepo),
     );
+  });
+
+  describe('비하인드 분기', () => {
+    const session = { id: 'session-123', userId: 1, templateId: 10 } as StorySession;
+
+    it('A/B 선택지·개인화 상태·최초 선택을 함께 반환한다', async () => {
+      sessionRepo.findOne.mockResolvedValue(session);
+      afterStoryChoiceRepo.find.mockResolvedValue([
+        { branchKey: 'a', title: 'A', description: 'A 설명' },
+        { branchKey: 'b', title: 'B', description: 'B 설명' },
+      ] as StoryAfterStoryChoice[]);
+      pageRepo.find.mockResolvedValue([
+        { pageNo: 6, branchKey: 'a', bodyText: 'A 결과' },
+        { pageNo: 6, branchKey: 'b', bodyText: 'B 결과' },
+      ] as StoryPage[]);
+      pageImageRepo.find.mockResolvedValue([
+        { pageNo: 6, branchKey: 'a', status: 'succeeded', imageKey: 'a.png', errorMessage: null },
+        { pageNo: 6, branchKey: 'b', status: 'failed', imageKey: null, errorMessage: '실패' },
+      ] as SessionPageImage[]);
+      branchChoiceRepo.findOne.mockResolvedValue({ branchKey: 'a' } as SessionBranchChoice);
+
+      const result = await service.getAfterStory(1, 'session-123');
+
+      expect(result.firstBranchChoice).toBe('a');
+      expect(result.choices[0]).toMatchObject({ branchKey: 'a', bodyText: 'A 결과', imageUrl: expect.any(String) });
+      expect(result.choices[1]).toMatchObject({ branchKey: 'b', status: 'failed', errorMessage: '실패' });
+    });
+
+    it('최초 선택을 저장하고 같은 선택은 멱등 처리한다', async () => {
+      sessionRepo.findOne.mockResolvedValue(session);
+      branchChoiceRepo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ branchKey: 'a' } as SessionBranchChoice);
+
+      await expect(service.selectAfterStoryChoice(1, 'session-123', { branchKey: 'a' })).resolves.toMatchObject({ isFirstChoice: true });
+      await expect(service.selectAfterStoryChoice(1, 'session-123', { branchKey: 'a' })).resolves.toMatchObject({ isFirstChoice: false });
+    });
+
+    it('다른 최초 선택으로 덮어쓰려 하면 409 도메인 오류를 던진다', async () => {
+      sessionRepo.findOne.mockResolvedValue(session);
+      branchChoiceRepo.findOne.mockResolvedValue({ branchKey: 'a' } as SessionBranchChoice);
+
+      await expect(service.selectAfterStoryChoice(1, 'session-123', { branchKey: 'b' })).rejects.toThrow(
+        FirstBranchAlreadyChosenErrorResponseDto,
+      );
+    });
   });
 
   describe('createOrResumeSession', () => {
@@ -242,8 +296,8 @@ describe('StorySessionService', () => {
         status: 'completed',
       } as unknown as StorySession);
       pageRepo.find.mockResolvedValue([
-        { id: 1, pageNo: 1 } as unknown as StoryPage,
-        { id: 2, pageNo: 2 } as unknown as StoryPage,
+        { id: 1, pageNo: 1, branchKey: 'common' } as unknown as StoryPage,
+        { id: 2, pageNo: 2, branchKey: 'common' } as unknown as StoryPage,
       ]);
 
       const result = await service.personalizeSession(1, 'session-123');
@@ -298,13 +352,14 @@ describe('StorySessionService', () => {
         updatedAt: new Date('2026-09-08T00:00:00Z'),
       } as unknown as StorySession);
       pageRepo.find.mockResolvedValue([
-        { id: 1, pageNo: 1 } as unknown as StoryPage,
-        { id: 2, pageNo: 2 } as unknown as StoryPage,
+        { id: 1, pageNo: 1, branchKey: 'common' } as unknown as StoryPage,
+        { id: 2, pageNo: 2, branchKey: 'common' } as unknown as StoryPage,
       ]);
       pageImageRepo.find.mockResolvedValue([
         {
           sessionId: 'session-123',
           pageNo: 1,
+          branchKey: 'common',
           status: 'succeeded',
           imageKey: 'pages/p1.png',
           updatedAt: new Date('2026-09-08T00:01:00Z'),
@@ -312,6 +367,7 @@ describe('StorySessionService', () => {
         {
           sessionId: 'session-123',
           pageNo: 2,
+          branchKey: 'common',
           status: 'pending',
           imageKey: null,
           updatedAt: new Date('2026-09-08T00:00:00Z'),
@@ -322,6 +378,7 @@ describe('StorySessionService', () => {
 
       expect(result.totalPages).toBe(2);
       expect(result.completedPages).toBe(1);
+      expect(result.isMainStoryReady).toBe(false);
       expect(result.isAllCompleted).toBe(false);
       expect(result.pages[0].status).toBe('succeeded');
       expect(result.pages[0].imageUrl).toBe('https://storage.local/references/session-1/ref.png');

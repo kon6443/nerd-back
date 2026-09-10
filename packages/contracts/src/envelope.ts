@@ -51,6 +51,7 @@ export const DOMAIN_ERROR_CODES = [
   'FACE_NOT_READY',
   'PAGE_NOT_FOUND',
   'PAGE_NOT_FAILED',
+  'FIRST_BRANCH_ALREADY_CHOSEN',
 ] as const;
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number];

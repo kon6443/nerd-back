@@ -5,6 +5,8 @@ import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
+import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
+import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
 import { User } from '@entities/user.entity';
 import { AuthModule } from '@modules/auth/auth.module';
 import { StorySessionController } from './story-session.controller';
@@ -23,6 +25,8 @@ import { LocalStorageAdapter } from '../../common/adapters/local-storage.adapter
       StoryTemplate,
       StoryPage,
       SessionPageImage,
+      StoryAfterStoryChoice,
+      SessionBranchChoice,
       User,
     ]),
     ConfigModule,

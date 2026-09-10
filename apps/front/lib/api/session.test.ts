@@ -2,11 +2,14 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   createSession,
   deleteSession,
+  fetchAfterStory,
   fetchSessionPages,
   findMySessionBySlug,
   getMySessions,
   personalizeSession,
   retrySessionPage,
+  retryAfterStoryPage,
+  selectAfterStoryChoice,
   uploadFace,
 } from "./session";
 import * as client from "./client";
@@ -114,6 +117,50 @@ describe("session api", () => {
     expect(result.sessionId).toBe("session-123");
     expect(result.pageNo).toBe(2);
     expect(result.status).toBe("pending");
+  });
+
+  it("fetchAfterStory 는 비하인드 선택지와 결과 상태를 조회한다", async () => {
+    const apiFetchSpy = vi.spyOn(client, "apiFetch").mockResolvedValue({
+      sessionId: "session-123",
+      firstBranchChoice: null,
+      choices: [],
+    });
+
+    await fetchAfterStory("session-123");
+
+    expect(apiFetchSpy).toHaveBeenCalledWith("/sessions/session-123/after-story", {
+      method: "GET",
+    });
+  });
+
+  it("selectAfterStoryChoice 는 최초 A/B 선택을 저장한다", async () => {
+    const apiFetchSpy = vi.spyOn(client, "apiFetch").mockResolvedValue({
+      sessionId: "session-123",
+      branchKey: "a",
+      isFirstChoice: true,
+    });
+
+    await selectAfterStoryChoice("session-123", "a");
+
+    expect(apiFetchSpy).toHaveBeenCalledWith("/sessions/session-123/after-story/choice", {
+      method: "POST",
+      json: { branchKey: "a" },
+    });
+  });
+
+  it("retryAfterStoryPage 는 실패한 A/B 결과만 재시도한다", async () => {
+    const apiFetchSpy = vi.spyOn(client, "apiFetch").mockResolvedValue({
+      sessionId: "session-123",
+      pageNo: 6,
+      branchKey: "b",
+      status: "pending",
+    });
+
+    await retryAfterStoryPage("session-123", "b");
+
+    expect(apiFetchSpy).toHaveBeenCalledWith("/sessions/session-123/after-story/b/retry", {
+      method: "POST",
+    });
   });
 
   it("getMySessions 는 /sessions/my 로 GET 요청을 보낸다", async () => {
