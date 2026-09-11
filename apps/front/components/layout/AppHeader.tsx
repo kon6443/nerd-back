@@ -89,7 +89,7 @@ export function AppHeader() {
             );
           })}
           {/* ⚠️ 넓은 화면에서는 오른쪽 CTA 가 같은 역할을 하므로 인증 칸만 숨긴다.
-              칸은 항상 있다 — 응답 뒤에 `<li>` 를 추가하면 네비 폭이 바뀌어 「시연 모드」까지 밀린다. */}
+              칸은 항상 있다 — 응답 뒤에 `<li>` 를 추가하면 네비 폭이 바뀌어 오른쪽 CTA 까지 밀린다. */}
           <li className="lg:hidden">
             {AUTH_NAV_SLOTS.map(({ status, className }) => {
               const link = AUTH_LINK[status];
@@ -108,13 +108,6 @@ export function AppHeader() {
           </li>
         </ul>
 
-        <span className="inline-flex h-9 items-center gap-1.5 rounded-pill border border-accent-a bg-accent-a-soft px-3 text-sm font-semibold text-ink">
-          <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="m12 3 1.4 5.6L19 10l-5.6 1.4L12 17l-1.4-5.6L5 10l5.6-1.4z" />
-            <path d="m19 16 .6 2.4L22 19l-2.4.6L19 22l-.6-2.4L16 19l2.4-.6z" />
-          </svg>
-          시연 모드
-        </span>
         {/* ⭐ 이 CTA 가 넓은 화면에서 **유일하게 보이는 인증 UI** 다. 하드코딩해 두면 로그인한
             뒤에도 「로그인하기」가 남아 "로그인이 안 됐나?" 로 읽힌다 — 실제로 그렇게 보고됐다.
             확인 전(`unknown`)에는 그리지 않아 상태가 깜빡이지 않게 한다. */}
