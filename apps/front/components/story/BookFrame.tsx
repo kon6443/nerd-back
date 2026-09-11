@@ -21,6 +21,8 @@ export interface BookFrameProps {
    * 호출하는 쪽의 책임이다. 없으면 삽화 준비 안내를 표시한다.
    */
   imageUrl?: string;
+  /** 현재 삽화가 브라우저에서 완전히 로드된 뒤 호출한다. 다음 장 프리로드 등에 사용한다. */
+  onImageLoad?: () => void;
   children: ReactNode;
   /** 이전/다음 같은 조작. 없으면 렌더하지 않는다. */
   footer?: ReactNode;
@@ -54,7 +56,7 @@ export function BookFrameSkeleton() {
   );
 }
 
-export function BookFrame({ pageNo, imageUrl, children, footer }: BookFrameProps) {
+export function BookFrame({ pageNo, imageUrl, onImageLoad, children, footer }: BookFrameProps) {
   return (
     <div className="flex w-full flex-col gap-4">
       <div className={styles.book}>
@@ -63,7 +65,12 @@ export function BookFrame({ pageNo, imageUrl, children, footer }: BookFrameProps
             {imageUrl ? (
               // 표시 URL의 호스트 허용 목록은 이미지 URL 연결 작업에서 확정한다.
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+              <img
+                src={imageUrl}
+                alt=""
+                className="h-full w-full object-cover"
+                onLoad={onImageLoad}
+              />
             ) : (
               <StoryArtwork className="h-full" />
             )}

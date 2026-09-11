@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, use, useEffect, useRef, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
+import { preconnect } from "react-dom";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
@@ -35,6 +36,12 @@ interface PageProps {
 
 type ViewState = "loading" | "generating" | "reader" | "branch" | "end";
 
+function getFirstPageImageUrl(sessionPages: SessionPagesResponse) {
+  return sessionPages.pages.find(
+    (page) => page.branchKey === "common" && page.pageNo === 1,
+  )?.imageUrl;
+}
+
 function StoryReadContent({ params }: PageProps) {
   const { slug } = use(params);
   const router = useRouter();
@@ -57,6 +64,60 @@ function StoryReadContent({ params }: PageProps) {
   const [retryTrigger, setRetryTrigger] = useState(0);
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const preloadedImagesRef = useRef(
+    new Map<string, { image: HTMLImageElement; loaded: Promise<void> }>(),
+  );
+  const preconnectedOriginsRef = useRef(new Set<string>());
+
+  const preloadImages = useCallback((imageUrls: Array<string | null | undefined>) => {
+    const loads: Promise<void>[] = [];
+
+    for (const imageUrl of imageUrls) {
+      if (!imageUrl) continue;
+
+      const existing = preloadedImagesRef.current.get(imageUrl);
+      if (existing) {
+        loads.push(existing.loaded);
+        continue;
+      }
+
+      try {
+        const url = new URL(imageUrl);
+        if (
+          (url.protocol === "http:" || url.protocol === "https:") &&
+          !preconnectedOriginsRef.current.has(url.origin)
+        ) {
+          preconnect(url.origin);
+          preconnectedOriginsRef.current.add(url.origin);
+        }
+      } catch {
+        // data URL과 상대 URL은 별도 오리진 연결이 필요하지 않다.
+      }
+
+      const image = new Image();
+      image.decoding = "async";
+      const loaded = new Promise<void>((resolve) => {
+        const timeoutId = window.setTimeout(resolve, 10_000);
+        const settle = () => {
+          window.clearTimeout(timeoutId);
+          resolve();
+        };
+
+        image.onload = () => {
+          void image.decode().catch(() => undefined).finally(settle);
+        };
+        image.onerror = () => {
+          preloadedImagesRef.current.delete(imageUrl);
+          settle();
+        };
+      });
+      preloadedImagesRef.current.set(imageUrl, { image, loaded });
+      image.src = imageUrl;
+      loads.push(loaded);
+    }
+
+    return Promise.all(loads).then(() => undefined);
+  }, []);
 
   const noSessionError = !sessionId ? "세션 정보가 없습니다. 얼굴 사진을 먼저 등록해 주세요." : "";
   const activeError = errorMsg || noSessionError;
@@ -102,6 +163,8 @@ function StoryReadContent({ params }: PageProps) {
         setSessionPages(sessionData);
 
         if (isReaderReady(sessionData)) {
+          await preloadImages([getFirstPageImageUrl(sessionData)]);
+          if (!active) return;
           setViewState("reader");
         } else {
           setViewState("generating");
@@ -125,7 +188,7 @@ function StoryReadContent({ params }: PageProps) {
     return () => {
       active = false;
     };
-  }, [slug, sessionId, autoStart, router, retryTrigger]);
+  }, [slug, sessionId, autoStart, router, retryTrigger, preloadImages]);
 
   // 진행 상태 3초 주기 폴링 (generating 상태일 때)
   useEffect(() => {
@@ -138,13 +201,17 @@ function StoryReadContent({ params }: PageProps) {
     }
 
     const currentSessionId = sessionId;
+    let active = true;
 
     async function poll() {
       try {
         const data = await fetchSessionPages(currentSessionId);
+        if (!active) return;
         setSessionPages(data);
 
         if (isReaderReady(data)) {
+          await preloadImages([getFirstPageImageUrl(data)]);
+          if (!active) return;
           // 폴링으로 본편 완료를 처음 받는 경로도 초기 조회와 똑같이 독서 화면으로 전환한다.
           // 이 전환이 없으면 5/7 상태에서 폴링만 멈춰 생성 화면이 그대로 남는다.
           setViewState("reader");
@@ -162,12 +229,13 @@ function StoryReadContent({ params }: PageProps) {
     pollingRef.current = setInterval(poll, 3000);
 
     return () => {
+      active = false;
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
       }
     };
-  }, [sessionId, viewState]);
+  }, [sessionId, viewState, preloadImages]);
 
   // 독서 중 현재 페이지 본문 온디맨드 로드
   useEffect(() => {
@@ -206,6 +274,12 @@ function StoryReadContent({ params }: PageProps) {
 
     return () => clearInterval(intervalId);
   }, [sessionId, viewState, afterStory]);
+
+  // 선택 화면이 열리면 준비된 A/B 결과를 미리 받아 어느 쪽을 골라도 바로 보여 준다.
+  useEffect(() => {
+    if (viewState !== "branch" || !afterStory) return;
+    void preloadImages(afterStory.choices.map((choice) => choice.imageUrl));
+  }, [viewState, afterStory, preloadImages]);
 
   // 특정 실패 페이지 단독 재시도
   async function handleRetry(pageNo: number) {
@@ -630,6 +704,26 @@ function StoryReadContent({ params }: PageProps) {
   const isFirstPage = currentPageNo <= 1;
   const isBehindPage = currentPageNo === 6;
 
+  function preloadFollowingPages() {
+    if (!sessionPages) return;
+
+    if (currentPageNo < 5) {
+      const nextPage = sessionPages.pages.find(
+        (page) => page.branchKey === "common" && page.pageNo === currentPageNo + 1,
+      );
+      void preloadImages([nextPage?.imageUrl]);
+      return;
+    }
+
+    if (currentPageNo === 5) {
+      void preloadImages(
+        sessionPages.pages
+          .filter((page) => page.pageNo === 6 && page.branchKey !== "common")
+          .map((page) => page.imageUrl),
+      );
+    }
+  }
+
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 py-5 md:px-8 md:py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -661,6 +755,7 @@ function StoryReadContent({ params }: PageProps) {
       <BookFrame
         pageNo={currentPageNo}
         imageUrl={currentSessionPage?.imageUrl || undefined}
+        onImageLoad={preloadFollowingPages}
         footer={
           <>
             {isFirstPage ? (
