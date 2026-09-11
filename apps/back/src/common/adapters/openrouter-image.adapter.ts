@@ -89,7 +89,7 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
     const getMime = (buf: Buffer) =>
       buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : 'image/png';
 
-    // 동화 템플릿 기본 삽화가 제공되면 첫 번째 이미지로 주입 (프롬프트의 "Input image 1" 지침과 일치)
+    // 첫 번째 첨부 파일은 프롬프트에서 <base_scene_template> 역할로 명명한다.
     if (input.baseImage) {
       inputReferences.push({
         type: 'image_url',
@@ -97,19 +97,24 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
       });
     }
 
-    // 사용자 얼굴 레퍼런스는 두 번째 이미지로 주입 (프롬프트의 "Input image 2" 지침과 일치)
+    // 두 번째 첨부 파일은 프롬프트에서 <protagonist_identity> 역할로 명명한다.
     inputReferences.push({
       type: 'image_url',
       image_url: { url: `data:${getMime(input.referenceImage)};base64,${input.referenceImage.toString('base64')}` },
     });
 
+    const hasNamedInputRoles =
+      input.prompt.includes('<base_scene_template>') &&
+      input.prompt.includes('<protagonist_identity>');
+
     let prompt: string;
     if (
-      input.prompt.includes('<base_scene_template>') ||
+      hasNamedInputRoles ||
       input.prompt.includes('IMAGE EDITING') ||
       input.prompt.includes('Input image 1')
     ) {
-      // 1. 이미 명시적인 변수 태그나 편집 지시문이 포함되어 있으면 그대로 사용
+      // 1. 두 입력의 역할을 이름으로 구분했거나 명시적인 편집 지시문이면 그대로 사용한다.
+      // 역할 태그가 있는 프롬프트를 다시 감싸면 상충한 지시가 생겨 인물 정체성이 약해진다.
       prompt = input.prompt;
     } else if (
       input.prompt.includes('첫 번째 이미지') ||

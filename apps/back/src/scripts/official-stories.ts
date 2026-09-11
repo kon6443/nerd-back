@@ -46,35 +46,49 @@ export interface OfficialStoryData {
 }
 
 export const buildJackPrompt = (sceneStory: string, expressionInstruction: string): string =>
-  `Edit Image 1 using Image 2 as the face and hairstyle identity reference.\n\n` +
-  `Image 1 is the original storybook illustration. Image 2 is the user's identity photo.\n\n` +
-  `Replace only the face and hairstyle of Jack, the main child protagonist in Image 1, with a recognizable illustrated version of the person in Image 2. Jack is the young boy wearing a moss-green vest, a cream shirt, and rust-brown trousers. If other children or adults appear, do not modify their faces or hair.\n\n` +
-  `Preserve the reference person's distinctive facial features, including face shape, eye shape, eyebrows, nose, lips, and skin tone. Also preserve their recognizable hairstyle, including hair color, hairline, parting, bangs, length, texture, curl pattern, volume, and overall silhouette. Completely replace Jack's original face and hair so that none of the template character's facial identity or hairstyle remains.\n\n` +
-  `Adapt the face and hairstyle naturally to Jack's existing childlike proportions. Keep Jack looking like the same young child and do not make him appear older.\n\n` +
-  `Match Jack's existing expression, emotion, gaze direction, head position, head angle, and perspective in Image 1. Preserve the emotion and action of the original scene. Do not copy Image 2's expression, head angle, gaze, pose, clothing, accessories, background, or lighting. When adapting the hairstyle to a different angle, keep the identity-defining shape, texture, volume, and hair color from Image 2.\n\n` +
-  `Render the new face and hair in exactly the same warm watercolor and gouache storybook style as Image 1. Match the original soft hand-drawn outlines, brushwork, paper texture, shading, color temperature, lighting, and level of detail. Do not paste photorealistic skin or hair into the illustration. Blend the hairline, forehead, face contour, ears, neck, and collar naturally with the existing artwork.\n\n` +
-  `Change only Jack's face, hair, and the minimal surrounding area required for a seamless blend. Preserve Jack's body, pose, hands, moss-green vest, cream shirt, rust-brown trousers, boots, and placement. Preserve every other character, animal, object, background element, composition, color, and the original image dimensions. Do not add text, borders, logos, watermarks, or new elements.\n\n` +
-  `Use the same recognizable facial identity, hairstyle, skin tone, and apparent age consistently across every page, even when Jack's expression, viewing angle, or lighting changes.\n\n` +
-  `The following notes only identify Jack's appearance in the existing scene. Do not use them to redesign, regenerate, or add anything to the scene.\n` +
-  `Scene reference: ${sceneStory}\n` +
-  `Existing appearance to preserve: ${expressionInstruction}\n\n` +
-  `Return one edited illustration only.`;
+  `<task_specification>\n` +
+  `<priority>IDENTITY FIDELITY TO <protagonist_identity> IS THE HIGHEST PRIORITY inside the editable face-and-hair region. The result must be immediately recognizable as the real person in <protagonist_identity>, not as the original template character.</priority>\n\n` +
+  `<inputs>\n` +
+  `  <base_scene_template>The first attached image is the original storybook illustration to edit. Use it only for the canvas, composition, Jack's body and clothing, pose, head position, expression, gaze, occlusion, lighting, and illustration style. Do not use Jack's original face or hair as an identity source.</base_scene_template>\n` +
+  `  <protagonist_identity>The second attached image is the user's real portrait photo. It is the sole source of facial identity, facial geometry, skin tone, and hairstyle.</protagonist_identity>\n` +
+  `</inputs>\n\n` +
+  `<edit_target>Jack is the main protagonist wearing a moss-green vest, cream shirt, and rust-brown trousers. Replace Jack only. Never alter another child, adult, or animal.</edit_target>\n\n` +
+  `<identity_transfer>\n` +
+  `- Completely replace Jack's original face and hair. Do not retain any identity-defining facial feature or hairstyle from <base_scene_template>.\n` +
+  `- Preserve the exact relative geometry and distinctive traits from <protagonist_identity>: face shape, forehead, cheek and jaw proportions, eye shape and spacing, eyelids, eyebrows, nose shape and width, lips, skin tone, and natural asymmetry.\n` +
+  `- Preserve the recognizable hairstyle from <protagonist_identity>: hair color, hairline, parting, bangs, length, texture, curl pattern, volume, and overall silhouette. Rotate it naturally to Jack's existing head angle without reverting to the template hairstyle.\n` +
+  `- Do not blend, average, interpolate, beautify, genericize, simplify, or combine the face or hairstyle from the two inputs. Scale the transferred face and hair only as needed to fit Jack's existing head. Do not deliberately make the identity younger or older.\n` +
+  `</identity_transfer>\n\n` +
+  `<expression_and_style>Preserve Jack's expression, emotion, gaze, head angle, and perspective from <base_scene_template>; do not copy them from the portrait. Render the transferred identity with the template's warm watercolor and gouache technique, soft outlines, brushwork, paper texture, shading, and scene lighting. Style adaptation may change the rendering medium, but it must not change or simplify identity-defining facial geometry or hairstyle. No photorealistic patches, seams, or pasted-on appearance.</expression_and_style>\n\n` +
+  `<preservation>Change only Jack's face, hair, and the smallest surrounding area required for a seamless blend. Preserve his body, pose, hands, clothing, boots, placement, and every other character, animal, object, background element, composition, color, and original image dimensions. Add no text, border, logo, watermark, or new element.</preservation>\n\n` +
+  `<consistency>Use the same recognizable identity, hairstyle, skin tone, and apparent age from <protagonist_identity> across every page.</consistency>\n\n` +
+  `<scene_reference>This text identifies the existing target and must not be used to redesign or regenerate the scene: ${sceneStory}</scene_reference>\n` +
+  `<appearance_to_preserve>${expressionInstruction}</appearance_to_preserve>\n\n` +
+  `<output>Return one edited illustration only.</output>\n` +
+  `</task_specification>`;
 
 export const buildRedRidingHoodPrompt = (sceneStory: string, expressionInstruction: string): string =>
-  `Edit Image 1 using Image 2 as the face and hairstyle identity reference.\n\n` +
-  `Image 1 is a page from a Little Red Riding Hood picture book. Image 2 is the user's identity photo.\n\n` +
-  `Replace only the face and hairstyle of Little Red Riding Hood, the main child protagonist wearing the red hood or red cape, with a recognizable illustrated version of the person in Image 2. Do not modify the grandmother, huntsman, wolf, squirrels, birds, or any other character.\n\n` +
-  `Preserve the reference person's distinctive facial features, including face shape, eye shape, eyebrows, nose, lips, and skin tone. Also preserve their recognizable hairstyle, including hair color, hairline, parting, bangs, length, texture, curl pattern, volume, and overall silhouette. Completely replace the protagonist's original face and visible hair so that none of the template character's facial identity or hairstyle remains.\n\n` +
-  `Adapt the face and hairstyle naturally to the protagonist's existing childlike proportions. Keep her looking like the same young child and do not make her appear older.\n\n` +
-  `Match the protagonist's existing expression, emotion, gaze direction, head position, head angle, and perspective in Image 1. Preserve the emotion and action of the original scene. Do not copy Image 2's expression, head angle, gaze, pose, clothing, accessories, background, or lighting. When adapting the hairstyle to a different angle, keep the identity-defining shape, texture, volume, and hair color from Image 2.\n\n` +
-  `Preserve the original red hood or cape, including its exact shape, position, folds, and size. Place the adapted hairstyle naturally inside and around the hood while respecting every existing overlap and occlusion created by the hood, hair, hands, or other objects. Do not remove, resize, reshape, or reposition the hood.\n\n` +
-  `Render the new face and hair in exactly the same warm watercolor and colored-pencil picture-book style as Image 1. Match the original linework, brushwork, paper texture, shading, color temperature, lighting, and level of detail. Do not paste photorealistic skin or hair into the illustration. Blend the hairline, forehead, face contour, ears, jaw, neck, and hood naturally with the existing artwork.\n\n` +
-  `Change only the protagonist's face, hair, and the minimal surrounding area required for a seamless blend. Preserve her red hood, cape, clothing, body, proportions, pose, hands, and placement. Preserve every other character, animal, object, background element, composition, framing, color, and the original image dimensions. Do not add text, borders, logos, watermarks, or new objects.\n\n` +
-  `Use the same recognizable facial identity, hairstyle, skin tone, and apparent age consistently across every page, even when the protagonist's expression, viewing angle, or lighting changes.\n\n` +
-  `The following notes only identify the protagonist's appearance in the existing scene. Do not use them to redesign, regenerate, or add anything to the scene.\n` +
-  `Scene reference: ${sceneStory}\n` +
-  `Existing appearance to preserve: ${expressionInstruction}\n\n` +
-  `Return one edited illustration only.`;
+  `<task_specification>\n` +
+  `<priority>IDENTITY FIDELITY TO <protagonist_identity> IS THE HIGHEST PRIORITY inside the editable face-and-hair region. The result must be immediately recognizable as the real person in <protagonist_identity>, not as the original template character.</priority>\n\n` +
+  `<inputs>\n` +
+  `  <base_scene_template>The first attached image is the original Little Red Riding Hood storybook illustration to edit. Use it only for the canvas, composition, protagonist's body and clothing, pose, head position, expression, gaze, occlusion, lighting, and illustration style. Do not use the protagonist's original face or hair as an identity source.</base_scene_template>\n` +
+  `  <protagonist_identity>The second attached image is the user's real portrait photo. It is the sole source of facial identity, facial geometry, skin tone, and hairstyle.</protagonist_identity>\n` +
+  `</inputs>\n\n` +
+  `<edit_target>Replace only Little Red Riding Hood, the main protagonist wearing the red hood or cape. Never alter the grandmother, huntsman, wolf, squirrels, birds, or any other character.</edit_target>\n\n` +
+  `<identity_transfer>\n` +
+  `- Completely replace the protagonist's original face and visible hair. Do not retain any identity-defining facial feature or hairstyle from <base_scene_template>.\n` +
+  `- Preserve the exact relative geometry and distinctive traits from <protagonist_identity>: face shape, forehead, cheek and jaw proportions, eye shape and spacing, eyelids, eyebrows, nose shape and width, lips, skin tone, and natural asymmetry.\n` +
+  `- Preserve the recognizable hairstyle from <protagonist_identity>: hair color, hairline, parting, bangs, length, texture, curl pattern, volume, and overall silhouette. Rotate it naturally to the protagonist's existing head angle without reverting to the template hairstyle.\n` +
+  `- Do not blend, average, interpolate, beautify, genericize, simplify, or combine the face or hairstyle from the two inputs. Scale the transferred face and hair only as needed to fit the protagonist's existing head. Do not deliberately make the identity younger or older.\n` +
+  `</identity_transfer>\n\n` +
+  `<hood_preservation>Preserve the original red hood or cape, including its exact shape, position, folds, and size. Place the transferred hairstyle naturally inside and around the hood while respecting every existing overlap and occlusion made by the hood, hair, hands, or other objects. Never remove, resize, reshape, or reposition the hood.</hood_preservation>\n\n` +
+  `<expression_and_style>Preserve the protagonist's expression, emotion, gaze, head angle, and perspective from <base_scene_template>; do not copy them from the portrait. Render the transferred identity with the template's warm watercolor and colored-pencil technique, linework, brushwork, paper texture, shading, and scene lighting. Style adaptation may change the rendering medium, but it must not change or simplify identity-defining facial geometry or hairstyle. No photorealistic patches, seams, or pasted-on appearance.</expression_and_style>\n\n` +
+  `<preservation>Change only the protagonist's face, hair, and the smallest surrounding area required for a seamless blend. Preserve the red hood, cape, clothing, body, pose, hands, placement, and every other character, animal, object, background element, composition, framing, color, and original image dimensions. Add no text, border, logo, watermark, or new object.</preservation>\n\n` +
+  `<consistency>Use the same recognizable identity, hairstyle, skin tone, and apparent age from <protagonist_identity> across every page.</consistency>\n\n` +
+  `<scene_reference>This text identifies the existing target and must not be used to redesign or regenerate the scene: ${sceneStory}</scene_reference>\n` +
+  `<appearance_to_preserve>${expressionInstruction}</appearance_to_preserve>\n\n` +
+  `<output>Return one edited illustration only.</output>\n` +
+  `</task_specification>`;
 
 export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
   slug: 'jack-and-beanstalk',

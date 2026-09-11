@@ -82,12 +82,16 @@ describe('정식 동화 데이터셋 (잭과 콩나무, 빨간 모자)', () => {
 
       it('개인화 프롬프트가 얼굴과 헤어스타일만 교체하고 원본 장면을 보존한다', () => {
         [...story.pages, ...story.afterStory.choices.map((choice) => choice.page)].forEach((page) => {
-          expect(page.illustrationPrompt).toContain('face and hairstyle identity reference');
-          expect(page.illustrationPrompt).toContain('childlike proportions');
-          expect(page.illustrationPrompt).toContain('expression, emotion, gaze direction');
-          expect(page.illustrationPrompt).toContain('minimal surrounding area');
-          expect(page.illustrationPrompt).toContain('Do not use them to redesign');
+          expect(page.illustrationPrompt).toContain('<base_scene_template>');
+          expect(page.illustrationPrompt).toContain('<protagonist_identity>');
+          expect(page.illustrationPrompt).toContain('IS THE HIGHEST PRIORITY');
+          expect(page.illustrationPrompt).toContain('sole source of facial identity');
+          expect(page.illustrationPrompt).toContain('Do not blend, average, interpolate');
+          expect(page.illustrationPrompt).toContain('smallest surrounding area');
+          expect(page.illustrationPrompt).toContain('<scene_reference>');
           expect(page.illustrationPrompt).toContain('Return one edited illustration only.');
+          expect(page.illustrationPrompt).not.toContain('Image 1');
+          expect(page.illustrationPrompt).not.toContain('childlike proportions');
         });
       });
     });
