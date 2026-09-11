@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { ActionLink } from "@/components/ui/ActionLink";
-import { actionClass } from "@/components/ui/actionStyles";
+import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
 import { ApiError } from "@/lib/api";
 import { type FieldErrors, fetchMe, login, signup, validateLogin, validateSignup } from "@/lib/api/auth";
 
@@ -128,7 +128,7 @@ export default function LoginPage() {
 
           <button
             type="button"
-            className="min-h-touch rounded-pill text-sm font-bold text-ink-muted underline underline-offset-4 disabled:cursor-wait disabled:opacity-50"
+            className={`min-h-touch rounded-pill px-4 text-sm font-bold text-ink-muted underline underline-offset-4 disabled:cursor-wait disabled:opacity-50 ${FOCUS_RING}`}
             disabled={pending}
             onClick={() => {
               setMode(mode === "login" ? "signup" : "login");

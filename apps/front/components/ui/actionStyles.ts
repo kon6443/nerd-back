@@ -35,8 +35,19 @@ const variantStyles: Record<ActionVariant, string> = {
  * ⭐ 형태가 듀오링고의 정체성이다 — **pill 이 아니라 16px 라운드 사각형 + 아래쪽 립**이고,
  * 누르면 립 두께(4px)만큼 내려앉으며 그림자가 사라진다. `shadow-sm` 으로 바꾸지 말 것.
  */
+/**
+ * 키보드 포커스 링. **CTA 가 아닌 작은 버튼도 이 문자열을 쓴다.**
+ *
+ * ⭐ 따로 두는 이유: `actionClass` 는 큰 CTA 의 모양(립·굵은 글씨·56px)까지 함께 주므로
+ * 도트 인디케이터나 인라인 재시도처럼 **모양이 달라야 하는 버튼**에는 쓸 수 없다. 그렇다고
+ * 링을 손으로 적으면 두 벌이 되어 한쪽만 바뀐다 — 모양은 각자, **포커스 표시는 공유**한다.
+ * 🚫 이 값을 복사해 쓰지 않는다. import 한다.
+ */
+export const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-magic-strong focus-visible:ring-offset-2";
+
 const BASE =
-  "inline-flex min-h-touch items-center justify-center rounded-btn font-extrabold shadow-[0_4px_0_var(--btn-lip)] transition-[filter,transform,box-shadow] active:translate-y-1 active:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-magic-strong focus-visible:ring-offset-2 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0";
+  `inline-flex min-h-touch items-center justify-center rounded-btn font-extrabold shadow-[0_4px_0_var(--btn-lip)] transition-[filter,transform,box-shadow] active:translate-y-1 active:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0 ${FOCUS_RING} disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0`;
 
 const sizeStyles: Record<ActionSize, string> = {
   default: "px-8 text-lg",
