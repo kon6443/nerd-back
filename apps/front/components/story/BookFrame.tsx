@@ -42,7 +42,8 @@ export function BookFrameSkeleton() {
         <div className={styles.spread}>
           <div className={`${styles.art} bg-line`} />
           <div className={styles.page}>
-            <div className="flex flex-col gap-5">
+            {/* 본문의 .text 와 같은 자동 여백 — 골격과 실제 본문의 세로 위치를 맞춘다. */}
+            <div className="my-auto flex flex-col gap-5">
               <div className="h-6 w-full rounded bg-line" />
               <div className="h-6 w-11/12 rounded bg-line" />
               <div className="h-6 w-4/5 rounded bg-line" />

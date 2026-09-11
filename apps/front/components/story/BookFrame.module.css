@@ -23,8 +23,18 @@
   display: flex;
   min-inline-size: 0;
   flex-direction: column;
-  justify-content: center;
   padding: 1.75rem;
+  /* ⭐ 본문 길이가 페이지마다 달라도 책 크기는 변하지 않는다.
+     실측(2026-09-11, 로컬 API 응답 기준): 본편 1~5쪽 84~107자(3~4줄), 6쪽 비하인드
+     119~128자(4줄). 최장 줄은 32~40자다. 높이를 콘텐츠에 맡기면 본편↔비하인드를 오갈 때
+     책과 삽화가 함께 출렁인다. 그래서 틀을 먼저 고정하고 넘치는 예외만 이 안에서 스크롤시킨다.
+     ⚠️ 이 수치는 현재 시드 2종 기준이다 — 더 긴 본문이 들어오면 스크롤 빈도가 는다.
+     🚫 `justify-content: center` 를 쓰지 않는다 — 내용이 넘칠 때 **위쪽이 잘려 첫 줄을
+        읽을 수 없다**(flex 중앙 정렬의 고전적 함정). 중앙 정렬은 .text 의 margin 이 맡는다. */
+  block-size: 15rem;
+  overflow-y: auto;
+  /* 스크롤바가 생겼다 사라질 때 본문 폭이 흔들리지 않게 자리를 미리 잡는다. */
+  scrollbar-gutter: stable;
   background: repeating-linear-gradient(
     to bottom,
     var(--color-surface),
@@ -35,6 +45,8 @@
 }
 
 .text {
+  /* 짧은 본문은 세로 중앙에, 긴 본문은 위에서부터 흐른다 — 넘쳐도 잘리지 않는다. */
+  margin-block: auto;
   white-space: pre-line;
   word-break: keep-all;
   overflow-wrap: anywhere;
@@ -54,7 +66,10 @@
 @media (min-width: 48rem) {
   .spread {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    min-block-size: 25rem;
+    /* 🚫 `min-block-size`(하한만)로 두지 않는다 — 상한이 없으면 본문이 긴 페이지에서 행 높이가
+       늘어나 **삽화까지 같이 커진다.** 고정 높이라야 페이지를 넘겨도 틀이 그대로다.
+       뷰포트 기준은 태블릿 가로(1024×768)이고, clamp 로 작은 창에서도 잘리지 않게 한다. */
+    block-size: clamp(26rem, 64vh, 38rem);
   }
 
   .spread::after {
@@ -79,6 +94,8 @@
 
   .page {
     padding: 2.5rem;
+    /* 높이는 위 .spread 가 정한다 — 그리드 행을 그대로 채운다. */
+    block-size: auto;
   }
 
   .text {
