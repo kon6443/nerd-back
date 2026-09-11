@@ -139,6 +139,64 @@ describe('OpenRouterImageAdapter', () => {
     expect(result.toString('utf-8')).toBe('custom-page-png');
   });
 
+  it('generatePageIllustration: 역할 태그로 구분한 편집 프롬프트는 추가 래핑 없이 전달한다', async () => {
+    const mockBase64 = Buffer.from('identity-priority-page-png').toString('base64');
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        data: [{ b64_json: mockBase64, media_type: 'image/png' }],
+      }),
+    });
+
+    const customPrompt =
+      '<task_specification>\n' +
+      '<inputs>\n' +
+      '<base_scene_template>The first attached image is the template.</base_scene_template>\n' +
+      '<protagonist_identity>The second attached image is the sole identity source.</protagonist_identity>\n' +
+      '</inputs>\n' +
+      '</task_specification>';
+
+    await adapter.generatePageIllustration({
+      referenceImage: Buffer.from('user-face-bytes'),
+      baseImage: Buffer.from('template-illustration-bytes'),
+      prompt: customPrompt,
+    });
+
+    const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    expect(body.input_references).toHaveLength(2);
+    expect(body.prompt).toBe(customPrompt);
+    expect(body.prompt).not.toContain('<scene_story>');
+  });
+
+  it('generatePageIllustration: 비율을 생략하면 PNG 템플릿의 세로 비율을 사용한다', async () => {
+    const mockBase64 = Buffer.from('portrait-page-png').toString('base64');
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        data: [{ b64_json: mockBase64, media_type: 'image/png' }],
+      }),
+    });
+
+    const portraitPng = Buffer.alloc(24);
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(portraitPng);
+    portraitPng.writeUInt32BE(1024, 16);
+    portraitPng.writeUInt32BE(1536, 20);
+
+    await adapter.generatePageIllustration({
+      referenceImage: Buffer.from('user-face-bytes'),
+      baseImage: portraitPng,
+      prompt:
+        '<base_scene_template>template</base_scene_template><protagonist_identity>portrait</protagonist_identity>',
+    });
+
+    const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    expect(body.aspect_ratio).toBe('2:3');
+  });
+
   it('generatePageIllustration: baseImage 가 주어지고 일반 본문 텍스트가 오면 명시적인 [IMAGE EDITING & COMPOSITION TASK] 지시문을 자동 생성한다', async () => {
     const mockBase64 = Buffer.from('edited-page-png').toString('base64');
     global.fetch = jest.fn().mockResolvedValue({
