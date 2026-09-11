@@ -224,7 +224,8 @@ export class StorySessionController {
   @UseGuards(AuthGuard)
   @ApiOperation({
     summary: '실패한 특정 페이지 개인화 재시도',
-    description: 'failed 상태인 특정 페이지만 다시 백그라운드로 재생성합니다.',
+    description:
+      'failed 이거나 오래 멈춘(고아) 페이지만 다시 백그라운드로 재생성합니다. 생성 중인 페이지는 400 으로 거절합니다 — 다른 인스턴스가 만들고 있는 삽화를 빼앗아 유료 생성이 중복되는 것을 막습니다.',
   })
   @ApiCommonUnauthorizedResponse()
   @ApiCommonValidationResponse()

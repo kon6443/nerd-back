@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Transactional } from 'typeorm-transactional';
 import { randomUUID } from 'node:crypto';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
@@ -40,6 +41,15 @@ import type {
   StoryBranchKey,
 } from '@nerd/contracts';
 
+/**
+ * `running` 인 페이지를 고아로 간주하기까지의 시간.
+ *
+ * 처리하던 프로세스가 죽으면 그 행은 영원히 `running` 으로 남는다. 이 시간을 넘기면
+ * 다른 레플리카가 회수해 다시 만든다. 이미지 1장 생성이 이보다 오래 걸리는 일은 없다 —
+ * 너무 짧으면 **정상 작업을 남이 빼앗고**, 너무 길면 진짜 고아를 오래 방치한다.
+ */
+const STALE_RUNNING_MS = 10 * 60 * 1000;
+
 @Injectable()
 export class StorySessionService {
   private readonly logger = new Logger(StorySessionService.name);
@@ -67,8 +77,52 @@ export class StorySessionService {
     private readonly branchChoiceRepo?: Repository<SessionBranchChoice>,
   ) {}
 
-  /** 현재 프로세스에서 비동기로 실행 중인 파이프라인 세션 ID 추적 (중복 실행 방지 및 서버 재시작 시 고아 세션 복구용) */
-  private readonly activePipelines = new Set<string>();
+  /**
+   * 페이지 한 장을 이 프로세스가 처리하겠다고 **원자적으로** 선언한다.
+   * `true` 면 내가 집은 것이고, `false` 면 다른 레플리카가 처리 중이거나 이미 끝난 것이다.
+   *
+   * 🚫 인메모리 플래그로 중복을 막지 않는다 — **레플리카가 3개라 프로세스마다 갈린다.**
+   *    "누가 처리 중인가" 를 메모리에 두면 다른 레플리카에게는 그 사실이 보이지 않아,
+   *    **처리 중인 작업**과 **죽어서 방치된 작업**이 똑같이 "비어 있음" 으로 관측된다.
+   *    그 둘은 정반대 대응(건드리지 않기 / 다시 돌리기)을 요구하므로 구분에 실패하면
+   *    유료 이미지 생성이 중복 호출된다. 그래서 판정을 DB 한 곳에 모은다.
+   *
+   * 같은 행에 대한 `UPDATE` 는 DB 가 직렬화하므로, 동시에 들어와도 **정확히 한 쪽만** 1행을 얻는다.
+   * `running` 인데 `updated_at` 이 오래된 행은 고아로 보고 회수한다 — TTL 을 따로 두지 않고
+   * 이미 있는 타임스탬프를 쓰므로 스키마 변경이 필요 없다.
+   */
+  /**
+   * 이 시각보다 `updated_at` 이 오래된 `running` 은 고아로 본다.
+   *
+   * claim 의 회수 조건과 재시도 허용 조건이 **같은 기준**을 쓰도록 한 곳에 둔다 —
+   * 두 곳이 어긋나면 한쪽은 빼앗고 한쪽은 막는 모순이 생긴다.
+   */
+  private staleRunningThreshold(): Date {
+    return new Date(Date.now() - STALE_RUNNING_MS);
+  }
+
+  private async claimPage(
+    sessionId: string,
+    pageNo: number,
+    branchKey: 'common' | StoryBranchKey,
+  ): Promise<boolean> {
+    const staleBefore = this.staleRunningThreshold();
+
+    const result = await this.pageImageRepo
+      .createQueryBuilder()
+      .update(SessionPageImage)
+      .set({ status: 'running', errorMessage: null, updatedAt: new Date() })
+      .where('session_id = :sessionId', { sessionId })
+      .andWhere('page_no = :pageNo', { pageNo })
+      .andWhere('branch_key = :branchKey', { branchKey })
+      .andWhere(
+        '(status IN (:...claimable) OR (status = :running AND updated_at < :staleBefore))',
+        { claimable: ['pending', 'failed'], running: 'running', staleBefore },
+      )
+      .execute();
+
+    return (result.affected ?? 0) > 0;
+  }
 
   async getAfterStory(userId: number, sessionId: string): Promise<AfterStoryResponse> {
     const session = await this.getOwnedSessionOrThrow(userId, sessionId);
@@ -253,6 +307,9 @@ export class StorySessionService {
   /**
    * 세션 삭제 (초기화 및 다른 얼굴로 새로 만들기용)
    */
+  // 페이지 이미지 → 세션 두 테이블을 지운다. 중간에 끊기면 "지웠는데 목록에 남는" 상태가
+  // 되므로 한 트랜잭션으로 묶는다 (컨텍스트는 main.ts 의 initializeTransactionalContext).
+  @Transactional()
   async deleteSession(userId: number, sessionId: string): Promise<void> {
     const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
     if (!session || session.userId !== userId) {
@@ -387,37 +444,30 @@ export class StorySessionService {
       return { id: session.id, status: 'completed', totalPages };
     }
 
-    // 이미 백그라운드 파이프라인이 현재 프로세스에서 정상 동작 중이면 중복 시작 방지 (멱등성)
-    if (session.status === 'generating' && this.activePipelines.has(session.id)) {
-      return { id: session.id, status: 'generating', totalPages };
-    }
-
-    // face_ready, failed 상태이거나, 서버 재시작 등으로 generating 상태인데 실제 파이프라인이 멈춘 경우:
-    // 개별 페이지 엔티티 초기화 및 비동기 작업 기동
+    // 진행 중이든 고아든 **똑같이 기동한다** — 어느 쪽인지 미리 알 필요가 없다.
+    // 어떤 페이지를 실제로 처리할지는 `claimPage` 의 조건부 UPDATE 가 정하므로,
+    // 다른 레플리카가 붙들고 있는 페이지는 자연히 건너뛴다. 이것이 멱등성을 보장한다.
     const existingImages = await this.pageImageRepo.find({ where: { sessionId } });
 
+    // 🚫 기존 행의 상태를 여기서 되돌리지 않는다. `running` 을 `pending` 으로 리셋하면
+    //    **다른 레플리카가 지금 만들고 있는 페이지**를 빼앗아 같은 이미지를 두 번 생성하게 된다.
+    //    재시도가 필요한 행(`failed`·오래된 `running`)은 claim 조건이 이미 포함한다.
     for (const page of templatePages) {
-      const existing = existingImages.find(
+      const exists = existingImages.some(
         (img) => img.pageNo === page.pageNo && img.branchKey === page.branchKey,
       );
-      if (existing) {
-        if (existing.status !== 'succeeded') {
-          existing.status = 'pending';
-          existing.errorMessage = null;
-          await this.pageImageRepo.save(existing);
-        }
-      } else {
-        const newPageImage = this.pageImageRepo.create({
-          id: randomUUID(),
-          sessionId: session.id,
-          pageNo: page.pageNo,
-          branchKey: page.branchKey,
-          status: 'pending',
-          imageKey: null,
-          errorMessage: null,
-        });
-        await this.pageImageRepo.save(newPageImage);
-      }
+      if (exists) continue;
+
+      const newPageImage = this.pageImageRepo.create({
+        id: randomUUID(),
+        sessionId: session.id,
+        pageNo: page.pageNo,
+        branchKey: page.branchKey,
+        status: 'pending',
+        imageKey: null,
+        errorMessage: null,
+      });
+      await this.pageImageRepo.save(newPageImage);
     }
 
     session.status = 'generating';
@@ -531,6 +581,14 @@ export class StorySessionService {
       throw new PageNotFoundErrorResponseDto();
     }
 
+    // 🚫 **살아 있는 `running` 을 재시도로 받지 않는다.** 아래에서 `pending` 으로 되돌리는데,
+    //    그러면 **다른 레플리카가 지금 그리고 있는 페이지를 빼앗아** 같은 삽화가 두 번 생성된다
+    //    (유료 호출 2배). 멈춘 것으로 보일 때 — 즉 claim 이 회수할 수 있는 시점 — 만 허용한다.
+    //    코드는 그대로 두고 메시지만 상황에 맞춘다(§3 override).
+    if (pageImg.status === 'running' && pageImg.updatedAt > this.staleRunningThreshold()) {
+      throw new PageNotFailedErrorResponseDto('아직 생성 중입니다. 잠시 후 다시 시도해 주세요.');
+    }
+
     if (pageImg.status !== 'failed' && pageImg.status !== 'running') {
       throw new PageNotFailedErrorResponseDto();
     }
@@ -568,12 +626,8 @@ export class StorySessionService {
    * 전체 페이지 개인화 파이프라인 백그라운드 병렬(Parallel) 처리
    */
   async executePersonalizationPipeline(sessionId: string): Promise<void> {
-    if (this.activePipelines.has(sessionId)) {
-      this.logger.warn(`이미 진행 중인 파이프라인 무시: 세션 ${sessionId}`);
-      return;
-    }
-    this.activePipelines.add(sessionId);
-
+    // 중복 기동 자체는 막지 않는다 — 페이지별 `claimPage` 가 실제 작업의 중복을 막으므로
+    // 두 레플리카가 함께 들어와도 유료 생성은 한 번만 일어난다.
     try {
       const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
       if (!session || !session.referenceImageKey) {
@@ -594,16 +648,15 @@ export class StorySessionService {
         const chunk = templatePages.slice(i, i + CHUNK_SIZE);
         await Promise.all(
           chunk.map(async (tplPage) => {
+            // 이 페이지를 내가 처리해도 되는지 DB 에 원자적으로 묻는다.
+            // 남이 집었거나 이미 끝났으면 조용히 건너뛴다.
+            const claimed = await this.claimPage(sessionId, tplPage.pageNo, tplPage.branchKey);
+            if (!claimed) return;
+
             const pageImg = await this.pageImageRepo.findOne({
-            where: { sessionId, pageNo: tplPage.pageNo, branchKey: tplPage.branchKey },
+              where: { sessionId, pageNo: tplPage.pageNo, branchKey: tplPage.branchKey },
             });
-
-            if (!pageImg || pageImg.status === 'succeeded') {
-              return;
-            }
-
-            pageImg.status = 'running';
-            await this.pageImageRepo.save(pageImg);
+            if (!pageImg) return;
 
             try {
               // 템플릿 기본 삽화가 등록되어 있으면 참조용으로 주입
@@ -647,8 +700,6 @@ export class StorySessionService {
       await this.checkAndUpdateSessionCompletion(session.id);
     } catch (error: unknown) {
       this.logger.error(`개인화 파이프라인 전체 오류: ${error}`);
-    } finally {
-      this.activePipelines.delete(sessionId);
     }
   }
 
@@ -660,29 +711,26 @@ export class StorySessionService {
     pageNo: number,
     branchKey: 'common' | StoryBranchKey = 'common',
   ): Promise<void> {
-    const pipelineKey = `${sessionId}:${branchKey}:${pageNo}`;
-    if (this.activePipelines.has(pipelineKey)) {
-      this.logger.warn(`이미 진행 중인 단일 페이지 재시도 무시: ${pipelineKey}`);
-      return;
-    }
-    this.activePipelines.add(pipelineKey);
-
     try {
       const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
       if (!session || !session.referenceImageKey) return;
-
-      const pageImg = await this.pageImageRepo.findOne({
-        where: { sessionId, pageNo, branchKey },
-      });
-      if (!pageImg) return;
 
       const tplPage = await this.pageRepo.findOne({
         where: { templateId: session.templateId, pageNo, branchKey },
       });
       if (!tplPage) return;
 
-      pageImg.status = 'running';
-      await this.pageImageRepo.save(pageImg);
+      // 전체 파이프라인과 같은 판정을 쓴다 — 다른 레플리카가 이 페이지를 재시도 중이면 집히지 않는다.
+      const claimed = await this.claimPage(sessionId, pageNo, branchKey);
+      if (!claimed) {
+        this.logger.warn(`이미 처리 중인 페이지라 재시도를 건너뛴다: ${sessionId}:${branchKey}:${pageNo}`);
+        return;
+      }
+
+      const pageImg = await this.pageImageRepo.findOne({
+        where: { sessionId, pageNo, branchKey },
+      });
+      if (!pageImg) return;
 
       const refBuffer = await this.storagePort.download(session.referenceImageKey);
       try {
@@ -723,8 +771,6 @@ export class StorySessionService {
       await this.checkAndUpdateSessionCompletion(session.id);
     } catch (error: unknown) {
       this.logger.error(`단일 페이지 재시도 오류: ${error}`);
-    } finally {
-      this.activePipelines.delete(pipelineKey);
     }
   }
 
