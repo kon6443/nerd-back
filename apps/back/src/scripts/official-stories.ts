@@ -46,36 +46,35 @@ export interface OfficialStoryData {
 }
 
 export const buildJackPrompt = (sceneStory: string, expressionInstruction: string): string =>
-  `<inputs>\n` +
-  `  <base_scene_template>배경과 구도, 소년 잭의 의상을 완벽히 유지할 원본 동화 템플릿 삽화 (Attached Image 1)</base_scene_template>\n` +
-  `  <protagonist_identity>주인공 얼굴 및 헤어스타일에 반영할 인물 레퍼런스 (사용자의 실제 얼굴 사진 또는 사전 제작된 캐릭터 디자인 시트) (Attached Image 2)</protagonist_identity>\n` +
-  `</inputs>\n\n` +
-  `<instructions>\n` +
-  `1. [필수 - 템플릿 이목구비 및 헤어스타일 완전 삭제 & 인물 교체]: <base_scene_template>에 이미 그려진 서양 만화 캐릭터의 헤어스타일(머리카락 색상, 모질, 컬, 모양)과 큰 눈망울, 코, 입, 얼굴 윤곽선을 100% 완전히 지워내세요. 템플릿 원본의 가상 소년 잭 생김새와 머리카락이 조금이라도 남아있으면 안 됩니다. 소년 잭의 머리카락과 얼굴 전체(헤어스타일, 가르마, 앞머리 형태, 머리 기장, 머리색, 눈매, 쌍꺼풀 유무, 눈 크기 및 눈꼬리 모양, 눈썹, 콧대, 입술, 턱선, 얼굴형)를 <protagonist_identity> 속 인물의 고유한 헤어스타일 및 생김새로 100% 확실하게 교체해야 합니다. (엄마, 노인, 거인 등 다른 등장인물의 얼굴과 요술 거위는 절대 변경하지 마세요.)\n` +
-  `2. [3D 각도 회전 & 헤어스타일 일관성 유지 필수]: <protagonist_identity>의 인물이 정면 사진이더라도, 이를 3차원 공간에서 회전시켜 <base_scene_template>의 고개 각도(정면, 3/4 측면, 반측면 등)와 시선 방향에 맞추어 새로 그려야 합니다. 각도가 돌아가더라도 템플릿의 머리카락으로 되돌아가지 말고, <protagonist_identity> 인물 고유의 헤어스타일(형태, 결, 볼륨)과 이목구비 정체성을 해당 3D 각도에 맞게 정확히 입체적으로 유지해야 합니다.\n` +
-  `3. [동화 화풍 일치 & 그림체 보존 필수]: 실사 사진의 피부 질감이나 머리카락을 이질감 있게 그대로 오려 붙이지 마세요. <protagonist_identity> 인물의 얼굴 이목구비 특징과 헤어스타일 형태(앞머리 모양, 기장, 가르마, 색상)를 정확히 추출하여 구현하되, 채색과 선화 질감은 <base_scene_template> 원본 삽화의 따뜻한 수채화·과슈 동화 일러스트 그림체(부드러운 손그림 윤곽선, 파스텔 톤 수채화 붓 터치)로 100% 완벽하게 녹아들도록 자연스럽게 일러스트화하여 그려주세요. 전체 동화 삽화의 그림체와 화풍을 절대 해치지 않아야 합니다.\n` +
-  `4. [보존 및 블렌딩 영역]: 소년 잭의 초록 조끼, 흰 셔츠, 갈색 바지와 장화, 체형, 자세, 손, 소품 및 모든 배경 풍경은 <base_scene_template> 그대로 완벽하게 유지해주세요. 머리카락과 얼굴 전체는 <protagonist_identity>의 인물 특징으로 완전히 대체하되, 헤어라인과 이마, 얼굴 윤곽선, 목과 옷깃 경계는 동화 삽화 화풍에 맞춰 자연스럽게 블렌딩해주세요.\n` +
-  `5. 현재 장면 스토리: ${sceneStory}\n` +
-  `6. 장면별 각도 및 표정 지시: ${expressionInstruction}\n` +
-  `7. 빛의 방향, 색온도, 명암은 <base_scene_template> 원본 장면에 맞춰 조화롭게 합성해주세요.\n` +
-  `8. <base_scene_template>의 가로세로 비율과 구도를 유지하고, 글자, 로고, 워터마크를 추가하지 마세요.\n` +
-  `</instructions>`;
+  `Edit Image 1 using Image 2 as the face and hairstyle identity reference.\n\n` +
+  `Image 1 is the original storybook illustration. Image 2 is the user's identity photo.\n\n` +
+  `Replace only the face and hairstyle of Jack, the main child protagonist in Image 1, with a recognizable illustrated version of the person in Image 2. Jack is the young boy wearing a moss-green vest, a cream shirt, and rust-brown trousers. If other children or adults appear, do not modify their faces or hair.\n\n` +
+  `Preserve the reference person's distinctive facial features, including face shape, eye shape, eyebrows, nose, lips, and skin tone. Also preserve their recognizable hairstyle, including hair color, hairline, parting, bangs, length, texture, curl pattern, volume, and overall silhouette. Completely replace Jack's original face and hair so that none of the template character's facial identity or hairstyle remains.\n\n` +
+  `Adapt the face and hairstyle naturally to Jack's existing childlike proportions. Keep Jack looking like the same young child and do not make him appear older.\n\n` +
+  `Match Jack's existing expression, emotion, gaze direction, head position, head angle, and perspective in Image 1. Preserve the emotion and action of the original scene. Do not copy Image 2's expression, head angle, gaze, pose, clothing, accessories, background, or lighting. When adapting the hairstyle to a different angle, keep the identity-defining shape, texture, volume, and hair color from Image 2.\n\n` +
+  `Render the new face and hair in exactly the same warm watercolor and gouache storybook style as Image 1. Match the original soft hand-drawn outlines, brushwork, paper texture, shading, color temperature, lighting, and level of detail. Do not paste photorealistic skin or hair into the illustration. Blend the hairline, forehead, face contour, ears, neck, and collar naturally with the existing artwork.\n\n` +
+  `Change only Jack's face, hair, and the minimal surrounding area required for a seamless blend. Preserve Jack's body, pose, hands, moss-green vest, cream shirt, rust-brown trousers, boots, and placement. Preserve every other character, animal, object, background element, composition, color, and the original image dimensions. Do not add text, borders, logos, watermarks, or new elements.\n\n` +
+  `Use the same recognizable facial identity, hairstyle, skin tone, and apparent age consistently across every page, even when Jack's expression, viewing angle, or lighting changes.\n\n` +
+  `The following notes only identify Jack's appearance in the existing scene. Do not use them to redesign, regenerate, or add anything to the scene.\n` +
+  `Scene reference: ${sceneStory}\n` +
+  `Existing appearance to preserve: ${expressionInstruction}\n\n` +
+  `Return one edited illustration only.`;
 
 export const buildRedRidingHoodPrompt = (sceneStory: string, expressionInstruction: string): string =>
-  `<inputs>\n` +
-  `  <base_scene_template>배경과 구도, 빨간 두건과 의상을 완벽히 유지할 원본 동화 템플릿 삽화 (Attached Image 1)</base_scene_template>\n` +
-  `  <protagonist_identity>주인공 얼굴에 반영할 인물 레퍼런스 (사용자의 실제 얼굴 사진 또는 사전 제작된 캐릭터 디자인 시트) (Attached Image 2)</protagonist_identity>\n` +
-  `</inputs>\n\n` +
-  `<instructions>\n` +
-  `1. [필수 - 템플릿 이목구비 완전 삭제 및 얼굴 교체]: <base_scene_template>에 이미 그려진 서양 만화 캐릭터의 큰 눈망울, 코, 입, 얼굴 윤곽선을 100% 완전히 지워내세요. 템플릿 원본의 가상 캐릭터 생김새가 조금이라도 남아있으면 안 됩니다. 빨간 두건을 쓴 소녀의 얼굴 전체(눈매, 쌍꺼풀 유무, 눈 크기 및 눈꼬리 모양, 눈썹, 콧대, 입술, 턱선, 얼굴형)를 <protagonist_identity> 속 인물의 실제 고유한 생김새로 100% 확실하게 교체해야 합니다. (할머니, 사냥꾼 등 다른 등장인물의 얼굴은 절대 변경하지 마세요.)\n` +
-  `2. [3D 각도 회전 & 시선 맞춤 필수]: <protagonist_identity>의 인물이 정면 사진이더라도, 이를 3차원 공간에서 회전시켜 <base_scene_template>의 고개 각도(정면, 3/4 측면, 반측면 등)와 시선 방향에 맞추어 새로 그려야 합니다. 각도가 돌아가더라도 <protagonist_identity> 인물 고유의 이목구비 정체성을 잃지 않아야 합니다.\n` +
-  `3. [화풍 일치]: 얼굴 이목구비의 정체성은 <protagonist_identity>를 그대로 구현하되, 채색 질감만 <base_scene_template> 원본 삽화의 따뜻한 수채화·과슈 동화 일러스트 질감으로 조화롭게 일치시켜주세요.\n` +
-  `4. [보존 및 블렌딩 영역]: 빨간 두건, 의상, 체형, 자세, 손, 페이지별 템플릿에 있는 소품과 배경은 <base_scene_template> 그대로 완벽하게 유지해주세요. 두건 안쪽의 얼굴 전체는 <protagonist_identity>의 인물 특징으로 완전히 대체하되, 얼굴과 목·두건 경계는 자연스럽게 블렌딩해주세요.\n` +
-  `5. 현재 장면 스토리: ${sceneStory}\n` +
-  `6. 장면별 각도 및 표정 지시: ${expressionInstruction}\n` +
-  `7. 빛의 방향, 밝기, 색감은 <base_scene_template> 원본 장면에 맞춰 조화롭게 합성해주세요.\n` +
-  `8. <base_scene_template>의 가로세로 비율과 구도를 유지하고, 글자·로고·워터마크를 추가하지 마세요.\n` +
-  `</instructions>`;
+  `Edit Image 1 using Image 2 as the face and hairstyle identity reference.\n\n` +
+  `Image 1 is a page from a Little Red Riding Hood picture book. Image 2 is the user's identity photo.\n\n` +
+  `Replace only the face and hairstyle of Little Red Riding Hood, the main child protagonist wearing the red hood or red cape, with a recognizable illustrated version of the person in Image 2. Do not modify the grandmother, huntsman, wolf, squirrels, birds, or any other character.\n\n` +
+  `Preserve the reference person's distinctive facial features, including face shape, eye shape, eyebrows, nose, lips, and skin tone. Also preserve their recognizable hairstyle, including hair color, hairline, parting, bangs, length, texture, curl pattern, volume, and overall silhouette. Completely replace the protagonist's original face and visible hair so that none of the template character's facial identity or hairstyle remains.\n\n` +
+  `Adapt the face and hairstyle naturally to the protagonist's existing childlike proportions. Keep her looking like the same young child and do not make her appear older.\n\n` +
+  `Match the protagonist's existing expression, emotion, gaze direction, head position, head angle, and perspective in Image 1. Preserve the emotion and action of the original scene. Do not copy Image 2's expression, head angle, gaze, pose, clothing, accessories, background, or lighting. When adapting the hairstyle to a different angle, keep the identity-defining shape, texture, volume, and hair color from Image 2.\n\n` +
+  `Preserve the original red hood or cape, including its exact shape, position, folds, and size. Place the adapted hairstyle naturally inside and around the hood while respecting every existing overlap and occlusion created by the hood, hair, hands, or other objects. Do not remove, resize, reshape, or reposition the hood.\n\n` +
+  `Render the new face and hair in exactly the same warm watercolor and colored-pencil picture-book style as Image 1. Match the original linework, brushwork, paper texture, shading, color temperature, lighting, and level of detail. Do not paste photorealistic skin or hair into the illustration. Blend the hairline, forehead, face contour, ears, jaw, neck, and hood naturally with the existing artwork.\n\n` +
+  `Change only the protagonist's face, hair, and the minimal surrounding area required for a seamless blend. Preserve her red hood, cape, clothing, body, proportions, pose, hands, and placement. Preserve every other character, animal, object, background element, composition, framing, color, and the original image dimensions. Do not add text, borders, logos, watermarks, or new objects.\n\n` +
+  `Use the same recognizable facial identity, hairstyle, skin tone, and apparent age consistently across every page, even when the protagonist's expression, viewing angle, or lighting changes.\n\n` +
+  `The following notes only identify the protagonist's appearance in the existing scene. Do not use them to redesign, regenerate, or add anything to the scene.\n` +
+  `Scene reference: ${sceneStory}\n` +
+  `Existing appearance to preserve: ${expressionInstruction}\n\n` +
+  `Return one edited illustration only.`;
 
 export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
   slug: 'jack-and-beanstalk',
@@ -297,7 +296,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
         '늑대가 이불을 걷어차며 사납게 달려들었어요!',
       illustrationPrompt: buildRedRidingHoodPrompt(
         '할머니 오두막 침대에서 이불을 걷어차며 달려드는 늑대를 보고 깜짝 놀라는 장면',
-        '[오른쪽 뒤 시선]: 늑대가 이불을 걷어차고 일어나는 모습을 보며 놀라 입을 벌린 표정. 원본의 오른쪽 아래로 달아나는 자세를 유지.',
+        '[오른쪽 위 시선]: 침대에서 몸을 일으킨 늑대를 올려다보며 눈을 크게 뜨고 입을 벌린 깜짝 놀란 표정. 원본의 침대 왼쪽에 서 있는 자세, 가슴 앞으로 모은 손과 바구니 위치를 유지.',
       ),
       baseImageKey: 'templates/red-riding-hood/page-3.png',
       personaTargetRole: 'red-hood',
@@ -349,11 +348,11 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
     choices: [
       {
         branchKey: 'a', title: '아기 다람쥐를 집으로 데려다줘요', description: '길을 잃고 울고 있는 아기 다람쥐를 만났어요.',
-        page: { pageNo: 6, bodyText: '다음 날, 빨간 모자는 풀숲에서 훌쩍이는 아기 다람쥐를 만났어요.\n아기 다람쥐는 집으로 가는 길을 잊어버렸다고 했지요.\n빨간 모자는 천천히 주변을 살피며 다람쥐와 함께 걸었어요.\n커다란 참나무 아래에서 엄마 다람쥐를 찾자, 숲에는 기쁜 인사가 가득 울려 퍼졌답니다.', illustrationPrompt: buildRedRidingHoodPrompt('커다란 참나무 아래에서 빨간 모자가 아기 다람쥐와 엄마 다람쥐가 다시 만나는 모습을 다정하게 바라보는 장면', '[오른쪽 아래 시선]: 아기 다람쥐를 바라보며 눈을 감고 환하게 웃는 따뜻한 표정. 원본의 앉은 자세와 빨간 두건을 유지.'), baseImageKey: 'templates/red-riding-hood/page-6-a.png', personaTargetRole: 'red-hood', characters: [{ role: 'red-hood', hitbox: { x: 0.09, y: 0.27, width: 0.37, height: 0.42 } }] },
+        page: { pageNo: 6, bodyText: '다음 날, 빨간 모자는 풀숲에서 훌쩍이는 아기 다람쥐를 만났어요.\n아기 다람쥐는 집으로 가는 길을 잊어버렸다고 했지요.\n빨간 모자는 천천히 주변을 살피며 다람쥐와 함께 걸었어요.\n커다란 참나무 아래에서 엄마 다람쥐를 찾자, 숲에는 기쁜 인사가 가득 울려 퍼졌답니다.', illustrationPrompt: buildRedRidingHoodPrompt('따뜻한 햇살이 드는 커다란 참나무 굴 앞에서 아기 다람쥐와 엄마 다람쥐가 다시 만나 코를 맞대는 모습을, 빨간 모자가 가까이 앉아 다정하게 바라보는 장면', '[오른쪽 아래 시선]: 다시 만난 다람쥐 가족을 바라보며 눈을 감고 환하게 웃는 따뜻한 표정. 원본의 나무 왼쪽에 무릎을 굽혀 앉은 자세, 무릎 위에 모은 두 손과 빨간 두건 위치를 유지.'), baseImageKey: 'templates/red-riding-hood/page-6-a.png', personaTargetRole: 'red-hood', characters: [{ role: 'red-hood', hitbox: { x: 0.09, y: 0.27, width: 0.37, height: 0.42 } }] },
       },
       {
         branchKey: 'b', title: '숲길에 빨간 리본을 달아요', description: '누구나 길을 잃지 않도록 숲길 표지를 만들어요.',
-        page: { pageNo: 6, bodyText: '빨간 모자는 할머니와 함께 숲길의 갈림길마다 빨간 리본을 달았어요.\n동물 친구들도 솔방울과 나뭇잎으로 작은 표지를 만들었지요.\n이제 숲에 오는 누구나 길을 쉽게 찾을 수 있었어요.\n빨간 모자는 바람에 흔들리는 리본을 보며 환하게 웃었답니다.', illustrationPrompt: buildRedRidingHoodPrompt('숲길의 큰 참나무에 빨간 모자와 할머니가 길을 알리는 빨간 리본을 함께 다는 장면', '[위쪽 시선]: 리본을 묶으며 눈을 감고 환하게 웃는 뿌듯한 표정. 원본의 나무, 리본, 할머니의 손 위치를 유지.'), baseImageKey: 'templates/red-riding-hood/page-6-b.png', personaTargetRole: 'red-hood', characters: [{ role: 'red-hood', hitbox: { x: 0.17, y: 0.17, width: 0.28, height: 0.49 } }, { role: 'grandmother', hitbox: { x: 0.31, y: 0.07, width: 0.3, height: 0.56 } }] },
+        page: { pageNo: 6, bodyText: '빨간 모자는 할머니와 함께 숲길의 갈림길마다 빨간 리본을 달았어요.\n동물 친구들도 솔방울과 나뭇잎으로 작은 표지를 만들었지요.\n이제 숲에 오는 누구나 길을 쉽게 찾을 수 있었어요.\n빨간 모자는 바람에 흔들리는 리본을 보며 환하게 웃었답니다.', illustrationPrompt: buildRedRidingHoodPrompt('햇살이 드는 숲길에서 빨간 모자와 할머니가 큰 참나무에 길을 알리는 빨간 리본을 함께 묶고, 다람쥐와 새들이 솔방울과 나뭇잎으로 숲길 표지를 만드는 장면', '[위쪽 시선]: 할머니와 함께 나무의 리본을 묶으며 눈을 감고 환하게 웃는 뿌듯한 표정. 원본의 나무 앞에 서서 두 팔을 위로 든 자세, 리본과 할머니의 손 위치를 유지.'), baseImageKey: 'templates/red-riding-hood/page-6-b.png', personaTargetRole: 'red-hood', characters: [{ role: 'red-hood', hitbox: { x: 0.17, y: 0.17, width: 0.28, height: 0.49 } }, { role: 'grandmother', hitbox: { x: 0.31, y: 0.07, width: 0.3, height: 0.56 } }] },
       },
     ],
   },

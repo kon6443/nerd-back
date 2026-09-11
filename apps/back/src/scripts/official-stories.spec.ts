@@ -79,6 +79,17 @@ describe('정식 동화 데이터셋 (잭과 콩나무, 빨간 모자)', () => {
           expect(character.displayName.trim().length).toBeGreaterThan(0);
         });
       });
+
+      it('개인화 프롬프트가 얼굴과 헤어스타일만 교체하고 원본 장면을 보존한다', () => {
+        [...story.pages, ...story.afterStory.choices.map((choice) => choice.page)].forEach((page) => {
+          expect(page.illustrationPrompt).toContain('face and hairstyle identity reference');
+          expect(page.illustrationPrompt).toContain('childlike proportions');
+          expect(page.illustrationPrompt).toContain('expression, emotion, gaze direction');
+          expect(page.illustrationPrompt).toContain('minimal surrounding area');
+          expect(page.illustrationPrompt).toContain('Do not use them to redesign');
+          expect(page.illustrationPrompt).toContain('Return one edited illustration only.');
+        });
+      });
     });
   });
 });
