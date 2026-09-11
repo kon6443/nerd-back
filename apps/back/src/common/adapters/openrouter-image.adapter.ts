@@ -171,8 +171,34 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
     return this.callImageApi({
       prompt,
       inputReferences,
-      aspectRatio: input.aspectRatio || '4:3',
+      aspectRatio: this.resolveAspectRatio(input.aspectRatio, input.baseImage),
       actionName: '동화 페이지 삽화 생성',
+    });
+  }
+
+  /** 명시값이 없으면 PNG 템플릿의 실제 비율과 가장 가까운 지원 비율을 사용한다. */
+  private resolveAspectRatio(explicitRatio?: string, baseImage?: Buffer): string {
+    if (explicitRatio) return explicitRatio;
+
+    const isPng =
+      baseImage !== undefined &&
+      baseImage.length >= 24 &&
+      baseImage.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    if (!isPng) return '4:3';
+
+    const width = baseImage.readUInt32BE(16);
+    const height = baseImage.readUInt32BE(20);
+    if (width === 0 || height === 0) return '4:3';
+
+    const supportedRatios = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9'];
+    const imageRatio = width / height;
+
+    return supportedRatios.reduce((closest, candidate) => {
+      const [candidateWidth, candidateHeight] = candidate.split(':').map(Number);
+      const [closestWidth, closestHeight] = closest.split(':').map(Number);
+      const candidateDistance = Math.abs(candidateWidth / candidateHeight - imageRatio);
+      const closestDistance = Math.abs(closestWidth / closestHeight - imageRatio);
+      return candidateDistance < closestDistance ? candidate : closest;
     });
   }
 

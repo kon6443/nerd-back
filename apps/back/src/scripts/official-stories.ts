@@ -45,25 +45,19 @@ export interface OfficialStoryData {
   afterStory: AfterStoryData;
 }
 
-export const buildJackPrompt = (sceneStory: string, expressionInstruction: string): string =>
+export const buildJackPrompt = (pageInstruction: string): string =>
   `<task_specification>\n` +
-  `<priority>IDENTITY FIDELITY TO <protagonist_identity> IS THE HIGHEST PRIORITY inside the editable face-and-hair region. The result must be immediately recognizable as the real person in <protagonist_identity>, not as the original template character.</priority>\n\n` +
   `<inputs>\n` +
-  `  <base_scene_template>The first attached image is the original storybook illustration to edit. Use it only for the canvas, composition, Jack's body and clothing, pose, head position, expression, gaze, occlusion, lighting, and illustration style. Do not use Jack's original face or hair as an identity source.</base_scene_template>\n` +
-  `  <protagonist_identity>The second attached image is the user's real portrait photo. It is the sole source of facial identity, facial geometry, skin tone, and hairstyle.</protagonist_identity>\n` +
+  `  <base_scene_template>The first attached image is the original Jack and the Beanstalk storybook illustration to edit. Use it for the scene, Jack's location, head size, expression, gaze, pose, clothing, lighting, and illustrated style. Never use Jack's original face or hair as an identity source.</base_scene_template>\n` +
+  `  <protagonist_identity>The second attached image is the user's real portrait photo. Use it as the sole source of Jack's facial identity, facial geometry, natural complexion, and hairstyle.</protagonist_identity>\n` +
   `</inputs>\n\n` +
-  `<edit_target>Jack is the main protagonist wearing a moss-green vest, cream shirt, and rust-brown trousers. Replace Jack only. Never alter another child, adult, or animal.</edit_target>\n\n` +
-  `<identity_transfer>\n` +
-  `- Completely replace Jack's original face and hair. Do not retain any identity-defining facial feature or hairstyle from <base_scene_template>.\n` +
-  `- Preserve the exact relative geometry and distinctive traits from <protagonist_identity>: face shape, forehead, cheek and jaw proportions, eye shape and spacing, eyelids, eyebrows, nose shape and width, lips, skin tone, and natural asymmetry.\n` +
-  `- Preserve the recognizable hairstyle from <protagonist_identity>: hair color, hairline, parting, bangs, length, texture, curl pattern, volume, and overall silhouette. Rotate it naturally to Jack's existing head angle without reverting to the template hairstyle.\n` +
-  `- Do not blend, average, interpolate, beautify, genericize, simplify, or combine the face or hairstyle from the two inputs. Scale the transferred face and hair only as needed to fit Jack's existing head. Do not deliberately make the identity younger or older.\n` +
-  `</identity_transfer>\n\n` +
-  `<expression_and_style>Preserve Jack's expression, emotion, gaze, head angle, and perspective from <base_scene_template>; do not copy them from the portrait. Render the transferred identity with the template's warm watercolor and gouache technique, soft outlines, brushwork, paper texture, shading, and scene lighting. Style adaptation may change the rendering medium, but it must not change or simplify identity-defining facial geometry or hairstyle. No photorealistic patches, seams, or pasted-on appearance.</expression_and_style>\n\n` +
-  `<preservation>Change only Jack's face, hair, and the smallest surrounding area required for a seamless blend. Preserve his body, pose, hands, clothing, boots, placement, and every other character, animal, object, background element, composition, color, and original image dimensions. Add no text, border, logo, watermark, or new element.</preservation>\n\n` +
-  `<consistency>Use the same recognizable identity, hairstyle, skin tone, and apparent age from <protagonist_identity> across every page.</consistency>\n\n` +
-  `<scene_reference>This text identifies the existing target and must not be used to redesign or regenerate the scene: ${sceneStory}</scene_reference>\n` +
-  `<appearance_to_preserve>${expressionInstruction}</appearance_to_preserve>\n\n` +
+  `<priority>Within Jack's editable face-and-hair region, identity fidelity to <protagonist_identity> is the highest priority. The result must be immediately recognizable as the real person in <protagonist_identity>, not as the original template character.</priority>\n\n` +
+  `<target>Replace only the face and hairstyle of Jack, the young protagonist wearing a moss-green vest, cream shirt, and rust-brown trousers. Never modify another character's face or hair.</target>\n\n` +
+  `<identity>Completely replace Jack's original face and hair. Preserve the portrait's distinctive face shape, cheek and jaw proportions, eye shape and spacing, eyelids, eyebrows, nose shape and width, lips, natural asymmetry, complexion, hair color, hairline, parting, bangs, length, texture, curl pattern, volume, and overall hairstyle silhouette. Rotate the transferred identity naturally to Jack's existing head angle. Scale it only as needed to fit his existing head size. Do not blend, average, interpolate, beautify, baby-face, genericize, or simplify the portrait identity with the template face or hair.</identity>\n\n` +
+  `<preserve_the_scene>Keep Jack's original expression, emotion, gaze direction, head angle, head size, body, pose, hands, clothing, and location from <base_scene_template>. Do not copy the portrait's expression, head angle, gaze, pose, clothing, background, or lighting. Preserve every other character, animal, object, background element, composition, framing, and aspect ratio.</preserve_the_scene>\n\n` +
+  `<style_and_lighting>Render the transferred face and hair in the same watercolor and gouache storybook style, matching the template's brushwork, paper texture, line quality, shading, palette, and scene lighting. Artistic adaptation must not change or simplify identity-defining facial geometry or hairstyle. Blend naturally at the hairline, ears, face contour, and neck without photorealistic patches or visible seams.</style_and_lighting>\n\n` +
+  `<edit_boundary>Limit changes to Jack's face, hair, and the smallest surrounding area required for seamless blending. Preserve existing occlusions; never move hands, hair, clothing, or objects to reveal more of the face. Add no text, watermark, border, extra face, or new object.</edit_boundary>\n\n` +
+  `<page_instruction>${pageInstruction}</page_instruction>\n\n` +
   `<output>Return one edited illustration only.</output>\n` +
   `</task_specification>`;
 
@@ -138,8 +132,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '"이건 밤새 자라는 마법의 콩이란다."\n' +
         '잭은 젖소와 콩을 바꾸었어요.',
       illustrationPrompt: buildJackPrompt(
-        '젖소를 데리고 장터로 가던 잭이 시골길에서 신비한 노인이 내민 반짝이는 마법의 콩을 받는 장면',
-        '[오른쪽 위 시선]: 노인의 손바닥 위 콩을 올려다보는 호기심과 기대감. 원본의 오른쪽을 향한 고개와 손 뻗는 자세를 유지.',
+        "Preserve Jack's curious, hopeful expression and his original gaze toward the magical beans. Keep the beans, both characters' hands, and the cow unchanged. Do not modify the old man's face or hair.",
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-1.png',
       personaTargetRole: 'jack',
@@ -152,8 +145,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '잭은 굵은 콩나무 줄기를 타고 구름 위로 올라갔지요.\n' +
         '안개 너머에는 아주 크고 낯선 성이 서 있었답니다.',
       illustrationPrompt: buildJackPrompt(
-        '하늘 끝까지 자라난 거대한 콩나무 줄기를 타고 올라가 구름 위 신비로운 거인의 성을 발견한 장면',
-        '[왼쪽 위 시선]: 콩나무를 붙잡은 채 구름 위 성을 올려다보는 경이롭고 들뜬 미소. 원본의 왼쪽 배치와 위로 향한 시선을 유지.',
+        "Preserve Jack's joyful sense of wonder and his original upward-right gaze toward the cloud-top castle. Keep his climbing pose, hands, head angle, and open-mouth smile unchanged. Do not turn his face toward the viewer.",
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-2.png',
       personaTargetRole: 'jack',
@@ -167,8 +159,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '"도둑이야!"\n' +
         '잠에서 깬 거인이 쿵쾅거리며 잭을 뒤쫓기 시작했어요.',
       illustrationPrompt: buildJackPrompt(
-        '황금 알을 낳는 요술 거위를 품에 안고, 뒤쫓아오는 무시무시한 거인을 피해 필사적으로 달아나는 장면',
-        '[오른쪽 뒤 시선]: 거위를 안고 달아나며 뒤의 거인을 돌아보는 다급하고 놀란 표정. 원본의 오른쪽 아래로 달리는 자세를 유지.',
+        "Preserve Jack's alarm and urgency, original open mouth, head angle, and backward gaze. Render his eyes with the identity-defining shape from <protagonist_identity> while preserving the alarmed expression. Keep his running pose and the goose unchanged. Do not modify the giant's face or hair, the magical harp, or the golden egg.",
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-3.png',
       personaTargetRole: 'jack',
@@ -185,8 +176,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '쿵!\n' +
         '콩나무가 쓰러지자 거인은 더는 마을로 내려올 수 없었어요.',
       illustrationPrompt: buildJackPrompt(
-        '집 앞 언덕에서 잭이 도끼로 거대한 콩나무 밑동을 힘껏 내리치는 장면',
-        '[힘주는 표정]: 양손으로 도끼를 잡고 콩나무를 향해 내리치며 굳게 다문 입과 결연한 눈빛. 원본의 왼쪽 아래 자세와 도끼를 유지.',
+        "Preserve Jack's determined expression and visible effort, including his exact brow tension, focused gaze, and closed mouth shape. Keep his head angle, axe, hands, stance, and chopping action unchanged. Do not exaggerate the expression or add injuries.",
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-4.png',
       personaTargetRole: 'jack',
@@ -202,8 +192,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
         '잭은 황금 알을 혼자 가지지 않았어요.\n' +
         '마을 사람들과 나누며, 이제는 서로 도우며 살겠다고 약속했답니다.',
       illustrationPrompt: buildJackPrompt(
-        '엄마와 요술 거위 곁에서 마을 사람들과 황금 알을 나누며 서로 돕겠다고 약속하는 장면',
-        '[정면의 따뜻한 미소]: 황금 알을 두 손으로 건네며 엄마와 마을 사람들을 바라보는 뿌듯하고 기쁜 표정. 원본의 중앙 배치와 손 자세를 유지.',
+        "Preserve Jack's warm, relieved smile and his original gaze toward the elderly woman receiving the golden egg. Keep the golden egg in both hands and preserve his mother's hands resting on his shoulders. Do not modify his mother's face or hair, the elderly woman, any villager, the goose, the basket, or the golden eggs.",
       ),
       baseImageKey: 'templates/jack-and-beanstalk/page-5.png',
       personaTargetRole: 'jack',
@@ -217,11 +206,11 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
     choices: [
       {
         branchKey: 'a', title: '별빛 씨앗을 하늘로 돌려보내요', description: '거위의 둥지에서 발견한 반짝이는 씨앗을 밤하늘에 띄워 보내요.',
-        page: { pageNo: 6, bodyText: '그날 밤, 요술 거위의 둥지에서 별빛 씨앗 하나가 반짝였어요.\n잭은 씨앗을 두 손에 올리고 하늘을 향해 살며시 불었지요.\n씨앗은 별이 되어 마을 위에 머물렀어요.\n늦은 밤 길을 걷는 사람들은 그 별을 보며 집으로 돌아갈 수 있었답니다.', illustrationPrompt: buildJackPrompt('밤의 집 앞에서 잭이 두 손의 별빛 씨앗을 하늘로 불어 보내고, 곁의 요술 거위가 이를 바라보는 장면', '[오른쪽 위 시선]: 손 위의 빛과 밤하늘을 올려다보는 경이롭고 따뜻한 미소. 원본의 두 손과 옆의 거위 위치를 유지.'), baseImageKey: 'templates/jack-and-beanstalk/page-6-a.png', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.2, y: 0.3, width: 0.3, height: 0.54 } }, { role: 'magical-goose', hitbox: { x: 0.42, y: 0.53, width: 0.2, height: 0.31 } }] },
+        page: { pageNo: 6, bodyText: '그날 밤, 요술 거위의 둥지에서 별빛 씨앗 하나가 반짝였어요.\n잭은 씨앗을 두 손에 올리고 하늘을 향해 살며시 불었지요.\n씨앗은 별이 되어 마을 위에 머물렀어요.\n늦은 밤 길을 걷는 사람들은 그 별을 보며 집으로 돌아갈 수 있었답니다.', illustrationPrompt: buildJackPrompt("Preserve Jack's gentle wonder, upward gaze, and exact mouth shape, including his softly pursed lips as he blows the glowing seed upward. Keep the seed's glow on his transferred face and hair. Do not move, duplicate, or alter the seed, glowing particles, stars, goose, nest, or nighttime village."), baseImageKey: 'templates/jack-and-beanstalk/page-6-a.png', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.2, y: 0.3, width: 0.3, height: 0.54 } }, { role: 'magical-goose', hitbox: { x: 0.42, y: 0.53, width: 0.2, height: 0.31 } }] },
       },
       {
         branchKey: 'b', title: '별빛 씨앗을 마을에 심어요', description: '마을 사람들이 함께 볼 수 있는 작은 빛을 키워요.',
-        page: { pageNo: 6, bodyText: '잭은 별빛 씨앗을 마을 한가운데에 심었어요.\n다음 날, 작은 싹이 돋더니 밤마다 은은한 빛을 내기 시작했지요.\n사람들은 그 나무 아래에 모여 이야기를 나눴어요.\n요술 거위는 날개를 퍼덕이며, 환한 마을을 바라보았답니다.', illustrationPrompt: buildJackPrompt('밤의 마을 광장에서 별빛 씨앗이 환하게 빛나는 큰 나무가 되고, 잭과 요술 거위, 마을 사람들이 그 아래 모인 장면', '[위쪽 시선]: 빛나는 나무를 올려다보는 기쁘고 편안한 미소. 원본의 나무 아래 중앙 배치와 앉은 자세를 유지.'), baseImageKey: 'templates/jack-and-beanstalk/page-6-b.png', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.35, y: 0.42, width: 0.2, height: 0.27 } }, { role: 'magical-goose', hitbox: { x: 0.05, y: 0.61, width: 0.29, height: 0.3 } }] },
+        page: { pageNo: 6, bodyText: '잭은 별빛 씨앗을 마을 한가운데에 심었어요.\n다음 날, 작은 싹이 돋더니 밤마다 은은한 빛을 내기 시작했지요.\n사람들은 그 나무 아래에 모여 이야기를 나눴어요.\n요술 거위는 날개를 퍼덕이며, 환한 마을을 바라보았답니다.', illustrationPrompt: buildJackPrompt("Preserve Jack's seated pose, peaceful proud smile, and original upward gaze toward the glowing star tree. Match the tree's warm golden light on his transferred face and hair. Keep his mother, every villager and child, the goose, lanterns, glowing tree, and nighttime village unchanged. Do not modify any other person's face or hair."), baseImageKey: 'templates/jack-and-beanstalk/page-6-b.png', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.35, y: 0.42, width: 0.2, height: 0.27 } }, { role: 'magical-goose', hitbox: { x: 0.05, y: 0.61, width: 0.29, height: 0.3 } }] },
       },
     ],
   },

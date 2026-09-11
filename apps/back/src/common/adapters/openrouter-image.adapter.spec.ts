@@ -170,6 +170,33 @@ describe('OpenRouterImageAdapter', () => {
     expect(body.prompt).not.toContain('<scene_story>');
   });
 
+  it('generatePageIllustration: 비율을 생략하면 PNG 템플릿의 세로 비율을 사용한다', async () => {
+    const mockBase64 = Buffer.from('portrait-page-png').toString('base64');
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        data: [{ b64_json: mockBase64, media_type: 'image/png' }],
+      }),
+    });
+
+    const portraitPng = Buffer.alloc(24);
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(portraitPng);
+    portraitPng.writeUInt32BE(1024, 16);
+    portraitPng.writeUInt32BE(1536, 20);
+
+    await adapter.generatePageIllustration({
+      referenceImage: Buffer.from('user-face-bytes'),
+      baseImage: portraitPng,
+      prompt:
+        '<base_scene_template>template</base_scene_template><protagonist_identity>portrait</protagonist_identity>',
+    });
+
+    const callArgs = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    expect(body.aspect_ratio).toBe('2:3');
+  });
+
   it('generatePageIllustration: baseImage 가 주어지고 일반 본문 텍스트가 오면 명시적인 [IMAGE EDITING & COMPOSITION TASK] 지시문을 자동 생성한다', async () => {
     const mockBase64 = Buffer.from('edited-page-png').toString('base64');
     global.fetch = jest.fn().mockResolvedValue({

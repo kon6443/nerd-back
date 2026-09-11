@@ -84,11 +84,11 @@ describe('정식 동화 데이터셋 (잭과 콩나무, 빨간 모자)', () => {
         [...story.pages, ...story.afterStory.choices.map((choice) => choice.page)].forEach((page) => {
           expect(page.illustrationPrompt).toContain('<base_scene_template>');
           expect(page.illustrationPrompt).toContain('<protagonist_identity>');
-          expect(page.illustrationPrompt).toContain('IS THE HIGHEST PRIORITY');
-          expect(page.illustrationPrompt).toContain('sole source of facial identity');
+          expect(page.illustrationPrompt?.toLowerCase()).toContain('is the highest priority');
+          expect(page.illustrationPrompt).toContain('sole source');
           expect(page.illustrationPrompt).toContain('Do not blend, average, interpolate');
           expect(page.illustrationPrompt).toContain('smallest surrounding area');
-          expect(page.illustrationPrompt).toContain('<scene_reference>');
+          expect(page.illustrationPrompt).toMatch(/<(?:page_instruction|scene_reference)>/);
           expect(page.illustrationPrompt).toContain('Return one edited illustration only.');
           expect(page.illustrationPrompt).not.toContain('Image 1');
           expect(page.illustrationPrompt).not.toContain('childlike proportions');
