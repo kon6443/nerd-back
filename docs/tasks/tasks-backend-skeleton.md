@@ -36,7 +36,7 @@
 | 포트 | **5501** (컨테이너 내부). 호스트 publish 없음 | Caddy가 같은 overlay에서 `tasks.prod_nerd_back_app:5501`로 접근. publish하면 도메인 우회 경로가 열리고 포트 충돌 위험이 생긴다 |
 | 소스맵 | `sourceMap: true` 유지 + 런타임 `--enable-source-maps` | tsconfig 가 이미 `.js.map` 을 만드는데 플래그 없이는 Node 가 쓰지 않는다(실측: dist 236K 중 map 80K 사장). 지우는 대신 켜서 500 에러 스택이 `src/*.ts` 줄번호를 가리키게 했다 — 전역 필터가 500 에 스택을 남기므로 직접적인 이득 |
 | 로그 마스킹 | Pino **내장 `redact`** | 참고 A는 재귀 함수로 페이로드 전체를 순회한다. 큰 응답을 다루는 우리에겐 비용이 크다. 키 목록만 승계 |
-| 배포 | Docker **Swarm stack** `prod_nerd_back`, 서비스 `app` → DNS **`prod_nerd_back_app`**, **replicas 3**. GitHub Environment **`PROD`** 로 시크릿 격리 | 서비스 DNS 는 `<스택>_<서비스>` 다. **2026-09-01 재명명** — 스택 이름을 노드 라벨 키와 일치시키고 서비스 키를 `app` 으로 고정했다. 최초에는 스택 `prod_nerd` + 서비스 `back` 이었고, 프론트가 추가되며 「스택이 어느 라벨을 보는가」를 매번 파일에서 확인해야 하는 문제가 드러났다 (전환 절차: [`tasks-stack-rename.md`](tasks-stack-rename.md)) |
+| 배포 | Docker **Swarm stack** `prod_nerd_back`, 서비스 `app` → DNS **`prod_nerd_back_app`**, **replicas 3**. GitHub Environment **`PROD`** 로 시크릿 격리 | 서비스 DNS 는 `<스택>_<서비스>` 다. **2026-09-01 재명명** — 스택 이름을 노드 라벨 키와 일치시키고 서비스 키를 `app` 으로 고정했다. 최초에는 스택 `prod_nerd` + 서비스 `back` 이었고, 프론트가 추가되며 「스택이 어느 라벨을 보는가」를 매번 파일에서 확인해야 하는 문제가 드러났다 (전환 절차: [`tasks-stack-rename.md`](archive/tasks-stack-rename.md)) |
 | Redis 운영 | **전용 인스턴스 · 독립 스택** `prod_nerd_cache` → DNS `prod_nerd_cache_redis`, 전용 워크플로 `deploy-redis.yml` | 배포 수명주기를 끊는다. 같은 스택이면 Redis 설정만 바꿔도 커밋 SHA 가 바뀌어 앱 이미지 태그가 달라지고 앱까지 재배포된다. ⚠️ **이 스택만 이름 규칙의 예외로 남았다** — named volume 이 스택 이름을 물고 있어 재명명 시 데이터 경계가 이동한다 |
 | 노드 배치 | 라벨 제약 — 앱 `prod_nerd_back=1` · Redis `prod_nerd_redis=1` | 규칙은 **`prod_<프로젝트>_<역할>`**. 기존 노드가 이미 `prod_nest`(백) / `prod_next`(프론트)로 역할을 분리해 라벨링하고 있으므로 그대로 따른다. 프론트가 추가되면 `prod_nerd_front=1` 로 대칭이 유지된다. **2026-09-01 재명명 이후 라벨 키 = 스택 이름**이 되어 어느 스택이 어느 라벨을 보는지 파일을 열지 않고 알 수 있다(서비스 DNS 는 여기에 `_app` 이 붙는다). `infra_redis` 는 **공유** Redis 를 뜻하므로 우리 전용 Redis 에 붙이면 의미가 어긋난다. 앱도 핀해야 하는 이유는 스모크 테스트가 매니저 노드에서 `docker ps` 로 컨테이너를 찾기 때문 |
 | Redis 정책 | `appendonly yes` · `maxmemory 128mb` · **`volatile-lru`** · `order: stop-first` | `allkeys-lru` 는 TTL 없는 키까지 evict 한다. named volume 은 동시 접근이 안 되므로 `start-first` 금지 |
@@ -437,7 +437,7 @@ Phase 1을 먼저 뚫는 이유는 **코드가 거의 없는 시점에 무중단
 
 - `Dockerfile` — 멀티스테이지, **ARM64 타깃**. 베이스 이미지 arm64 지원을 먼저 확인
 - `infra/docker-stack.app.yml` — 서비스 키 `app`(스택 `prod_nerd_back` → DNS `prod_nerd_back_app`), `replicas: 3`, 메모리 한도, `restart_policy: on-failure`
-  - ⚠️ Phase 1 당시에는 서비스 키가 `back`, 스택이 `prod_nerd` 였다. 2026-09-01 재명명 ([`tasks-stack-rename.md`](tasks-stack-rename.md)). **아래 「실행 체크리스트」의 완료 기록은 당시 이름 그대로 둔다** — 그때 무엇을 했는지가 사라지면 안 된다
+  - ⚠️ Phase 1 당시에는 서비스 키가 `back`, 스택이 `prod_nerd` 였다. 2026-09-01 재명명 ([`tasks-stack-rename.md`](archive/tasks-stack-rename.md)). **아래 「실행 체크리스트」의 완료 기록은 당시 이름 그대로 둔다** — 그때 무엇을 했는지가 사라지면 안 된다
 - `healthcheck`는 **liveness 경로만** 찌른다 (Step 6)
 - 롤링 업데이트: `update_config` → `order: start-first`, `parallelism: 1`, `failure_action: rollback`, `max_failure_ratio: 0`. `rollback_config`도 함께 정의
 - `TASK_SLOT: "{{.Task.Slot}}"` 주입 — 스케줄러 가드용 (지금은 미사용, 자리만)
@@ -619,7 +619,7 @@ Step 9 — CI/CD ✅
         없던 것은 "src+test 를 한 번에 보는 수단" 이고, DB 계층에서 타입이 늘 때 필요해진다.
   [x] GitHub Secrets 등록 (8개) — deploy 워크플로 2회 success 로 확인 (2026-08-27)
         · 시크릿 미등록이면 SSH 단계에서 실패하므로 성공 자체가 증거다
-  [ ] 러너 선택 확정 (public 이면 arm64 네이티브로 전환)
+  [x] 러너 선택 확정 — **`ubuntu-24.04-arm` 네이티브로 전환 완료**(워크플로 9개 job 전부, 2026-09-11 실측)
 
 Step 10 — 배포
   [x] Dockerfile 멀티스테이지 ARM64 + COPY 목록 주석 + 비특권 사용자

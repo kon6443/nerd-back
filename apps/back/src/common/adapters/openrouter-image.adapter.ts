@@ -186,10 +186,11 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
       );
     }
 
+    // 🚫 프롬프트 원문을 남기지 않는다 — 외부 API 요청·응답 **본문** 로깅 금지(루트 CLAUDE.md).
+    //    공유 로그 스택의 인제스트 한도가 낮아, 본문 대신 길이만 남긴다.
+    //    응답 로그(아래)가 이미 비용·길이만 남기는 것과 형식을 맞췄다.
     this.logger.log(
-      `[OpenRouter 요청] ${params.actionName} | 모델: ${this.defaultModel} | 레퍼런스 이미지: ${params.inputReferences.length}장\n` +
-        `>>> [전송된 프롬프트]\n${params.prompt}\n` +
-        `<<< [프롬프트 끝]`,
+      `[OpenRouter 요청] ${params.actionName} | 모델: ${this.defaultModel} | 레퍼런스 이미지: ${params.inputReferences.length}장 | 프롬프트 ${params.prompt.length}자`,
     );
 
     const response = await fetch('https://openrouter.ai/api/v1/images', {

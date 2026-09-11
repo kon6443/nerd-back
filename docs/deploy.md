@@ -69,6 +69,7 @@ docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_back.yml"  prod_nerd_back
 docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_front.yml" prod_nerd_front
 docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_cache.yml" prod_nerd_cache
 docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_db.yml"    prod_nerd_db   # 사전 조건: 라벨·secret·데이터 경로 (deploy-db.yml 사전 점검)
+docker stack deploy -c "$DEPLOY_DIR/stacks/prod_nerd_storage.yml" prod_nerd_storage
 ```
 
 **파일명 = 스택명 — 저장소와 서버가 같은 이름을 쓴다.** 스택명은 노드 라벨 키·서비스 DNS 접두와도 같으므로 이름 하나로 YAML·env·라벨·DNS 를 전부 찾는다. 저장소에서 이미 그 이름이라 **CI 는 파일을 그대로 올린다**(이름을 바꾸는 단계가 없다).
@@ -79,10 +80,11 @@ infra/                                 ← 저장소. 배포되는 스택 5개�
 ├── prod_nerd_front.yml
 ├── prod_nerd_db.yml
 ├── prod_nerd_cache.yml                ← Redis. 스택명이 cache 인 예외가 파일명에 드러난다
+├── prod_nerd_storage.yml              ← MinIO. 자기 라벨이 없고 prod_nerd_back 라벨을 쓴다 (2026-09-07)
 └── mysql/init-users.sh                ← prod_nerd_db.yml 의 configs 가 ./mysql/ 로 참조
 
 <DEPLOY_DIR>/                          ← 서버
-├── stacks/   prod_nerd_back.yml · prod_nerd_front.yml · prod_nerd_db.yml · prod_nerd_cache.yml · mysql/init-users.sh
+├── stacks/   prod_nerd_back.yml · prod_nerd_front.yml · prod_nerd_db.yml · prod_nerd_cache.yml · prod_nerd_storage.yml · mysql/init-users.sh
 └── env/      prod_nerd_back.env · prod_nerd_front.env      (600, 사람이 관리)
 ```
 

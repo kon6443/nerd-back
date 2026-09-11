@@ -7,7 +7,7 @@ on:
     # paths 는 화이트리스트로 지정한다.
     # paths-ignore 는 머지 커밋 평가에서 의도 외 트리거가 발생한다.
     #
-    # ⚠️ 배포 워크플로 4개(back·front·db·redis)의 paths 는 **교집합이 0건**이어야 한다.
+    # ⚠️ 배포 워크플로 5개(back·front·db·redis·storage)의 paths 는 **교집합이 0건**이어야 한다.
     #    겹치면 한 커밋에 두 스택이 뜬다.
     #
     # ⚠️ **2026-09-04 부터 front 와 paths 가 겹친다 — 의도된 예외다.**
