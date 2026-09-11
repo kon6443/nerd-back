@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import { StoryArtwork } from "@/components/story/StoryArtwork";
 import styles from "./BookFrame.module.css";
 
@@ -64,14 +65,15 @@ export function BookFrame({ pageNo, imageUrl, onImageLoad, children, footer }: B
         <div className={styles.spread}>
           <div className={styles.art}>
             {imageUrl ? (
-              // 표시 URL의 호스트 허용 목록은 이미지 URL 연결 작업에서 확정한다.
-              // eslint-disable-next-line @next/next/no-img-element
-<img
+              <Image
                 src={imageUrl}
                 alt=""
-                decoding="async"
-                className="h-full w-full object-cover"
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                priority={pageNo === 1}
+                className="object-cover"
                 onLoad={onImageLoad}
+                unoptimized={imageUrl.startsWith("data:")}
               />
             ) : (
               <StoryArtwork className="h-full" />
