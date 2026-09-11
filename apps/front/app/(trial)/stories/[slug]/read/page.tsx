@@ -11,6 +11,8 @@ import { LoadingView } from "@/components/ui/LoadingView";
 import { actionClass } from "@/components/ui/actionStyles";
 import { BookFrame } from "@/components/story/BookFrame";
 import { isReaderReady } from "./readiness";
+import { isAfterStoryGenerating } from "./polling";
+import { usePolling } from "./usePolling";
 import {
   ApiError,
   fetchAfterStory,
@@ -63,7 +65,6 @@ function StoryReadContent({ params }: PageProps) {
   const [retryingPageNo, setRetryingPageNo] = useState<number | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
 
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const preloadedImagesRef = useRef(
     new Map<string, { image: HTMLImageElement; loaded: Promise<void> }>(),
   );
@@ -118,7 +119,6 @@ function StoryReadContent({ params }: PageProps) {
 
     return Promise.all(loads).then(() => undefined);
   }, []);
-
   const noSessionError = !sessionId ? "세션 정보가 없습니다. 얼굴 사진을 먼저 등록해 주세요." : "";
   const activeError = errorMsg || noSessionError;
 
@@ -190,56 +190,31 @@ function StoryReadContent({ params }: PageProps) {
     };
   }, [slug, sessionId, autoStart, router, retryTrigger, preloadImages]);
 
-  // 진행 상태 3초 주기 폴링 (generating 상태일 때)
-  useEffect(() => {
-    if (!sessionId || viewState !== "generating") {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-      return;
-    }
-
-    const currentSessionId = sessionId;
-    let active = true;
-
-    async function poll() {
-      try {
-        const data = await fetchSessionPages(currentSessionId);
-        if (!active) return;
-        setSessionPages(data);
-
-        if (isReaderReady(data)) {
-          await preloadImages([getFirstPageImageUrl(data)]);
-          if (!active) return;
+  // 진행 상태 폴링 (generating 상태일 때).
+  // 완료를 받으면 viewState 가 바뀌어 enabled 가 false 가 되므로 폴링은 스스로 멈춘다.
+  const { degraded: pagesPollDegraded } = usePolling({
+    enabled: sessionId !== null && viewState === "generating",
+    // enabled 가 sessionId 존재를 보장한다 — 타입 좁히기가 콜백 안까지 전파되지 않아 기본값을 둔다.
+    fetcher: () => fetchSessionPages(sessionId ?? ""),
+    onData: (data) => {
+      setSessionPages(data);
+      if (isReaderReady(data)) {
+        void preloadImages([getFirstPageImageUrl(data)]).then(() => {
           // 폴링으로 본편 완료를 처음 받는 경로도 초기 조회와 똑같이 독서 화면으로 전환한다.
           // 이 전환이 없으면 5/7 상태에서 폴링만 멈춰 생성 화면이 그대로 남는다.
           setViewState("reader");
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
-        }
-      } catch (err: unknown) {
-        console.error("폴링 오류:", err);
+        });
       }
-    }
-
-    // 3초 간격 폴링
-    pollingRef.current = setInterval(poll, 3000);
-
-    return () => {
-      active = false;
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
-  }, [sessionId, viewState, preloadImages]);
+    },
+  });
 
   // 독서 중 현재 페이지 본문 온디맨드 로드
   useEffect(() => {
     if (viewState !== "reader" || !story) return;
+    // 🚫 6쪽(비하인드)은 본편 API 로 가져오지 않는다 — 템플릿에 branchKey 'a'/'b' 로만 존재해
+    //    `GET /stories/:slug/pages/6`(branchKey 'common' 고정 조회)은 **항상 404** 다.
+    //    본문은 activeAfterStory 가 준다 (아래 렌더 분기와 같은 조건).
+    if (currentPageNo === 6) return;
     if (storyPages.some((p) => p.pageNo === currentPageNo)) return;
 
     let active = true;
@@ -259,21 +234,11 @@ function StoryReadContent({ params }: PageProps) {
   }, [slug, currentPageNo, viewState, story, storyPages]);
 
   // 비하인드 선택 화면에서는 A/B 결과의 생성 상태만 가볍게 갱신한다.
-  useEffect(() => {
-    if (!sessionId || viewState !== "branch" || !afterStory) return;
-    const isGenerating = afterStory.choices.some(
-      (choice) => choice.status === "pending" || choice.status === "running",
-    );
-    if (!isGenerating) return;
-
-    const intervalId = setInterval(() => {
-      void fetchAfterStory(sessionId)
-        .then(setAfterStory)
-        .catch(() => undefined);
-    }, 3000);
-
-    return () => clearInterval(intervalId);
-  }, [sessionId, viewState, afterStory]);
+  const { degraded: afterStoryPollDegraded } = usePolling({
+    enabled: sessionId !== null && viewState === "branch" && isAfterStoryGenerating(afterStory),
+    fetcher: () => fetchAfterStory(sessionId ?? ""),
+    onData: setAfterStory,
+  });
 
   // 선택 화면이 열리면 준비된 A/B 결과를 미리 받아 어느 쪽을 골라도 바로 보여 준다.
   useEffect(() => {
@@ -456,6 +421,13 @@ function StoryReadContent({ params }: PageProps) {
           </p>
         </div>
 
+        {/* 폴링이 연속 실패할 때만 뜬다 — "멈춘 것"과 "느린 것"을 사용자가 구분할 수 있어야 한다. */}
+        {pagesPollDegraded && (
+          <p className="max-w-md text-sm font-medium text-amber-700" role="status">
+            연결이 불안정해요. 진행 상황을 계속 다시 확인하고 있어요.
+          </p>
+        )}
+
         {/* 진행률 프로그레스 바 */}
         <div className="w-full max-w-md">
           <div className="mb-2 flex items-center justify-between text-xs font-bold text-ink-muted">
@@ -624,6 +596,12 @@ function StoryReadContent({ params }: PageProps) {
           <Card className="w-full max-w-md border-red-200 text-red-700">
             비하인드 선택지를 준비하지 못했어요.
           </Card>
+        )}
+
+        {afterStoryPollDegraded && (
+          <p className="max-w-md text-sm font-medium text-amber-700" role="status">
+            연결이 불안정해요. 생성 상태를 계속 다시 확인하고 있어요.
+          </p>
         )}
 
         {afterStoryError && (

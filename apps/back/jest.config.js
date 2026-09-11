@@ -29,7 +29,11 @@ module.exports = {
   // reflect-metadata 는 데코레이터 메타데이터를 읽는 모든 코드(class-validator·class-transformer·
   // Nest DI)의 전제다. main.ts 에서만 import 하면 테스트에서는 로드되지 않아
   // "Reflect.getMetadata is not a function" 으로 터진다.
-  setupFiles: ['reflect-metadata', '<rootDir>/../test/setup/setup-tz.ts'],
+  setupFiles: [
+    'reflect-metadata',
+    '<rootDir>/../test/setup/setup-tz.ts',
+    '<rootDir>/../test/setup/setup-transactional.ts',
+  ],
 
   // ⚠️ tsconfig.json 의 paths 와 1:1 로 유지할 것.
   //    누락 시 해당 alias 를 쓰는 테스트가 모듈 해석에 실패한다.

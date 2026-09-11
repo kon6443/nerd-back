@@ -11,7 +11,7 @@
 **이 문서가 SSOT 인 것** — 프론트 고유의 결정·근거·진행 상황.
 **이 문서가 SSOT 가 아닌 것** — 배포 인프라의 일반 규약(Swarm·Caddy·롤백·이름 규칙)은 같은 저장소의 [`docs/deploy.md`](../deploy.md) 가 정본이다. 여기서는 **프론트에서 달라지는 것만** 적고 같은 내용을 다시 쓰지 않는다.
 
-**선행 의존** — 스택 재명명은 [`tasks-stack-rename.md`](tasks-stack-rename.md) 가 소유한다. **이름은 확정됐다.** 다만 그 전환이 끝나기 전에는 `prod_nerd_back_app` 이 실제로 존재하지 않으므로, 이 이름을 참조하는 것(Caddy 블록 · `BACKEND_INTERNAL_URL`)은 전환 이후에 유효해진다.
+**선행 의존** — 스택 재명명은 [`tasks-stack-rename.md`](archive/tasks-stack-rename.md) 가 소유한다. **이름은 확정됐다.** 다만 그 전환이 끝나기 전에는 `prod_nerd_back_app` 이 실제로 존재하지 않으므로, 이 이름을 참조하는 것(Caddy 블록 · `BACKEND_INTERNAL_URL`)은 전환 이후에 유효해진다.
 
 ---
 
@@ -41,7 +41,7 @@
 |---|---|---|
 | ISR / `use cache` 도입 | 기능 미착수 | 도입 시 `cacheHandler` + Redis 가 **필수**가 된다 (아래 「레플리카 3개」절) |
 | Server Actions 도입 | 기능 미착수 | 도입 시 `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` 고정이 **필수**가 된다 |
-| 테스트 프레임워크 (후속) | 지금은 미도입 결정 | 도입하면 `ci:core` 에 `test` 가 들어가고 `check:stubs` 의 `.only` 규칙이 실효를 갖는다 |
+| 테스트 프레임워크 (후속) | ~~지금은 미도입 결정~~ **2026-09-04 vitest 도입으로 해소** (`88bb028`) | 예고대로 `ci:core` 에 `test` 가 들어갔고 `check:stubs` 의 `.only` 규칙이 실효를 갖는다 |
 
 ---
 
@@ -757,4 +757,4 @@ docker ps -q --filter "label=com.docker.stack.namespace=prod_nerd_front" | head 
 - Turbopack standalone 이슈 — https://github.com/vercel/next.js/issues/88844
 - [`docs/deploy.md`](../deploy.md) — 배포 인프라 일반 규약 (SSOT)
 - [`docs/lessons.md`](../lessons.md) — 이식 대상 교훈
-- [`tasks-stack-rename.md`](tasks-stack-rename.md) — 스택 재명명 (선행 의존)
+- [`tasks-stack-rename.md`](archive/tasks-stack-rename.md) — 스택 재명명 (선행 의존)

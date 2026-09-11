@@ -13,7 +13,7 @@
 | [`apps/back/`](apps/back/) | NestJS API (`/api/v2`, 포트 5501) | 스택 `prod_nerd_back` |
 | [`apps/front/`](apps/front/) | Next.js 앱 (포트 5502) | 스택 `prod_nerd_front` |
 | [`packages/contracts/`](packages/contracts/) | 프론트·백이 공유하는 **검증 스키마와 타입** (API 계약의 SSOT) | 배포 단위 아님 — 두 앱에 함께 빌드된다 |
-| [`infra/`](infra/) | **배포되는 스택 YAML 4개가 전부 여기** — 파일명 = 스택명 | 4개 스택 |
+| [`infra/`](infra/) | **배포되는 스택 YAML 5개가 전부 여기** — 파일명 = 스택명 | 5개 스택 |
 
 **앱 이름은 모든 축에서 `back` / `front` 로 같다** — 디렉터리 · 패키지명 · 워크플로 · 스택 · 서비스 DNS · 이미지 · 서버 env 파일. 한 축을 알면 나머지를 파일을 열지 않고 안다 ([`docs/deploy.md`](docs/deploy.md) 이름 규칙표).
 

@@ -1,4 +1,10 @@
-import { asRepository, createMockRepository, type MockRepository } from '@common/__spec__/mock-repository';
+import {
+  asRepository,
+  createMockRepository,
+  mockUpdateQueryBuilder,
+  type MockRepository,
+} from '@common/__spec__/mock-repository';
+import { createStoryPage } from '@entities/__spec__/entity.factory';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
@@ -17,6 +23,8 @@ import {
   FirstBranchAlreadyChosenErrorResponseDto,
 } from './dto/story-session-error.dto';
 import { StorySessionService } from './story-session.service';
+import type { DataSource } from 'typeorm';
+import { addTransactionalDataSource, deleteDataSourceByName } from 'typeorm-transactional';
 import type { ImageGenerationPort } from '../../common/port/image-generation.port';
 import type { StoragePort } from '../../common/port/storage.port';
 
@@ -32,6 +40,27 @@ describe('StorySessionService', () => {
   let mockImagePort: jest.Mocked<ImageGenerationPort>;
   let mockStoragePort: jest.Mocked<StoragePort>;
   let service: StorySessionService;
+
+  // `deleteSession` 의 `@Transactional()` 은 레지스트리에서 DataSource 를 찾아
+  // `dataSource.transaction(cb)` 를 부른다. 단위 테스트는 mock repository 만 쓰므로 실제
+  // 트랜잭션도 EntityManager 도 필요 없다 — 콜백을 그대로 실행하는 스텁을 `patch: false` 로
+  // 등록해 래퍼만 통과시킨다.
+  // 🚫 진짜 `DataSource` 를 만들지 않는다 — 생성자가 드라이버를 들며 `mysql2` 를 로드해
+  //    forbid-db 스텁에 걸린다 (test/setup/forbid-db.ts).
+  beforeAll(() => {
+    deleteDataSourceByName('default');
+    addTransactionalDataSource({
+      name: 'default',
+      dataSource: {
+        transaction: <T>(cb: (em: unknown) => Promise<T>): Promise<T> => cb({}),
+      } as unknown as DataSource,
+      patch: false,
+    });
+  });
+
+  afterAll(() => {
+    deleteDataSourceByName('default');
+  });
 
   beforeEach(() => {
     sessionRepo = createMockRepository<StorySession>();
@@ -424,6 +453,47 @@ describe('StorySessionService', () => {
       );
     });
 
+    // 레플리카 3개: 살아 있는 작업을 재시도로 빼앗으면 같은 삽화가 두 번 생성된다(유료 2회).
+    it('다른 인스턴스가 생성 중인(running) 페이지는 재시도를 거절한다 ⭐', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: 'session-123',
+        userId: 1,
+      } as unknown as StorySession);
+      pageImageRepo.findOne.mockResolvedValue({
+        sessionId: 'session-123',
+        pageNo: 1,
+        status: 'running',
+        updatedAt: new Date(), // 방금 갱신됨 = 살아 있다
+      } as SessionPageImage);
+
+      await expect(service.retryPage(1, 'session-123', 1)).rejects.toThrow(
+        PageNotFailedErrorResponseDto,
+      );
+      expect(pageImageRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('오래 멈춘(고아) running 페이지는 재시도를 허용한다', async () => {
+      const session = { id: 'session-123', userId: 1 } as unknown as StorySession;
+      const pageImg = {
+        sessionId: 'session-123',
+        pageNo: 1,
+        status: 'running',
+        // 11분 전 — STALE_RUNNING_MS(10분)를 넘겨 고아로 판정된다.
+        updatedAt: new Date(Date.now() - 11 * 60 * 1000),
+        errorMessage: null,
+      } as SessionPageImage;
+
+      sessionRepo.findOne.mockResolvedValue(session);
+      sessionRepo.save.mockResolvedValue(session);
+      pageImageRepo.findOne.mockResolvedValue(pageImg);
+      pageImageRepo.save.mockResolvedValue(pageImg);
+
+      const result = await service.retryPage(1, 'session-123', 1);
+
+      expect(result.status).toBe('pending');
+      expect(pageImg.status).toBe('pending');
+    });
+
     it('실패한 페이지를 재시도하면 상태를 pending으로 바꾸고 재생성을 시작한다', async () => {
       const session = {
         id: 'session-123',
@@ -449,6 +519,53 @@ describe('StorySessionService', () => {
       expect(pageImg.status).toBe('pending');
       expect(pageImg.errorMessage).toBeNull();
       expect(session.status).toBe('generating');
+    });
+  });
+
+  // E1 회귀 방지: 레플리카 3개에서 같은 페이지가 두 번 생성되면 유료 API 가 중복 호출된다.
+  // 판정은 인메모리가 아니라 `claimPage` 의 조건부 UPDATE(= affected 행 수)가 한다.
+  describe('executePersonalizationPipeline — 레플리카 간 중복 생성 방지', () => {
+    const session = {
+      id: 'session-1',
+      userId: 1,
+      templateId: 10,
+      referenceImageKey: 'references/session-1/ref.png',
+    } as StorySession;
+
+    beforeEach(() => {
+      sessionRepo.findOne.mockResolvedValue(session);
+      pageRepo.find.mockResolvedValue([
+        createStoryPage({ templateId: 10, pageNo: 1, branchKey: 'common', baseImageKey: null }),
+      ]);
+      pageImageRepo.find.mockResolvedValue([]);
+      pageImageRepo.findOne.mockResolvedValue({
+        id: 'img-1',
+        sessionId: 'session-1',
+        pageNo: 1,
+        branchKey: 'common',
+        status: 'running',
+        imageKey: null,
+        errorMessage: null,
+      } as SessionPageImage);
+      pageImageRepo.save.mockImplementation((entity: unknown) => Promise.resolve(entity));
+    });
+
+    it('다른 레플리카가 이미 집어간 페이지는 이미지를 생성하지 않는다 ⭐', async () => {
+      // affected 0 = "내가 집지 못했다"
+      pageImageRepo.createQueryBuilder.mockReturnValue(mockUpdateQueryBuilder(0));
+
+      await service.executePersonalizationPipeline('session-1');
+
+      expect(mockImagePort.generatePageIllustration).not.toHaveBeenCalled();
+      expect(mockStoragePort.upload).not.toHaveBeenCalled();
+    });
+
+    it('집을 수 있는 페이지는 정확히 한 번 생성한다', async () => {
+      pageImageRepo.createQueryBuilder.mockReturnValue(mockUpdateQueryBuilder(1));
+
+      await service.executePersonalizationPipeline('session-1');
+
+      expect(mockImagePort.generatePageIllustration).toHaveBeenCalledTimes(1);
     });
   });
 });

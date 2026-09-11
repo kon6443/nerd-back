@@ -20,9 +20,9 @@
 
 ## Commands
 
-- 검증: `pnpm front ci:core`(lint → check:types → build) · PR 직전 `pnpm front ci:all`(+ 스텁 검사 + 헬스 경로 검사). **루트에서 부른다**
+- 검증: `pnpm front ci:core`(lint → check:types → **test** → build) · PR 직전 `pnpm front ci:all`(+ 스텁 검사 + 헬스 경로 검사). **루트에서 부른다**
 - 실행: `pnpm front dev` → `localhost:5502`
-- **테스트 프레임워크가 없다** (의도된 미도입). 그래서 `ci:core` 에 `test` 단계가 없다
+- **테스트는 vitest** — 2026-09-04 도입(`88bb028`). `ci:core`·`ci:all` 에 **`test` 단계가 있다.** 설정은 `vitest.config.mts` 하나, 테스트는 소스 옆 `*.test.ts`. 상세는 [`front-code-patterns.md`](../../.claude/rules/front-code-patterns.md) §7
 - 로컬 env 는 `apps/front/.env.local`. ⚠️ **`PORT` 는 `.env` 계열 어디에 넣어도 무시된다** — HTTP 서버 부팅이 env 로딩보다 먼저다. 포트는 `package.json` scripts 와 Dockerfile `ENV` 가 소유한다
 - ⚠️ `next build` 는 Google Fonts 를 받아오므로 **네트워크가 필요하다**. 오프라인·프록시 환경에서는 빌드가 실패한다
 

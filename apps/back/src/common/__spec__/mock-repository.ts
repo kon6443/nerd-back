@@ -25,6 +25,7 @@ interface MockedMethods {
   countBy: jest.Mock;
   save: jest.Mock;
   delete: jest.Mock;
+  createQueryBuilder: jest.Mock;
 }
 
 export type MockRepository<T extends ObjectLiteral> = MockedMethods & Partial<Repository<T>>;
@@ -38,7 +39,36 @@ export function createMockRepository<T extends ObjectLiteral>(): MockRepository<
     countBy: jest.fn(),
     save: jest.fn(),
     delete: jest.fn(),
+    // 기본값은 "1행을 집었다" — 조건부 UPDATE 를 쓰지 않는 spec 의 동작을 바꾸지 않는다.
+    createQueryBuilder: jest.fn(() => mockUpdateQueryBuilder(1)) as unknown as jest.Mock,
   };
+}
+
+/**
+ * `createQueryBuilder().update()…execute()` 체이닝 스텁.
+ *
+ * 조건부 UPDATE 로 동시성을 제어하는 코드(`StorySessionService.claimPage` 등)는
+ * **`affected` 행 수가 곧 "내가 집었는가" 의 답**이다. 그 분기를 spec 에서 직접 조종하려면
+ * 빌더를 흉내 내야 한다.
+ */
+export interface MockUpdateQueryBuilder {
+  update: jest.Mock;
+  set: jest.Mock;
+  where: jest.Mock;
+  andWhere: jest.Mock;
+  execute: jest.Mock;
+}
+
+export function mockUpdateQueryBuilder(affected: number): MockUpdateQueryBuilder {
+  // 타입을 명시해야 한다 — 체이닝이라 `builder` 가 자기 초기화식을 참조해 추론이 any 로 떨어진다.
+  const builder: MockUpdateQueryBuilder = {
+    update: jest.fn(() => builder),
+    set: jest.fn(() => builder),
+    where: jest.fn(() => builder),
+    andWhere: jest.fn(() => builder),
+    execute: jest.fn(() => Promise.resolve({ affected })),
+  };
+  return builder;
 }
 
 /**

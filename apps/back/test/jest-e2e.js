@@ -14,7 +14,11 @@ module.exports = {
     '^.+\\.ts$': 'ts-jest',
   },
   restoreMocks: true,
-  setupFiles: ['reflect-metadata', '<rootDir>/setup/setup-tz.ts'],
+  setupFiles: [
+    'reflect-metadata',
+    '<rootDir>/setup/setup-tz.ts',
+    '<rootDir>/setup/setup-transactional.ts',
+  ],
 
   // ⚠️ jest.config.js 의 moduleNameMapper · tsconfig.json 의 paths 와 1:1 로 유지할 것.
   moduleNameMapper: {
