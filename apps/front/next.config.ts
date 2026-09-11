@@ -78,17 +78,17 @@ const nextConfig: NextConfig = {
   },
 
   /**
-   * 🚫 `outputFileTracingIncludes` 로 sharp 를 강제 포함하지 않는다.
-   *
-   * 공식 문서에 `'/*': ['node_modules/sharp/**\/*']` 예시가 있어 넣었다가 뺐다.
-   * pnpm 은 최상위에 `node_modules/sharp` 를 두지 않으므로(격리 구조)
-   * 그 glob 은 **아무것도 매칭하지 못한다.** 설정이 있어도 하는 일이 없는데
-   * "챙겼다"는 착각만 남는다.
-   *
-   * 2026-09-01 실측: 기본 트레이싱이 pnpm 경로를 따라 sharp 와
-   * `@img/sharp-*` 네이티브 바이너리까지 이미 담는다. standalone 을 띄워
-   * 래스터 이미지 최적화가 200 으로 동작하는 것을 확인했다.
+   * 🖼️ 외부 S3/MinIO 스토리지 도메인 허용.
+   * 개인화 삽화 및 정식 템플릿 이미지를 Next.js <Image> 로 자동 최적화 서빙한다.
    */
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "storage.onceupon.duckdns.org",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

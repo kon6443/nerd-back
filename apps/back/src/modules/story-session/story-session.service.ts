@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Transactional } from 'typeorm-transactional';
 import { randomUUID } from 'node:crypto';
+import sharp from 'sharp';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
@@ -678,8 +679,10 @@ export class StorySessionService {
                 characterPrompt: characterCostume,
               });
 
-              const key = `personalizations/${sessionId}/${tplPage.branchKey}/page-${tplPage.pageNo}-${randomUUID()}.png`;
-              const s3Key = await this.storagePort.upload(key, generatedBuffer, 'image/png');
+              const { buffer: uploadBuffer, mimeType: uploadMime, ext } =
+                await this.convertToWebp(generatedBuffer);
+              const key = `personalizations/${sessionId}/${tplPage.branchKey}/page-${tplPage.pageNo}-${randomUUID()}.${ext}`;
+              const s3Key = await this.storagePort.upload(key, uploadBuffer, uploadMime);
 
               pageImg.imageKey = s3Key;
               pageImg.status = 'succeeded';
@@ -752,8 +755,10 @@ export class StorySessionService {
           characterPrompt: characterCostume,
         });
 
-        const key = `personalizations/${sessionId}/${tplPage.branchKey}/page-${tplPage.pageNo}-${randomUUID()}.png`;
-        const s3Key = await this.storagePort.upload(key, generatedBuffer, 'image/png');
+        const { buffer: uploadBuffer, mimeType: uploadMime, ext } =
+          await this.convertToWebp(generatedBuffer);
+        const key = `personalizations/${sessionId}/${tplPage.branchKey}/page-${tplPage.pageNo}-${randomUUID()}.${ext}`;
+        const s3Key = await this.storagePort.upload(key, uploadBuffer, uploadMime);
 
         pageImg.imageKey = s3Key;
         pageImg.status = 'succeeded';
@@ -795,6 +800,16 @@ export class StorySessionService {
         session.status = 'failed';
         await this.sessionRepo.save(session);
       }
+    }
+  }
+
+  private async convertToWebp(buffer: Buffer): Promise<{ buffer: Buffer; mimeType: string; ext: string }> {
+    try {
+      const webpBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
+      return { buffer: webpBuffer, mimeType: 'image/webp', ext: 'webp' };
+    } catch (err) {
+      this.logger.warn(`WebP 변환 실패, 원본 포맷을 유지합니다: ${err}`);
+      return { buffer, mimeType: 'image/png', ext: 'png' };
     }
   }
 }

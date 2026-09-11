@@ -2,6 +2,7 @@
 
 import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
 import { preconnect } from "react-dom";
+import NextImage from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
@@ -649,9 +650,15 @@ function StoryReadContent({ params }: PageProps) {
         </div>
 
         {coverImage && (
-          <div className="h-64 w-64 overflow-hidden rounded-card border-4 border-white shadow-xl">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={coverImage} alt="동화 표지" decoding="async" className="h-full w-full object-cover" />
+          <div className="relative h-64 w-64 overflow-hidden rounded-card border-4 border-white shadow-xl">
+            <NextImage
+              src={coverImage}
+              alt="동화 표지"
+              fill
+              sizes="256px"
+              className="object-cover"
+              unoptimized={coverImage.startsWith("data:")}
+            />
           </div>
         )}
 

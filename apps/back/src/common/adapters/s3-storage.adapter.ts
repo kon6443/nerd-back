@@ -45,6 +45,7 @@ export class S3StorageAdapter implements StoragePort {
         Key: fullKey,
         Body: buffer,
         ContentType: mimeType,
+        CacheControl: 'private, max-age=86400, no-transform',
       }),
     );
 

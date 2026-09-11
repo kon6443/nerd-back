@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import { Card } from "@/components/ui/Card";
 import { StoryArtwork } from "@/components/story/StoryArtwork";
 
@@ -55,18 +56,16 @@ export function StoryCard({
     <Card tone={tone ?? variantTone[variant]} className={variantLayout[variant]}>
       <div className="flex h-full flex-col gap-4">
         {imageUrl ? (
-          // 표시 URL의 호스트 허용 목록은 이미지 URL 연결 작업에서 확정한다.
-          // 목록이라 화면 밖 카드까지 미리 받지 않는다 — 뷰포트 안이면 브라우저가 즉시 받으므로
-          // 첫 화면 표시는 늦어지지 않는다.
-          // ⚠️ 아래 disable 주석과 <img> 사이에 아무것도 끼워 넣지 않는다 (next-line 이라 무효화된다).
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageUrl}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            className="aspect-4/3 w-full rounded-card object-cover"
-          />
+          <div className="relative aspect-4/3 w-full overflow-hidden rounded-card">
+            <Image
+              src={imageUrl}
+              alt=""
+              fill
+              sizes="(max-width: 768px) 100vw, 320px"
+              className="object-cover"
+              unoptimized={imageUrl.startsWith("data:")}
+            />
+          </div>
         ) : (
           <StoryArtwork className="aspect-4/3 w-full rounded-xl" />
         )}
