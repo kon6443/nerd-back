@@ -194,6 +194,8 @@ export default function MyPage() {
                         <img
                           src={s.referenceImageUrl}
                           alt={s.templateTitle}
+                          loading="lazy"
+                          decoding="async"
                           className="h-full w-full object-cover"
                         />
                       </div>

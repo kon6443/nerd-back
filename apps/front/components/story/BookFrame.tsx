@@ -64,7 +64,7 @@ export function BookFrame({ pageNo, imageUrl, children, footer }: BookFrameProps
             {imageUrl ? (
               // 표시 URL의 호스트 허용 목록은 이미지 URL 연결 작업에서 확정한다.
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+              <img src={imageUrl} alt="" decoding="async" className="h-full w-full object-cover" />
             ) : (
               <StoryArtwork className="h-full" />
             )}

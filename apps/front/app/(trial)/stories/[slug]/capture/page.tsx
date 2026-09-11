@@ -4,8 +4,9 @@ import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { StatusEmblem } from "@/components/ui/StatusEmblem";
 import { Badge } from "@/components/ui/Badge";
-import { actionClass } from "@/components/ui/actionStyles";
+import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
 import { ApiError, createSession, deleteSession, findMySessionBySlug, uploadFace } from "@/lib/api";
 import type { MyStorySessionItem, UploadFaceResponse } from "@nerd/contracts";
 
@@ -342,7 +343,7 @@ export default function CapturePage({ params }: PageProps) {
       {/* 완료 화면 또는 기존 동화 안내 */}
       {existingSession ? (
         <Card className="flex flex-col items-center gap-6 text-center">
-          <div className="rounded-full bg-amber-100 p-4 text-3xl">📚</div>
+          <StatusEmblem tone="notice">📚</StatusEmblem>
           <h1 className="text-2xl font-bold text-ink">이미 완성된 동화책이 있습니다!</h1>
           <p className="text-sm text-neutral-600">
             회원님께서 이미 얼굴을 등록하여 완성하신 동화책이 존재합니다.<br />
@@ -355,6 +356,7 @@ export default function CapturePage({ params }: PageProps) {
               <img
                 src={existingSession.referenceImageUrl}
                 alt="기존 주인공 캐릭터"
+                decoding="async"
                 className="h-full w-full object-cover"
               />
             </div>
@@ -382,7 +384,7 @@ export default function CapturePage({ params }: PageProps) {
         </Card>
       ) : result ? (
         <Card className="flex flex-col items-center gap-6 text-center">
-          <div className="rounded-full bg-emerald-100 p-4 text-3xl">✨</div>
+          <StatusEmblem tone="success">✨</StatusEmblem>
           <h1 className="text-2xl font-bold text-ink">주인공 캐릭터가 완성되었어요!</h1>
           <p className="text-sm text-neutral-600">
             아이의 얼굴을 바탕으로 동화 속 주인공 캐릭터 레퍼런스가 만들어졌습니다.<br />
@@ -394,6 +396,7 @@ export default function CapturePage({ params }: PageProps) {
             <img
               src={result.referenceImageUrl}
               alt="주인공 캐릭터 레퍼런스"
+              decoding="async"
               className="h-full w-full object-cover"
             />
           </div>
@@ -440,7 +443,8 @@ export default function CapturePage({ params }: PageProps) {
                   key={slot}
                   type="button"
                   onClick={() => setActiveSlot(slot)}
-                  className={`flex flex-1 flex-col items-center rounded-lg border-2 p-2 text-xs font-bold transition ${
+                  aria-pressed={isActive}
+                  className={`flex flex-1 flex-col items-center rounded-lg border-2 p-2 text-xs font-bold transition motion-reduce:transition-none ${FOCUS_RING} ${
                     isActive
                       ? "border-primary bg-primary-soft text-primary"
                       : "border-neutral-200 bg-white text-neutral-600"
@@ -466,6 +470,7 @@ export default function CapturePage({ params }: PageProps) {
                 <img
                   src={previews[activeSlot]}
                   alt="미리보기"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
                 <button
@@ -482,7 +487,7 @@ export default function CapturePage({ params }: PageProps) {
                       return next;
                     });
                   }}
-                  className="absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1 text-xs font-bold text-white hover:bg-black/80"
+                  className={`absolute right-3 top-3 min-h-[40px] rounded-full bg-black/60 px-4 text-xs font-bold text-white hover:bg-black/80 ${FOCUS_RING}`}
                 >
                   다시 찍기
                 </button>
@@ -507,7 +512,7 @@ export default function CapturePage({ params }: PageProps) {
                 <button
                   type="button"
                   onClick={startWebcam}
-                  className="rounded-pill bg-white/20 px-4 py-2 text-xs font-bold hover:bg-white/30"
+                  className={`min-h-touch rounded-pill bg-white/20 px-5 text-sm font-bold hover:bg-white/30 ${FOCUS_RING}`}
                 >
                   카메라 켜기
                 </button>

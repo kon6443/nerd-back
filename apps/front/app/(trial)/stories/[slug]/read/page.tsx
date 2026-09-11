@@ -4,10 +4,11 @@ import { Suspense, use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
+import { StatusEmblem } from "@/components/ui/StatusEmblem";
 import { Badge } from "@/components/ui/Badge";
 import { CenteredPage } from "@/components/ui/CenteredPage";
 import { LoadingView } from "@/components/ui/LoadingView";
-import { actionClass } from "@/components/ui/actionStyles";
+import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
 import { BookFrame } from "@/components/story/BookFrame";
 import { isReaderReady } from "./readiness";
 import { isAfterStoryGenerating } from "./polling";
@@ -131,8 +132,9 @@ function StoryReadContent({ params }: PageProps) {
   // 완료를 받으면 viewState 가 바뀌어 enabled 가 false 가 되므로 폴링은 스스로 멈춘다.
   const { degraded: pagesPollDegraded } = usePolling({
     enabled: sessionId !== null && viewState === "generating",
-    // enabled 가 sessionId 존재를 보장한다 — 타입 좁히기가 콜백 안까지 전파되지 않아 기본값을 둔다.
-    fetcher: () => fetchSessionPages(sessionId ?? ""),
+    // `enabled` 가 sessionId 존재를 보장한다 — 타입 좁히기가 콜백 안까지 전파되지 않아
+    // 이 파일의 다른 호출부와 같은 방식(`!`)으로 맞춘다.
+    fetcher: () => fetchSessionPages(sessionId!),
     onData: (data) => {
       setSessionPages(data);
       if (isReaderReady(data)) {
@@ -171,7 +173,7 @@ function StoryReadContent({ params }: PageProps) {
   // 비하인드 선택 화면에서는 A/B 결과의 생성 상태만 가볍게 갱신한다.
   const { degraded: afterStoryPollDegraded } = usePolling({
     enabled: sessionId !== null && viewState === "branch" && isAfterStoryGenerating(afterStory),
-    fetcher: () => fetchAfterStory(sessionId ?? ""),
+    fetcher: () => fetchAfterStory(sessionId!),
     onData: setAfterStory,
   });
 
@@ -284,7 +286,7 @@ function StoryReadContent({ params }: PageProps) {
     return (
       <CenteredPage>
         <Card className="flex flex-col items-center gap-4">
-          <div className="rounded-full bg-red-100 p-4 text-3xl">⚠️</div>
+          <StatusEmblem tone="danger">⚠️</StatusEmblem>
           <h1 className="text-xl font-bold text-ink">문제가 발생했어요</h1>
           <p className="text-sm text-neutral-600">{activeError}</p>
           <div className="flex flex-wrap justify-center gap-3 pt-2">
@@ -421,7 +423,9 @@ function StoryReadContent({ params }: PageProps) {
                             : handleRetry(item.pageNo))
                         }
                         disabled={retryingPageNo === item.pageNo || isSelectingBranch !== null}
-                        className="rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-200"
+                        // 색은 디자이너 영역이라 그대로 두고 **누를 수 있는 크기와 포커스 표시**만 보강했다.
+                        // ⚠️ 여기도 56px 규약에는 미달한다 — 페이지 목록 한 줄 안에 들어가야 한다.
+                        className={`min-h-[40px] rounded-btn bg-red-100 px-3 text-sm font-bold text-red-600 hover:bg-red-200 disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`}
                       >
                         {retryingPageNo === item.pageNo || isSelectingBranch === item.branchKey
                           ? "재시도 중..."
@@ -576,7 +580,7 @@ function StoryReadContent({ params }: PageProps) {
         {coverImage && (
           <div className="h-64 w-64 overflow-hidden rounded-card border-4 border-white shadow-xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={coverImage} alt="동화 표지" className="h-full w-full object-cover" />
+            <img src={coverImage} alt="동화 표지" decoding="async" className="h-full w-full object-cover" />
           </div>
         )}
 
@@ -665,7 +669,7 @@ function StoryReadContent({ params }: PageProps) {
             )}
 
             {/* 도트 인디케이터 (1~6쪽) */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
                 const isCur = num === currentPageNo;
                 const isBehind = num > 4;
@@ -681,14 +685,27 @@ function StoryReadContent({ params }: PageProps) {
                       setCurrentPageNo(num);
                     }}
                     title={`${num}쪽`}
-                    className={`h-2.5 w-2.5 rounded-full transition-all ${
-                      isCur
-                        ? "w-6 bg-primary"
-                        : isBehind
-                        ? "bg-magic/40 hover:bg-magic"
-                        : "bg-line hover:bg-ink-muted"
-                    }`}
-                  />
+                    // 🚫 title 에만 기대지 않는다 — 스크린리더가 일관되게 읽지 않는다.
+                    //    현재 위치도 색으로만 표시하면 화면을 못 보는 사용자에게는 없는 정보다.
+                    aria-label={`${num}쪽으로 이동`}
+                    aria-current={isCur ? "true" : undefined}
+                    // ⭐ 보이는 점(10px)은 그대로 두고 **히트 영역만** 넓힌다. 10px 짜리 점을
+                    //    직접 누르게 하면 아이 손가락으로는 거의 맞출 수 없다.
+                    //    ⚠️ 56px(`--spacing-touch`) 규약에는 못 미친다 — 6개가 한 줄에 들어가야 해
+                    //    30px 로 절충했다(기존 대비 3배). 대신 컨테이너 gap 을 없애 총폭을 억제했다.
+                    className={`group grid place-items-center rounded-full p-2.5 ${FOCUS_RING}`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`h-2.5 rounded-full transition-all motion-reduce:transition-none ${
+                        isCur
+                          ? "w-6 bg-primary"
+                          : isBehind
+                          ? "w-2.5 bg-magic/40 group-hover:bg-magic"
+                          : "w-2.5 bg-line group-hover:bg-ink-muted"
+                      }`}
+                    />
+                  </button>
                 );
               })}
             </div>
