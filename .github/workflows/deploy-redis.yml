@@ -27,7 +27,7 @@ jobs:
       # (`$DEPLOY_DIR/stacks/<스택명>.yml`)이 성립한다. 이름을 바꾸는 staging 단계가 필요 없다.
       # Redis 만 스택명이 `cache` 인 예외라 파일명도 `prod_nerd_cache.yml` 이다 —
       # named volume 이 스택 이름을 물고 있어 재명명하지 않기로 한 결정이 파일명에도 드러난다
-      # (docs/tasks/tasks-stack-rename.md).
+      # (docs/tasks/archive/tasks-stack-rename.md).
       - name: stack YAML 전송
         uses: appleboy/scp-action@v0.1.7
         with:

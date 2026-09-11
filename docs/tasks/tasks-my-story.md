@@ -1069,10 +1069,10 @@ Next 는 서버 코드를 번들링하므로 contracts 는 산출물에 인라�
 
 ### Slice 6 — 비하인드 + A/B · **D4 해소됨 (2026-09-10)**
 
-- [ ] 콘텐츠/세션 페이지 이미지에 `branch_key`를 추가해 `(6, A)`와 `(6, B)`를 구분
-- [ ] `session_branch_choices`로 최초 선택만 영구 보존 + API 14
-- [ ] 개인화 파이프라인을 공통 5장 + A/B 결과 2장으로 확장하고 분기별 실패·재시도 지원
-- [ ] **프론트**: 확인 모달이 있는 삽화 없는 분기 UI, 건너뛰기, 재독 결과 탐색, 결과 화면
+- [x] 콘텐츠/세션 페이지 이미지에 `branch_key`를 추가해 `(6, A)`와 `(6, B)`를 구분 — 마이그레이션 `1788728400000-AddBehindStoryBranches.ts`
+- [x] `session_branch_choices`로 최초 선택만 영구 보존 + API 14 — 엔티티 `session-branch-choice.entity.ts` · `POST :id/after-story/choice`(409 처리 포함)
+- [x] 개인화 파이프라인을 공통 5장 + A/B 결과 2장으로 확장하고 분기별 실패·재시도 지원
+- [x] **프론트**: 확인 모달이 있는 삽화 없는 분기 UI, 건너뛰기, 재독 결과 탐색, 결과 화면 — `read/page.tsx` `handleBranchChoice`
 - [ ] 상세 설계·수용 기준: [`slice-6-behind-branch-spec.md`](slice-6-behind-branch-spec.md)
 
 ---

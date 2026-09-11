@@ -14,7 +14,7 @@ paths:
 # 프론트 코드 패턴 (`apps/front`)
 
 > **이 파일은 위 `paths` 의 파일을 읽는 순간 자동으로 컨텍스트에 로드된다.**
-> 최종 확인일: **2026-09-10** · 규모: `app/` 14파일 · `components/` 17 · `lib/` 13 · `scripts/` 3 · 테스트 5(40건).
+> 최종 확인일: **2026-09-11** · 규모: `app/` 18파일 · `components/` 17 · `lib/` 13 · `scripts/` 3 · 테스트 6(46건).
 > 기반(디자인 토큰 · `lib/api` · UI 3종 · vitest)까지 구현됨. 근거는 [`tasks-my-story.md`](../../docs/tasks/tasks-my-story.md) 0-B.
 > **용도**: 프론트 코드를 쓸 때 **코드에서 어기기 쉬운 것**만 모았다. 결정의 근거와 배경은 [`docs/tasks/tasks-frontend-cicd.md`](../../docs/tasks/tasks-frontend-cicd.md) 가 SSOT 다.
 > **경계**: 백엔드 규약은 [`back-code-patterns.md`](back-code-patterns.md), 금지·함정 전체는 [`CLAUDE.md`](../../CLAUDE.md), 배포 규약은 [`docs/deploy.md`](../../docs/deploy.md).

@@ -1,12 +1,13 @@
 # Task Tracker: Swarm 스택·서비스 재명명
 
-> **상태**: **전환 완료 (2026-09-01)** — 새 스택 배포 · Caddy 전환 · 도메인 200 확인.
-> 남은 것: 옛 스택 제거(절차 9) · 옛 디렉터리·env 정리(절차 11).
+> **상태**: **완료 · 아카이브 (2026-09-11)** — 새 스택 배포 · Caddy 전환 · 도메인 200 확인. **남은 작업 없음.**
+> 서버 정리(절차 11)까지 2026-09-04 에 닫혔다 — 근거는 [`tasks-monorepo.md`](../tasks-monorepo.md) 「머지 후 정리 완료」.
+> ⚠️ 2026-09-11 정리: 체크박스 13개가 미완료로 남아 실제 상태와 어긋나 있었다. 대상 파일(`docker-stack.app.yml` 등)은 이미 재명명·재배치되어 **존재하지 않았고**, 절차 11 의 완료 사실은 다른 문서에만 기록돼 있었다. 실제 상태에 맞춰 닫는다.
 > **작성일**: 2026-09-01
 > **용도**: 스택·서비스 이름을 노드 라벨 체계와 1:1 로 맞추는 작업의 **결정·영향 범위·전환 절차**.
-> **경계**: 배포 구성의 정본은 [`../deploy.md`](../deploy.md) 다. 이 문서는 **바꾸는 동안**의 절차를 소유하고, 전환이 끝나면 결과를 `deploy.md` 에 반영한 뒤 이 문서를 아카이브한다.
-> **연동**: 프론트 CI/CD 는 [`tasks-frontend-cicd.md`](tasks-frontend-cicd.md) 가 소유한다. 이 재명명이 그쪽 이름의 선행 조건이었다.
-> **2026-09-03**: 두 저장소가 [모노레포로 합쳐졌다](tasks-monorepo.md). 서버 파일 규약이 `<DEPLOY_DIR>/stacks|env/<스택명>` 으로 바뀌었으니 **경로가 걸린 항목은 `docs/deploy.md` 를 정본으로 본다.** 아래 본문의 서버 경로는 전환 당시의 기록이다.
+> **경계**: 배포 구성의 정본은 [`docs/deploy.md`](../../deploy.md) 다. 이 문서는 **바꾸는 동안**의 절차를 소유하고, 전환이 끝나면 결과를 `deploy.md` 에 반영한 뒤 이 문서를 아카이브한다.
+> **연동**: 프론트 CI/CD 는 [`tasks-frontend-cicd.md`](../tasks-frontend-cicd.md) 가 소유한다. 이 재명명이 그쪽 이름의 선행 조건이었다.
+> **2026-09-03**: 두 저장소가 [모노레포로 합쳐졌다](../tasks-monorepo.md). 서버 파일 규약이 `<DEPLOY_DIR>/stacks|env/<스택명>` 으로 바뀌었으니 **경로가 걸린 항목은 `docs/deploy.md` 를 정본으로 본다.** 아래 본문의 서버 경로는 전환 당시의 기록이다.
 
 ---
 
@@ -22,7 +23,7 @@
 
 ## 현재 → 목표
 
-서비스 DNS 는 **`<스택명>_<서비스키>`** 다. 최종 DNS 를 먼저 적고 역산했다 ([lessons 2026-08-26](../lessons.md)).
+서비스 DNS 는 **`<스택명>_<서비스키>`** 다. 최종 DNS 를 먼저 적고 역산했다 ([lessons 2026-08-26](../../lessons.md)).
 
 ### 앱
 
@@ -357,13 +358,13 @@ docker node inspect --pretty <노드명> | sed -n '/Labels/,/^[A-Z]/p'
 
 ### 저장소 (AI 작업, 한 커밋)
 
-- [ ] `infra/docker-stack.app.yml` — 서비스 키 `back` → `app`, 주석의 스택·DNS 이름
-- [ ] `.github/workflows/deploy.yml` — 스택명, **스모크 필터**, `service ps`/`logs` 대상
-- [ ] `infra/docker-stack.redis.yml` — **Redis 가 이름 규칙의 예외라는 주석 추가** (이름 자체는 무변경)
-- [ ] `docs/deploy.md` — 구성표·상태 확인 명령·Caddy 예시·롤백 명령 + 이름 규칙표에 Redis 예외 명시
-- [ ] `docs/tasks/tasks-backend-skeleton.md` — 이름 규칙표·결정 요약
-- [ ] `docs/lessons.md` — 해당 항목에 "2026-09-01 재명명" 한 줄 덧붙임 (**본문 수정 금지**)
-- [ ] `pnpm ci:core` 통과 확인 (문서·YAML 변경이라 영향은 없어야 하지만 확인한다)
+- [x] `infra/docker-stack.app.yml` — 서비스 키 `back` → `app`, 주석의 스택·DNS 이름 (이후 모노레포 전환에서 `infra/prod_nerd_back.yml` 로 재배치)
+- [x] `.github/workflows/deploy.yml` — 스택명, **스모크 필터**, `service ps`/`logs` 대상 (이후 `deploy-back.yml`·`deploy-front.yml` 로 분리)
+- [x] `infra/docker-stack.redis.yml` — **Redis 가 이름 규칙의 예외라는 주석 추가** (현 `infra/prod_nerd_cache.yml`)
+- [x] `docs/deploy.md` — 구성표·상태 확인 명령·Caddy 예시·롤백 명령 + 이름 규칙표에 Redis 예외 명시
+- [x] `docs/tasks/tasks-backend-skeleton.md` — 이름 규칙표·결정 요약
+- [x] `docs/lessons.md` — 해당 항목에 "2026-09-01 재명명" 한 줄 덧붙임 (아래 「lessons 승격 완료」 참조)
+- [x] `pnpm ci:core` 통과 확인 (문서·YAML 변경이라 영향은 없어야 하지만 확인한다)
 
 🚫 **`CLAUDE.md` 는 건드리지 않는다** (2026-09-01 사용자 결정). 라우팅 표 등재와 경고 병기를 하지 않으므로, 이 문서를 열어야 한다는 신호가 `CLAUDE.md` 에는 없다 — **작업자가 이 파일의 존재를 알고 있어야 한다.**
 
@@ -373,9 +374,9 @@ docker node inspect --pretty <노드명> | sed -n '/Labels/,/^[A-Z]/p'
 - [x] `cp nerd.prod.env nerd-back.prod.env` (2026-09-01 — 113B·권한 600 보존, 원본 유지 확인)
 - [x] `ENV_FILE_PATH` 갱신 (2026-09-01)
 - [x] `DEPLOY_STACK_DIR` 저장소별 분리 + 서버 디렉터리 생성 (2026-09-01, 백엔드·프론트 양쪽)
-- [ ] `docker node update --label-add prod_nerd_front=1 <노드명>` — **프론트 작업 때 하면 된다.** 이번 재명명에는 불필요
+- [x] `docker node update --label-add prod_nerd_front=1 <노드명>` — 프론트 배포가 운영 중이고 `docs/deploy.md` 가 이 라벨을 전제로 기술한다. ⚠️ 서버 실측은 아님
 - [x] 전환 절차 5~10 수행 (2026-09-01) — 옛 스택 제거까지 완료
-- [ ] 안정화 후 정리 (절차 11) — 옛 env 파일 + **옛 stack 디렉터리 `.../infra/nerd/prod/`**
+- [x] 안정화 후 정리 (절차 11) — 옛 stack 디렉터리 삭제 완료. 근거: [`tasks-monorepo.md`](../tasks-monorepo.md) 「머지 후 정리 완료 (2026-09-04, 사용자 실행)」. ⚠️ 단 **env 파일 격리는 하지 않기로 변경**되었다 (같은 문서의 결정)
 - [x] Redis 워크플로 확인 (2026-09-01) — YAML 이 새 경로로 이동, **서비스는 5일 전 그대로 Running** (스펙 무변경이라 재시작 없음). 두 워크플로가 1분 차로 병렬 실행됨
 
 ### 전환 실측 (2026-09-01)
@@ -395,14 +396,14 @@ docker node inspect --pretty <노드명> | sed -n '/Labels/,/^[A-Z]/p'
 
 ### 완료 후
 
-- [ ] 결과를 `docs/deploy.md` 에 반영
-- [ ] 이 문서를 `docs/tasks/archive/` 로 이동
-- [ ] `grep -rn "prod_nerd"` 재실행 — 구 이름 잔존 0건 확인
-- [ ] 배운 것이 있으면 `docs/lessons.md` 에 4필드로 append
+- [x] 결과를 `docs/deploy.md` 에 반영
+- [x] 이 문서를 `docs/tasks/archive/` 로 이동 (2026-09-11)
+- [x] `grep -rn "docker-stack\\.(app|redis)\\.yml"` 재실행 — 구 이름 잔존 0건 (태스크 문서의 역사 기록 제외, 2026-09-11)
+- [x] 배운 것이 있으면 `docs/lessons.md` 에 4필드로 append (아래 「lessons 승격 완료」)
 
 ### lessons 승격 완료 (2026-09-01)
 
-두 건을 [`../lessons.md`](../lessons.md) 에 4필드로 등재했다.
+두 건을 [`docs/lessons.md`](../../lessons.md) 에 4필드로 등재했다.
 
 - **`docker ps` 의 `name` 필터는 부분 문자열 매칭이다** — 전환 중 실제로 6줄(신 3 + 구 3)을 반환하는 것을 확인했다. 예방 규칙은 `label=com.docker.stack.namespace=<스택명>`.
 - **프로그램으로 세도 세는 방법이 틀리면 같은 결과다** — 파일별 합계 55 vs 총계 54 의 1 차이가 누락 신호였다.

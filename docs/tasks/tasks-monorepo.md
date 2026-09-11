@@ -34,7 +34,7 @@
 
 - **워크플로별 `paths` 화이트리스트 + 교집합 0** — 이미 `deploy.yml` / `deploy-db.yml` / `deploy-redis.yml` 3개가 이 패턴이다 ([`deploy.md` 「독립 배포」](../deploy.md)). 모노레포는 이 표에 **행을 추가**하는 일이다.
 - **프론트 배포 파이프라인은 이미 완성돼 있다** — Dockerfile(deps→builder→runner, standalone) · `infra/docker-stack.app.yml` · `ci.yml`/`deploy.yml` · 헬스체크. Step 1~5 완료, **PR #3 머지로 9월 1일 운영 배포까지 성공**(`prod_nerd_front` 3/3 healthy). 문서상 Step 6 은 미완 표기지만 Caddy·DNS·무중단 실측 여부만 남았다. 프론트 저장소 `docs/tasks/tasks-frontend-cicd.md` 가 정본.
-- **이름 규칙은 확정됐다** — 스택 `prod_nerd_front` · 서비스 `app` · DNS `prod_nerd_front_app` · 이미지 `prod_nerd_front:<sha>` · 라벨 `prod_nerd_front=1`(부여 완료) · 서버 env `nerd-front.prod.env`(생성 완료) · 서버 stack 디렉터리 저장소별 분리 완료 ([`tasks-stack-rename.md`](tasks-stack-rename.md)).
+- **이름 규칙은 확정됐다** — 스택 `prod_nerd_front` · 서비스 `app` · DNS `prod_nerd_front_app` · 이미지 `prod_nerd_front:<sha>` · 라벨 `prod_nerd_front=1`(부여 완료) · 서버 env `nerd-front.prod.env`(생성 완료) · 서버 stack 디렉터리 저장소별 분리 완료 ([`tasks-stack-rename.md`](archive/tasks-stack-rename.md)).
 - **"로컬 빌드 성공 ≠ 컨테이너 빌드 성공"** ([lessons 2026-08-26](../lessons.md)) — 빌드 컨텍스트를 바꾸는 이번 작업의 핵심 위험. CI 의 ARM64 빌드 검증 job 이 방어선.
 - **`docker ps --filter name=` 은 부분 매칭** ([lessons 2026-09-01](../lessons.md)) — 프론트 워크플로는 이미 라벨 필터, 백엔드는 미전환(후속).
 
@@ -51,7 +51,7 @@
 | 시크릿 (GitHub Env `PROD`) | 10개 | 9개 — 7개는 백엔드와 값 동일, `DEPLOY_STACK_DIR` · `ENV_FILE_PATH` 만 프론트 값 |
 | git | `main` a187787, 원격과 동기 | 원격 `main` = **`1aa9484` (PR #3 머지, 2026-09-01 21:46)** = 운영 이미지 태그. 총 12커밋. `feat/frontend-skeleton` 9b0cd9e 는 그 안에 포함. 로컬 클론 `main` 은 11커밋 뒤처짐 |
 | prettier | `.prettierrc` + devDep | **없음** |
-| 테스트 | jest + supertest | **없음** (의도된 미도입) |
+| 테스트 | jest + supertest | ~~**없음** (의도된 미도입)~~ → **vitest 도입됨** (2026-09-04 `88bb028`) |
 | API 호출 코드 | — | **0건** (설계상 브라우저는 상대경로 `/api/v2/*`) |
 | 공유 타입 | — | 없음 |
 | CLAUDE.md | 규약 문서 (≤200줄) | `@AGENTS.md` 한 줄. `AGENTS.md` 는 **Next 가 자동 생성**하는 보일러플레이트 |
@@ -174,7 +174,7 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 | path-scoped rule | `back-code-patterns.md` | `front-code-patterns.md` | — |
 | 커밋 scope | `(back)` | `(front)` | `(infra)` `(ci)` `(repo)` `(docs)` |
 
-이미 굳어진 이름(`prod_nerd_cache`, 이미지에 `_app` 접미사 없음)은 **바꾸지 않는다** — [`tasks-stack-rename.md`](tasks-stack-rename.md) 의 결정. 서버 파일은 그 스택명을 그대로 파일명으로 쓰므로 Redis 만 `prod_nerd_cache.yml` 이다 — 예외가 파일명에도 그대로 드러나는 것이 의도다.
+이미 굳어진 이름(`prod_nerd_cache`, 이미지에 `_app` 접미사 없음)은 **바꾸지 않는다** — [`tasks-stack-rename.md`](archive/tasks-stack-rename.md) 의 결정. 서버 파일은 그 스택명을 그대로 파일명으로 쓰므로 Redis 만 `prod_nerd_cache.yml` 이다 — 예외가 파일명에도 그대로 드러나는 것이 의도다.
 
 ### 시크릿 · 서버 디렉터리 — 경로 시크릿을 `DEPLOY_DIR` 하나로 (D5 재결정 · 2026-09-03)
 
@@ -383,8 +383,8 @@ nerd-back/                          ← 저장소 (이름 변경은 후속)
 
 ### Step 2 — 프론트 subtree 합류 (merge 커밋)
 
-- [ ] `git remote add front git@github.com:kon6443/nerd-front.git && git fetch front` — ⚠️ 로컬 `../nerd-front` 를 원격으로 잡지 않는다. 그 클론의 `main` 은 11커밋 뒤처져 있다(2026-09-03 확인)
-- [ ] `git subtree add --prefix=apps/front front/main` — `main`(= `1aa9484`, PR #3 머지)을 가져온다. 운영에 떠 있는 이미지 태그와 같은 커밋이라 "무엇이 배포돼 있는가" 와 "무엇을 가져왔는가" 가 일치한다
+- [x] `git remote add front git@github.com:kon6443/nerd-front.git && git fetch front` — ⚠️ 로컬 `../nerd-front` 를 원격으로 잡지 않는다. 그 클론의 `main` 은 11커밋 뒤처져 있다(2026-09-03 확인)
+- [x] `git subtree add --prefix=apps/front front/main` — **완료: 커밋 `f1362c8` (2026-09-03)**. — `main`(= `1aa9484`, PR #3 머지)을 가져온다. 운영에 떠 있는 이미지 태그와 같은 커밋이라 "무엇이 배포돼 있는가" 와 "무엇을 가져왔는가" 가 일치한다
 - **verify**: `git ls-files apps/front | wc -l` = 30 · `git log --oneline --merges -1` 이 subtree merge · 프론트 원본 커밋 12개(11 + PR #3 머지)가 `git log --oneline | grep -c` 로 보인다 · `git log --oneline | grep 1aa9484` 1건
 
 ### Step 3 — 프론트를 워크스페이스에 맞춤

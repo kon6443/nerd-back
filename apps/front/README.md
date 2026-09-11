@@ -19,7 +19,7 @@ Next.js 16 + React 19 프론트엔드.
 | 스타일 | Tailwind CSS 4 |
 | 번들러 | Turbopack (Next 16 기본) |
 | 패키지 매니저 | pnpm |
-| 테스트 | **미도입** |
+| 테스트 | **vitest** (`environment: 'node'`) — `pnpm front test` |
 | 배포 | Docker Swarm on ARM64 (`ubuntu-24.04-arm` 네이티브 빌드) |
 
 ---
