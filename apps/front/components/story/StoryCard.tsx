@@ -63,7 +63,7 @@ export function StoryCard({
               fill
               sizes="(max-width: 768px) 100vw, 320px"
               className="object-cover"
-              unoptimized={imageUrl.startsWith("data:")}
+              unoptimized
             />
           </div>
         ) : (
