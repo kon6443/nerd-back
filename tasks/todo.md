@@ -1,3 +1,65 @@
+# main 기준 등장인물 채팅 통합 Implementation Plan
+
+> **For implementers:** main 구현을 유지하고 채팅만 이식하며 아래 검증을 완료한다.
+
+**Goal:** 최신 main의 얼굴 등록·개인화·분기형 리더에 기존 페이지 대화를 추가하고 충돌 없는 PR을 만든다.
+**Architecture:** origin/main에서 만든 feat/story-character-chat-main 작업 트리에 채팅 계약·영속 예약·LLM adapter·리더 UI만 이식한다. 기존 StorySession 및 인증 흐름을 그대로 사용한다. 채팅의 권한/장면 조회는 별도 서비스가 맡고 페이지 ID로 분기별 대화를 구분한다.
+**Tech Stack:** 기존 NestJS / TypeORM(MySQL) / Next.js / React / pnpm / GitHub CLI.
+**Spec:** 사용자 지시 “지금꺼만 PR”, “main과 충돌 해결하고 PR”, “main 내용을 우선하고 채팅 추가한걸 넣어야해”.
+
+## Global Constraints
+
+- main의 로그인·저장·얼굴 등록·개인화 이미지·본편 1~5쪽·비하인드 A/B 6쪽·캐시 동작을 보존한다.
+- 추가 개선 6개, 새 dependency, 운영 DB 변경, migration 실행, 배포, main merge는 제외한다.
+- 본인 동화의 장면당 질문 1회. 배역 변경·동시 요청·AI 실패·새로고침으로 복구하지 않는다.
+- 현재 장면만 모델에 전달하고 persona와 질문/답변은 로그에 남기지 않는다.
+- 기존 미커밋 작업 및 실행 중인 테스트 서버는 원래 작업 트리에 보존한다. 비밀값·로컬 env·QA 파일은 커밋에서 제외한다.
+
+## Implementation Steps
+
+### Task 1: main 기반 채팅 API와 영속 예약
+**Files:** packages/contracts/src/story-chat.ts, index.ts, envelope.ts; apps/back/src/modules/story/story-chat*.ts 및 dto/story-chat*.ts; common/port/llm.port.ts, common/utils/is-mysql-duplicate-key.ts; entities/story-page-chat.entity.ts; migrations/*CreateStoryPageChats*; modules/story/story.module.ts; config/env.validation* 및 .env.example.
+**Interfaces:** GET/POST /sessions/:sessionId/pages/:pageNo/chat?branchKey=common|a|b. GET은 안전한 등장인물 목록과 상태/저장 대화, POST는 role/message를 받는다. branchKey 생략 시 common. UNIQUE(sessionId,pageId)로 장면별 1회 예약.
+- [x] 최신 StorySession varchar UUID와 기존 스키마를 사용해 채팅만 추가한다.
+**Acceptance criteria:** 소유권 검사 선행, 잘못된 분기/미등장인물 거부, 중복 요청 모델 1회, AI/DB 실패 시 예약 유지, 기존 session API 변경 없음.
+**Verification:** 채팅 context/service/adapter 단위 tests, 외부 의존 없는 HTTP E2E, migration metadata/SQL mock tests. 실제 DB 실행 없음.
+
+### Task 2: main 리더 안의 채팅 UX
+**Files:** apps/front/app/(trial)/stories/[slug]/read/page.tsx 및 CharacterChat.tsx, chat-drafts.ts/test; apps/front/lib/api/story-chat.ts/test.
+**Interfaces:** CharacterChat은 sessionId/pageNo/branchKey, reader 수명의 drafts와 다음 장면 callback을 받는다. GET의 characters로 질문 대상을 그린다.
+- [x] 첫 화면 채팅 진입, 편집 가능한 예시, 초안 보존, 저장 대화 재조회, 등장인물 없는 장면 안내를 기존 책 아래에 연결한다.
+**Acceptance criteria:** 본편·A/B 이동 및 이미지 렌더 유지. 책/페이지/분기별 초안 분리. 인증 변경/401 시 초안과 대화 제거. 재전송·자동 AI 재시도 없음.
+**Verification:** Vitest 요청/검증/초안 분리 tests, 합성 API로 태블릿·모바일의 본편/분기/대화/실패/재방문·키보드 확인.
+
+### Task 3: 최종 검증과 PR
+**Files:** 이번 작업 변경 파일과 tasks/todo.md, GitHub PR.
+- [x] pnpm ci:all, main 대비 diff, 비밀/충돌 표식 검사 후 scope별 commit/push 및 PR 생성.
+**Acceptance criteria:** main 소스의 기존 기능 제거 없음. backend/frontend 전체 검사 통과. PR base main, merge 가능 여부와 원격 SHA/CI 확인. 운영 migration과 AI 설정 미검증 조건을 PR에 명시한다.
+**Verification:** npx --yes pnpm@10.26.2 ci:all, git diff --check, gh pr view/checks.
+
+## Risk & Rollback
+
+채팅 테이블 migration 파일만 작성하며 운영 적용은 담당자 작업이다. 기존 테이블을 변경하지 않는다. API key가 없으면 채팅만 unavailable이며 리더는 유지된다. main으로 merge하지 않고 검토 가능한 PR까지 수행한다.
+
+## 검증 결과
+
+- PR: https://github.com/kon6443/nerd-back/pull/44 — base `main`, head `feat/story-character-chat-main`. 생성 직후 소스 SHA `a300d2be1254585cc820c00cfa6e596d7f68fb40`와 `MERGEABLE`을 확인했다. GitHub CI의 최신 결과는 PR checks에 연결된다.
+- 최종 `pnpm ci:all` exit 0: backend unit 244개(27 suites), HTTP E2E 66개(9 suites), frontend 61개(9 files), lint 경고 0, contracts/types/build 통과. `git diff --check`, 충돌 표식 및 추가된 코드의 비밀 signature 검사 통과.
+- main `f008860`의 얼굴 등록·개인화·StorySession API·인증·BookFrame·이미지 처리·lockfile 경로는 diff 0건이다. 기존 read/page.tsx는 채팅 연결 38줄 추가·등장인물 안내 8줄 대체만 포함한다.
+
+| 수용 기준 | 검증 근거 |
+| --- | --- |
+| 본인 동화만 조회·전송, 현재 분기 출연 여부 검증 | context 단위 및 HTTP E2E의 401·404, UUID/분기/role 위조 차단 |
+| 장면당 1회·실패 및 응답 유실에 따른 재호출 차단 | service 동시 요청·중복·AI 실패·저장 ACK 유실·서버 중단 tests, A/B 별도 예약 HTTP E2E |
+| 본문 및 내부 persona 비공개 | SQL logger·LLM adapter·HTTP 응답 tests |
+| main 리더와 새 채팅 동시 동작 | 실제 Next + 합성 Nest API에서 본편·A/B 전환, 장면별 이미지 로드, 저장 답변 재방문 확인 |
+| 초안 분리·복원·인증 변경 시 제거 | Vitest와 브라우저에서 1→2→1 배역/질문 복원, A→B→A 복원, session-changed 후 빈 초안 확인 |
+| 첫 화면 진입·모바일·실패·빈 장면 안내 | 1024×768·390×844 첫 화면 진입과 키보드 포커스, 320px 가로 overflow 없음, 56px 질문 버튼, 실패 후 재전송 폼 없음, 등장인물 없는 장면 안내 |
+
+통합 브라우저 QA는 합성 AI 2회(성공 1·실패 1)를 사용했다. 실제 AI/운영 DB는 호출하지 않았다. migration은 기존 VARCHAR(36) 세션과의 SQL·metadata 호환성만 검증했고 운영 적용은 담당자 작업이다. 이번 QA의 5531/5532 서버와 브라우저는 종료했으며 기존 사용자의 5521/5522 테스트 서버는 유지했다.
+
+## main의 기존 작업 기록
+
 # My Story 프로토타입 UI 적용 계획
 
 **Goal:** PR #22의 시각 구성을 현재 동작하는 홈·서재·동화 상세·리더·로그인 화면에 적용하고 기존 API 동작을 검증한다.
