@@ -4,6 +4,8 @@ import { StoryCharacter } from '@entities/story-character.entity';
 import { StoryPage } from '@entities/story-page.entity';
 import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { StoryTemplate } from '@entities/story-template.entity';
+import { User } from '@entities/user.entity';
+import { AuthModule } from '@modules/auth/auth.module';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryPageChat } from '@entities/story-page-chat.entity';
 import { LLM_PORT } from '@common/port/llm.port';
@@ -22,6 +24,7 @@ import { StoryService } from './story.service';
  */
 @Module({
   imports: [
+    AuthModule,
     TypeOrmModule.forFeature([
       StoryTemplate,
       StoryPage,
@@ -29,6 +32,7 @@ import { StoryService } from './story.service';
       StoryPageCharacter,
       StorySession,
       StoryPageChat,
+      User,
     ]),
   ],
   controllers: [StoryController, StoryChatController],
