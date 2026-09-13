@@ -26,6 +26,19 @@ describe('validateEnv', () => {
     expect(result.DB_POOL_SIZE).toBe(10);
   });
 
+  it('채팅 모델 설정을 이미지 모델과 분리하고 API 키 없이도 기동한다', () => {
+    const defaults = validateEnv(MINIMAL);
+    expect(defaults.OPENROUTER_API_KEY).toBeUndefined();
+    expect(defaults.OPENROUTER_CHAT_MODEL).toBe('openai/gpt-5.6-luna');
+    expect(defaults.OPENROUTER_IMAGE_MODEL).toBe('qwen/qwen-image-3');
+    const custom = validateEnv({ ...MINIMAL, OPENROUTER_CHAT_MODEL: ' provider/chat-model ' });
+    expect(custom.OPENROUTER_CHAT_MODEL).toBe('provider/chat-model');
+    expect(custom.OPENROUTER_IMAGE_MODEL).toBe(defaults.OPENROUTER_IMAGE_MODEL);
+    expect(() => validateEnv({ ...MINIMAL, OPENROUTER_CHAT_MODEL: '  ' })).toThrow(
+      /OPENROUTER_CHAT_MODEL/,
+    );
+  });
+
   describe('SESSION_SECRET — 세션 쿠키 서명 키', () => {
     it('없으면 기동을 막는다 ⭐', () => {
       // 🚫 기본값을 주지 않는다. 기본값이 있으면 **모든 배포가 같은 키**를 쓰게 되어

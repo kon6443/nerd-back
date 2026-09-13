@@ -15,6 +15,9 @@ import { BookFrame } from "@/components/story/BookFrame";
 import { isReaderReady } from "./readiness";
 import { isAfterStoryGenerating } from "./polling";
 import { usePolling } from "./usePolling";
+import { CharacterChat } from "./CharacterChat";
+import { createChatDraftStore } from "./chat-drafts";
+import { SESSION_CHANGED_EVENT, UNAUTHORIZED_EVENT } from "@/lib/api/client";
 import {
   ApiError,
   fetchAfterStory,
@@ -52,6 +55,18 @@ function StoryReadContent({ params }: PageProps) {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
   const autoStart = searchParams.get("autoStart") === "true";
+
+  const [chatDrafts] = useState(createChatDraftStore);
+  useEffect(() => {
+    const clearDrafts = () => chatDrafts.clear();
+    window.addEventListener(SESSION_CHANGED_EVENT, clearDrafts);
+    window.addEventListener(UNAUTHORIZED_EVENT, clearDrafts);
+    return () => {
+      chatDrafts.clear();
+      window.removeEventListener(SESSION_CHANGED_EVENT, clearDrafts);
+      window.removeEventListener(UNAUTHORIZED_EVENT, clearDrafts);
+    };
+  }, [chatDrafts]);
 
   const [viewState, setViewState] = useState<ViewState>("loading");
   const [errorMsg, setErrorMsg] = useState("");
@@ -740,6 +755,14 @@ function StoryReadContent({ params }: PageProps) {
         </p>
       </header>
 
+      <a
+        href="#character-chat-title"
+        onClick={() => document.getElementById("character-chat-title")?.focus()}
+        className={actionClass("ghost", "self-start", "compact")}
+      >
+        이 장면의 등장인물에게 물어보기
+      </a>
+
       {/* 좌우 2단 책 프레임 (합성 삽화 + 본문) */}
       <BookFrame
         pageNo={currentPageNo}
@@ -838,14 +861,21 @@ function StoryReadContent({ params }: PageProps) {
         {currentPageData?.bodyText || "본문을 불러오는 중입니다..."}
       </BookFrame>
 
-      {/* 등장인물 안내 */}
-      {currentPageNo !== 6 && currentStoryPage?.characters && currentStoryPage.characters.length > 0 ? (
-        <p className="text-center text-xs text-ink-muted">
-          이 장면에 등장하는 인물:{" "}
-          <span className="font-semibold text-ink">
-            {currentStoryPage.characters.map((c) => c.displayName).join(" · ")}
-          </span>
-        </p>
+      {sessionId ? (
+        <CharacterChat
+          key={`${sessionId}:${currentPageNo}:${isBehindPage ? activeBranchKey : "common"}`}
+          sessionId={sessionId}
+          pageNo={currentPageNo}
+          branchKey={isBehindPage && activeBranchKey ? activeBranchKey : "common"}
+          drafts={chatDrafts}
+          loginHref={`/login?redirect=${encodeURIComponent(`/stories/${slug}/read?sessionId=${sessionId}`)}`}
+          nextLabel={currentPageNo === 5 ? "비하인드 선택하기" : isBehindPage ? "다 읽었어요" : "다음 페이지"}
+          onNext={() => {
+            if (currentPageNo === 5) void openBranchScreen();
+            else if (isBehindPage) setViewState("end");
+            else setCurrentPageNo((prev) => Math.min(totalPages, prev + 1));
+          }}
+        />
       ) : null}
     </main>
   );

@@ -35,6 +35,9 @@ export const DOMAIN_ERROR_CODES = [
   'INTERNAL_SERVER_ERROR',
   'STORY_NOT_FOUND',
   'STORY_PAGE_NOT_FOUND',
+  'STORY_CHARACTER_NOT_FOUND',
+  'STORY_CHAT_ALREADY_USED',
+  'STORY_CHAT_UNAVAILABLE',
   // 인증 — 로그인 실패는 **한 가지 코드로만** 답한다. "아이디 없음"과 "비밀번호 틀림"을
   // 나누면 그 차이가 곧 계정 존재 여부다.
   'INVALID_CREDENTIALS',

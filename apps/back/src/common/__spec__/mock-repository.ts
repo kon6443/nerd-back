@@ -24,6 +24,7 @@ interface MockedMethods {
   findOneBy: jest.Mock;
   countBy: jest.Mock;
   save: jest.Mock;
+  update: jest.Mock;
   delete: jest.Mock;
   createQueryBuilder: jest.Mock;
 }
@@ -38,6 +39,7 @@ export function createMockRepository<T extends ObjectLiteral>(): MockRepository<
     findOneBy: jest.fn(),
     countBy: jest.fn(),
     save: jest.fn(),
+    update: jest.fn(),
     delete: jest.fn(),
     // 기본값은 "1행을 집었다" — 조건부 UPDATE 를 쓰지 않는 spec 의 동작을 바꾸지 않는다.
     createQueryBuilder: jest.fn(() => mockUpdateQueryBuilder(1)) as unknown as jest.Mock,

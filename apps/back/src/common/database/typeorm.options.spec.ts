@@ -42,6 +42,29 @@ describe('TypeORM 옵션', () => {
     expect(buildTypeOrmOptions(ENV).logging).toEqual(['error']);
   });
 
+  it('대화 저장 오류 로그에는 SQL·질문·답변·driver 오류 본문이 남지 않는다', () => {
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const logger = buildTypeOrmOptions(ENV).logger;
+    if (typeof logger !== 'object') throw new Error('Database logger is missing');
+    logger.logQueryError(
+      new Error('private-driver-detail'),
+      'UPDATE `story_page_chats` SET `reply` = ?',
+      ['private-question', 'private-reply'],
+    );
+    const output = JSON.stringify([...errorLog.mock.calls, ...log.mock.calls, ...warn.mock.calls]);
+    expect(output).toContain('story_page_chats');
+    expect(output).not.toMatch(/private-|UPDATE|PARAMETERS/);
+    logger.logQueryError('non-chat-error', 'SELECT 1');
+    const otherOutput = JSON.stringify([
+      ...errorLog.mock.calls,
+      ...log.mock.calls,
+      ...warn.mock.calls,
+    ]);
+    expect(otherOutput).toContain('non-chat-error');
+  });
+
   it('재시도 예산이 healthcheck 종료 시한 안에 끝난다', () => {
     const total = DB_CONNECT_RETRY.attempts * DB_CONNECT_RETRY.delayMs;
 

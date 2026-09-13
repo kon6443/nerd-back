@@ -9,7 +9,7 @@
  * - 제공자를 바꿀 때 어댑터만 교체하면 되고 서비스는 건드리지 않는다.
  * - 호출 비용·토큰 수 계측을 어댑터 한 곳에서 처리할 수 있다.
  *
- * 구현체는 주제 확정 후 추가한다. 지금은 경계만 세운다.
+ * 등장인물 채팅에서 현재 장면에 대한 단발 응답을 생성한다.
  */
 export const LLM_PORT = Symbol('LLM_PORT');
 
@@ -36,6 +36,9 @@ export interface LlmCompletion {
 }
 
 export interface LlmPort {
+  /** 설정 미완료 시 유료 요청과 이용 횟수 예약을 시작하지 않는다. */
+  isAvailable(): boolean;
+
   /**
    * 단발 완성 요청.
    *
