@@ -11,6 +11,8 @@
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* 쪽 넘김의 3D 원근. ⚠️ 값을 줄이면 들린 종이가 커지며 .book 의 overflow 에 위아래가 잘린다. */
+  perspective: 2400px;
 }
 
 .art {
@@ -36,12 +38,13 @@
   overflow-y: auto;
   /* 스크롤바가 생겼다 사라질 때 본문 폭이 흔들리지 않게 자리를 미리 잡는다. */
   scrollbar-gutter: stable;
+  /* 종이색은 `--page-paper` 로 받는다 — 몰입 리더(.volume)는 크림색 종이로 바꾼다. */
   background: repeating-linear-gradient(
     to bottom,
-    var(--color-surface),
-    var(--color-surface) 43px,
-    color-mix(in srgb, var(--color-paper-line) 30%, var(--color-surface)) 43px,
-    color-mix(in srgb, var(--color-paper-line) 30%, var(--color-surface)) 44px
+    var(--page-paper, var(--color-surface)),
+    var(--page-paper, var(--color-surface)) 43px,
+    color-mix(in srgb, var(--color-paper-line) 30%, var(--page-paper, var(--color-surface))) 43px,
+    color-mix(in srgb, var(--color-paper-line) 30%, var(--page-paper, var(--color-surface))) 44px
   );
 }
 
@@ -101,5 +104,275 @@
 
   .text {
     font-size: 1.5rem;
+  }
+}
+
+/*
+ * 몰입 읽기 — 책이 부모가 준 높이를 **꽉 채운다**(`BookReader`).
+ * 좁은 화면은 세로로 쌓이므로 채우지 않고 자연 높이로 흐른다(화면이 스크롤된다).
+ */
+@media (min-width: 48rem) {
+  /* 🚫 `block-size: 100%` 로 두지 않는다 — 부모가 flex 항목이라 백분율이 풀리지 않고 **본문 길이만큼**
+     줄어든다. 쪽마다 책 높이가 달라져 넘길 때 출렁였다(2026-09-14 실측: 1쪽 583px · 2쪽 537px 끝).
+     높이는 flex 로 내려받는다. */
+  .fill {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-block-size: 0;
+  }
+
+  .fill .spread {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    block-size: auto;
+    /* 행을 콘텐츠 최소 높이에 맡기면 긴 본문이 책 밖으로 민다 — 넘치는 본문은 .page 안에서 스크롤한다. */
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+/*
+ * 펼친 하드커버 책 — 짙은 표지 위에 크림색 종이, 양옆·아래로 **종이 단면이 겹겹이** 보인다.
+ * 한 장짜리 태블릿 화면처럼 보이지 않게 하려는 장치다(2026-09-14 요청, 펼친 책 일러스트 참고).
+ *
+ * 구조: `.volume` 안에 표지(`.cover`) → 좌우 단면(`.stackLeft` / `.stackRight`) → 책(`.book`) 순으로 겹친다.
+ * 단면 두께는 `BookReader` 가 `--stack-left` / `--stack-right` 로 넘긴다(읽은 쪽은 왼쪽, 남은 쪽은 오른쪽).
+ * 🚫 두께에 따라 책 자리를 바꾸지 않는다 — 여백은 `--stack-max` 기준으로 고정이라 넘겨도 책 크기가 그대로다.
+ * ⚠️ `--stack-max` 는 `readerNav.ts` 의 `STACK_MAX_PX` 와 같은 값이어야 한다.
+ * 좁은 화면(세로 1단)에는 그리지 않는다 — 삽화와 본문이 위아래라 좌우 단면이 책으로 읽히지 않는다.
+ */
+
+/* 두께가 넘김과 함께 **부드럽게** 옮겨가려면 길이 타입으로 등록해야 한다 — 미등록 변수는 전환되지 않는다. */
+@property --stack-left {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 4px;
+}
+
+@property --stack-right {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 18px;
+}
+
+.volume {
+  --stack-max: 18px;
+  /* 표지가 가장 두꺼운 단면보다 더 바깥으로 나오는 폭. */
+  --cover-out: 14px;
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.cover,
+.stack {
+  display: none;
+}
+
+@media (min-width: 48rem) {
+  .volume {
+    --page-paper: var(--color-paper);
+    padding-inline: calc(var(--stack-max) + var(--cover-out));
+    padding-block-end: calc(var(--stack-max) + var(--cover-out));
+    transition:
+      --stack-left 700ms ease,
+      --stack-right 700ms ease;
+  }
+
+  .cover {
+    display: block;
+    position: absolute;
+    /* 종이 윗단이 표지 위로 솟아 보이게 표지는 조금 아래에서 시작한다. */
+    inset: 1.5rem 0 0.75rem;
+    z-index: 0;
+    border-radius: 0.75rem;
+    background: var(--color-book-cover);
+    box-shadow: 0 14px 28px color-mix(in srgb, var(--color-ink) 22%, transparent);
+  }
+
+  /* 책등 아래로 비어져 나온 표지 탭. */
+  .cover::after {
+    content: "";
+    position: absolute;
+    inset-block-end: -0.75rem;
+    inset-inline-start: 50%;
+    inline-size: 5rem;
+    block-size: 1.25rem;
+    transform: translateX(-50%);
+    border-radius: 0 0 0.6rem 0.6rem;
+    background: var(--color-book-cover-strong);
+  }
+
+  /*
+   * 단면 — 종이 반쪽 모양의 판 하나에 **어긋난 그림자를 여러 겹** 깔아 띠를 만든다.
+   * 그림자는 판의 둥근 모서리를 따라가므로, 책등 쪽 아래 모서리를 크게 굴려 띠가 책등으로 모이게 한다.
+   * 겹 수는 고정이고 간격이 두께를 따른다 — 겹 수가 바뀌면 전환 없이 뚝 끊긴다.
+   */
+  .stack {
+    display: block;
+    position: absolute;
+    z-index: 0;
+    inset-block: 0.5rem calc(var(--stack-max) + var(--cover-out));
+    background: var(--color-paper);
+  }
+
+  .stackLeft {
+    --t: var(--stack-left);
+    inset-inline: calc(var(--stack-max) + var(--cover-out)) 50%;
+    border-radius: 1.25rem 0 45% 0.5rem / 1.25rem 0 1.75rem 0.5rem;
+    box-shadow:
+      calc(var(--t) * -1 / 6) calc(var(--t) * 1 / 6) 0 var(--color-paper-edge-strong),
+      calc(var(--t) * -2 / 6) calc(var(--t) * 2 / 6) 0 var(--color-paper),
+      calc(var(--t) * -3 / 6) calc(var(--t) * 3 / 6) 0 var(--color-paper-edge),
+      calc(var(--t) * -4 / 6) calc(var(--t) * 4 / 6) 0 var(--color-paper),
+      calc(var(--t) * -5 / 6) calc(var(--t) * 5 / 6) 0 var(--color-paper-edge),
+      calc(var(--t) * -1) var(--t) 0 var(--color-paper-edge-strong);
+  }
+
+  .stackRight {
+    --t: var(--stack-right);
+    inset-inline: 50% calc(var(--stack-max) + var(--cover-out));
+    border-radius: 0 1.25rem 0.5rem 45% / 0 1.25rem 0.5rem 1.75rem;
+    box-shadow:
+      calc(var(--t) * 1 / 6) calc(var(--t) * 1 / 6) 0 var(--color-paper-edge-strong),
+      calc(var(--t) * 2 / 6) calc(var(--t) * 2 / 6) 0 var(--color-paper),
+      calc(var(--t) * 3 / 6) calc(var(--t) * 3 / 6) 0 var(--color-paper-edge),
+      calc(var(--t) * 4 / 6) calc(var(--t) * 4 / 6) 0 var(--color-paper),
+      calc(var(--t) * 5 / 6) calc(var(--t) * 5 / 6) 0 var(--color-paper-edge),
+      var(--t) var(--t) 0 var(--color-paper-edge-strong);
+  }
+
+  /* 맨 위 종이 — 테두리·카드 그림자 대신 종이 모양. 바깥 윗모서리를 크게 굴려 펼친 종이의 휨을 낸다. */
+  .volume > .book {
+    position: relative;
+    z-index: 1;
+    border: 0;
+    border-radius: 1.25rem 1.25rem 0.5rem 0.5rem / 1.25rem 1.25rem 0.5rem 0.5rem;
+    background: var(--color-paper);
+    box-shadow: none;
+  }
+
+  /* 책등 골 — 종이가 가운데로 말려 들어가 어두워진다. 일반 프레임보다 깊게. */
+  .volume .spread::after {
+    inline-size: 72px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      color-mix(in srgb, var(--color-ink) 10%, transparent) 35%,
+      color-mix(in srgb, var(--color-ink) 22%, transparent) 50%,
+      color-mix(in srgb, var(--color-ink) 10%, transparent) 65%,
+      transparent
+    );
+  }
+}
+
+/*
+ * 쪽 넘김 — **넘어가는 종이 한 장(leaf)에 앞뒤 면을 붙여 책등을 축으로 뒤집는다.**
+ *
+ * ⭐ 앞면은 떠나는 쪽, 뒷면은 도착하는 쪽의 **실제 내용**이다. 그래서 두 쪽을 동시에 그릴 수 있어야
+ * 하고, 리더가 쪽 데이터를 미리 다 받아 두는 이유가 이것이다(`BookReader`).
+ *
+ * 넓은 화면(펼침면):
+ *   다음 — 오른쪽 종이가 왼쪽으로 넘어간다. 밑에는 [떠나는 삽화 | 도착 본문], 종이 앞=떠나는 본문, 뒤=도착 삽화.
+ *   이전 — 거울상. 밑에는 [도착 삽화 | 떠나는 본문], 종이 앞=떠나는 삽화, 뒤=도착 본문.
+ * 좁은 화면(1단): 책 전체가 한 장이다. 밑에 도착 쪽, 위에 떠나는 쪽이 들려 넘어간다.
+ *
+ * ⚠️ `animationend` 가 넘김을 끝내는 신호다. 동작 줄이기 설정에서는 `globals.css` 가 시간을 0에
+ * 가깝게 줄여 즉시 끝난다.
+ */
+.leaf {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  transform-style: preserve-3d;
+  animation: leaf-turn 700ms cubic-bezier(0.45, 0.05, 0.35, 1) both;
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+/* 뒷면은 미리 뒤집어 둔다 — 종이가 180° 돌면 바로 선다. */
+.faceBack {
+  transform: rotateY(180deg);
+}
+
+/* 1단 화면의 앞면 — 삽화와 본문을 세로로 쌓아 밑에 깔린 책과 같은 모양을 만든다. */
+.faceStack {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+}
+
+/* 책등 쪽이 어두워진다 — 종이가 들리며 빛이 덜 닿는 면. */
+.face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  animation: leaf-shade 700ms ease-in-out both;
+}
+
+.leaf[data-turn="next"] {
+  --leaf-to: -180deg;
+  transform-origin: left center;
+}
+
+.leaf[data-turn="prev"] {
+  --leaf-to: 180deg;
+  transform-origin: right center;
+}
+
+.leaf[data-turn="next"] .face::after {
+  background: linear-gradient(to left, color-mix(in srgb, var(--color-ink) 22%, transparent), transparent 70%);
+}
+
+.leaf[data-turn="prev"] .face::after {
+  background: linear-gradient(to right, color-mix(in srgb, var(--color-ink) 22%, transparent), transparent 70%);
+}
+
+@media (min-width: 48rem) {
+  /* 펼침면에서는 반쪽만 넘어간다. */
+  .leaf[data-turn="next"] {
+    inset-inline-start: 50%;
+  }
+
+  .leaf[data-turn="prev"] {
+    inset-inline-end: 50%;
+  }
+}
+
+@media (max-width: 47.99rem) {
+  /* 1단은 떠나는 쪽이 들려 사라지면 끝이다 — 뒷면이 필요 없어 90°까지만 돌린다. */
+  .leaf[data-turn="next"] {
+    --leaf-to: -90deg;
+  }
+
+  .leaf[data-turn="prev"] {
+    --leaf-to: 90deg;
+  }
+}
+
+@keyframes leaf-turn {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(var(--leaf-to));
+  }
+}
+
+@keyframes leaf-shade {
+  50% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }

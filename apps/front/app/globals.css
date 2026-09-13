@@ -31,6 +31,12 @@
   --color-danger-soft: #ffdfe0;
   --color-hill-1: #a5ed6e;
   --color-hill-2: #58cc02;
+  /* 리더의 책 — 하드커버·크림색 종이·쌓인 종이 단면(`BookFrame.module.css` 의 `.volume`). */
+  --color-book-cover: #2f5b69;
+  --color-book-cover-strong: #22454f;
+  --color-paper: #fbf7ec;
+  --color-paper-edge: #ecd9b6;
+  --color-paper-edge-strong: #d3b68a;
 
   /* ⭐ 버튼은 pill 이 아니라 16px 라운드 사각형이다 (듀오링고 실측: 12~16px).
      `rounded-btn` 으로 쓴다. `--radius-pill` 은 탭·칩·배지에만 남긴다. */

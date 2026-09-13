@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isReaderPath } from "@/components/story/readerNav";
 import { AUTH_LINK } from "./authLinks";
 import { AuthCta } from "./AuthCta";
 
@@ -52,6 +53,10 @@ function navLinkClass(active: boolean): string {
 
 export function AppHeader() {
   const pathname = usePathname();
+
+  // 시연 리더는 책이 화면을 꽉 채우는 몰입 화면이다 — 전역 헤더를 그리지 않는다.
+  // 리더가 자기 상단 줄에 「동화 소개」 돌아가기를 둔다.
+  if (isReaderPath(pathname)) return null;
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-surface-raised/90 shadow-sm backdrop-blur-sm">
