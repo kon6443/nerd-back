@@ -70,10 +70,10 @@ export function BookFrame({ pageNo, imageUrl, onImageLoad, children, footer }: B
                 alt=""
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
-                priority={pageNo === 1}
+                preload={pageNo === 1}
                 className="object-cover"
                 onLoad={onImageLoad}
-                unoptimized={imageUrl.startsWith("data:")}
+                unoptimized
               />
             ) : (
               <StoryArtwork className="h-full" />

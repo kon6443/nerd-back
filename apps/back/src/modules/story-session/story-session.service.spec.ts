@@ -25,6 +25,7 @@ import {
 import { StorySessionService } from './story-session.service';
 import type { DataSource } from 'typeorm';
 import { addTransactionalDataSource, deleteDataSourceByName } from 'typeorm-transactional';
+import sharp from 'sharp';
 import type { ImageGenerationPort } from '../../common/port/image-generation.port';
 import type { StoragePort } from '../../common/port/storage.port';
 
@@ -560,12 +561,43 @@ describe('StorySessionService', () => {
       expect(mockStoragePort.upload).not.toHaveBeenCalled();
     });
 
-    it('집을 수 있는 페이지는 정확히 한 번 생성한다', async () => {
+    it('집을 수 있는 페이지는 WebP로 변환해 정확히 한 번 업로드한다', async () => {
+      const generatedPng = await sharp({
+        create: {
+          width: 64,
+          height: 48,
+          channels: 4,
+          background: { r: 80, g: 120, b: 200, alpha: 1 },
+        },
+      })
+        .png()
+        .toBuffer();
+      mockImagePort.generatePageIllustration.mockResolvedValueOnce(generatedPng);
       pageImageRepo.createQueryBuilder.mockReturnValue(mockUpdateQueryBuilder(1));
 
       await service.executePersonalizationPipeline('session-1');
 
       expect(mockImagePort.generatePageIllustration).toHaveBeenCalledTimes(1);
+      const [key, uploadedBuffer, mimeType] = mockStoragePort.upload.mock.calls[0];
+      expect(key).toMatch(/^personalizations\/session-1\/common\/page-1-.+\.webp$/);
+      expect(mimeType).toBe('image/webp');
+      await expect(sharp(uploadedBuffer).metadata()).resolves.toMatchObject({
+        format: 'webp',
+        width: 64,
+        height: 48,
+      });
+    });
+
+    it('WebP 변환 실패 시 원본 PNG로 폴백해 업로드한다', async () => {
+      pageImageRepo.createQueryBuilder.mockReturnValue(mockUpdateQueryBuilder(1));
+
+      await service.executePersonalizationPipeline('session-1');
+
+      expect(mockStoragePort.upload).toHaveBeenCalledWith(
+        expect.stringMatching(/^personalizations\/session-1\/common\/page-1-.+\.png$/),
+        Buffer.from('mock-page-image-bytes'),
+        'image/png',
+      );
     });
   });
 });

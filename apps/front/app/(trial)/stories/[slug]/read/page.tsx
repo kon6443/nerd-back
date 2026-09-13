@@ -657,7 +657,7 @@ function StoryReadContent({ params }: PageProps) {
               fill
               sizes="256px"
               className="object-cover"
-              unoptimized={coverImage.startsWith("data:")}
+              unoptimized
             />
           </div>
         )}

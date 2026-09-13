@@ -4,13 +4,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Transactional } from 'typeorm-transactional';
 import { randomUUID } from 'node:crypto';
-import sharp from 'sharp';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
 import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
 import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
+import { convertImageToWebp } from './convertImageToWebp';
 import { StoryNotFoundErrorResponseDto } from '@modules/story/dto/story.error.dto';
 import {
   FaceNotReadyErrorResponseDto,
@@ -805,7 +805,7 @@ export class StorySessionService {
 
   private async convertToWebp(buffer: Buffer): Promise<{ buffer: Buffer; mimeType: string; ext: string }> {
     try {
-      const webpBuffer = await sharp(buffer).webp({ quality: 85 }).toBuffer();
+      const webpBuffer = await convertImageToWebp(buffer);
       return { buffer: webpBuffer, mimeType: 'image/webp', ext: 'webp' };
     } catch (err) {
       this.logger.warn(`WebP 변환 실패, 원본 포맷을 유지합니다: ${err}`);

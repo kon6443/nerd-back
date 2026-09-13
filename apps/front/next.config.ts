@@ -79,7 +79,8 @@ const nextConfig: NextConfig = {
 
   /**
    * 🖼️ 외부 S3/MinIO 스토리지 도메인 허용.
-   * 개인화 삽화 및 정식 템플릿 이미지를 Next.js <Image> 로 자동 최적화 서빙한다.
+   * 개인화 삽화는 서버에서 WebP로 변환되고 서명 URL을 사용하므로 <Image unoptimized>로
+   * 원본을 직접 표시한다. 이 허용 목록은 최적화가 필요한 정식 템플릿 이미지에도 사용한다.
    */
   images: {
     remotePatterns: [
