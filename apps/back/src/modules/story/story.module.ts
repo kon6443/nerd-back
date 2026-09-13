@@ -4,6 +4,13 @@ import { StoryCharacter } from '@entities/story-character.entity';
 import { StoryPage } from '@entities/story-page.entity';
 import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { StoryTemplate } from '@entities/story-template.entity';
+import { StorySession } from '@entities/story-session.entity';
+import { StoryPageChat } from '@entities/story-page-chat.entity';
+import { LLM_PORT } from '@common/port/llm.port';
+import { StoryChatController } from './story-chat.controller';
+import { StoryChatService } from './story-chat.service';
+import { StoryChatContextService } from './story-chat-context.service';
+import { StoryChatLlm } from './story-chat.llm';
 import { StoryController } from './story.controller';
 import { StoryService } from './story.service';
 
@@ -15,9 +22,21 @@ import { StoryService } from './story.service';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([StoryTemplate, StoryPage, StoryCharacter, StoryPageCharacter]),
+    TypeOrmModule.forFeature([
+      StoryTemplate,
+      StoryPage,
+      StoryCharacter,
+      StoryPageCharacter,
+      StorySession,
+      StoryPageChat,
+    ]),
   ],
-  controllers: [StoryController],
-  providers: [StoryService],
+  controllers: [StoryController, StoryChatController],
+  providers: [
+    StoryService,
+    StoryChatService,
+    StoryChatContextService,
+    { provide: LLM_PORT, useClass: StoryChatLlm },
+  ],
 })
 export class StoryModule {}

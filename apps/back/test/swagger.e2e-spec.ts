@@ -17,6 +17,8 @@ import { SessionService } from '@modules/auth/session.service';
 import { AuthGuard } from '@common/guards/auth.guard';
 import { StoryController } from '@modules/story/story.controller';
 import { StoryService } from '@modules/story/story.service';
+import { StoryChatController } from '@modules/story/story-chat.controller';
+import { StoryChatService } from '@modules/story/story-chat.service';
 import { createE2eApp } from './helpers/e2e-app';
 
 /**
@@ -42,9 +44,10 @@ describe('Swagger 문서 (E2E)', () => {
     app = await createE2eApp({
       // ⚠️ **문서에 실리는 컨트롤러를 전부 올린다.** 하나라도 빠지면 그 엔드포인트가 문서에서
       //    사라져도 이 테스트가 초록이다 — 2026-09-07 까지 auth 4종이 그 상태였다.
-      controllers: [StoryController, AuthController],
+      controllers: [StoryController, AuthController, StoryChatController],
       providers: [
         StoryService,
+        { provide: StoryChatService, useValue: { get: jest.fn(), send: jest.fn() } },
         AuthService,
         PasswordService,
         SessionService,
@@ -64,6 +67,23 @@ describe('Swagger 문서 (E2E)', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it('개인 동화 대화의 경로·분기·상태코드·안전한 응답 계약을 문서화한다', () => {
+    const path = doc.paths[`/${API_PREFIX}/sessions/{sessionId}/pages/{pageNo}/chat`];
+    expect(path.get?.responses).toHaveProperty('200');
+    expect(path.post?.responses).toHaveProperty('201');
+    expect(path.post?.responses).toHaveProperty('409');
+    expect(path.post?.responses).toHaveProperty('503');
+    const names = path.get?.parameters?.map((parameter) =>
+      'name' in parameter ? parameter.name : undefined,
+    );
+    expect(names).toEqual(expect.arrayContaining(['sessionId', 'pageNo', 'branchKey']));
+    const schema = doc.components?.schemas?.StoryChatViewDto;
+    expect(schema && 'properties' in schema ? Object.keys(schema.properties ?? {}) : []).toEqual(
+      expect.arrayContaining(['characters', 'status', 'remainingMessages', 'exchange']),
+    );
+    expect(JSON.stringify(schema)).not.toContain('persona');
   });
 
   it('동화 엔드포인트 3종이 문서에 있다', () => {
@@ -134,9 +154,14 @@ describe('Swagger 문서 (E2E)', () => {
     // isArray 경로. 빠지면 목록 API 의 data 가 단일 객체로 문서화된다.
     const ok = doc.paths[`/${API_PREFIX}/stories`]?.get?.responses?.['200'];
     const schema = JSON.parse(JSON.stringify(ok)) as {
-      content: Record<string, { schema: { allOf: { properties?: { data?: { type?: string } } }[] } }>;
+      content: Record<
+        string,
+        { schema: { allOf: { properties?: { data?: { type?: string } } }[] } }
+      >;
     };
-    const dataSchema = Object.values(schema.content)[0].schema.allOf.find((p) => p.properties?.data);
+    const dataSchema = Object.values(schema.content)[0].schema.allOf.find(
+      (p) => p.properties?.data,
+    );
 
     expect(dataSchema?.properties?.data?.type).toBe('array');
     expect(JSON.stringify(ok)).toContain('StorySummaryDto');

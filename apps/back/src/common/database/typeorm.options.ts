@@ -1,3 +1,5 @@
+import { AdvancedConsoleLogger } from 'typeorm';
+import type { QueryRunner } from 'typeorm';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import type { MysqlConnectionOptions } from 'typeorm/driver/mysql/MysqlConnectionOptions';
 import type { DbEnvVariables } from '@config/env.validation';
@@ -8,6 +10,27 @@ import type { DbEnvVariables } from '@config/env.validation';
  * 프로세스가 종료되어야 restart_policy 가 깔끔하게 다음 시도를 시작한다 (D8, tasks-db-mysql.md).
  */
 export const DB_CONNECT_RETRY = { attempts: 10, delayMs: 3_000 } as const; // = 30초
+
+class StoryChatSafeDatabaseLogger extends AdvancedConsoleLogger {
+  override logQueryError(
+    error: string | Error,
+    query: string,
+    parameters?: unknown[],
+    queryRunner?: QueryRunner,
+  ): void {
+    // 기본 error 로깅도 SQL 파라미터를 출력한다. 대화 내용은 오류 경로에서도 남기지 않는다.
+    if (/story_page_chats/i.test(query)) {
+      super.logQueryError(
+        '대화 기록 DB 요청 실패 (본문 비공개)',
+        '[story_page_chats]',
+        undefined,
+        queryRunner,
+      );
+      return;
+    }
+    super.logQueryError(String(error), query, parameters, queryRunner);
+  }
+}
 
 /**
  * 접속 옵션 — 앱(`DatabaseModule`)과 마이그레이션 CLI(`config/data-source.ts`)가 공유한다.
@@ -78,6 +101,7 @@ export function buildTypeOrmOptions(env: DbEnvVariables): TypeOrmModuleOptions {
     autoLoadEntities: true,
     // 🚫 쿼리 로깅을 켜지 않는다 — 공유 로그 스택 인제스트 한도 (CLAUDE.md Never).
     logging: ['error'],
+    logger: new StoryChatSafeDatabaseLogger(['error']),
     retryAttempts: DB_CONNECT_RETRY.attempts,
     retryDelay: DB_CONNECT_RETRY.delayMs,
   };

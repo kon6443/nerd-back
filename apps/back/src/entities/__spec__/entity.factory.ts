@@ -1,3 +1,5 @@
+import { StorySession } from '../story-session.entity';
+import { StoryPageChat } from '../story-page-chat.entity';
 import { StoryCharacter } from '../story-character.entity';
 import { StoryPageCharacter } from '../story-page-character.entity';
 import { StoryPage } from '../story-page.entity';
@@ -84,6 +86,38 @@ export const createUser = (overrides: Partial<User> = {}): User => ({
   // 실제 해시와 **같은 형식**을 쓴다. 그럴듯한 문자열이 아니라 형식이 맞아야
   // 파싱 경로를 지나는 테스트가 의미를 갖는다.
   passwordHash: 'scrypt$16384$8$1$00000000000000000000000000000000$0000',
+  createdAt: FIXED_DATE,
+  ...overrides,
+});
+
+export const STORY_SESSION_ID = '11111111-1111-4111-8111-111111111111';
+
+export const createStorySession = (overrides: Partial<StorySession> = {}): StorySession => ({
+  status: 'completed',
+  referenceImageKey: null,
+  updatedAt: FIXED_DATE,
+  id: STORY_SESSION_ID,
+  userId: 1,
+  user: UNSET,
+  templateId: 1,
+  template: createStoryTemplate(),
+  createdAt: FIXED_DATE,
+  ...overrides,
+});
+
+export const createStoryPageChat = (overrides: Partial<StoryPageChat> = {}): StoryPageChat => ({
+  id: 1,
+  userId: 1,
+  user: UNSET,
+  sessionId: STORY_SESSION_ID,
+  session: UNSET,
+  pageId: 31,
+  page: UNSET,
+  role: 'wolf',
+  displayName: '늑대',
+  message: '지금 어떤 기분이야?',
+  reply: null,
+  status: 'pending',
   createdAt: FIXED_DATE,
   ...overrides,
 });

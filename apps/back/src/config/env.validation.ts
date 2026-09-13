@@ -117,6 +117,8 @@ export const envSchema = dbEnvSchema.extend({
   DIRECT_FACE_MODE: z.enum(['true', 'false']).default('false'),
   /** OpenRouter API 키 */
   OPENROUTER_API_KEY: optionalText,
+  /** 등장인물 대화 모델. 이미지 생성 모델과 독립적으로 설정한다. */
+  OPENROUTER_CHAT_MODEL: z.string().trim().min(1).default('openai/gpt-5.6-luna'),
   /** OpenRouter 이미지 모델 (기본: qwen/qwen-image-3) */
   OPENROUTER_IMAGE_MODEL: z.string().default('qwen/qwen-image-3'),
   /** 스토리지 어댑터 공급자 (local | s3) */
