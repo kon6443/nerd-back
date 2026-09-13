@@ -44,9 +44,12 @@ const AUTH_NAV_SLOTS = [
   { status: "authenticated", className: "session-authenticated" },
 ] as const;
 
-/** 네비 항목 한 칸의 스타일. 실제 링크와 확인 전 자리표시가 **같은 폭**이어야 해서 한 곳에 둔다. */
+/**
+ * 네비 항목 한 칸의 스타일. 실제 링크와 확인 전 자리표시가 **같은 폭**이어야 해서 한 곳에 둔다.
+ * ⚠️ 좌우 여백을 줄이지 않는다 — 「홈」처럼 짧은 문구는 최소 폭(56px)과 높이가 같아져 알약이 아니라 원이 된다.
+ */
 function navLinkClass(active: boolean): string {
-  return `flex min-h-touch min-w-touch items-center justify-center rounded-pill px-3 text-sm font-bold transition-colors motion-reduce:transition-none sm:px-4 sm:text-base ${
+  return `flex min-h-touch min-w-touch items-center justify-center rounded-pill px-5 text-sm font-bold transition-colors motion-reduce:transition-none sm:px-7 sm:text-base ${
     active ? "bg-primary-strong text-white" : "text-ink-muted hover:bg-primary-tint hover:text-ink"
   }`;
 }
