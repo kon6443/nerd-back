@@ -1,9 +1,24 @@
 # AI 동화 MVP — Gemini 비용·구성 결정 기록
 
-- **상태**: 제안 (2026-08-29)
+- **상태**: 일부 대체됨 (2026-08-29 작성 · TTS 결정은 2026-09-14 Slice 7이 대체)
 - **범위**: 부모 캐릭터 이미지, 동화 본문, TTS, 아이와의 상호작용에 사용하는 Gemini 모델과 예상 API 비용
 - **비목표**: 실제 결제 금액 보장, 환율 예측, Cloud Storage·네트워크·백엔드 인프라 비용, 부모 음성 복제 구현
 - **가격 기준일**: 2026-08-29. 모델 가격은 바뀔 수 있으므로 구현 직전에 공식 가격표를 다시 확인한다.
+
+> **현재 TTS 정본:** [`slice-7-tts-spec.md`](slice-7-tts-spec.md). 본문 낭독은 사전 제작 MP3라 런타임 비용이 없고, 캐릭터 답변만 OpenRouter의 `google/gemini-3.1-flash-tts-preview`로 생성한다. 이 문서의 Gemini 2.5 전체 낭독·Free Tier·합계 계산은 과거 제안이며 현재 예산으로 사용하지 않는다.
+
+## 2026-09-14 TTS 결정
+
+| 항목 | 현재 결정 |
+|---|---|
+| 본편 1~5 및 결과 6A·6B 낭독 | 업로드된 정적 MP3 재생, 런타임 TTS 호출 없음 |
+| 캐릭터 답변 | OpenRouter `google/gemini-3.1-flash-tts-preview` |
+| 단가 | 텍스트 입력 `$1/1M tokens`, 오디오 출력 `$20/1M tokens` |
+| 예상 출력 비용 | 초당 25 audio tokens 기준 약 `$0.03/분`; 10초 답변 7개 약 `$0.035` |
+| 무료 한도 | OpenRouter에는 해당 모델의 무료 엔드포인트 없음 |
+| 결제·인증 | 기존 OpenRouter 크레딧과 `OPENROUTER_API_KEY` 재사용 |
+
+OpenRouter 모델 가격은 [모델 페이지](https://openrouter.ai/google/gemini-3.1-flash-tts-preview), 오디오 토큰 기준은 [Gemini 가격 문서](https://ai.google.dev/gemini-api/docs/pricing)를 따른다.
 
 ## 결론
 

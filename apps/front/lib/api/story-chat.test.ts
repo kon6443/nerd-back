@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch } from "./client";
-import { fetchStoryChat, sendStoryChat } from "./story-chat";
+import { fetchStoryChat, retryStoryChatAudio, sendStoryChat } from "./story-chat";
 
 vi.mock("./client", () => ({ apiFetch: vi.fn() }));
 
@@ -35,5 +35,12 @@ describe("개인 동화 장면 대화 API", () => {
       "connection lost",
     );
     expect(apiFetch).toHaveBeenCalledTimes(1);
+  });
+  it("답변을 다시 만들지 않고 음성 전용 재시도 경로를 호출한다", async () => {
+    await retryStoryChatAudio("book/other", 6, "a");
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/sessions/book%2Fother/pages/6/chat/audio?branchKey=a",
+      { method: "POST" },
+    );
   });
 });

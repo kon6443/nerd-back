@@ -47,6 +47,8 @@ async function upsertOfficialStory(
         role: character.role,
         displayName: character.displayName,
         persona: character.persona,
+        ttsVoiceId: character.ttsVoiceId ?? null,
+        ttsSettings: character.ttsSettings ?? null,
       }),
     ),
   );
@@ -77,6 +79,7 @@ async function upsertOfficialStory(
         bodyText: page.bodyText,
         illustrationPrompt: page.illustrationPrompt ?? null,
         baseImageKey: page.baseImageKey ?? null,
+        narrationAudioKey: page.narrationAudioKey ?? null,
         personaTargetRole: page.personaTargetRole,
       }),
     ),

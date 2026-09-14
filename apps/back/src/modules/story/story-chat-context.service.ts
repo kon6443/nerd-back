@@ -58,7 +58,7 @@ export class StoryChatContextService {
     }));
   }
 
-  /** persona를 명시적으로 읽는 유일한 경로. 현재 장면의 출연 여부를 확인한다. */
+  /** 비공개 persona·음성 설정을 명시적으로 읽는 유일한 경로. 현재 장면의 출연 여부를 확인한다. */
   async getChatContext(
     templateId: number,
     pageNo: number,
@@ -68,7 +68,14 @@ export class StoryChatContextService {
     const page = await this.findPage(templateId, pageNo, branchKey);
     const character = await this.characters.findOne({
       where: { templateId, role },
-      select: { id: true, role: true, displayName: true, persona: true },
+      select: {
+        id: true,
+        role: true,
+        displayName: true,
+        persona: true,
+        ttsVoiceId: true,
+        ttsSettings: true,
+      },
     });
     if (
       !character ||

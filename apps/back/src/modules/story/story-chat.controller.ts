@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Header,
+  HttpCode,
   HttpStatus,
   Param,
   Post,
@@ -87,6 +88,25 @@ export class StoryChatController {
       params.sessionId,
       params.pageNo,
       input,
+      query.branchKey,
+    );
+    return { code: SUCCESS_CODE, data, message: '' };
+  }
+
+  @Post('audio')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({ summary: '실패한 캐릭터 답변 음성만 다시 생성' })
+  @ApiSuccessResponse(StoryChatViewDto)
+  async retryAudio(
+    @CurrentUser() user: User | undefined,
+    @Param() params: StoryChatParamsDto,
+    @Query() query: StoryChatQueryDto,
+  ) {
+    const data = await this.chats.retryAudio(
+      user!.id,
+      params.sessionId,
+      params.pageNo,
       query.branchKey,
     );
     return { code: SUCCESS_CODE, data, message: '' };

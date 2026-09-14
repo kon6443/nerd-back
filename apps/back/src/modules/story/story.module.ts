@@ -9,6 +9,9 @@ import { AuthModule } from '@modules/auth/auth.module';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryPageChat } from '@entities/story-page-chat.entity';
 import { LLM_PORT } from '@common/port/llm.port';
+import { StorageModule } from '@common/storage/storageModule';
+import { TEXT_TO_SPEECH_PORT } from '@common/port/textToSpeechPort';
+import { OpenRouterTextToSpeechAdapter } from '@common/adapters/openRouterTextToSpeechAdapter';
 import { StoryChatController } from './story-chat.controller';
 import { StoryChatService } from './story-chat.service';
 import { StoryChatContextService } from './story-chat-context.service';
@@ -25,6 +28,7 @@ import { StoryService } from './story.service';
 @Module({
   imports: [
     AuthModule,
+    StorageModule,
     TypeOrmModule.forFeature([
       StoryTemplate,
       StoryPage,
@@ -40,7 +44,9 @@ import { StoryService } from './story.service';
     StoryService,
     StoryChatService,
     StoryChatContextService,
+    OpenRouterTextToSpeechAdapter,
     { provide: LLM_PORT, useClass: StoryChatLlm },
+    { provide: TEXT_TO_SPEECH_PORT, useExisting: OpenRouterTextToSpeechAdapter },
   ],
 })
 export class StoryModule {}

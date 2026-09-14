@@ -2,12 +2,15 @@
 
 import type { StoryPageView } from "@nerd/contracts";
 import { usePathname } from "next/navigation";
-import { useCallback, useState, type MouseEvent } from "react";
+import { useCallback, useMemo, useState, type MouseEvent } from "react";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { actionClass } from "@/components/ui/actionStyles";
 import { BookArtContent, BookTextContent } from "./BookFrame";
 import { BookPager, READER_BAR } from "./BookPager";
 import { readerHref, readerPageNo } from "./readerNav";
+import { NarrationPlayer } from "./NarrationPlayer";
+import { ReaderAudioProvider } from "./ReaderAudioProvider";
+import { useNarration } from "./useNarration";
 
 /**
  * 시연 리더 — 화면을 꽉 채운 책을 **깜빡임 없이** 한 장씩 넘긴다.
@@ -20,7 +23,7 @@ import { readerHref, readerPageNo } from "./readerNav";
  * Next 라우터가 pushState 를 `usePathname` 에 동기화하므로 새로고침·뒤로가기·주소 공유가 그대로 된다.
  * 🚫 넘김 버튼을 일반 `<Link>` 이동으로 되돌리지 않는다 — 서버 왕복과 골격 화면이 돌아온다.
  */
-export function BookReader({
+function BookReaderContent({
   slug,
   title,
   pages,
@@ -61,6 +64,16 @@ export function BookReader({
   const isFirst = targetPageNo <= 1;
   const isLast = targetPageNo >= pageCount;
   const characters = pages[targetPageNo - 1].characters;
+  const activePage = pages[targetPageNo - 1];
+  const narrationPreloads = useMemo(
+    () => [activePage.narrationAudioUrl, pages[targetPageNo]?.narrationAudioUrl],
+    [activePage.narrationAudioUrl, pages, targetPageNo],
+  );
+  const narration = useNarration({
+    pageKey: `demo:${slug}:${targetPageNo}`,
+    audioUrl: activePage.narrationAudioUrl,
+    preloadUrls: narrationPreloads,
+  });
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-3 px-4 py-3 md:h-dvh md:px-6">
@@ -92,6 +105,15 @@ export function BookReader({
         renderArt={(pageNo) => <BookArtContent pageNo={pageNo} />}
         renderText={(pageNo) => (
           <BookTextContent pageNo={pageNo}>{pages[pageNo - 1].bodyText}</BookTextContent>
+        )}
+        renderTextControls={() => (
+          <NarrationPlayer
+            audioUrl={activePage.narrationAudioUrl}
+            enabled={narration.enabled}
+            onPlay={narration.play}
+            onPause={narration.pause}
+            onRestart={narration.restart}
+          />
         )}
       />
 
@@ -132,5 +154,18 @@ export function BookReader({
         )}
       </footer>
     </main>
+  );
+}
+
+export function BookReader(props: {
+  slug: string;
+  title: string;
+  pages: StoryPageView[];
+  initialPageNo: number;
+}) {
+  return (
+    <ReaderAudioProvider>
+      <BookReaderContent {...props} />
+    </ReaderAudioProvider>
   );
 }

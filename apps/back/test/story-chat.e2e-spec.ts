@@ -8,6 +8,8 @@ import { API_PREFIX } from '@common/constants/app.constants';
 import { createMockRepository } from '@common/__spec__/mock-repository';
 import { AuthGuard } from '@common/guards/auth.guard';
 import { LLM_PORT } from '@common/port/llm.port';
+import { TEXT_TO_SPEECH_PORT } from '@common/port/textToSpeechPort';
+import { STORAGE_PORT } from '@common/port/storage.port';
 import {
   createStoryCharacter,
   createStoryPage,
@@ -46,6 +48,13 @@ describe('등장인물 대화 HTTP 계약', () => {
   const sessions = createMockRepository<StorySession>();
   const users = createMockRepository<User>();
   const llm = { isAvailable: jest.fn(), complete: jest.fn() };
+  const textToSpeech = { isAvailable: jest.fn().mockReturnValue(false), synthesize: jest.fn() };
+  const storage = {
+    upload: jest.fn(),
+    getPresignedUrl: jest.fn(),
+    download: jest.fn(),
+    delete: jest.fn(),
+  };
   let rows: Map<string, StoryPageChat>;
   let ownedBooks: Map<string, StorySession>;
 
@@ -134,6 +143,8 @@ describe('등장인물 대화 HTTP 계약', () => {
         SessionService,
         { provide: ConfigService, useValue: new ConfigService() },
         { provide: LLM_PORT, useValue: llm },
+        { provide: TEXT_TO_SPEECH_PORT, useValue: textToSpeech },
+        { provide: STORAGE_PORT, useValue: storage },
         { provide: getRepositoryToken(StorySession), useValue: sessions },
         { provide: getRepositoryToken(User), useValue: users },
         { provide: getRepositoryToken(StoryTemplate), useValue: templates },

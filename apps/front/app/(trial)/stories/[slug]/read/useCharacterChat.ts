@@ -10,7 +10,7 @@ import {
   type StoryChatView,
 } from "@nerd/contracts";
 import { ApiError, SESSION_CHANGED_EVENT, UNAUTHORIZED_EVENT } from "@/lib/api/client";
-import { fetchStoryChat, sendStoryChat } from "@/lib/api/story-chat";
+import { fetchStoryChat, retryStoryChatAudio, sendStoryChat } from "@/lib/api/story-chat";
 
 import type { ChatDraftStore } from "./chat-drafts";
 
@@ -48,6 +48,10 @@ export interface CharacterChatController {
   updateDraft: (nextRole: string, nextMessage: string) => void;
   /** 「이용 상태 다시 확인」. */
   recheck: () => void;
+  retryAudio: () => Promise<void>;
+  retryingAudio: boolean;
+  autoPlayReply: boolean;
+  markReplyPlayed: () => void;
 }
 
 export function useCharacterChat({
@@ -70,6 +74,8 @@ export function useCharacterChat({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
+  const [retryingAudio, setRetryingAudio] = useState(false);
+  const [autoPlayReply, setAutoPlayReply] = useState(false);
   const submitting = useRef(false);
   const mounted = useRef(false);
   const requestVersion = useRef(0);
@@ -86,6 +92,7 @@ export function useCharacterChat({
     setRole(draft?.role ?? "");
     setMessage(draft?.message ?? "");
     setError("");
+    setAutoPlayReply(false);
   }
 
   const refresh = useCallback(
@@ -113,7 +120,10 @@ export function useCharacterChat({
         },
         (cause: unknown): undefined => {
           if (!mounted.current || signal?.aborted || version !== requestVersion.current) return;
-          setState(cause instanceof ApiError && cause.isUnauthorized ? "login" : "error");
+          setState((current) => {
+            if (cause instanceof ApiError && cause.isUnauthorized) return "login";
+            return typeof current === "object" && current.exchange?.reply ? current : "error";
+          });
         },
       );
     },
@@ -147,8 +157,10 @@ export function useCharacterChat({
   }, [refresh, drafts]);
 
   const status: CharacterChatStatus = typeof state === "string" ? state : state.status;
+  const replyAudioPending =
+    typeof state === "object" && state.exchange?.replyAudioStatus === "pending";
   useEffect(() => {
-    if (status !== "pending") return;
+    if (status !== "pending" && !replyAudioPending) return;
     const controller = new AbortController();
     // 느린 조회를 겹쳐 보내면 requestVersion이 계속 바뀌어 모든 응답이 폐기된다.
     // 이전 조회가 끝난 뒤 다음 조회를 예약한다.
@@ -161,7 +173,7 @@ export function useCharacterChat({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [status, refresh]);
+  }, [replyAudioPending, status, refresh]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -181,6 +193,11 @@ export function useCharacterChat({
       const next = await sendStoryChat(sessionId, pageNo, branchKey, parsed.data);
       if (mounted.current && version === requestVersion.current) {
         setState(next);
+        setAutoPlayReply(
+          next.exchange?.replyAudioStatus === "pending" ||
+            (next.exchange?.replyAudioStatus === "completed" &&
+              next.exchange.replyAudioUrl !== null),
+        );
         drafts.delete(sessionId, pageNo, branchKey);
         setMessage("");
       }
@@ -217,6 +234,23 @@ export function useCharacterChat({
     void refresh();
   }
 
+  async function retryAudio() {
+    if (!sessionId || retryingAudio) return;
+    setRetryingAudio(true);
+    setError("");
+    try {
+      const next = await retryStoryChatAudio(sessionId, pageNo, branchKey);
+      if (!mounted.current) return;
+      setState(next);
+      setAutoPlayReply(true);
+    } catch (cause) {
+      if (!mounted.current) return;
+      setError(cause instanceof ApiError ? cause.message : "음성을 다시 만들지 못했어요.");
+    } finally {
+      if (mounted.current) setRetryingAudio(false);
+    }
+  }
+
   const characters = typeof state === "object" ? state.characters : [];
   const exchange = typeof state === "object" ? state.exchange : null;
 
@@ -235,5 +269,9 @@ export function useCharacterChat({
     submit,
     updateDraft,
     recheck,
+    retryAudio,
+    retryingAudio,
+    autoPlayReply,
+    markReplyPlayed: () => setAutoPlayReply(false),
   };
 }

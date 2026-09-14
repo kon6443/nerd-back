@@ -180,6 +180,7 @@ describe('동화 콘텐츠 조회 (E2E)', () => {
         pageNo: 2,
         bodyText: '거울아 거울아',
         baseImageKey: 'pages/snow-white-2.png',
+        narrationAudioKey: null,
         personaTargetRole: 'protagonist',
       });
       stubs.pageCharacters.find.mockResolvedValue([
@@ -195,6 +196,7 @@ describe('동화 콘텐츠 조회 (E2E)', () => {
         pageNo: 2,
         bodyText: '거울아 거울아',
         baseImageKey: 'pages/snow-white-2.png',
+        narrationAudioUrl: null,
         personaTargetRole: 'protagonist',
         characters: [
           {

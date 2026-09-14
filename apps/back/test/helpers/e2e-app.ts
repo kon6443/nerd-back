@@ -8,6 +8,7 @@ import { API_PREFIX, TRUST_PROXY_HOPS } from '@common/constants/app.constants';
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
 import { createGlobalValidationPipe } from '@common/pipes/global-validation-pipe';
 import { REDIS_CLIENT } from '@common/redis/redis.module';
+import { STORAGE_PORT } from '@common/port/storage.port';
 import { HealthController } from '@modules/health/health.controller';
 
 /**
@@ -52,6 +53,15 @@ export async function createE2eApp(options: E2eAppOptions = {}): Promise<INestAp
     controllers: [HealthController, ...(options.controllers ?? [])],
     providers: [
       { provide: REDIS_CLIENT, useValue: { ping } },
+      {
+        provide: STORAGE_PORT,
+        useValue: {
+          upload: async (key: string) => key,
+          getPresignedUrl: async (key: string) => `https://storage.e2e.test/${key}`,
+          download: async () => Buffer.alloc(0),
+          delete: async () => undefined,
+        },
+      },
       // @InjectDataSource() 의 기본 토큰은 DataSource 클래스다. 실 DataSource 는 만들지 않는다.
       { provide: DataSource, useValue: { query } },
       ...(options.providers ?? []),

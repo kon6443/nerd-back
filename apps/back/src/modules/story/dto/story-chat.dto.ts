@@ -1,7 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { createZodDto } from 'nestjs-zod';
 import { storyChatInputSchema, storyChatParamsSchema, storyChatQuerySchema } from '@nerd/contracts';
-import type { StoryChatExchange, StoryChatStatus, StoryChatView } from '@nerd/contracts';
+import type {
+  StoryChatExchange,
+  StoryChatStatus,
+  StoryChatView,
+  StoryReplyAudioStatus,
+} from '@nerd/contracts';
 
 export class StoryChatParamsDto extends createZodDto(storyChatParamsSchema) {}
 export class StoryChatQueryDto extends createZodDto(storyChatQuerySchema) {}
@@ -27,6 +32,12 @@ export class StoryChatExchangeDto implements StoryChatExchange {
 
   @ApiProperty({ type: String, nullable: true })
   reply: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: '답변 음성의 만료 서명 URL' })
+  replyAudioUrl: string | null;
+
+  @ApiProperty({ enum: ['not_requested', 'pending', 'completed', 'failed'] })
+  replyAudioStatus: StoryReplyAudioStatus;
 }
 
 export class StoryChatViewDto implements StoryChatView {
