@@ -2,27 +2,34 @@
 
 import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
 import { preconnect } from "react-dom";
-import NextImage from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { StatusEmblem } from "@/components/ui/StatusEmblem";
-import { Badge } from "@/components/ui/Badge";
 import { CenteredPage } from "@/components/ui/CenteredPage";
 import { LoadingView } from "@/components/ui/LoadingView";
 import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
-import { BookFrame } from "@/components/story/BookFrame";
+import { BookArtContent, BookTextContent } from "@/components/story/BookFrame";
+import { BookPager, READER_BAR } from "@/components/story/BookPager";
 import { isReaderReady } from "./readiness";
 import { isAfterStoryGenerating } from "./polling";
 import { usePolling } from "./usePolling";
+import { BranchView } from "./BranchView";
 import { CharacterChat } from "./CharacterChat";
+import { EndView } from "./EndView";
+import { GeneratingView } from "./GeneratingView";
+import { ChatLauncher } from "./ChatLauncher";
+import { ChatSurface } from "./ChatSurface";
+import { ReaderPreviewSettings } from "./ReaderPreviewSettings";
+import { parseReaderOptions } from "./readerOptions";
+import { useCharacterChat } from "./useCharacterChat";
 import { createChatDraftStore } from "./chat-drafts";
 import { SESSION_CHANGED_EVENT, UNAUTHORIZED_EVENT } from "@/lib/api/client";
 import {
   ApiError,
   fetchAfterStory,
   fetchStoryDetail,
-  fetchStoryPage,
+  fetchStoryPages,
   fetchSessionPages,
   personalizeSession,
   retryAfterStoryPage,
@@ -33,9 +40,13 @@ import type {
   AfterStoryResponse,
   SessionPagesResponse,
   StoryBranchKey,
+  StoryChatBranchKey,
   StoryDetail,
   StoryPageView,
 } from "@nerd/contracts";
+
+/** 대화 표면의 제목 — 껍데기가 이 id 로 자기 이름을 가리킨다. */
+const CHAT_TITLE_ID = "character-chat-title";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -136,6 +147,65 @@ function StoryReadContent({ params }: PageProps) {
 
     return Promise.all(loads).then(() => undefined);
   }, []);
+  // ⏳ 디자인 후보를 주소로 고른다(한시적 — `readerOptions.ts`).
+  const readerOptions = parseReaderOptions(searchParams);
+
+  const [chatOpen, setChatOpen] = useState(false);
+  // 넘김이 도는 동안 `dock` 을 여닫으면 책 폭이 변해 넘어가던 종이가 튄다(길이는 CSS 가 소유).
+  const [turning, setTurning] = useState(false);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const chatWasOpen = useRef(false);
+
+  const chatBranchKey: StoryChatBranchKey =
+    currentPageNo === 6 && activeBranchKey ? activeBranchKey : "common";
+
+  // ⭐ **리더가 대화 상태를 소유한다.** 표면을 닫아도 답변 폴링이 살아 있어야 한다.
+  const chat = useCharacterChat({
+    sessionId,
+    pageNo: currentPageNo,
+    branchKey: chatBranchKey,
+    drafts: chatDrafts,
+  });
+
+  const dockLocked = readerOptions.chat === "dock" && turning;
+
+  const closeChat = useCallback(() => {
+    // ⚠️ 여는 것만 막으면 폭 변화의 절반만 막은 것이다 — 닫을 때도 책이 넓어진다.
+    if (dockLocked) return;
+    setChatOpen(false);
+  }, [dockLocked]);
+
+  // 닫은 뒤 포커스를 런처로 되돌린다. `<dialog>` 는 브라우저가 해 주지만 `dock`(aside)은 아니다.
+  // 🚫 첫 렌더에는 옮기지 않는다 — 화면에 들어오자마자 포커스가 튄다.
+  useEffect(() => {
+    if (chatOpen) {
+      chatWasOpen.current = true;
+      return;
+    }
+    if (chatWasOpen.current) launcherRef.current?.focus();
+  }, [chatOpen]);
+
+  // 몰입 화면에서는 전역 헤더를 숨긴다 — CSS 가 `<html data-reader>` 를 보고 고른다.
+  // 🚫 `AppHeader` 에서 쿼리를 읽지 않는다. 전 화면에 Suspense 경계가 생긴다.
+  useEffect(() => {
+    if (!readerOptions.immersive || viewState !== "reader") return;
+    document.documentElement.dataset.reader = "immersive";
+    return () => {
+      delete document.documentElement.dataset.reader;
+    };
+  }, [readerOptions.immersive, viewState]);
+
+  /**
+   * 리더의 좌우 방향키가 부르는 쪽 이동(`BookPager`).
+   * 🚫 6쪽으로 직행시키지 않는다 — A/B 를 고르기 전에는 존재하지 않는 쪽이다.
+   *    비하인드는 하단 「비하인드 선택하기」가 여는 선택 화면을 거친다.
+   */
+  const requestPage = useCallback((pageNo: number) => {
+    if (pageNo >= 6) return;
+    setActiveBranchKey(null);
+    setCurrentPageNo(pageNo);
+  }, []);
+
   const noSessionError = !sessionId ? "세션 정보가 없습니다. 얼굴 사진을 먼저 등록해 주세요." : "";
   const activeError = errorMsg || noSessionError;
 
@@ -154,12 +224,15 @@ function StoryReadContent({ params }: PageProps) {
         if (!active) return;
         setStory(detail);
 
-        // 2. 1페이지 본문 우선 로드 (전체 페이지 동시 호출로 인한 429 방지)
+        // 2. 본편 전 쪽 본문을 **한 번에** 받는다.
+        //    ⭐ 이후 쪽을 오가도 추가 요청이 없다 — 넘김 뒷면에 도착 쪽 본문이 항상 준비돼 있다.
+        //    🚫 쪽마다 부르지 않는다. 그러면 어느 쪽을 먼저 받을지 정하는 로직이 화면에 생기고,
+        //       동시 호출을 피하려는 순차 루프까지 따라온다 — 둘 다 API 모양 때문에 생긴 코드였다.
         try {
-          const page1 = await fetchStoryPage(slug, 1);
-          if (active) setStoryPages([page1]);
+          const pages = await fetchStoryPages(slug);
+          if (active) setStoryPages(pages);
         } catch (err) {
-          console.warn("1페이지 사전 로드 지연:", err);
+          console.warn("본문 사전 로드 지연:", err);
         }
 
         // 3. autoStart 플래그가 있으면 개인화 생성 시작 호출 (API 10, 멱등성 보장)
@@ -225,31 +298,6 @@ function StoryReadContent({ params }: PageProps) {
       }
     },
   });
-
-  // 독서 중 현재 페이지 본문 온디맨드 로드
-  useEffect(() => {
-    if (viewState !== "reader" || !story) return;
-    // 🚫 6쪽(비하인드)은 본편 API 로 가져오지 않는다 — 템플릿에 branchKey 'a'/'b' 로만 존재해
-    //    `GET /stories/:slug/pages/6`(branchKey 'common' 고정 조회)은 **항상 404** 다.
-    //    본문은 activeAfterStory 가 준다 (아래 렌더 분기와 같은 조건).
-    if (currentPageNo === 6) return;
-    if (storyPages.some((p) => p.pageNo === currentPageNo)) return;
-
-    let active = true;
-    async function loadPage() {
-      try {
-        const page = await fetchStoryPage(slug, currentPageNo);
-        if (!active) return;
-        setStoryPages((prev) => [...prev.filter((p) => p.pageNo !== currentPageNo), page]);
-      } catch (err) {
-        console.error(`${currentPageNo}페이지 로드 오류:`, err);
-      }
-    }
-    void loadPage();
-    return () => {
-      active = false;
-    };
-  }, [slug, currentPageNo, viewState, story, storyPages]);
 
   // 비하인드 선택 화면에서는 A/B 결과의 생성 상태만 가볍게 갱신한다.
   const { degraded: afterStoryPollDegraded } = usePolling({
@@ -414,129 +462,16 @@ function StoryReadContent({ params }: PageProps) {
   // 2. 생성 중 대기 화면 (v-generating)
   // ==========================================
   if (viewState === "generating") {
-    const total = sessionPages?.totalPages || 7;
-    const completed = sessionPages?.completedPages || 0;
-    const progressPercent = Math.min(100, Math.round((completed / total) * 100));
-    const generationPages = sessionPages?.pages ?? [];
-
     return (
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-6 px-4 py-8 text-center">
-        {/* 마법 오라 애니메이션 */}
-        <div className="relative flex h-40 w-40 items-center justify-center">
-          <div className="absolute inset-0 animate-ping rounded-full bg-magic opacity-20" />
-          <div className="absolute -inset-2 animate-pulse rounded-full bg-primary-soft opacity-60" />
-          <div className="relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-surface shadow-xl">
-            <span className="animate-bounce text-5xl">🎨</span>
-          </div>
-          <span className="absolute -top-1 -right-1 text-2xl animate-spin">✨</span>
-          <span className="absolute -bottom-1 -left-1 text-2xl">📖</span>
-        </div>
-
-        <div>
-          <h1 className="text-2xl font-bold text-ink md:text-3xl">나만의 동화책을 만들고 있어요</h1>
-          <p className="mt-2 text-sm text-ink-muted">
-            AI가 동화 속 장면에 아이의 얼굴과 표정을 마법처럼 합성하고 있어요.
-          </p>
-        </div>
-
-        {/* 폴링이 연속 실패할 때만 뜬다 — "멈춘 것"과 "느린 것"을 사용자가 구분할 수 있어야 한다. */}
-        {pagesPollDegraded && (
-          <p className="max-w-md text-sm font-medium text-amber-700" role="status">
-            연결이 불안정해요. 진행 상황을 계속 다시 확인하고 있어요.
-          </p>
-        )}
-
-        {/* 진행률 프로그레스 바 */}
-        <div className="w-full max-w-md">
-          <div className="mb-2 flex items-center justify-between text-xs font-bold text-ink-muted">
-            <span>제작 진행률 ({completed}/{total}장)</span>
-            <span>{progressPercent}%</span>
-          </div>
-          <div className="h-4 w-full overflow-hidden rounded-pill border-2 border-line bg-white shadow-inner">
-            <div
-              className="h-full bg-gradient-to-r from-accent-a via-primary to-magic transition-all duration-500 ease-out"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-
-        {/* 페이지별 진행 단계 카드 리스트 */}
-        <div className="w-full max-w-md rounded-card border-2 border-line bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-left text-xs font-bold text-ink-muted uppercase tracking-wider">
-            페이지별 제작 현황
-          </h2>
-          <div className="flex flex-col gap-2">
-            {generationPages.map((item) => {
-              const isBehind = item.branchKey !== "common";
-              const pageLabel = isBehind
-                ? `6쪽 비하인드 ${item.branchKey.toUpperCase()}`
-                : `${item.pageNo}쪽`;
-              const status = item?.status || "pending";
-
-              return (
-                <div
-                  key={`${item.branchKey}-${item.pageNo}`}
-                  className="flex items-center justify-between rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-ink">
-                      {pageLabel}
-                    </span>
-                    {item?.imageUrl && (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                        삽화 준비 완료
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {status === "succeeded" && (
-                      <span className="font-bold text-emerald-600">✓ 완성</span>
-                    )}
-                    {status === "running" && (
-                      <span className="flex items-center gap-1 font-bold text-primary animate-pulse">
-                        <span className="inline-block h-2 w-2 rounded-full bg-primary" />
-                        그리는 중...
-                      </span>
-                    )}
-                    {status === "pending" && (
-                      <span className="text-xs text-neutral-400">대기 중</span>
-                    )}
-                    {status === "failed" && (
-                      <button
-                        onClick={() =>
-                          void (isBehind
-                            ? handleAfterStoryRetry(item.branchKey as StoryBranchKey)
-                            : handleRetry(item.pageNo))
-                        }
-                        disabled={retryingPageNo === item.pageNo || isSelectingBranch !== null}
-                        // 색은 디자이너 영역이라 그대로 두고 **누를 수 있는 크기와 포커스 표시**만 보강했다.
-                        // ⚠️ 여기도 56px 규약에는 미달한다 — 페이지 목록 한 줄 안에 들어가야 한다.
-                        className={`min-h-[40px] rounded-btn bg-red-100 px-3 text-sm font-bold text-red-600 hover:bg-red-200 disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`}
-                      >
-                        {retryingPageNo === item.pageNo || isSelectingBranch === item.branchKey
-                          ? "재시도 중..."
-                          : "다시 만들기"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 완료 액션 버튼 */}
-        <div className="flex w-full max-w-md flex-col gap-3">
-          <p className="text-xs text-ink-muted">
-            본편 5장이 준비되면 바로 읽을 수 있어요. 한 장이 실패하더라도 해당 페이지만 다시 만들 수 있습니다.
-          </p>
-
-          <Link href={`/library/${slug}`} className={actionClass("ghost", "w-full")}>
-            동화 소개로 돌아가기
-          </Link>
-        </div>
-      </main>
+      <GeneratingView
+        slug={slug}
+        sessionPages={sessionPages}
+        pagesPollDegraded={pagesPollDegraded}
+        retryingPageNo={retryingPageNo}
+        isSelectingBranch={isSelectingBranch}
+        handleRetry={handleRetry}
+        handleAfterStoryRetry={handleAfterStoryRetry}
+      />
     );
   }
 
@@ -544,106 +479,21 @@ function StoryReadContent({ params }: PageProps) {
   // 3. 비하인드 이야기 분기 화면 (v-branch)
   // ==========================================
   if (viewState === "branch") {
-    const savedChoice = afterStory?.firstBranchChoice;
-
     return (
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-6 px-4 py-8 text-center">
-        <div className="rounded-full bg-magic-strong/10 p-5 text-4xl shadow-inner">
-          🌙
-        </div>
-
-        <div>
-          {/* 톤을 적어 둔다 — 기본값에 기대면 `Badge` 기본이 바뀔 때 이 화면 색이 조용히 따라 바뀐다. */}
-          <Badge tone="info">특별 수록: 비하인드 스토리</Badge>
-          <h1 className="mt-3 text-3xl font-bold text-ink">
-            그날 밤, 이야기는 어떻게 되었을까요?
-          </h1>
-          <p className="mt-2 text-base text-ink-muted">
-            마음에 드는 선택지를 눌러 뒷이야기를 만나 보세요.
-          </p>
-        </div>
-
-        {isAfterStoryLoading ? (
-          <Card className="w-full max-w-md text-ink-muted">
-            <p role="status">선택지를 준비하고 있어요...</p>
-          </Card>
-        ) : afterStory ? (
-          <div className="flex w-full max-w-md flex-col gap-3">
-            {savedChoice && (
-              <p className="rounded-lg bg-primary-soft px-3 py-2 text-sm font-semibold text-ink">
-                처음 고른 이야기는 {savedChoice.toUpperCase()}예요. 다시 읽을 때는 두 결과를 모두 볼 수 있어요.
-              </p>
-            )}
-            {afterStory.choices.map((choice) => {
-              const isReady = choice.status === "succeeded";
-              const isSelecting = isSelectingBranch === choice.branchKey;
-              return (
-                <Card key={choice.branchKey} className="border-2 border-magic/40 bg-surface text-left">
-                  <p className="text-xs font-bold tracking-wider text-magic-strong">선택 {choice.branchKey.toUpperCase()}</p>
-                  <h2 className="mt-1 text-lg font-bold text-ink">{choice.title}</h2>
-                  <p className="mt-2 text-sm leading-relaxed text-ink-muted">{choice.description}</p>
-                  {choice.status === "failed" && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      <p className="text-sm font-medium text-red-600">
-                        이 이야기를 아직 준비하지 못했어요. 다시 만들 수 있어요.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void handleAfterStoryRetry(choice.branchKey)}
-                        disabled={isSelectingBranch !== null}
-                        className={actionClass("ghost", "w-full py-2 text-base disabled:pointer-events-none disabled:opacity-45")}
-                      >
-                        {isSelecting ? "다시 만드는 중..." : "이 결과 다시 만들기"}
-                      </button>
-                    </div>
-                  )}
-                  {choice.status === "pending" || choice.status === "running" ? (
-                    <p className="mt-3 text-sm font-medium text-ink-muted">삽화를 준비하고 있어요...</p>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void handleBranchChoice(choice.branchKey)}
-                    disabled={!isReady || isSelectingBranch !== null}
-                    className={actionClass("accentA", "mt-4 w-full py-3 disabled:pointer-events-none disabled:opacity-45")}
-                  >
-                    {isSelecting ? "선택 저장 중..." : `${choice.title} →`}
-                  </button>
-                </Card>
-              );
-            })}
-          </div>
-        ) : (
-          <Card className="w-full max-w-md border-red-200 text-red-700">
-            비하인드 선택지를 준비하지 못했어요.
-          </Card>
-        )}
-
-        {afterStoryPollDegraded && (
-          <p className="max-w-md text-sm font-medium text-amber-700" role="status">
-            연결이 불안정해요. 생성 상태를 계속 다시 확인하고 있어요.
-          </p>
-        )}
-
-        {afterStoryError && (
-          <p className="max-w-md text-sm font-medium text-red-600" role="alert">{afterStoryError}</p>
-        )}
-
-        <div className="flex flex-wrap justify-center gap-3">
-          <button type="button" onClick={() => setViewState("end")} className={actionClass("ghost")}>
-            건너뛰기
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setCurrentPageNo(5);
-              setViewState("reader");
-            }}
-            className={actionClass("ghost")}
-          >
-            ← 5쪽으로 돌아가기
-          </button>
-        </div>
-      </main>
+      <BranchView
+        afterStory={afterStory}
+        isAfterStoryLoading={isAfterStoryLoading}
+        isSelectingBranch={isSelectingBranch}
+        afterStoryError={afterStoryError}
+        afterStoryPollDegraded={afterStoryPollDegraded}
+        handleBranchChoice={handleBranchChoice}
+        handleAfterStoryRetry={handleAfterStoryRetry}
+        onSkip={() => setViewState("end")}
+        onBackToStory={() => {
+          setCurrentPageNo(5);
+          setViewState("reader");
+        }}
+      />
     );
   }
 
@@ -651,47 +501,14 @@ function StoryReadContent({ params }: PageProps) {
   // 4. 완독 축하 화면 (v-end)
   // ==========================================
   if (viewState === "end") {
-    const coverImage = sessionPages?.pages.find((p) => p.pageNo === 1)?.imageUrl;
-
     return (
-      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-6 px-4 py-8 text-center">
-        <div className="text-5xl animate-bounce">🎉</div>
-
-        <div>
-          <h1 className="text-3xl font-bold text-ink">동화책을 모두 읽었어요!</h1>
-          <p className="mt-2 text-sm text-ink-muted">
-            내가 주인공이 된 세상에 단 하나뿐인 특별한 모험이었습니다.
-          </p>
-        </div>
-
-        {coverImage && (
-          <div className="relative h-64 w-64 overflow-hidden rounded-card border-4 border-white shadow-xl">
-            <NextImage
-              src={coverImage}
-              alt="동화 표지"
-              fill
-              sizes="256px"
-              className="object-cover"
-              unoptimized
-            />
-          </div>
-        )}
-
-        <div className="flex w-full flex-col gap-3">
-          <button
-            onClick={() => {
-              setCurrentPageNo(1);
-              setViewState("reader");
-            }}
-            className={actionClass("primary", "w-full py-3")}
-          >
-            처음부터 다시 읽기
-          </button>
-          <Link href="/library" className={actionClass("ghost", "w-full")}>
-            서재로 돌아가기
-          </Link>
-        </div>
-      </main>
+      <EndView
+        sessionPages={sessionPages}
+        onRestart={() => {
+          setCurrentPageNo(1);
+          setViewState("reader");
+        }}
+      />
     );
   }
 
@@ -701,183 +518,222 @@ function StoryReadContent({ params }: PageProps) {
   const activeAfterStory = activeBranchKey
     ? afterStory?.choices.find((choice) => choice.branchKey === activeBranchKey)
     : undefined;
-  const currentStoryPage = storyPages.find((p) => p.pageNo === currentPageNo);
-  const currentPageData = currentPageNo === 6 ? activeAfterStory : currentStoryPage;
-  const currentSessionPage = currentPageNo === 6 ? activeAfterStory : sessionPages?.pages.find((p) => p.pageNo === currentPageNo);
   const totalPages = 6;
+
+  // ⭐ **쪽 하나가 아니라 쪽 번호로 조회한다.** 넘김 중에는 떠나는 쪽과 도착 쪽을 동시에 그려야 해서
+  //    "현재 쪽" 변수 하나로는 부족하다(`BookPager`).
+  /** 쪽 → 합성 삽화 URL. 6쪽은 고른 A/B 결과에서 온다. */
+  function imageUrlAt(pageNo: number): string | undefined {
+    if (pageNo === 6) return activeAfterStory?.imageUrl ?? undefined;
+    // ⚠️ `branchKey` 를 함께 본다 — 목록에는 6쪽 a·b 도 들어 있어 쪽 번호만으로는 갈리지 않는다.
+    return (
+      sessionPages?.pages.find((page) => page.branchKey === "common" && page.pageNo === pageNo)
+        ?.imageUrl ?? undefined
+    );
+  }
+
+  /** 쪽 → 본문. 아직 못 받았으면 안내 문구가 자리를 지킨다 — 틀이 흔들리지 않는다. */
+  function bodyTextAt(pageNo: number): string {
+    const source =
+      pageNo === 6 ? activeAfterStory : storyPages.find((page) => page.pageNo === pageNo);
+    return source?.bodyText || "본문을 불러오는 중입니다...";
+  }
+
   const isFirstPage = currentPageNo <= 1;
   const isBehindPage = currentPageNo === 6;
 
-  function preloadFollowingPages() {
+  /**
+   * 첫 삽화가 뜨는 순간 **나머지 삽화를 전부** 받아 둔다(비하인드 A/B 포함).
+   * ⭐ 다음 한 장만 받으면 넘김 뒷면에 삽화가 늦게 도착해 빈 종이가 스친다. 6~7장뿐이고
+   *    이미지 요청은 스토리지로 직접 가므로 API 레이트리밋과 무관하다.
+   */
+  function preloadRemainingArtwork() {
     if (!sessionPages) return;
-
-    if (currentPageNo < 5) {
-      const nextPage = sessionPages.pages.find(
-        (page) => page.branchKey === "common" && page.pageNo === currentPageNo + 1,
-      );
-      void preloadImages([nextPage?.imageUrl]);
-      return;
-    }
-
-    if (currentPageNo === 5) {
-      void preloadImages(
-        sessionPages.pages
-          .filter((page) => page.pageNo === 6 && page.branchKey !== "common")
-          .map((page) => page.imageUrl),
-      );
-    }
+    void preloadImages(sessionPages.pages.map((page) => page.imageUrl));
   }
 
+  // `dock` 은 책 옆에 나란히 놓인다 — 열리면 책 칸이 그만큼 좁아진다.
+  const dockOpen = readerOptions.chat === "dock" && chatOpen;
+
+  // 🚫 클래스를 JSX 안에서 조립하지 않는다 — 후보를 지울 때 조건을 하나씩 찾아다니게 된다.
+  //    아래 여백은 하단 가운데 플로팅 바의 자리다. 없으면 그 바가 책의 조작줄을 덮는다.
+  //    ⚠️ 좁은 화면에서는 「보기 설정」과 런처가 **두 줄로 접히므로** 더 많이 비운다.
+  const mainClass = [
+    "mx-auto flex w-full flex-1 gap-4 px-4 pt-5 pb-40 md:px-8 md:pt-6 md:pb-24",
+    readerOptions.immersive ? "max-w-7xl md:h-dvh" : "max-w-5xl",
+    dockOpen ? "flex-col md:flex-row" : "flex-col",
+  ].join(" ");
+
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 py-5 md:px-8 md:py-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          onClick={() => setViewState("generating")}
-          className={actionClass("ghost", "text-sm")}
-        >
-          ← 제작 현황 보기
-        </button>
+    <>
+      <main className={mainClass}>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+        <header className={READER_BAR}>
+          <button
+            onClick={() => setViewState("generating")}
+            className={actionClass("ghost", "text-sm")}
+          >
+            ← 제작 현황 보기
+          </button>
 
-        <h1 className="order-first w-full text-xl font-bold text-balance break-keep wrap-anywhere text-ink md:order-none md:w-auto md:flex-1 md:text-center">
-          {story.title}
-          {isBehindPage && (
-            <span className="ml-2 rounded-pill bg-magic-strong/10 px-2 py-0.5 text-xs text-magic-strong">
-              비하인드
-            </span>
-          )}
-        </h1>
-
-        <p
-          className="rounded-pill bg-surface-raised px-4 py-2 text-sm font-bold text-ink-muted shadow-sm"
-          aria-live="polite"
-        >
-          {currentPageNo} / {totalPages}
-        </p>
-      </header>
-
-      <a
-        href="#character-chat-title"
-        onClick={() => document.getElementById("character-chat-title")?.focus()}
-        className={actionClass("ghost", "self-start", "compact")}
-      >
-        이 장면의 등장인물에게 물어보기
-      </a>
-
-      {/* 좌우 2단 책 프레임 (합성 삽화 + 본문) */}
-      <BookFrame
-        pageNo={currentPageNo}
-        imageUrl={currentSessionPage?.imageUrl || undefined}
-        onImageLoad={preloadFollowingPages}
-        footer={
-          <>
-            {isFirstPage ? (
-              <span
-                aria-disabled="true"
-                className={actionClass("ghost", "pointer-events-none opacity-40")}
-              >
-                이전
+          <h1 className="order-first w-full text-xl font-bold text-balance break-keep wrap-anywhere text-ink md:order-none md:w-auto md:flex-1 md:text-center">
+            {story.title}
+            {isBehindPage && (
+              <span className="ml-2 rounded-pill bg-magic-strong/10 px-2 py-0.5 text-xs text-magic-strong">
+                비하인드
               </span>
-            ) : currentPageNo === 6 ? (
-              <button onClick={openBranchScreen} className={actionClass("ghost")}>
-                선택지로
-              </button>
-            ) : (
-              <button
-                onClick={() => setCurrentPageNo((prev) => Math.max(1, prev - 1))}
-                className={actionClass("ghost")}
-              >
-                이전
-              </button>
             )}
+          </h1>
 
-            {/* 도트 인디케이터 (1~6쪽) */}
-            <div className="flex items-center">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
-                const isCur = num === currentPageNo;
-                const isBehind = num > 4;
-                return (
-                  <button
-                    key={num}
-                    onClick={() => {
-                      if (num === 6) {
-                        openBranchScreen();
-                        return;
-                      }
-                      setActiveBranchKey(null);
-                      setCurrentPageNo(num);
-                    }}
-                    title={`${num}쪽`}
-                    // 🚫 title 에만 기대지 않는다 — 스크린리더가 일관되게 읽지 않는다.
-                    //    현재 위치도 색으로만 표시하면 화면을 못 보는 사용자에게는 없는 정보다.
-                    aria-label={`${num}쪽으로 이동`}
-                    aria-current={isCur ? "true" : undefined}
-                    // ⭐ 보이는 점(10px)은 그대로 두고 **히트 영역만** 넓힌다. 10px 짜리 점을
-                    //    직접 누르게 하면 아이 손가락으로는 거의 맞출 수 없다.
-                    //    ⚠️ 56px(`--spacing-touch`) 규약에는 못 미친다 — 6개가 한 줄에 들어가야 해
-                    //    30px 로 절충했다(기존 대비 3배). 대신 컨테이너 gap 을 없애 총폭을 억제했다.
-                    className={`group grid place-items-center rounded-full p-2.5 ${FOCUS_RING}`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`h-2.5 rounded-full transition-all motion-reduce:transition-none ${
-                        isCur
-                          ? "w-6 bg-primary"
-                          : isBehind
-                          ? "w-2.5 bg-magic/40 group-hover:bg-magic"
-                          : "w-2.5 bg-line group-hover:bg-ink-muted"
-                      }`}
-                    />
-                  </button>
-                );
-              })}
-            </div>
+          <p
+            className="rounded-pill bg-surface-raised px-4 py-2 text-sm font-bold text-ink-muted shadow-sm"
+            aria-live="polite"
+          >
+            {currentPageNo} / {totalPages}
+          </p>
+        </header>
 
-            {/* 다음 버튼 분기 처리 */}
-            {currentPageNo === 5 ? (
-              <button
-                onClick={openBranchScreen}
-                className={actionClass("accentA", "font-bold")}
-              >
-                비하인드 선택하기 →
-              </button>
-            ) : currentPageNo >= totalPages ? (
-              <button
-                onClick={() => setViewState("end")}
-                className={actionClass("primary", "font-bold")}
-              >
-                다 읽었어요 🎉
-              </button>
-            ) : (
-              <button
-                onClick={() => setCurrentPageNo((prev) => Math.min(totalPages, prev + 1))}
-                className={actionClass("accentA")}
-              >
-                다음 페이지 →
-              </button>
-            )}
-          </>
-        }
-      >
-        {currentPageData?.bodyText || "본문을 불러오는 중입니다..."}
-      </BookFrame>
-
-      {sessionId ? (
-        <CharacterChat
-          key={`${sessionId}:${currentPageNo}:${isBehindPage ? activeBranchKey : "common"}`}
-          sessionId={sessionId}
+        {/* 펼친 책 — 시연 리더와 **같은** 넘김 엔진을 쓴다. 하드커버 표지·종이 단면은 `BookVolume` 이 그린다. */}
+        <BookPager
           pageNo={currentPageNo}
-          branchKey={isBehindPage && activeBranchKey ? activeBranchKey : "common"}
-          drafts={chatDrafts}
-          loginHref={`/login?redirect=${encodeURIComponent(`/stories/${slug}/read?sessionId=${sessionId}`)}`}
-          nextLabel={currentPageNo === 5 ? "비하인드 선택하기" : isBehindPage ? "다 읽었어요" : "다음 페이지"}
-          onNext={() => {
-            if (currentPageNo === 5) void openBranchScreen();
-            else if (isBehindPage) setViewState("end");
-            else setCurrentPageNo((prev) => Math.min(totalPages, prev + 1));
-          }}
+          pageCount={totalPages}
+          fill={readerOptions.immersive}
+          onRequestPage={requestPage}
+          onTurningChange={setTurning}
+          renderArt={(pageNo) => (
+            <BookArtContent
+              pageNo={pageNo}
+              imageUrl={imageUrlAt(pageNo)}
+              onImageLoad={preloadRemainingArtwork}
+            />
+          )}
+          renderText={(pageNo) => (
+            <BookTextContent pageNo={pageNo}>{bodyTextAt(pageNo)}</BookTextContent>
+          )}
         />
-      ) : null}
-    </main>
+
+        <div className={READER_BAR}>
+          {isFirstPage ? (
+            <span
+              aria-disabled="true"
+              className={actionClass("ghost", "pointer-events-none opacity-40")}
+            >
+              이전
+            </span>
+          ) : currentPageNo === 6 ? (
+            <button onClick={openBranchScreen} className={actionClass("ghost")}>
+              선택지로
+            </button>
+          ) : (
+            <button
+              onClick={() => setCurrentPageNo((prev) => Math.max(1, prev - 1))}
+              className={actionClass("ghost")}
+            >
+              이전
+            </button>
+          )}
+
+          {/* 도트 인디케이터 (1~6쪽) */}
+          <div className="flex items-center">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
+              const isCur = num === currentPageNo;
+              const isBehind = num > 4;
+              return (
+                <button
+                  key={num}
+                  onClick={() => {
+                    if (num === 6) {
+                      openBranchScreen();
+                      return;
+                    }
+                    setActiveBranchKey(null);
+                    setCurrentPageNo(num);
+                  }}
+                  title={`${num}쪽`}
+                  // 🚫 title 에만 기대지 않는다 — 스크린리더가 일관되게 읽지 않는다.
+                  //    현재 위치도 색으로만 표시하면 화면을 못 보는 사용자에게는 없는 정보다.
+                  aria-label={`${num}쪽으로 이동`}
+                  aria-current={isCur ? "true" : undefined}
+                  // ⭐ 보이는 점(10px)은 그대로 두고 **히트 영역만** 넓힌다. 10px 짜리 점을
+                  //    직접 누르게 하면 아이 손가락으로는 거의 맞출 수 없다.
+                  //    ⚠️ 56px(`--spacing-touch`) 규약에는 못 미친다 — 6개가 한 줄에 들어가야 해
+                  //    30px 로 절충했다(기존 대비 3배). 대신 컨테이너 gap 을 없애 총폭을 억제했다.
+                  className={`group grid place-items-center rounded-full p-2.5 ${FOCUS_RING}`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`h-2.5 rounded-full transition-all motion-reduce:transition-none ${
+                      isCur
+                        ? "w-6 bg-primary"
+                        : isBehind
+                        ? "w-2.5 bg-magic/40 group-hover:bg-magic"
+                        : "w-2.5 bg-line group-hover:bg-ink-muted"
+                    }`}
+                  />
+                </button>
+              );
+            })}
+        </div>
+
+        {/* 다음 버튼 분기 처리 */}
+        {currentPageNo === 5 ? (
+          <button
+            onClick={openBranchScreen}
+            className={actionClass("accentA", "font-bold")}
+          >
+            비하인드 선택하기 →
+          </button>
+        ) : currentPageNo >= totalPages ? (
+          <button
+            onClick={() => setViewState("end")}
+            className={actionClass("primary", "font-bold")}
+          >
+            다 읽었어요 🎉
+          </button>
+        ) : (
+          <button
+            onClick={() => setCurrentPageNo((prev) => Math.min(totalPages, prev + 1))}
+            className={actionClass("accentA")}
+          >
+            다음 페이지 →
+          </button>
+        )}
+      </div>
+
+        </div>
+
+        <ChatSurface
+          kind={readerOptions.chat}
+          open={chatOpen}
+          onClose={closeChat}
+          closeDisabled={dockLocked}
+          titleId={CHAT_TITLE_ID}
+        >
+          <CharacterChat
+            chat={chat}
+            loginHref={`/login?redirect=${encodeURIComponent(`/stories/${slug}/read?sessionId=${sessionId}`)}`}
+          />
+        </ChatSurface>
+      </main>
+
+      {/*
+        화면 **아래 가운데**. 구석에 두었더니 몰입 화면에서 눈에 들어오지 않았다(2026-09-14 피드백).
+        ⭐ 위치는 이 컨테이너가 **혼자** 소유한다 — 버튼마다 `fixed` 를 달면 둘이 따로 놀고,
+        안전영역·겹침을 두 곳에서 관리하게 된다.
+        `pointer-events-none` 은 버튼 사이 빈 곳으로 책을 계속 누를 수 있게 한다(자식만 되살린다).
+      */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-30 flex flex-wrap items-end justify-center gap-3 px-4">
+        <ReaderPreviewSettings options={readerOptions} />
+        {chatOpen ? null : (
+          <ChatLauncher
+            chat={chat}
+            onOpen={() => setChatOpen(true)}
+            buttonRef={launcherRef}
+            disabled={dockLocked}
+          />
+        )}
+      </div>
+    </>
   );
 }
 

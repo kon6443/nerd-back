@@ -7,7 +7,7 @@ export {
 } from "./client";
 export type { ApiFetchOptions } from "./client";
 export { orNotFound } from "./notFound";
-export { fetchStories, fetchStoryDetail, fetchStoryPage } from "./story";
+export { fetchStories, fetchStoryDetail, fetchStoryPage, fetchStoryPages } from "./story";
 export {
   createSession,
   fetchAfterStory,
