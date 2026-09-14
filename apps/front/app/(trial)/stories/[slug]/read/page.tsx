@@ -771,8 +771,12 @@ function StoryReadContent({ params }: PageProps) {
               />
             )}
             {currentPageNo === 5 ? (
-              <button onClick={openBranchScreen} className={actionClass("primary", "whitespace-nowrap", "compact")}>
-                <span className="hidden sm:inline">비하인드 </span>선택하기 →
+              // ⚠️ 띄어쓰기는 `gap` 이 만든다. 버튼이 inline-flex 라 글자·span 이 각각 flex 항목이 되어
+              //    항목 끝의 공백 문자는 잘린다(「비하인드선택하기→」로 붙어 보였다).
+              <button onClick={openBranchScreen} className={actionClass("primary", "gap-1.5 whitespace-nowrap", "compact")}>
+                <span className="hidden sm:inline">비하인드</span>
+                <span>선택하기</span>
+                <span aria-hidden="true">→</span>
               </button>
             ) : currentPageNo >= totalPages ? (
               <button onClick={() => setViewState("end")} className={actionClass("primary", "whitespace-nowrap", "compact")}>
@@ -781,10 +785,12 @@ function StoryReadContent({ params }: PageProps) {
             ) : (
               <button
                 onClick={() => setCurrentPageNo((prev) => Math.min(totalPages, prev + 1))}
-                className={actionClass("primary", "whitespace-nowrap", "compact")}
+                className={actionClass("primary", "gap-1.5 whitespace-nowrap", "compact")}
               >
-                {/* 좁은 화면은 「다음」만 — 바 한 줄에 네 버튼이 서야 한다. */}
-                다음<span className="hidden sm:inline"> 페이지</span> →
+                {/* 좁은 화면은 「다음」만 — 바 한 줄에 네 버튼이 서야 한다. 띄어쓰기는 `gap` 이 만든다(위 참고). */}
+                <span>다음</span>
+                <span className="hidden sm:inline">페이지</span>
+                <span aria-hidden="true">→</span>
               </button>
             )}
           </div>
