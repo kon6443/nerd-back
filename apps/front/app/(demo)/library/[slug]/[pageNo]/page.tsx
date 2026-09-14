@@ -1,8 +1,6 @@
 import { storyPageParamsSchema } from "@nerd/contracts";
 import { notFound } from "next/navigation";
-import { BookFrame } from "@/components/story/BookFrame";
-import { ActionLink } from "@/components/ui/ActionLink";
-import { actionClass } from "@/components/ui/actionStyles";
+import { BookReader } from "@/components/story/BookReader";
 import { fetchStoryDetail, fetchStoryPage, orNotFound } from "@/lib/api";
 
 /**
@@ -19,76 +17,16 @@ export default async function StoryReaderPage({ params }: PageProps<"/library/[s
   if (!parsed.success) notFound();
 
   const { slug, pageNo } = parsed.data;
+  const story = await orNotFound(fetchStoryDetail(slug));
+  if (pageNo > story.pageCount) notFound();
 
-  // 상세를 함께 부르는 이유: **마지막 페이지인지 알아야** 다음 버튼을 무엇으로 바꿀지 정해진다.
-  // 다음 페이지를 미리 호출해 404 로 판정하면 매 페이지마다 헛된 요청이 하나씩 는다.
-  const [story, page] = await Promise.all([
-    orNotFound(fetchStoryDetail(slug)),
-    orNotFound(fetchStoryPage(slug, pageNo)),
-  ]);
-
-  const isFirst = pageNo <= 1;
-  const isLast = pageNo >= story.pageCount;
-
-  return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 px-4 py-5 md:px-8 md:py-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        {/* ⚠️ 목적지는 서재 목록이 아니라 **이 동화의 상세**다. 라벨을 「서재로」로 두면
-            전역 네비의 「서재」와 같은 곳으로 가는 것처럼 보이는데 실제로는 다르다. */}
-        <ActionLink href={`/library/${slug}`} variant="ghost" size="compact">
-          동화 소개
-        </ActionLink>
-        <h1 className="order-first w-full text-xl font-bold text-balance break-keep wrap-anywhere text-ink md:order-none md:w-auto md:flex-1 md:text-center">
-          {story.title}
-        </h1>
-        <p
-          className="rounded-pill bg-surface-raised px-4 py-2 text-sm font-bold text-ink-muted"
-          aria-live="polite"
-        >
-          {pageNo} / {story.pageCount}
-        </p>
-      </header>
-
-      <BookFrame
-        pageNo={page.pageNo}
-        footer={
-          <>
-            {isFirst ? (
-              // 🚫 링크를 숨기지 않는다 — 버튼이 사라졌다 나타나면 위치가 흔들려 오터치가 는다.
-              //    같은 `actionClass` 를 써서 모양이 두 벌이 되지 않게 한다.
-              <span
-                aria-disabled="true"
-                className={actionClass("ghost", "pointer-events-none opacity-40")}
-              >
-                이전
-              </span>
-            ) : (
-              <ActionLink href={`/library/${slug}/${pageNo - 1}`} variant="ghost">
-                이전
-              </ActionLink>
-            )}
-
-            {isLast ? (
-              <ActionLink href="/library" variant="accentA">
-                다 읽었어요
-              </ActionLink>
-            ) : (
-              <ActionLink href={`/library/${slug}/${pageNo + 1}`} variant="accentA">
-                다음 페이지
-              </ActionLink>
-            )}
-          </>
-        }
-      >
-        {page.bodyText}
-      </BookFrame>
-
-      {page.characters.length > 0 ? (
-        <p className="text-center text-ink-muted">
-          이 장면에는 {page.characters.map((character) => character.displayName).join(" · ")} 가
-          있어요.
-        </p>
-      ) : null}
-    </main>
+  // ⭐ **모든 쪽을 한 번에 받는다.** 리더는 쪽 넘김을 라우트 이동 없이 하고, 넘어가는 종이의 앞뒤에
+  // 떠나는 쪽과 도착하는 쪽을 함께 그린다(`BookReader`). 쪽마다 받으면 넘길 때마다 골격 화면이 끼어든다.
+  // 요청 수: 한 번 방문에 상세 1 + 쪽 N. 예전(쪽마다 상세+쪽 2회)보다 끝까지 읽을 때 오히려 적다.
+  // ⚠️ 쪽이 하나라도 실패하면 리더 전체가 `error.tsx` 로 간다 — 중간 쪽이 빈 책을 보이지 않는다.
+  const pages = await Promise.all(
+    Array.from({ length: story.pageCount }, (_, index) => fetchStoryPage(slug, index + 1)),
   );
+
+  return <BookReader slug={slug} title={story.title} pages={pages} initialPageNo={pageNo} />;
 }
