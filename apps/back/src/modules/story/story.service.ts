@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import type { StoryDetail, StoryPageView, StorySummary } from '@nerd/contracts';
 import { StoryCharacter } from '@entities/story-character.entity';
 import { StoryPage } from '@entities/story-page.entity';
@@ -59,6 +59,46 @@ export class StoryService {
     };
   }
 
+  /**
+   * 본편 전 쪽을 한 번에. **리더는 이것 하나로 끝난다.**
+   *
+   * ⭐ 쪽마다 부르면 6쪽짜리 책 한 권에 요청 5회 · 쿼리 15회가 나간다. 여기서는 등장인물까지
+   * `In(pageIds)` 로 **한 번에 긁어와** 쿼리가 3회(템플릿 · 쪽 · 등장)로 고정된다.
+   * 🚫 쪽 수만큼 반복 조회하지 않는다 — 분량이 늘어도 쿼리 수가 그대로여야 한다.
+   *
+   * 🚫 비하인드(`branchKey` 'a'/'b')는 포함하지 않는다. 그것은 세션의 선택 결과라
+   * `GET /sessions/:id/after-story` 가 소유한다.
+   */
+  async listPublishedPages(slug: string): Promise<StoryPageView[]> {
+    const template = await this.findPublishedOrThrow(slug);
+
+    const pages = await this.pages.find({
+      where: { templateId: template.id, branchKey: 'common' },
+      order: { pageNo: 'ASC' },
+    });
+    if (pages.length === 0) {
+      return [];
+    }
+
+    const appearances = await this.pageCharacters.find({
+      where: { pageId: In(pages.map((page) => page.id)) },
+      relations: { character: true },
+      order: { id: 'ASC' },
+    });
+
+    const byPage = new Map<number, StoryPageCharacter[]>();
+    for (const appearance of appearances) {
+      const bucket = byPage.get(appearance.pageId);
+      if (bucket) {
+        bucket.push(appearance);
+      } else {
+        byPage.set(appearance.pageId, [appearance]);
+      }
+    }
+
+    return pages.map((page) => this.toPageView(page, byPage.get(page.id) ?? []));
+  }
+
   async getPublishedPage(slug: string, pageNo: number): Promise<StoryPageView> {
     const template = await this.findPublishedOrThrow(slug);
 
@@ -77,6 +117,11 @@ export class StoryService {
       order: { id: 'ASC' },
     });
 
+    return this.toPageView(page, appearances);
+  }
+
+  /** 단건 조회와 목록 조회가 **같은 모양**을 내도록 한 곳에 둔다. */
+  private toPageView(page: StoryPage, appearances: StoryPageCharacter[]): StoryPageView {
     return {
       pageNo: page.pageNo,
       bodyText: page.bodyText,

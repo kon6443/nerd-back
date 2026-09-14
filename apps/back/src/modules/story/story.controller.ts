@@ -49,6 +49,29 @@ export class StoryController {
     return { code: SUCCESS_CODE, data, message: '' };
   }
 
+  @Get(':slug/pages')
+  @ApiOperation({
+    summary: '동화 전 쪽 조회 (SPEC-004)',
+    description:
+      '본편 전 쪽의 본문과 등장인물을 한 번에 반환한다. 리더는 진입할 때 이것 하나만 부르면 되고, ' +
+      '이후 쪽을 오갈 때 추가 요청이 없다. 비하인드(6쪽 A/B)는 세션의 선택 결과라 여기 없다.',
+  })
+  @ApiSuccessResponse(StoryPageDto, { isArray: true })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: '동화 없음 (code: `STORY_NOT_FOUND`)',
+    type: ApiErrorBodyDto,
+  })
+  @ApiCommonValidationResponse()
+  @ApiCommonThrottledResponse()
+  @ApiCommonInternalServerErrorResponse()
+  async pages(@Param() params: StorySlugParamsDto) {
+    const data = await this.storyService.listPublishedPages(params.slug);
+    return { code: SUCCESS_CODE, data, message: '' };
+  }
+
+  // ⚠️ 단건은 **목록보다 뒤에** 둔다. 세그먼트 수가 달라 충돌하지는 않지만, 라우트는 구체적인 것이
+  //    뒤로 가는 순서를 지켜야 나중에 와일드카드가 끼어들 때 조용히 가려지지 않는다.
   @Get(':slug/pages/:pageNo')
   @ApiOperation({
     summary: '동화 페이지 조회 (SPEC-004)',
