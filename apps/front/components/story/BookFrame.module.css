@@ -250,8 +250,8 @@
     padding-block-end: calc(var(--stack-max) + var(--cover-out));
     /* ⚠️ 넘김 길이(`.leaf` 의 `animation-duration`)와 **같아야 한다** — 어긋나면 두께만 먼저 멎는다. */
     transition:
-      --stack-left 790ms ease,
-      --stack-right 790ms ease;
+      --stack-left 620ms ease,
+      --stack-right 620ms ease;
   }
 
   .cover {
@@ -364,15 +364,18 @@
  * 글자가 잘리거나 어긋나지 않는다.
  *
  * ⭐ **회전과 휨을 분리한다.** 종이 전체(`.leaf`)가 `--turn-angle` 만큼 통째로 돌고, 마디는 거기에
- * **몇 도씩만**(`--bend`) 더 얹어 배를 부풀린다.
+ * **`--bend × --curl` 만** 더 얹는다.
  * 🚫 전체 각도를 마디가 나눠 갖게 하지 않는다 — 그러면 180° 를 6마디가 30° 씩 나눠 **종이가 원통으로
  * 말린다**(2026-09-14 실측: 후반 프레임에서 종이가 S자로 감겼다). 휨의 크기는 회전량과 무관해야 한다.
- * `--bend` 의 합은 0 이다 — 종이 끝이 결국 몸통과 같은 방향을 향해야 넘어간 뒤 평평하게 눕는다.
- * `--curl` 이 0 이면 휨도 0 이라 완전한 평면이 된다.
  *
- * ⚠️ `animationend` 가 넘김을 끝내는 신호다. **마디에도 애니메이션이 있어**(`seg-curl`) 이벤트가
- * 마디 수만큼 버블링되므로, 받는 쪽이 `event.target === event.currentTarget` 으로 종이 자신의 것만
- * 골라야 한다(`BookPager`). 동작 줄이기 설정에서는 `globals.css` 가 시간을 0 에 가깝게 줄인다.
+ * ⭐ **얇은 종이다(7차 피드백).** `--bend` 는 끝으로 갈수록 커지는 경사라, `--curl` 이 + 면 **끝이 뒤처지고**
+ * − 면 **끝이 앞지른다.** 들릴 때 뒤처졌다가, 넘어가며 앞질렀다가, 착지 순간 0 이 되어 평평하게 눕는다.
+ * `--curl` 은 몸통 키프레임(`leaf-*`)이 **각도와 함께** 소유한다 — 끝이 뒤처지는 양(58° × curl)이
+ * 몸통 각도를 넘으면 종이 끝이 책 아래로 파고들기 때문에, 두 값을 같은 시점표에서 맞춘다.
+ *
+ * ⚠️ `animationend` 가 넘김을 끝내는 신호다. 자손의 이벤트가 버블링될 수 있으므로 받는 쪽이
+ * `event.target === event.currentTarget` 으로 종이 자신의 것만 고른다(`BookPager`).
+ * 동작 줄이기 설정에서는 `globals.css` 가 시간을 0 에 가깝게 줄인다.
  */
 
 /* 등록해야 보간된다 — 미등록 커스텀 프로퍼티는 중간값 없이 뚝 바뀐다. */
@@ -404,19 +407,17 @@
    * ⭐ 크기를 `--curl` 에 묶는다. 시작·끝에 그림자가 0 이라 **종이가 밑면과 픽셀로 겹치며 사라진다** —
    *    고정 그림자를 두면 종이가 걷히는 순간 그늘만 뚝 없어져 화면이 튄다.
    */
-  box-shadow: 0 calc(var(--curl) * 14px) calc(var(--curl) * 32px)
-    color-mix(in srgb, var(--color-ink) 22%, transparent);
+  /* 얇은 종이는 빛이 투과해 그림자가 옅다. `--curl` 이 음수(끝이 앞지름)여도 크기는 절댓값으로 잡는다. */
+  box-shadow: 0 calc(max(var(--curl), var(--curl) * -1) * 8px) calc(max(var(--curl), var(--curl) * -1) * 20px)
+    color-mix(in srgb, var(--color-ink) 12%, transparent);
   /*
-   * ⭐ **휨(`--curl`)도 켜고 끄는 스위치가 아니다.** 서서히 배가 불렀다가 서서히 펴져야 종이다 —
- * 곧바로 1 로 세우면 눌리는 순간 종이가 "탁" 하고 휘어 딱딱해 보인다.
- * ⭐ **속도 곡선은 키프레임이 만든다.** 그래서 이징은 `linear` 다 — 둘을 겹치면 구간마다 두 번
-   * 휘어 울퉁불퉁해진다. 눌리자마자 들리고(초반 반응), 중간이 가장 빠르며, 끝에서 살짝 지나쳤다
-   * 되돌아와 착지한다.
+   * ⭐ **속도 곡선은 키프레임이 만든다.** 그래서 이징은 `linear` 다 — 둘을 겹치면 구간마다 두 번
+   * 휘어 울퉁불퉁해진다. 가벼운 종이라 **튕기지 않는다** — 지나쳤다 되돌아오는 착지는 무게로 읽혔다(7차).
    * 🚫 `animation` shorthand 를 이름 없이 쓰지 않는다. 이름은 아래에서 방향마다 정하는데,
    *    shorthand 가 먼저 오면 재작성기가 규칙을 정규화하며 **길이를 0 으로 만들어 버린다**
    *    (2026-09-14 실측: animationstart 와 animationend 가 같은 프레임에 왔다).
    */
-  animation-duration: 790ms;
+  animation-duration: 620ms;
   animation-timing-function: linear;
   animation-fill-mode: both;
 }
@@ -425,16 +426,8 @@
   position: absolute;
   inset-block: 0;
   transform-style: preserve-3d;
-  /* 마디가 얹는 휨은 몇 도뿐이다. 중첩돼 있으므로 이 각도가 누적되어 곡선이 된다. */
+  /* 중첩돼 있으므로 이 각도가 누적되어 곡선이 된다. `--curl` 은 `.leaf` 의 키프레임에서 물려받는다. */
   transform: rotateY(calc(var(--curl) * var(--bend)));
-  /*
-   * ⭐ **마디마다 조금씩 늦게 휜다.** 전부 같은 순간에 휘면 곡면이어도 **한 덩어리가 통째로**
-   * 움직여 "텅, 쿵" 하는 판으로 보인다(2026-09-14 지적). 책등에서 먼 마디일수록 늦게 따라오면
-   * 힘이 종이를 타고 흘러가는 것처럼 **출렁인다.**
-   * ⚠️ 지연 총합만큼 `.leaf` 의 길이가 더 길어야 한다 — 짧으면 끝 마디가 휜 채로 종이가 걷힌다.
-   */
-  animation: seg-curl 640ms linear both;
-  animation-delay: calc(var(--depth) * 14ms);
 }
 
 /* 첫 마디만 leaf 를 나눈 폭을 갖고, 이후 마디는 앞 마디와 같은 폭으로 이어 붙는다. */
@@ -470,6 +463,13 @@
   inset-block: 0;
   inset-inline: -1px;
   overflow: hidden;
+  /*
+   * ⭐ **비침 — 얇은 종이의 표시.** 휘는 동안 최대 12% 투명해져 밑면 글자가 비친다. 평평할 때(`--curl` 0)는
+   * 불투명이라 넘김 시작·끝에 밑면과 겹쳐 보이지 않는다.
+   * 🚫 `.leaf`·`.seg` 에 주지 않는다 — opacity 는 `transform-style: preserve-3d` 를 평면으로 눌러
+   *    곡면이 사라진다. 3D 자식이 없는 이 층에만 준다.
+   */
+  opacity: calc(1 - max(var(--curl), var(--curl) * -1) * 0.12);
 }
 
 /*
@@ -516,26 +516,28 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: var(--curl);
+  /* 끝이 앞지를 때(`--curl` 음수)도 휘어 있으니 절댓값으로 켠다. */
+  opacity: max(var(--curl), var(--curl) * -1);
+  /*
+   * 얇은 종이는 빛이 투과해 **그늘이 옅고 윤기가 조금 더 돈다**(7차). 두꺼운 종이 때 값의 절반 남짓이다.
+   * ⚠️ 백분율 자리에 calc 를 넣지 않는다 — 규칙이 통째로 죽는다(`docs/lessons.md`). 값은 리터럴로 적는다.
+   */
   background:
     linear-gradient(
       var(--shade-dir),
       color-mix(in srgb, var(--color-surface-raised) 0%, transparent) 0%,
-      color-mix(in srgb, var(--color-surface-raised) 5%, transparent) 16%,
-      color-mix(in srgb, var(--color-surface-raised) 13%, transparent) 38%,
-      color-mix(in srgb, var(--color-surface-raised) 15%, transparent) 54%,
-      color-mix(in srgb, var(--color-surface-raised) 7%, transparent) 76%,
+      color-mix(in srgb, var(--color-surface-raised) 8%, transparent) 20%,
+      color-mix(in srgb, var(--color-surface-raised) 18%, transparent) 45%,
+      color-mix(in srgb, var(--color-surface-raised) 10%, transparent) 72%,
       color-mix(in srgb, var(--color-surface-raised) 0%, transparent) 100%
     ),
     linear-gradient(
       var(--shade-dir),
-      color-mix(in srgb, var(--color-ink) 38%, transparent) 0%,
-      color-mix(in srgb, var(--color-ink) 22%, transparent) 14%,
-      color-mix(in srgb, var(--color-ink) 9%, transparent) 32%,
-      color-mix(in srgb, var(--color-ink) 4%, transparent) 50%,
-      color-mix(in srgb, var(--color-ink) 9%, transparent) 68%,
-      color-mix(in srgb, var(--color-ink) 19%, transparent) 85%,
-      color-mix(in srgb, var(--color-ink) 30%, transparent) 100%
+      color-mix(in srgb, var(--color-ink) 16%, transparent) 0%,
+      color-mix(in srgb, var(--color-ink) 8%, transparent) 16%,
+      color-mix(in srgb, var(--color-ink) 2%, transparent) 45%,
+      color-mix(in srgb, var(--color-ink) 5%, transparent) 75%,
+      color-mix(in srgb, var(--color-ink) 12%, transparent) 100%
     );
 }
 
@@ -642,112 +644,130 @@
 /*
  * ⚠️ 각도를 `var(--leaf-to)` 로 받지 않고 **방향마다 따로 적는다.** 등록된 커스텀 프로퍼티를
  * 키프레임에서 다시 var 로 받으면 보간이 브라우저마다 갈린다.
- * curl 이 양 끝에서 0 인 것이 핵심이다 — 평평하게 출발해 휘었다가 평평하게 눕는다.
+ *
+ * ⭐ **각도와 휨(`--curl`)을 한 시점표에 둔다(7차 — 얇은 종이).**
+ *   - 들림: curl + — 끝이 뒤처진다. ⚠️ **58 × curl < |각도|** 를 지킨다. 넘으면 종이 끝이 책 아래로 파고든다.
+ *   - 넘어감: curl 이 + 에서 − 로 — 끝이 휙 앞지른다. ⚠️ **58 × |curl| < 180 − |각도|** (반대편 책 아래로 파고들지 않게).
+ *   - 착지: curl 0, 각도 정확히 180° — 🚫 지나쳤다 되돌아오지 않는다. 가벼운 종이는 튕기지 않는다.
+ * 🚫 한쪽 값만 고치지 않는다. 위 두 부등식은 같은 줄의 두 값이 함께 지킨다.
  */
-/* 마디의 휨 — 서서히 배가 불렀다가 서서히 펴진다. 지연 덕에 마디마다 이 곡선을 조금씩 늦게 탄다. */
-@keyframes seg-curl {
-  0% {
-    --curl: 0;
-  }
-  18% {
-    --curl: 0.7;
-  }
-  42% {
-    --curl: 1;
-  }
-  66% {
-    --curl: 0.95;
-  }
-  86% {
-    --curl: 0.6;
-  }
-  100% {
-    --curl: 0;
-  }
-}
-
 @keyframes leaf-next {
   0% {
     --turn-angle: 0deg;
+    --curl: 0;
   }
-  20% {
-    /* 손가락이 종이를 들어올리는 구간 — 여기가 느긋해야 뒤의 가속이 살아난다. */
-    --turn-angle: -15deg;
+  10% {
+    /* 손끝에 모서리가 들린다 — 얇아서 반응이 즉각적이다. */
+    --turn-angle: -7deg;
+    --curl: 0.1;
   }
-  55% {
-    --turn-angle: -110deg;
+  28% {
+    --turn-angle: -42deg;
+    --curl: 0.62;
   }
-  80% {
-    --turn-angle: -168deg;
+  44% {
+    /* 끝이 가장 많이 뒤처진다(몸통 −95° · 끝 −37°). */
+    --turn-angle: -95deg;
+    --curl: 1;
   }
-  92% {
-    /* 살짝 지나쳤다 천천히 되돌아온다 — 급히 튕기면 그것이 '쿵' 으로 읽힌다. */
-    --turn-angle: -183deg;
+  58% {
+    --turn-angle: -142deg;
+    --curl: 0.1;
+  }
+  70% {
+    /* 끝이 휙 앞지른다(몸통 −165° · 끝 −179.5°). */
+    --turn-angle: -165deg;
+    --curl: -0.25;
+  }
+  84% {
+    --turn-angle: -177deg;
+    --curl: -0.04;
   }
   100% {
     --turn-angle: -180deg;
+    --curl: 0;
   }
 }
 
 @keyframes leaf-prev {
   0% {
     --turn-angle: 0deg;
+    --curl: 0;
   }
-  20% {
-    /* 손가락이 종이를 들어올리는 구간 — 여기가 느긋해야 뒤의 가속이 살아난다. */
-    --turn-angle: 15deg;
+  10% {
+    --turn-angle: 7deg;
+    --curl: 0.1;
   }
-  55% {
-    --turn-angle: 110deg;
+  28% {
+    --turn-angle: 42deg;
+    --curl: 0.62;
   }
-  80% {
-    --turn-angle: 168deg;
+  44% {
+    --turn-angle: 95deg;
+    --curl: 1;
   }
-  92% {
-    /* 살짝 지나쳤다 천천히 되돌아온다 — 급히 튕기면 그것이 '쿵' 으로 읽힌다. */
-    --turn-angle: 183deg;
+  58% {
+    --turn-angle: 142deg;
+    --curl: 0.1;
+  }
+  70% {
+    --turn-angle: 165deg;
+    --curl: -0.25;
+  }
+  84% {
+    --turn-angle: 177deg;
+    --curl: -0.04;
   }
   100% {
     --turn-angle: 180deg;
+    --curl: 0;
   }
 }
 
-/* 1단은 떠나는 쪽이 들려 사라지면 끝이다 — 뒷면이 필요 없어 90°까지만 돌린다. */
+/* 1단은 떠나는 쪽이 들려 사라지면 끝이다 — 뒷면이 필요 없어 90°까지만 돌린다. 앞지르는 구간이 없다. */
 @keyframes leaf-next-single {
   0% {
     --turn-angle: 0deg;
+    --curl: 0;
   }
-  20% {
-    /* 손가락이 종이를 들어올리는 구간 — 여기가 느긋해야 뒤의 가속이 살아난다. */
-    --turn-angle: -8deg;
+  15% {
+    --turn-angle: -10deg;
+    --curl: 0.14;
   }
-  55% {
-    --turn-angle: -55deg;
+  40% {
+    --turn-angle: -45deg;
+    --curl: 0.6;
   }
-  80% {
-    --turn-angle: -84deg;
+  70% {
+    --turn-angle: -78deg;
+    --curl: 0.45;
   }
   100% {
     --turn-angle: -90deg;
+    --curl: 0;
   }
 }
 
 @keyframes leaf-prev-single {
   0% {
     --turn-angle: 0deg;
+    --curl: 0;
   }
-  20% {
-    /* 손가락이 종이를 들어올리는 구간 — 여기가 느긋해야 뒤의 가속이 살아난다. */
-    --turn-angle: 8deg;
+  15% {
+    --turn-angle: 10deg;
+    --curl: 0.14;
   }
-  55% {
-    --turn-angle: 55deg;
+  40% {
+    --turn-angle: 45deg;
+    --curl: 0.6;
   }
-  80% {
-    --turn-angle: 84deg;
+  70% {
+    --turn-angle: 78deg;
+    --curl: 0.45;
   }
   100% {
     --turn-angle: 90deg;
+    --curl: 0;
   }
 }
 
