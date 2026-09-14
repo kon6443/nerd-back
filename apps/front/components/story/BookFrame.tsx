@@ -79,7 +79,6 @@ export function BookFrameSkeleton({ fill = false }: { fill?: boolean }) {
 export function BookArtContent({
   pageNo,
   imageUrl,
-  onImageLoad,
 }: {
   pageNo: number;
   /**
@@ -87,8 +86,6 @@ export function BookArtContent({
    * 호출하는 쪽의 책임이다. 없으면 삽화 준비 안내를 표시한다.
    */
   imageUrl?: string;
-  /** 이 삽화가 브라우저에서 완전히 로드된 뒤 호출한다. 다음 장 프리로드 등에 쓴다. */
-  onImageLoad?: () => void;
 }) {
   return imageUrl ? (
     <Image
@@ -98,7 +95,6 @@ export function BookArtContent({
       sizes="(max-width: 768px) 100vw, 50vw"
       preload={pageNo === 1}
       className="object-cover"
-      onLoad={onImageLoad}
       unoptimized
     />
   ) : (

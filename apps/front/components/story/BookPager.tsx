@@ -179,6 +179,14 @@ export function BookPager({
 }: BookPagerProps) {
   const [shownPageNo, setShownPageNo] = useState(pageNo);
   const [turn, setTurn] = useState<Turn | null>(null);
+  /**
+   * 밑면 삽화의 **직전 쪽**. 새 삽화가 아직 안 왔을 때 그 자리를 메운다.
+   *
+   * ⭐ **로드 완료를 감지하지 않는다.** 두 장을 겹쳐 두면 위 장이 로드되기 전에는 아무것도 그리지
+   * 않아 아래 장이 그대로 보이고, 로드되는 순간 자연히 덮인다 — 브라우저가 알아서 하는 일이라
+   * `onLoad` 를 배선할 필요가 없다(`renderArt` 는 부르는 쪽이 만드는 함수라 배선할 수도 없다).
+   */
+  const [artPair, setArtPair] = useState({ under: pageNo, over: pageNo });
 
   // 렌더 중 상태 조정 — 요청된 쪽이 앞서 가 있고 넘기는 중이 아니면 한 장을 시작한다.
   // 이펙트로 옮기면 한 프레임 동안 옛 쪽이 그대로 그려진 뒤 넘김이 시작된다.
@@ -239,6 +247,11 @@ export function BookPager({
     baseText = prevSpread ? turn.from : turn.to;
   }
 
+  // 밑면 삽화가 바뀌면 직전 것을 아래에 남긴다. 다음 교체 때 밀려난다 — 한 장만 더 들고 있는다.
+  if (artPair.over !== baseArt) {
+    setArtPair({ under: artPair.over, over: baseArt });
+  }
+
   // 단면 두께는 **요청된** 쪽을 따른다 — CSS 전환이 넘김과 같은 시간 동안 두께를 옮긴다.
   const stack = stackWidths(pageNo, pageCount);
   const volumeStyle = {
@@ -252,7 +265,15 @@ export function BookPager({
         {/* 정적인 내용은 여기서 둥근 모서리로 잘린다. 넘어가는 종이는 이 밖에 둬야 안 잘린다. */}
         <div className={styles.surface}>
           <div className={styles.spread}>
-            <div className={styles.art}>{renderArt(baseArt)}</div>
+            <div className={styles.art}>
+              {artPair.under !== artPair.over ? (
+                // 🚫 `key` 를 주지 않는다 — 같은 쪽으로 되돌아올 때 새로 마운트되어 다시 빈다.
+                <div className={styles.artHold} aria-hidden="true">
+                  {renderArt(artPair.under)}
+                </div>
+              ) : null}
+              {renderArt(artPair.over)}
+            </div>
             <div className={styles.page}>{renderText(baseText)}</div>
           </div>
         </div>
