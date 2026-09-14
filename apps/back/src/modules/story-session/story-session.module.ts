@@ -12,11 +12,9 @@ import { AuthModule } from '@modules/auth/auth.module';
 import { StorySessionController } from './story-session.controller';
 import { StorySessionService } from './story-session.service';
 import { IMAGE_GENERATION_PORT } from '../../common/port/image-generation.port';
-import { STORAGE_PORT } from '../../common/port/storage.port';
 import { MockImageAdapter } from '../../common/adapters/mock-image.adapter';
 import { OpenRouterImageAdapter } from '../../common/adapters/openrouter-image.adapter';
-import { S3StorageAdapter } from '../../common/adapters/s3-storage.adapter';
-import { LocalStorageAdapter } from '../../common/adapters/local-storage.adapter';
+import { StorageModule } from '../../common/storage/storageModule';
 
 @Module({
   imports: [
@@ -30,6 +28,7 @@ import { LocalStorageAdapter } from '../../common/adapters/local-storage.adapter
       User,
     ]),
     ConfigModule,
+    StorageModule,
     AuthModule,
   ],
   controllers: [StorySessionController],
@@ -37,8 +36,6 @@ import { LocalStorageAdapter } from '../../common/adapters/local-storage.adapter
     StorySessionService,
     MockImageAdapter,
     OpenRouterImageAdapter,
-    S3StorageAdapter,
-    LocalStorageAdapter,
     {
       provide: IMAGE_GENERATION_PORT,
       useFactory: (
@@ -50,18 +47,6 @@ import { LocalStorageAdapter } from '../../common/adapters/local-storage.adapter
         return provider === 'openrouter' ? openRouter : mock;
       },
       inject: [ConfigService, MockImageAdapter, OpenRouterImageAdapter],
-    },
-    {
-      provide: STORAGE_PORT,
-      useFactory: (
-        config: ConfigService,
-        s3: S3StorageAdapter,
-        local: LocalStorageAdapter,
-      ) => {
-        const provider = config.get<string>('STORAGE_PROVIDER');
-        return provider === 's3' ? s3 : local;
-      },
-      inject: [ConfigService, S3StorageAdapter, LocalStorageAdapter],
     },
   ],
   exports: [StorySessionService],

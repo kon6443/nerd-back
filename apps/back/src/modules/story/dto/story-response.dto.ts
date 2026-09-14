@@ -68,6 +68,9 @@ export class StoryPageDto implements StoryPageView {
   @ApiProperty({ nullable: true, description: '개인화 전 기본 삽화의 오브젝트 키' })
   baseImageKey: string | null;
 
+  @ApiProperty({ nullable: true, description: '페이지 낭독 MP3의 만료 서명 URL' })
+  narrationAudioUrl: string | null;
+
   @ApiProperty({
     nullable: true,
     description: '이 페이지에서 사용자 얼굴로 개인화할 배역. null 이면 개인화 대상이 아니다.',

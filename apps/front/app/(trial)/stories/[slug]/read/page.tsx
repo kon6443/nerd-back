@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { preconnect } from "react-dom";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -11,6 +11,9 @@ import { LoadingView } from "@/components/ui/LoadingView";
 import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
 import { BookArtContent, BookTextContent } from "@/components/story/BookFrame";
 import { BookPager, READER_BAR } from "@/components/story/BookPager";
+import { NarrationPlayer } from "@/components/story/NarrationPlayer";
+import { ReaderAudioProvider } from "@/components/story/ReaderAudioProvider";
+import { useNarration } from "@/components/story/useNarration";
 import { isReaderReady } from "./readiness";
 import { isAfterStoryGenerating } from "./polling";
 import { usePolling } from "./usePolling";
@@ -166,6 +169,35 @@ function StoryReadContent({ params }: PageProps) {
     branchKey: chatBranchKey,
     drafts: chatDrafts,
   });
+
+  const narrationAudioUrl =
+    currentPageNo === 6
+      ? (afterStory?.choices.find((choice) => choice.branchKey === activeBranchKey)
+          ?.narrationAudioUrl ?? null)
+      : (storyPages.find((page) => page.pageNo === currentPageNo)?.narrationAudioUrl ?? null);
+  const narrationPreloads = useMemo(() => {
+    if (currentPageNo === 5) {
+      return [
+        narrationAudioUrl,
+        ...(afterStory?.choices.map((choice) => choice.narrationAudioUrl) ?? []),
+      ];
+    }
+    return [
+      narrationAudioUrl,
+      storyPages.find((page) => page.pageNo === currentPageNo + 1)?.narrationAudioUrl,
+    ];
+  }, [afterStory, currentPageNo, narrationAudioUrl, storyPages]);
+  const narration = useNarration({
+    pageKey: `trial:${sessionId}:${currentPageNo}:${activeBranchKey ?? "common"}`,
+    audioUrl: narrationAudioUrl,
+    preloadUrls: narrationPreloads,
+  });
+  const pauseNarration = narration.pause;
+  const suspendNarration = narration.suspend;
+  useEffect(() => {
+    if (viewState === "branch") suspendNarration();
+    else if (viewState !== "reader") pauseNarration();
+  }, [pauseNarration, suspendNarration, viewState]);
 
   const dockLocked = readerOptions.chat === "dock" && turning;
 
@@ -355,10 +387,18 @@ function StoryReadContent({ params }: PageProps) {
   }
 
   function openBranchScreen() {
+    narration.suspend();
     setActiveBranchKey(null);
     setViewState("branch");
     void loadAfterStory();
   }
+
+  useEffect(() => {
+    if (viewState !== "reader" || currentPageNo !== 5 || !sessionId || afterStory) return;
+    const controller = new AbortController();
+    void fetchAfterStory(sessionId, controller.signal).then(setAfterStory, () => undefined);
+    return () => controller.abort();
+  }, [afterStory, currentPageNo, sessionId, viewState]);
 
   async function handleBranchChoice(branchKey: StoryBranchKey) {
     if (!afterStory) return;
@@ -610,6 +650,15 @@ function StoryReadContent({ params }: PageProps) {
           renderText={(pageNo) => (
             <BookTextContent pageNo={pageNo}>{bodyTextAt(pageNo)}</BookTextContent>
           )}
+          renderTextControls={() => (
+            <NarrationPlayer
+              audioUrl={narrationAudioUrl}
+              enabled={narration.enabled}
+              onPlay={narration.play}
+              onPause={narration.pause}
+              onRestart={narration.restart}
+            />
+          )}
         />
 
         <div className={READER_BAR}>
@@ -711,6 +760,7 @@ function StoryReadContent({ params }: PageProps) {
         >
           <CharacterChat
             chat={chat}
+            onInteraction={narration.pause}
             loginHref={`/login?redirect=${encodeURIComponent(`/stories/${slug}/read?sessionId=${sessionId}`)}`}
           />
         </ChatSurface>
@@ -727,7 +777,10 @@ function StoryReadContent({ params }: PageProps) {
         {chatOpen ? null : (
           <ChatLauncher
             chat={chat}
-            onOpen={() => setChatOpen(true)}
+            onOpen={() => {
+              narration.pause();
+              setChatOpen(true);
+            }}
             buttonRef={launcherRef}
             disabled={dockLocked}
           />
@@ -742,7 +795,9 @@ export default function StoryReadPage({ params }: PageProps) {
   //    `LoadingView` 가 `role="status"` 문구를 함께 준다.
   return (
     <Suspense fallback={<LoadingView message="동화를 준비하고 있어요..." />}>
-      <StoryReadContent params={params} />
+      <ReaderAudioProvider>
+        <StoryReadContent params={params} />
+      </ReaderAudioProvider>
     </Suspense>
   );
 }

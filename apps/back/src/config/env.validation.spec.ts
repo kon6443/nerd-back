@@ -31,9 +31,11 @@ describe('validateEnv', () => {
     expect(defaults.OPENROUTER_API_KEY).toBeUndefined();
     expect(defaults.OPENROUTER_CHAT_MODEL).toBe('openai/gpt-5.6-luna');
     expect(defaults.OPENROUTER_IMAGE_MODEL).toBe('qwen/qwen-image-3');
+    expect(defaults.OPENROUTER_TTS_MODEL).toBe('google/gemini-3.1-flash-tts-preview');
     const custom = validateEnv({ ...MINIMAL, OPENROUTER_CHAT_MODEL: ' provider/chat-model ' });
     expect(custom.OPENROUTER_CHAT_MODEL).toBe('provider/chat-model');
     expect(custom.OPENROUTER_IMAGE_MODEL).toBe(defaults.OPENROUTER_IMAGE_MODEL);
+    expect(custom.OPENROUTER_TTS_MODEL).toBe(defaults.OPENROUTER_TTS_MODEL);
     expect(() => validateEnv({ ...MINIMAL, OPENROUTER_CHAT_MODEL: '  ' })).toThrow(
       /OPENROUTER_CHAT_MODEL/,
     );

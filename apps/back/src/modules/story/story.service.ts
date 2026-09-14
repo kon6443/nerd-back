@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import type { StoryDetail, StoryPageView, StorySummary } from '@nerd/contracts';
@@ -6,6 +6,7 @@ import { StoryCharacter } from '@entities/story-character.entity';
 import { StoryPage } from '@entities/story-page.entity';
 import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { STORY_TEMPLATE_STATUS, StoryTemplate } from '@entities/story-template.entity';
+import { STORAGE_PORT, type StoragePort } from '@common/port/storage.port';
 import { StoryNotFoundErrorResponseDto, StoryPageNotFoundErrorResponseDto } from './dto/story.error.dto';
 
 /**
@@ -28,6 +29,8 @@ export class StoryService {
     private readonly characters: Repository<StoryCharacter>,
     @InjectRepository(StoryPageCharacter)
     private readonly pageCharacters: Repository<StoryPageCharacter>,
+    @Inject(STORAGE_PORT)
+    private readonly storage: StoragePort,
   ) {}
 
   /** 공개된 동화 목록. `draft` 는 절대 포함하지 않는다. */
@@ -96,7 +99,9 @@ export class StoryService {
       }
     }
 
-    return pages.map((page) => this.toPageView(page, byPage.get(page.id) ?? []));
+    return Promise.all(
+      pages.map((page) => this.toPageView(page, byPage.get(page.id) ?? [])),
+    );
   }
 
   async getPublishedPage(slug: string, pageNo: number): Promise<StoryPageView> {
@@ -121,11 +126,15 @@ export class StoryService {
   }
 
   /** 단건 조회와 목록 조회가 **같은 모양**을 내도록 한 곳에 둔다. */
-  private toPageView(page: StoryPage, appearances: StoryPageCharacter[]): StoryPageView {
+  private async toPageView(
+    page: StoryPage,
+    appearances: StoryPageCharacter[],
+  ): Promise<StoryPageView> {
     return {
       pageNo: page.pageNo,
       bodyText: page.bodyText,
       baseImageKey: page.baseImageKey,
+      narrationAudioUrl: await this.getNarrationAudioUrl(page.narrationAudioKey),
       personaTargetRole: page.personaTargetRole,
       characters: appearances.map((appearance) => ({
         role: appearance.character.role,
@@ -133,6 +142,15 @@ export class StoryService {
         hitbox: appearance.hitbox,
       })),
     };
+  }
+
+  private async getNarrationAudioUrl(key: string | null): Promise<string | null> {
+    if (key === null) return null;
+    try {
+      return await this.storage.getPresignedUrl(key);
+    } catch {
+      return null;
+    }
   }
 
   /**

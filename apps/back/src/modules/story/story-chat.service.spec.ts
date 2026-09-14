@@ -1,6 +1,8 @@
 import { Logger } from '@nestjs/common';
 import { asRepository, createMockRepository } from '@common/__spec__/mock-repository';
 import type { LlmPort } from '@common/port/llm.port';
+import type { TextToSpeechPort } from '@common/port/textToSpeechPort';
+import type { StoragePort } from '@common/port/storage.port';
 import {
   FIXED_DATE,
   createStoryCharacter,
@@ -27,6 +29,8 @@ const COMPLETION = {
   usage: { model: 'openai/gpt-5.6-luna', inputTokens: 100, outputTokens: 40, elapsedMs: 10 },
 };
 
+const flushBackgroundWork = () => new Promise<void>((resolve) => setImmediate(resolve));
+
 describe('페이지당 1회 대화', () => {
   const chats = createMockRepository<StoryPageChat>();
   const sessionRows = createMockRepository<StorySession>();
@@ -37,7 +41,23 @@ describe('페이지당 1회 대화', () => {
     asRepository(createMockRepository()),
   );
   const llm: jest.Mocked<LlmPort> = { isAvailable: jest.fn(), complete: jest.fn() };
-  const service = new StoryChatService(stories, asRepository(chats), llm);
+  const textToSpeech: jest.Mocked<TextToSpeechPort> = {
+    isAvailable: jest.fn(),
+    synthesize: jest.fn(),
+  };
+  const storage: jest.Mocked<StoragePort> = {
+    upload: jest.fn(),
+    getPresignedUrl: jest.fn(),
+    download: jest.fn(),
+    delete: jest.fn(),
+  };
+  const service = new StoryChatService(
+    stories,
+    asRepository(chats),
+    llm,
+    textToSpeech,
+    storage,
+  );
   let rows: Map<string, StoryPageChat>;
 
   beforeEach(() => {
@@ -53,6 +73,14 @@ describe('페이지당 1회 대화', () => {
       .mockResolvedValue([{ role: 'wolf', displayName: '늑대' }]);
     llm.isAvailable.mockReturnValue(true);
     llm.complete.mockResolvedValue(COMPLETION);
+    textToSpeech.isAvailable.mockReturnValue(false);
+    textToSpeech.synthesize.mockResolvedValue({
+      audio: Buffer.from('reply-audio'),
+      mimeType: 'audio/mpeg',
+    });
+    storage.upload.mockResolvedValue('prod/chat-audio/reply.mp3');
+    storage.getPresignedUrl.mockResolvedValue('https://storage.local/chat.mp3');
+    storage.delete.mockResolvedValue(undefined);
     sessionRows.findOne.mockImplementation(
       ({ where }: { where: { id: string; userId: number } }) => {
         const owner = where.id === STORY_SESSION_ID ? 1 : where.id === OTHER_SESSION_ID ? 2 : 0;
@@ -75,11 +103,20 @@ describe('페이지당 1회 대화', () => {
         Promise.resolve(rows.get(`${sessionId}:${pageId}`) ?? null),
     );
     chats.update.mockImplementation(
-      (criteria: number | { id: number; status: string }, patch: Partial<StoryPageChat>) => {
+      (
+        criteria: number | { id: number; status?: string; replyAudioStatus?: string },
+        patch: Partial<StoryPageChat>,
+      ) => {
         const row = [...rows.values()].find(
           (candidate) => candidate.id === (typeof criteria === 'number' ? criteria : criteria.id),
         );
-        if (!row || (typeof criteria !== 'number' && row.status !== criteria.status))
+        if (
+          !row ||
+          (typeof criteria !== 'number' &&
+            ((criteria.status !== undefined && row.status !== criteria.status) ||
+              (criteria.replyAudioStatus !== undefined &&
+                row.replyAudioStatus !== criteria.replyAudioStatus)))
+        )
           return Promise.resolve({ affected: 0 });
         Object.assign(row, patch);
         return Promise.resolve({ affected: 1 });
@@ -99,7 +136,13 @@ describe('페이지당 1회 대화', () => {
       characters: [{ role: 'wolf', displayName: '늑대' }],
       status: 'completed',
       remainingMessages: 0,
-      exchange: { ...INPUT, displayName: '늑대', reply: COMPLETION.text },
+      exchange: {
+        ...INPUT,
+        displayName: '늑대',
+        reply: COMPLETION.text,
+        replyAudioUrl: null,
+        replyAudioStatus: 'not_requested',
+      },
     });
     expect(await service.get(1, STORY_SESSION_ID, 1)).toEqual(sent);
     expect(llm.complete).toHaveBeenCalledTimes(1);
@@ -213,6 +256,106 @@ describe('페이지당 1회 대화', () => {
       StoryChatAlreadyUsedErrorResponseDto,
     );
     expect(llm.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('답변 텍스트를 pending 음성 상태로 먼저 반환하고 생성된 MP3를 저장·재사용한다', async () => {
+    textToSpeech.isAvailable.mockReturnValue(true);
+    jest.spyOn(stories, 'getChatContext').mockResolvedValue({
+      page: createStoryPage(),
+      character: createStoryCharacter({
+        ttsVoiceId: 'Kore',
+        ttsSettings: { audioTag: '[whispers]' },
+      }),
+    });
+
+    const sent = await service.send(1, STORY_SESSION_ID, 1, INPUT);
+    expect(sent.exchange).toMatchObject({
+      reply: COMPLETION.text,
+      replyAudioStatus: 'pending',
+      replyAudioUrl: null,
+    });
+    expect(textToSpeech.synthesize).not.toHaveBeenCalled();
+
+    await flushBackgroundWork();
+
+    expect(textToSpeech.synthesize).toHaveBeenCalledWith({
+      text: COMPLETION.text,
+      voiceId: 'Kore',
+      settings: { audioTag: '[whispers]' },
+    });
+    expect(storage.upload).toHaveBeenCalledWith(
+      expect.stringMatching(
+        new RegExp(`^chat-audio/${STORY_SESSION_ID}/31/1-[0-9a-f-]+\\.mp3$`),
+      ),
+      Buffer.from('reply-audio'),
+      'audio/mpeg',
+    );
+    expect(await service.get(1, STORY_SESSION_ID, 1)).toMatchObject({
+      exchange: {
+        replyAudioStatus: 'completed',
+        replyAudioUrl: 'https://storage.local/chat.mp3',
+      },
+    });
+    expect(textToSpeech.synthesize).toHaveBeenCalledTimes(1);
+  });
+
+  it('TTS 실패는 답변 텍스트를 유지하고 음성만 failed로 바꾼다', async () => {
+    textToSpeech.isAvailable.mockReturnValue(true);
+    textToSpeech.synthesize.mockRejectedValueOnce(new Error('private provider response'));
+    jest.spyOn(stories, 'getChatContext').mockResolvedValue({
+      page: createStoryPage(),
+      character: createStoryCharacter({ ttsVoiceId: 'Kore' }),
+    });
+
+    const sent = await service.send(1, STORY_SESSION_ID, 1, INPUT);
+    expect(sent.exchange?.replyAudioStatus).toBe('pending');
+    await flushBackgroundWork();
+
+    expect(await service.get(1, STORY_SESSION_ID, 1)).toMatchObject({
+      status: 'completed',
+      exchange: { reply: COMPLETION.text, replyAudioStatus: 'failed', replyAudioUrl: null },
+    });
+  });
+
+  it('실패 음성의 동시 재시도는 한 번만 선점하고 LLM 답변은 다시 만들지 않는다', async () => {
+    textToSpeech.isAvailable.mockReturnValue(true);
+    const chat = createStoryPageChat({
+      status: 'completed',
+      reply: COMPLETION.text,
+      replyAudioStatus: 'failed',
+      replyAudioUpdatedAt: FIXED_DATE,
+    });
+    rows.set(`${STORY_SESSION_ID}:31`, chat);
+    jest.spyOn(stories, 'getChatContext').mockResolvedValue({
+      page: createStoryPage(),
+      character: createStoryCharacter({ ttsVoiceId: 'Kore' }),
+    });
+
+    const first = await service.retryAudio(1, STORY_SESSION_ID, 1);
+    const second = await service.retryAudio(1, STORY_SESSION_ID, 1);
+
+    expect(first.exchange?.replyAudioStatus).toBe('pending');
+    expect(second.exchange?.replyAudioStatus).toBe('pending');
+    await flushBackgroundWork();
+    expect(textToSpeech.synthesize).toHaveBeenCalledTimes(1);
+    expect(llm.complete).not.toHaveBeenCalled();
+  });
+
+  it('완료 음성의 URL 발급 실패는 채팅 조회를 실패시키지 않는다', async () => {
+    rows.set(
+      `${STORY_SESSION_ID}:31`,
+      createStoryPageChat({
+        status: 'completed',
+        reply: COMPLETION.text,
+        replyAudioKey: 'prod/chat-audio/reply.mp3',
+        replyAudioStatus: 'completed',
+      }),
+    );
+    storage.getPresignedUrl.mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(service.get(1, STORY_SESSION_ID, 1)).resolves.toMatchObject({
+      exchange: { replyAudioStatus: 'completed', replyAudioUrl: null },
+    });
   });
 
   it('답변 저장 실패와 실패 표시 저장 실패에도 예약을 보존한다', async () => {

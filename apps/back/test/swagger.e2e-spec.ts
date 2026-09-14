@@ -75,6 +75,9 @@ describe('Swagger 문서 (E2E)', () => {
     expect(path.post?.responses).toHaveProperty('201');
     expect(path.post?.responses).toHaveProperty('409');
     expect(path.post?.responses).toHaveProperty('503');
+    expect(
+      doc.paths[`/${API_PREFIX}/sessions/{sessionId}/pages/{pageNo}/chat/audio`]?.post?.responses,
+    ).toHaveProperty('200');
     const names = path.get?.parameters?.map((parameter) =>
       'name' in parameter ? parameter.name : undefined,
     );

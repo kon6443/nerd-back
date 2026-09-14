@@ -1,6 +1,6 @@
 # Slice 7: 동화 낭독과 캐릭터 답변 TTS 명세
 
-> 상태: **설계 확정 · 구현 전**
+> 상태: **구현 완료 · 운영 DB 적용 및 수동 QA 전**
 > 확정일: 2026-09-14
 > TTS 공급자 확정: 2026-09-14 OpenRouter `google/gemini-3.1-flash-tts-preview`
 > 입력: 2026-09-14 `/grill-me` Q1~Q27 합의
@@ -114,7 +114,7 @@ DB에는 URL이 아니라 오브젝트 키와 공급자 설정을 저장한다.
 | 컬럼 | 타입 | 의미 |
 |---|---|---|
 | `tts_voice_id` | `VARCHAR(128) NULL` | Gemini 캐릭터 사전 구성 목소리 ID |
-| `tts_settings` | `JSON NULL` | 발화 스타일·오디오 태그 등 비밀값이 아닌 공급자 음성 설정 |
+| `tts_settings` | `JSON NULL` | Gemini 인라인 오디오 태그 등 비밀값이 아닌 공급자 음성 설정 |
 
 모델은 캐릭터마다 바꾸지 않고 서버 환경변수 `OPENROUTER_TTS_MODEL`로 고정하며 기본값은 `google/gemini-3.1-flash-tts-preview`다. 기존 OpenRouter 연동과 같은 서버 전용 `OPENROUTER_API_KEY`를 사용한다. API 키와 위 두 필드는 공개 API로 내보내지 않는다.
 
@@ -124,11 +124,12 @@ DB에는 URL이 아니라 오브젝트 키와 공급자 설정을 저장한다.
 |---|---|---|
 | `reply_audio_key` | `VARCHAR(512) NULL` | 생성된 캐릭터 답변 음성 오브젝트 키 |
 | `reply_audio_status` | `VARCHAR(16) NOT NULL` | `not_requested`, `pending`, `completed`, `failed` |
+| `reply_audio_updated_at` | `DATETIME(3) NULL` | 음성 작업 선점·완료·실패 시각. 오래된 `pending` 회수 기준 |
 
 - LLM 답변과 TTS 상태를 분리한다. 기존 채팅 `status`는 질문·답변 생성 상태만 나타낸다.
 - 음성 생성 전 DB 상태를 `pending`으로 선점해 레플리카 간 중복 과금을 막는다.
 - 완료된 키는 영구 재사용하며 일반 조회에서 TTS API를 다시 호출하지 않는다.
-- 서버 프로세스가 생성 중 종료된 경우 제한시간을 넘긴 `pending`은 조회 시 `failed`로 취급해 음성만 재시도할 수 있게 한다.
+- 서버 프로세스가 생성 중 종료된 경우 `reply_audio_updated_at`이 제한시간을 넘긴 `pending`은 조회 시 `failed`로 취급해 음성만 재시도할 수 있게 한다. 채팅 생성 시각을 쓰면 오래된 대화의 음성 재시도가 즉시 만료되므로 별도 시각을 둔다.
 
 ## Storage Objects
 
@@ -201,6 +202,7 @@ export interface TextToSpeechPort {
 - 기본 구현: `OpenRouterTextToSpeechAdapter`
 - 테스트 구현: 네트워크를 호출하지 않는 mock
 - OpenRouter의 `POST /api/v1/audio/speech`를 사용하고 `model`, `input`, `voice`, `response_format: "mp3"`를 전달한다.
+- Gemini 3.1의 발화 제어는 검증된 `tts_settings.audioTag`를 답변 앞에 인라인으로 붙인다. OpenAI 공급자 전용 `instructions`를 최상위 필드로 보내지 않는다.
 - 인증은 기존 `OPENROUTER_API_KEY`의 Bearer 토큰을 재사용한다.
 - 타임아웃과 최대 입력 길이를 서버 상수로 제한한다.
 - OpenRouter 또는 Preview 모델 장애는 채팅 텍스트와 책 리더의 가용성에 전파하지 않는다.

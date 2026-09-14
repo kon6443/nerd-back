@@ -29,6 +29,17 @@ describe('정식 동화 데이터셋 (잭과 콩나무, 빨간 모자)', () => {
         });
       });
 
+      it('본편 5쪽과 A/B 결과에 서로 다른 낭독 오브젝트 키가 연결되어 있다', () => {
+        const pages = [...story.pages, ...story.afterStory.choices.map((choice) => choice.page)];
+        const audioKeys = pages.map((page) => page.narrationAudioKey);
+
+        expect(audioKeys).toHaveLength(7);
+        expect(new Set(audioKeys).size).toBe(7);
+        audioKeys.forEach((key) => {
+          expect(key).toMatch(new RegExp(`^narration/${story.slug}/page-(?:[1-5]|6-[ab])\\.mp3$`));
+        });
+      });
+
       it('배역 키가 중복되지 않는다', () => {
         expect(roles.size).toBe(story.characters.length);
       });
@@ -77,6 +88,14 @@ describe('정식 동화 데이터셋 (잭과 콩나무, 빨간 모자)', () => {
         story.characters.forEach((character) => {
           expect(character.persona.trim().length).toBeGreaterThan(0);
           expect(character.displayName.trim().length).toBeGreaterThan(0);
+        });
+      });
+
+      it('등장인물마다 TTS 목소리가 있고 설정은 지원하는 인라인 태그만 쓴다', () => {
+        story.characters.forEach((character) => {
+          expect(character.ttsVoiceId?.trim().length).toBeGreaterThan(0);
+          if (character.ttsSettings === null) return;
+          expect(character.ttsSettings).toEqual({ audioTag: expect.stringMatching(/^\[[a-z-]+\]$/) });
         });
       });
 

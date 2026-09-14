@@ -154,6 +154,8 @@ export interface BookPagerProps {
   pageCount: number;
   renderArt: (pageNo: number) => ReactNode;
   renderText: (pageNo: number) => ReactNode;
+  /** 정적인 본문 면에만 그리는 조작 UI. 넘기는 종이에는 복제하지 않는다. */
+  renderTextControls?: (pageNo: number) => ReactNode;
   /**
    * 좌우 방향키가 쪽을 요청한다.
    * 🚫 여기서 쪽을 직접 바꾸지 않는다 — 주소로 옮길지(시연) 상태로 옮길지(체험)는 부르는 쪽이 정한다.
@@ -173,6 +175,7 @@ export function BookPager({
   pageCount,
   renderArt,
   renderText,
+  renderTextControls,
   onRequestPage,
   onTurningChange,
   fill = true,
@@ -253,7 +256,12 @@ export function BookPager({
         <div className={styles.surface}>
           <div className={styles.spread}>
             <div className={styles.art}>{renderArt(baseArt)}</div>
-            <div className={styles.page}>{renderText(baseText)}</div>
+            <div className={styles.page}>
+              {renderText(baseText)}
+              {renderTextControls ? (
+                <div className={styles.pageControls}>{renderTextControls(baseText)}</div>
+              ) : null}
+            </div>
           </div>
         </div>
 

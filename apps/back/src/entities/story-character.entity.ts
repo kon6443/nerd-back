@@ -40,4 +40,12 @@ export class StoryCharacter {
    */
   @Column({ name: 'persona', type: 'text', select: false })
   persona: string;
+
+  /** 공급자의 사전 구성 음성 ID. 비밀은 아니지만 공개 API에는 내보내지 않는다. */
+  @Column({ name: 'tts_voice_id', type: 'varchar', length: 128, nullable: true, select: false })
+  ttsVoiceId: string | null;
+
+  /** 발화 스타일 등 공급자 설정. API 키와 모델 ID는 여기에 저장하지 않는다. */
+  @Column({ name: 'tts_settings', type: 'json', nullable: true, select: false })
+  ttsSettings: Record<string, string | number | boolean> | null;
 }

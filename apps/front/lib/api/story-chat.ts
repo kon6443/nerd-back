@@ -33,3 +33,12 @@ export function sendStoryChat(
     json: storyChatInputSchema.parse(input),
   });
 }
+
+export function retryStoryChatAudio(
+  sessionId: string,
+  pageNo: number,
+  branchKey: StoryChatBranchKey,
+): Promise<StoryChatView> {
+  const path = chatPath(sessionId, pageNo, branchKey).replace("?", "/audio?");
+  return apiFetch<StoryChatView>(path, { method: "POST" });
+}

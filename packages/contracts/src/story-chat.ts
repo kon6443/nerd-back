@@ -31,11 +31,22 @@ export const storyChatInputSchema = z
 export type StoryChatInput = z.infer<typeof storyChatInputSchema>;
 export type StoryChatStatus = 'available' | 'pending' | 'completed' | 'failed' | 'unavailable';
 
+export const storyReplyAudioStatusSchema = z.enum([
+  'not_requested',
+  'pending',
+  'completed',
+  'failed',
+]);
+export type StoryReplyAudioStatus = z.infer<typeof storyReplyAudioStatusSchema>;
+
 export interface StoryChatExchange {
   role: string;
   displayName: string;
   message: string;
   reply: string | null;
+  /** 저장된 답변 음성의 만료 서명 URL. 오브젝트 키는 공개하지 않는다. */
+  replyAudioUrl: string | null;
+  replyAudioStatus: StoryReplyAudioStatus;
 }
 
 /** 보관된 동화의 장면 전체에서 1회. A/B는 별도 장면이며 같은 장면의 등장인물은 횟수를 공유한다. */

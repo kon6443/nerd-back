@@ -51,6 +51,7 @@ export const createStoryPage = (overrides: Partial<StoryPage> = {}): StoryPage =
   branchKey: 'common',
   bodyText: '늑대가 숲에서 빨간 모자를 만났습니다.',
   baseImageKey: 'pages/lrrh-1.png',
+  narrationAudioKey: null,
   personaTargetRole: 'protagonist',
   illustrationPrompt: null,
   ...overrides,
@@ -65,6 +66,8 @@ export const createStoryCharacter = (overrides: Partial<StoryCharacter> = {}): S
   // 🚫 엔티티에서 `select: false` 라 조회 결과에는 담기지 않는다. 팩토리는 저장 시점의
   //    전체 모습을 만들므로 값을 갖되, **응답에 새지 않는지**는 서비스 spec 이 본다.
   persona: '능글맞고 말이 많다.',
+  ttsVoiceId: null,
+  ttsSettings: null,
   ...overrides,
 });
 
@@ -118,6 +121,9 @@ export const createStoryPageChat = (overrides: Partial<StoryPageChat> = {}): Sto
   message: '지금 어떤 기분이야?',
   reply: null,
   status: 'pending',
+  replyAudioKey: null,
+  replyAudioStatus: 'not_requested',
+  replyAudioUpdatedAt: null,
   createdAt: FIXED_DATE,
   ...overrides,
 });

@@ -106,8 +106,8 @@ describe('StorySessionService', () => {
         { branchKey: 'b', title: 'B', description: 'B 설명' },
       ] as StoryAfterStoryChoice[]);
       pageRepo.find.mockResolvedValue([
-        { pageNo: 6, branchKey: 'a', bodyText: 'A 결과' },
-        { pageNo: 6, branchKey: 'b', bodyText: 'B 결과' },
+        { pageNo: 6, branchKey: 'a', bodyText: 'A 결과', narrationAudioKey: 'a.mp3' },
+        { pageNo: 6, branchKey: 'b', bodyText: 'B 결과', narrationAudioKey: 'b.mp3' },
       ] as StoryPage[]);
       pageImageRepo.find.mockResolvedValue([
         { pageNo: 6, branchKey: 'a', status: 'succeeded', imageKey: 'a.png', errorMessage: null },
@@ -120,6 +120,34 @@ describe('StorySessionService', () => {
       expect(result.firstBranchChoice).toBe('a');
       expect(result.choices[0]).toMatchObject({ branchKey: 'a', bodyText: 'A 결과', imageUrl: expect.any(String) });
       expect(result.choices[1]).toMatchObject({ branchKey: 'b', status: 'failed', errorMessage: '실패' });
+      expect(result.choices.map((choice) => choice.narrationAudioUrl)).toEqual([
+        'https://storage.local/references/session-1/ref.png',
+        'https://storage.local/references/session-1/ref.png',
+      ]);
+    });
+
+    it('비하인드 낭독 URL 하나의 발급 실패가 A/B 응답 전체를 막지 않는다', async () => {
+      sessionRepo.findOne.mockResolvedValue(session);
+      afterStoryChoiceRepo.find.mockResolvedValue([
+        { branchKey: 'a', title: 'A', description: 'A 설명' },
+        { branchKey: 'b', title: 'B', description: 'B 설명' },
+      ] as StoryAfterStoryChoice[]);
+      pageRepo.find.mockResolvedValue([
+        { pageNo: 6, branchKey: 'a', bodyText: 'A 결과', narrationAudioKey: 'a.mp3' },
+        { pageNo: 6, branchKey: 'b', bodyText: 'B 결과', narrationAudioKey: 'b.mp3' },
+      ] as StoryPage[]);
+      pageImageRepo.find.mockResolvedValue([]);
+      branchChoiceRepo.findOne.mockResolvedValue(null);
+      mockStoragePort.getPresignedUrl
+        .mockRejectedValueOnce(new Error('storage unavailable'))
+        .mockResolvedValueOnce('https://storage.local/b.mp3');
+
+      await expect(service.getAfterStory(1, 'session-123')).resolves.toMatchObject({
+        choices: [
+          { branchKey: 'a', narrationAudioUrl: null },
+          { branchKey: 'b', narrationAudioUrl: 'https://storage.local/b.mp3' },
+        ],
+      });
     });
 
     it('최초 선택을 저장하고 같은 선택은 멱등 처리한다', async () => {

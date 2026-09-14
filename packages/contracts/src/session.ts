@@ -147,6 +147,7 @@ export const afterStoryChoiceSchema = z.object({
   bodyText: z.string(),
   status: sessionPageStatusSchema,
   imageUrl: z.string().nullable(),
+  narrationAudioUrl: z.string().nullable(),
   errorMessage: z.string().nullable(),
 });
 
