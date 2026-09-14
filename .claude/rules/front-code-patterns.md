@@ -120,8 +120,23 @@ lib/api/                fetch 래퍼 · ApiError
 ### variant — 객체 맵, 의존성 0개
 
 ```ts
-const variantStyles: Record<Variant, string> = { primary: '...', ghost: '...' };
+const variantStyles: Record<ActionVariant, string> = { primary: '...', secondary: '...', dark: '...', tertiary: '...' };
 ```
+
+### ⭐ 버튼 위계는 네 가지뿐이다 (2026-09-14)
+
+variant 이름은 **색이 아니라 위계**다. 정의와 근거는 `components/ui/actionStyles.ts` 가 소유한다.
+
+| 위계 | 모양 | 쓰는 곳 |
+|---|---|---|
+| `primary` | 파랑 | 한 묶음에서 가장 중요한 동작 **하나** |
+| `secondary` | 흰색 | 그다음 동작 |
+| `dark` | 초록빛 검정(`--color-night`) | secondary 인데 흰 면 위라 묻힐 때 |
+| `tertiary` | 텍스트 | 되돌아가기·임시 도구처럼 눈에 덜 띄어야 할 때 |
+
+- 🚫 **초록 CTA 금지** — 초록은 GNB(현재 위치)만 쓴다. 🚫 **노랑·보라 버튼 금지.** 선택 칩·진행 표시 같은 조작 요소도 초록 대신 파랑 계열을 쓴다.
+- 🚫 나란히 놓인 두 버튼을 둘 다 `primary` 로 두지 않는다. 무엇이 중요한지 정하고 하나를 내린다.
+- 색 variant 를 되살리지 않는다(`accentA`·`gold` 등). 타입에서 지웠기 때문에 새로 쓰면 타입 검사가 막는다.
 
 🚫 `cva`·`tailwind-merge`·`clsx` 를 도입하지 않는다. 객체 맵으로 같은 일이 되고, 새 의존성은 승인 대상이다 (`CLAUDE.md` Ask).
 
