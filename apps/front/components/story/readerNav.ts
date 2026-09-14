@@ -7,6 +7,13 @@
 
 export type TurnDirection = "next" | "prev";
 
+/**
+ * 책이 좌우 펼침면이 되는 전환점.
+ * ⚠️ `BookFrame.module.css` 의 `@media (min-width: 48rem)` 과 **같은 값이어야 한다.**
+ * 넘김 모양(`BookPager`)과 대화 dock 가능 여부(`ChatSurface`)가 이 값으로 갈린다.
+ */
+export const SPREAD_QUERY = "(min-width: 48rem)";
+
 const READER_PATH = /^\/library\/([^/]+)\/(\d+)\/?$/;
 
 /** 몰입 읽기 화면인가 — 전역 헤더를 숨길지 정한다. */

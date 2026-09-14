@@ -24,6 +24,19 @@ export function fetchStoryDetail(slug: string): Promise<StoryDetail> {
   return apiFetch<StoryDetail>(storyPath(slug));
 }
 
+/**
+ * 본편 **전 쪽**을 한 번에.
+ *
+ * ⭐ 리더는 진입할 때 이것 하나만 부른다 — 이후 쪽을 오가도 추가 요청이 없다.
+ * 중간 쪽으로 바로 들어와도 요청 수는 같다(1회).
+ * 🚫 쪽마다 `fetchStoryPage` 를 부르지 않는다. 그러면 한 권에 5회가 나가고, 어느 쪽을 먼저
+ * 받을지 정하는 우선순위 로직이 화면 쪽에 생긴다.
+ */
+export function fetchStoryPages(slug: string): Promise<StoryPageView[]> {
+  return apiFetch<StoryPageView[]>(storyPath(slug, "/pages"));
+}
+
+/** 한 쪽만 필요할 때. 리더는 `fetchStoryPages` 를 쓴다. */
 export function fetchStoryPage(slug: string, pageNo: number): Promise<StoryPageView> {
   return apiFetch<StoryPageView>(storyPath(slug, `/pages/${encodeURIComponent(String(pageNo))}`));
 }

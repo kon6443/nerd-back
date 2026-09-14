@@ -112,3 +112,25 @@ html[data-session="guest"] .session-authenticated {
 html:not([data-session]) .session-authenticated {
   visibility: hidden;
 }
+
+/*
+ * 몰입 읽기 — 전역 헤더를 숨긴다.
+ *
+ * ⭐ **속성으로 고르는 이유는 `data-session` 과 같다.** 몰입 여부는 리더의 쿼리(`?immersive=`)가
+ * 정하는데, `AppHeader` 가 그것을 읽으려면 `useSearchParams` 가 필요하고 그 순간 **전 화면에
+ * Suspense 경계**가 생긴다. 헤더는 데이터 조회를 하지 않는 자리다 — 리더가 `<html data-reader>` 를
+ * 세우고 여기서 고른다.
+ * 🚫 `AppHeader` 안에서 조건 분기로 되돌리지 않는다.
+ */
+html[data-reader="immersive"] [data-app-header] {
+  display: none;
+}
+
+/*
+ * 열린 모달 뒤의 배경은 스크롤되지 않는다.
+ * ⚠️ `showModal()` 은 포커스와 top-layer 는 처리하지만 **배경 스크롤은 막지 않는다.**
+ * 🚫 JS 로 `body.style.overflow` 를 만지지 않는다 — 열고 닫는 경로마다 되돌리기를 빠뜨린다.
+ */
+body:has(dialog[open]) {
+  overflow: hidden;
+}

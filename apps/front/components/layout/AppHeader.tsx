@@ -62,7 +62,11 @@ export function AppHeader() {
   if (isReaderPath(pathname)) return null;
 
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-surface-raised/90 shadow-sm backdrop-blur-sm">
+    // `data-app-header` 는 몰입 리더가 CSS 로 이 헤더를 숨길 때 쓰는 손잡이다(`globals.css`).
+    <header
+      data-app-header
+      className="sticky top-0 z-20 border-b border-line bg-surface-raised/90 shadow-sm backdrop-blur-sm"
+    >
       <nav
         aria-label="주요 메뉴"
         className="mx-auto flex min-h-[76px] w-full max-w-6xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2 sm:flex-nowrap sm:px-6"
