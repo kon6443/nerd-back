@@ -444,11 +444,11 @@ function StoryReadContent({ params }: PageProps) {
             )}
             <Link
               href={`/stories/${slug}/capture`}
-              className={actionClass(errorMsg ? "ghost" : "primary")}
+              className={actionClass(errorMsg ? "secondary" : "primary")}
             >
               얼굴 다시 등록하기
             </Link>
-            <Link href={`/library/${slug}`} className={actionClass("ghost")}>
+            <Link href={`/library/${slug}`} className={actionClass("secondary")}>
               동화 소개로
             </Link>
           </div>
@@ -566,7 +566,7 @@ function StoryReadContent({ params }: PageProps) {
         <header className={READER_BAR}>
           <button
             onClick={() => setViewState("generating")}
-            className={actionClass("ghost", "text-sm")}
+            className={actionClass("secondary", "text-sm")}
           >
             ← 제작 현황 보기
           </button>
@@ -605,18 +605,18 @@ function StoryReadContent({ params }: PageProps) {
           {isFirstPage ? (
             <span
               aria-disabled="true"
-              className={actionClass("ghost", "pointer-events-none opacity-40")}
+              className={actionClass("secondary", "pointer-events-none opacity-40")}
             >
               이전
             </span>
           ) : currentPageNo === 6 ? (
-            <button onClick={openBranchScreen} className={actionClass("ghost")}>
+            <button onClick={openBranchScreen} className={actionClass("secondary")}>
               선택지로
             </button>
           ) : (
             <button
               onClick={() => setCurrentPageNo((prev) => Math.max(1, prev - 1))}
-              className={actionClass("ghost")}
+              className={actionClass("secondary")}
             >
               이전
             </button>
@@ -668,7 +668,7 @@ function StoryReadContent({ params }: PageProps) {
         {currentPageNo === 5 ? (
           <button
             onClick={openBranchScreen}
-            className={actionClass("accentA", "font-bold")}
+            className={actionClass("primary", "font-bold")}
           >
             비하인드 선택하기 →
           </button>
@@ -682,7 +682,7 @@ function StoryReadContent({ params }: PageProps) {
         ) : (
           <button
             onClick={() => setCurrentPageNo((prev) => Math.min(totalPages, prev + 1))}
-            className={actionClass("accentA")}
+            className={actionClass("primary")}
           >
             다음 페이지 →
           </button>

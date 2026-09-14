@@ -106,10 +106,10 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
         {resolving ? (
           /* 0. 확인 중 — 기본 세트와 같은 높이의 투명 자리표시. 눌리지 않고 보조기술에도 안 읽힌다. */
           <>
-            <span aria-hidden="true" className={actionClass("primary", "invisible")}>
+            <span aria-hidden="true" className={actionClass("secondary", "invisible")}>
               시연 동화 읽기
             </span>
-            <span aria-hidden="true" className={actionClass("accentA", "invisible")}>
+            <span aria-hidden="true" className={actionClass("primary", "invisible")}>
               📷 내 얼굴로 만들기
             </span>
           </>
@@ -118,13 +118,13 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
           <>
             <ActionLink
               href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
-              variant="gold"
+              variant="primary"
               size="default"
               className="font-bold shadow-md"
             >
               📖 내 얼굴 동화 읽기
             </ActionLink>
-            <ActionLink href={`/library/${slug}/1`} variant="ghost" size="default">
+            <ActionLink href={`/library/${slug}/1`} variant="secondary" size="default">
               시연 동화 읽기
             </ActionLink>
             <button
@@ -132,7 +132,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
               onClick={handleResetAndRecreate}
               disabled={isDeleting}
               className={actionClass(
-                "ghost",
+                "secondary",
                 "text-sm text-neutral-600 hover:text-rose-600 hover:border-rose-300 disabled:opacity-50",
                 "compact",
               )}
@@ -145,13 +145,13 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
           <>
             <ActionLink
               href={`/stories/${slug}/read?sessionId=${currentSession.id}&autoStart=true`}
-              variant="accentA"
+              variant="primary"
               size="default"
               className="font-bold"
             >
               ⏳ 제작 중인 동화 이어보기
             </ActionLink>
-            <ActionLink href={`/library/${slug}/1`} variant="ghost" size="default">
+            <ActionLink href={`/library/${slug}/1`} variant="secondary" size="default">
               시연 동화 읽기
             </ActionLink>
             <button
@@ -159,7 +159,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
               onClick={handleResetAndRecreate}
               disabled={isDeleting}
               className={actionClass(
-                "ghost",
+                "secondary",
                 "text-sm text-neutral-600 hover:text-rose-600 disabled:opacity-50",
                 "compact",
               )}
@@ -172,13 +172,13 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
           <>
             <ActionLink
               href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
-              variant="accentB"
+              variant="primary"
               size="default"
               className="font-bold"
             >
               ⚠️ 제작 재시도하기
             </ActionLink>
-            <ActionLink href={`/library/${slug}/1`} variant="ghost" size="default">
+            <ActionLink href={`/library/${slug}/1`} variant="secondary" size="default">
               시연 동화 읽기
             </ActionLink>
             <button
@@ -186,7 +186,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
               onClick={handleResetAndRecreate}
               disabled={isDeleting}
               className={actionClass(
-                "ghost",
+                "secondary",
                 "text-sm text-neutral-600 hover:text-rose-600 disabled:opacity-50",
                 "compact",
               )}
@@ -197,9 +197,12 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
         ) : (
           /* 4. 아직 세션이 없거나(비로그인 포함) draft 상태인 경우 */
           <>
-            <ActionLink href={`/library/${slug}/1`}>시연 동화 읽기</ActionLink>
-            <ActionLink href={`/stories/${slug}/capture`} variant="accentA">
+            {/* 이 화면의 주 동작은 개인화다 — 시연 읽기는 한 단계 내린다. */}
+            <ActionLink href={`/stories/${slug}/capture`} variant="primary">
               📷 내 얼굴로 만들기
+            </ActionLink>
+            <ActionLink href={`/library/${slug}/1`} variant="secondary">
+              시연 동화 읽기
             </ActionLink>
           </>
         )}

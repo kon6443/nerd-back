@@ -24,7 +24,7 @@ export default async function StoryDetailPage({ params }: PageProps<"/library/[s
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-5 py-6 md:px-10 md:py-8">
       <div>
-        <ActionLink href="/library" variant="ghost" size="compact">
+        <ActionLink href="/library" variant="secondary" size="compact">
           서재로 돌아가기
         </ActionLink>
       </div>

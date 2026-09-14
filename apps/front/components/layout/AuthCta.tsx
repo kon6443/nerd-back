@@ -20,7 +20,7 @@ export function AuthCta({ className = "" }: { className?: string }) {
     <>
       <ActionLink
         href={AUTH_LINK.guest.href}
-        variant="ghost"
+        variant="secondary"
         className={`session-guest ${className}`}
         aria-current={pathname === AUTH_LINK.guest.href ? "page" : undefined}
       >
@@ -28,7 +28,7 @@ export function AuthCta({ className = "" }: { className?: string }) {
       </ActionLink>
       <ActionLink
         href={AUTH_LINK.authenticated.href}
-        variant="ghost"
+        variant="secondary"
         className={`session-authenticated ${className}`}
         aria-current={pathname === AUTH_LINK.authenticated.href ? "page" : undefined}
       >

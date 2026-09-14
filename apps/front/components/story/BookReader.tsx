@@ -67,7 +67,7 @@ export function BookReader({
       <header className={READER_BAR}>
         {/* ⚠️ 목적지는 서재 목록이 아니라 **이 동화의 상세**다. 라벨을 「서재로」로 두면
             전역 네비의 「서재」와 같은 곳으로 가는 것처럼 보이는데 실제로는 다르다. */}
-        <ActionLink href={`/library/${slug}`} variant="ghost" size="compact">
+        <ActionLink href={`/library/${slug}`} variant="secondary" size="compact">
           동화 소개
         </ActionLink>
         <h1 className="order-first w-full text-xl font-bold text-balance break-keep wrap-anywhere text-ink md:order-none md:w-auto md:flex-1 md:text-center">
@@ -98,13 +98,13 @@ export function BookReader({
       <footer className={READER_BAR}>
         {isFirst ? (
           // 🚫 링크를 숨기지 않는다 — 버튼이 사라졌다 나타나면 위치가 흔들려 오터치가 는다.
-          <span aria-disabled="true" className={actionClass("ghost", "pointer-events-none opacity-40")}>
+          <span aria-disabled="true" className={actionClass("secondary", "pointer-events-none opacity-40")}>
             이전
           </span>
         ) : (
           <ActionLink
             href={readerHref(slug, targetPageNo - 1)}
-            variant="ghost"
+            variant="secondary"
             onClick={(event) => onTurnClick(event, targetPageNo - 1)}
           >
             이전
@@ -118,13 +118,13 @@ export function BookReader({
         </p>
 
         {isLast ? (
-          <ActionLink href="/library" variant="accentA">
+          <ActionLink href="/library" variant="primary">
             다 읽었어요
           </ActionLink>
         ) : (
           <ActionLink
             href={readerHref(slug, targetPageNo + 1)}
-            variant="accentA"
+            variant="primary"
             onClick={(event) => onTurnClick(event, targetPageNo + 1)}
           >
             다음 페이지

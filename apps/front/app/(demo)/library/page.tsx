@@ -32,7 +32,7 @@ export default async function LibraryPage() {
         <Card className="flex flex-col items-center gap-5 py-12 text-center">
           <p className="text-xl font-bold text-ink">아직 준비된 동화가 없어요.</p>
           <p className="text-ink-muted">새로운 이야기가 준비되면 이곳에서 만날 수 있어요.</p>
-          <ActionLink href="/" variant="ghost">
+          <ActionLink href="/" variant="secondary">
             홈으로 가기
           </ActionLink>
         </Card>
@@ -51,7 +51,7 @@ export default async function LibraryPage() {
             action={
               <ActionLink
                 href={`/library/${story.slug}`}
-                variant="accentA"
+                variant="primary"
                 size="compact"
                 className="w-full"
               >

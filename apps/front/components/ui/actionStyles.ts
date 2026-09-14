@@ -9,24 +9,33 @@
  * 새 의존성은 승인 대상이다.
  * 🚫 색 리터럴을 쓰지 않는다 — 토큰만 쓴다 (`app/globals.css`).
  */
-export type ActionVariant = "primary" | "accentA" | "accentB" | "ghost" | "gold";
+/**
+ * ⭐ **버튼 위계는 네 가지뿐이다**(2026-09-14 결정). 색 이름이 아니라 **위계 이름**으로 부른다 —
+ * 화면이 "무슨 색"이 아니라 "얼마나 중요한가"를 고르게 하려는 것이다.
+ *
+ * | 위계 | 모양 | 쓰는 곳 |
+ * |---|---|---|
+ * | `primary` | 파랑 | 한 화면(한 묶음)의 **가장 중요한 동작 하나** |
+ * | `secondary` | 흰색 | 그다음 동작 |
+ * | `dark` | 초록빛이 섞인 검정 | secondary 인데 **흰 면·사진 위에서 묻힐 때** |
+ * | `tertiary` | 텍스트 | 되돌아가기·건너뛰기처럼 눈에 덜 띄어야 하는 동작 |
+ *
+ * 🚫 **초록·노랑·보라 CTA 를 만들지 않는다.** 초록은 GNB(현재 위치 표시)만 쓴다 — CTA 에도 쓰면 "지금 여기"와
+ * "누르세요"가 같은 색이 된다. 노랑은 서비스 전체에서 버튼으로 쓰지 않는다.
+ * 🚫 나란히 놓인 두 버튼을 둘 다 `primary` 로 두지 않는다. 둘 중 무엇이 중요한지 정하고 하나를 내린다.
+ */
+export type ActionVariant = "primary" | "secondary" | "dark" | "tertiary";
 export type ActionSize = "default" | "compact";
 
 /**
- * 색 배정 — 주 동작은 그린, 보조는 블루, 비하인드 B 는 퍼플.
- *
  * ⭐ `--btn-lip` 은 **버튼 아래 그림자(립) 색**이다. variant 마다 자기 짙은 색을 넣고
- * `BASE` 가 그것으로 그림자를 그린다. 색과 립이 갈리면 눌린 느낌이 깨지므로 **같이 정한다.**
- *
- * 🚫 `gold` 에 흰 글자를 쓰지 않는다 — 노랑 위 흰 글자는 읽히지 않는다.
- * 듀오링고도 노란 면에는 진한 글자를 얹는다.
+ * `LIFT` 가 그것으로 그림자를 그린다. 색과 립이 갈리면 눌린 느낌이 깨지므로 **같이 정한다.**
  */
 const variantStyles: Record<ActionVariant, string> = {
-  primary: "bg-primary text-white [--btn-lip:var(--color-primary-strong)] hover:brightness-105",
-  accentA: "bg-accent-a text-white [--btn-lip:var(--color-accent-a-strong)] hover:brightness-105",
-  accentB: "bg-accent-b text-white [--btn-lip:var(--color-accent-b-strong)] hover:brightness-105",
-  ghost: "border-2 border-line bg-surface-raised text-ink [--btn-lip:#d4d4d4] hover:bg-surface",
-  gold: "bg-gold text-ink [--btn-lip:var(--color-gold-strong)] hover:brightness-105",
+  primary: "bg-accent-a text-white [--btn-lip:var(--color-accent-a-strong)] hover:brightness-105",
+  secondary: "border-2 border-line bg-surface-raised text-ink [--btn-lip:#d4d4d4] hover:bg-surface",
+  dark: "bg-night text-white [--btn-lip:var(--color-night-strong)] hover:brightness-125",
+  tertiary: "text-ink-muted underline-offset-4 hover:text-ink hover:underline",
 };
 
 /**
@@ -47,7 +56,15 @@ export const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-magic-strong focus-visible:ring-offset-2";
 
 const BASE =
-  `inline-flex min-h-touch items-center justify-center rounded-btn font-extrabold shadow-[0_4px_0_var(--btn-lip)] transition-[filter,transform,box-shadow] active:translate-y-1 active:shadow-none motion-reduce:transition-none motion-reduce:active:translate-y-0 ${FOCUS_RING} disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-y-0`;
+  `inline-flex min-h-touch items-center justify-center rounded-btn font-extrabold transition-[filter,transform,box-shadow] motion-reduce:transition-none ${FOCUS_RING} disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50`;
+
+/**
+ * 누르면 립만큼 내려앉는 입체감. **텍스트 버튼(`tertiary`)에는 주지 않는다** — 면이 없는데 그림자가 생긴다.
+ * 🚫 BASE 에 되돌려 넣고 tertiary 에서 덮어쓰지 않는다. Tailwind 는 클래스 순서가 아니라 생성 순서로
+ * 이겨서, 같은 속성을 두 번 주면 어느 쪽이 적용될지 보장되지 않는다.
+ */
+const LIFT =
+  "shadow-[0_4px_0_var(--btn-lip)] active:translate-y-1 active:shadow-none motion-reduce:active:translate-y-0 disabled:active:translate-y-0";
 
 const sizeStyles: Record<ActionSize, string> = {
   default: "px-8 text-lg",
@@ -60,5 +77,6 @@ export function actionClass(
   extra = "",
   size: ActionSize = "default",
 ): string {
-  return `${BASE} ${sizeStyles[size]} ${variantStyles[variant]} ${extra}`.trim();
+  const lift = variant === "tertiary" ? "" : LIFT;
+  return `${BASE} ${lift} ${sizeStyles[size]} ${variantStyles[variant]} ${extra}`.trim();
 }

@@ -13,7 +13,7 @@ export default function Home() {
       </p>
       <div className="mt-8 flex w-full max-w-xl flex-col justify-center gap-3 sm:flex-row">
         {/* 두 CTA 는 **같은 폭**이다 — 문구 길이에 맡기면 나란히 놓였을 때 크기가 달라 보인다. */}
-        <ActionLink href="/library" variant="accentA" className="w-full sm:w-56">
+        <ActionLink href="/library" variant="primary" className="w-full sm:w-56">
           동화 체험하기
         </ActionLink>
         {/* 로그인 상태에 따라 「로그인하기」 ↔ 「마이페이지」로 갈린다.
