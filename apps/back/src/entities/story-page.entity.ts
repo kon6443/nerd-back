@@ -34,6 +34,10 @@ export class StoryPage {
   @Column({ name: 'base_image_key', type: 'varchar', length: 512, nullable: true })
   baseImageKey: string | null;
 
+  /** 사전 제작한 페이지 낭독 MP3의 오브젝트 키. 공개 응답에는 서명 URL만 내보낸다. */
+  @Column({ name: 'narration_audio_key', type: 'varchar', length: 512, nullable: true })
+  narrationAudioKey: string | null;
+
   /**
    * 이 페이지에서 **사용자 얼굴로 개인화할 주인공의 배역**. `StoryCharacter.role` 을 가리킨다.
    *

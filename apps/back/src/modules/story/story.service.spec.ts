@@ -16,6 +16,7 @@ import type { StoryPage } from '@entities/story-page.entity';
 import type { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { STORY_TEMPLATE_STATUS, type StoryTemplate } from '@entities/story-template.entity';
 import { StoryService } from './story.service';
+import type { StoragePort } from '@common/port/storage.port';
 
 const PUBLISHED_TEMPLATE = createStoryTemplate({ id: 7 });
 
@@ -28,6 +29,7 @@ describe('StoryService', () => {
   let pages: MockRepository<StoryPage>;
   let characters: MockRepository<StoryCharacter>;
   let pageCharacters: MockRepository<StoryPageCharacter>;
+  let storage: jest.Mocked<StoragePort>;
   let service: StoryService;
 
   beforeEach(() => {
@@ -35,12 +37,19 @@ describe('StoryService', () => {
     pages = createMockRepository<StoryPage>();
     characters = createMockRepository<StoryCharacter>();
     pageCharacters = createMockRepository<StoryPageCharacter>();
+    storage = {
+      upload: jest.fn(),
+      getPresignedUrl: jest.fn().mockResolvedValue('https://storage.local/narration.mp3'),
+      download: jest.fn(),
+      delete: jest.fn(),
+    };
 
     service = new StoryService(
       asRepository(templates),
       asRepository(pages),
       asRepository(characters),
       asRepository(pageCharacters),
+      storage,
     );
   });
 
@@ -256,6 +265,7 @@ describe('StoryService', () => {
         pageNo: 3,
         bodyText: '늑대가 숲에서 빨간 모자를 만났습니다.',
         baseImageKey: 'pages/lrrh-3.png',
+        narrationAudioUrl: null,
         personaTargetRole: 'protagonist',
         characters: [
           {
@@ -266,6 +276,36 @@ describe('StoryService', () => {
           { role: 'protagonist', displayName: '빨간 모자', hitbox: null },
         ],
       });
+    });
+
+    it('낭독 키는 서명 URL로 바꾸고 오브젝트 키를 응답에 노출하지 않는다', async () => {
+      templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ narrationAudioKey: 'prod/narration/red/page-3.mp3' }),
+      );
+      pageCharacters.find.mockResolvedValue([]);
+      storage.getPresignedUrl.mockResolvedValueOnce('https://storage.local/red-3.mp3?signed=1');
+
+      const result = await service.getPublishedPage('little-red-riding-hood', 3);
+
+      expect(result.narrationAudioUrl).toBe('https://storage.local/red-3.mp3?signed=1');
+      expect(storage.getPresignedUrl).toHaveBeenCalledWith(
+        'prod/narration/red/page-3.mp3',
+      );
+      expect(JSON.stringify(result)).not.toContain('prod/narration');
+    });
+
+    it('낭독 URL 발급 실패는 본문 조회를 실패시키지 않고 null로 내린다', async () => {
+      templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ narrationAudioKey: 'prod/narration/red/page-3.mp3' }),
+      );
+      pageCharacters.find.mockResolvedValue([]);
+      storage.getPresignedUrl.mockRejectedValueOnce(new Error('storage unavailable'));
+
+      await expect(
+        service.getPublishedPage('little-red-riding-hood', 3),
+      ).resolves.toMatchObject({ narrationAudioUrl: null, bodyText: expect.any(String) });
     });
   });
 });

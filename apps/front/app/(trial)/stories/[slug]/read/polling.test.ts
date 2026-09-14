@@ -16,8 +16,9 @@ function choice(branchKey: StoryBranchKey, status: SessionPageStatus) {
     pageNo: 6 as const,
     bodyText: "본문",
     status,
-    imageUrl: null,
-    errorMessage: null,
+      imageUrl: null,
+      narrationAudioUrl: null,
+      errorMessage: null,
   };
 }
 

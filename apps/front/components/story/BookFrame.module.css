@@ -120,10 +120,15 @@
 }
 
 .pageNumber {
+  order: 2;
   padding-block-start: 1.5rem;
   text-align: end;
   color: var(--color-ink-muted);
   font-size: 0.875rem;
+}
+
+.pageControls {
+  order: 1;
 }
 
 @media (min-width: 48rem) {

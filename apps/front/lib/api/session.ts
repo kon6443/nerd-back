@@ -98,9 +98,13 @@ export async function retrySessionPage(
 }
 
 /** 비하인드 A/B 선택지와 각 결과 페이지의 준비 상태를 조회한다. */
-export async function fetchAfterStory(sessionId: string): Promise<AfterStoryResponse> {
+export async function fetchAfterStory(
+  sessionId: string,
+  signal?: AbortSignal,
+): Promise<AfterStoryResponse> {
   return apiFetch<AfterStoryResponse>(`/sessions/${sessionId}/after-story`, {
     method: "GET",
+    signal,
   });
 }
 

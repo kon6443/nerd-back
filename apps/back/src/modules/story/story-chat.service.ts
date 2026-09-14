@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { randomUUID } from 'node:crypto';
 import type {
   StoryChatInput,
   StoryChatView,
@@ -9,6 +10,11 @@ import type {
 } from '@nerd/contracts';
 import { LLM_PORT } from '@common/port/llm.port';
 import type { LlmPort } from '@common/port/llm.port';
+import {
+  TEXT_TO_SPEECH_PORT,
+  type TextToSpeechPort,
+} from '@common/port/textToSpeechPort';
+import { STORAGE_PORT, type StoragePort } from '@common/port/storage.port';
 import { isMysqlDuplicateKey } from '@common/utils/is-mysql-duplicate-key';
 import { StoryPageChat } from '@entities/story-page-chat.entity';
 import {
@@ -17,6 +23,8 @@ import {
 } from './dto/story-chat.error.dto';
 import { StoryChatContextService, type StoryChatContext } from './story-chat-context.service';
 import { STORY_CHAT_MAX_OUTPUT_TOKENS, STORY_CHAT_TIMEOUT_MS } from './story-chat.llm';
+
+const REPLY_AUDIO_STALE_MS = 2 * 60 * 1000;
 
 function buildPrompt(context: StoryChatContext): string {
   return [
@@ -42,6 +50,8 @@ export class StoryChatService {
     private readonly stories: StoryChatContextService,
     @InjectRepository(StoryPageChat) private readonly chats: Repository<StoryPageChat>,
     @Inject(LLM_PORT) private readonly llm: LlmPort,
+    @Inject(TEXT_TO_SPEECH_PORT) private readonly textToSpeech: TextToSpeechPort,
+    @Inject(STORAGE_PORT) private readonly storage: StoragePort,
   ) {}
 
   async get(
@@ -55,7 +65,7 @@ export class StoryChatService {
     const characters = await this.stories.listCharacters(page.id);
     try {
       const chat = await this.chats.findOneBy({ sessionId: session.id, pageId: page.id });
-      if (chat) return this.toView(chat, characters);
+      if (chat) return await this.toView(chat, characters);
       return {
         characters,
         status: this.llm.isAvailable() ? 'available' : 'unavailable',
@@ -96,6 +106,9 @@ export class StoryChatService {
         message: input.message,
         reply: null,
         status: 'pending',
+        replyAudioKey: null,
+        replyAudioStatus: 'not_requested',
+        replyAudioUpdatedAt: null,
       });
     } catch (error) {
       if (isMysqlDuplicateKey(error)) throw new StoryChatAlreadyUsedErrorResponseDto();
@@ -115,7 +128,14 @@ export class StoryChatService {
         reply: completion.text,
       });
       if (saved.affected !== 1) throw new StoryChatUnavailableErrorResponseDto();
-      return this.toView({ ...chat, status: 'completed', reply: completion.text }, characters);
+      const completedChat = { ...chat, status: 'completed' as const, reply: completion.text };
+      const audioClaimed = await this.claimReplyAudio(completedChat, context.character);
+      if (audioClaimed) {
+        completedChat.replyAudioStatus = 'pending';
+        completedChat.replyAudioUpdatedAt = new Date();
+        this.startReplyAudioGeneration(completedChat, context.character);
+      }
+      return await this.toView(completedChat, characters);
     } catch {
       try {
         // 완료 저장의 ACK만 유실됐을 수 있으므로 pending일 때만 실패로 바꾼다.
@@ -125,18 +145,157 @@ export class StoryChatService {
           pageId: context.page.id,
         });
         if (!stored) throw new StoryChatUnavailableErrorResponseDto();
-        return this.toView(stored, characters);
+        return await this.toView(stored, characters);
       } catch {
         throw new StoryChatUnavailableErrorResponseDto();
       }
     }
   }
 
-  private toView(chat: StoryPageChat, characters: StoryCharacterSummary[]): StoryChatView {
+  async retryAudio(
+    userId: number,
+    sessionId: string,
+    pageNo: number,
+    branchKey: StoryChatBranchKey = 'common',
+  ): Promise<StoryChatView> {
+    const session = await this.stories.findOwned(userId, sessionId);
+    const page = await this.stories.findPage(session.templateId, pageNo, branchKey);
+    const characters = await this.stories.listCharacters(page.id);
+    const chat = await this.chats.findOneBy({ sessionId: session.id, pageId: page.id });
+    if (!chat) throw new StoryChatUnavailableErrorResponseDto();
+
+    const isStalePending = this.isStaleReplyAudio(chat);
+    if (chat.replyAudioStatus === 'completed' || (chat.replyAudioStatus === 'pending' && !isStalePending)) {
+      return this.toView(chat, characters);
+    }
+    if (chat.replyAudioStatus !== 'failed' && !isStalePending) return this.toView(chat, characters);
+
+    const context = await this.stories.getChatContext(
+      session.templateId,
+      pageNo,
+      chat.role,
+      branchKey,
+    );
+    if (!chat.reply || !context.character.ttsVoiceId || !this.textToSpeech.isAvailable()) {
+      return this.toView(chat, characters);
+    }
+
+    if (isStalePending) {
+      const released = await this.chats.update(
+        { id: chat.id, replyAudioStatus: 'pending' },
+        { replyAudioStatus: 'failed', replyAudioUpdatedAt: new Date() },
+      );
+      if (released.affected !== 1) {
+        const current = await this.chats.findOneBy({ id: chat.id });
+        return this.toView(current ?? chat, characters);
+      }
+      chat.replyAudioStatus = 'failed';
+    }
+
+    const claimed = await this.claimReplyAudio(chat, context.character);
+    if (claimed) {
+      chat.replyAudioStatus = 'pending';
+      chat.replyAudioUpdatedAt = new Date();
+      this.startReplyAudioGeneration(chat, context.character);
+    }
+    return this.toView(chat, characters);
+  }
+
+  private async claimReplyAudio(
+    chat: StoryPageChat,
+    character: StoryChatContext['character'],
+  ): Promise<boolean> {
+    if (
+      !chat.reply ||
+      !character.ttsVoiceId ||
+      !this.textToSpeech.isAvailable() ||
+      (chat.replyAudioStatus !== 'not_requested' && chat.replyAudioStatus !== 'failed')
+    ) {
+      return false;
+    }
+    const result = await this.chats.update(
+      { id: chat.id, replyAudioStatus: chat.replyAudioStatus },
+      { replyAudioStatus: 'pending', replyAudioUpdatedAt: new Date() },
+    );
+    return result.affected === 1;
+  }
+
+  private startReplyAudioGeneration(
+    chat: StoryPageChat,
+    character: StoryChatContext['character'],
+  ): void {
+    setImmediate(() => {
+      void this.generateReplyAudio(chat, character);
+    });
+  }
+
+  private async generateReplyAudio(
+    chat: StoryPageChat,
+    character: StoryChatContext['character'],
+  ): Promise<void> {
+    if (!chat.reply || !character.ttsVoiceId) return;
+    let uploadedKey: string | null = null;
+    try {
+      const result = await this.textToSpeech.synthesize({
+        text: chat.reply,
+        voiceId: character.ttsVoiceId,
+        settings: character.ttsSettings,
+      });
+      if (result.usage !== undefined) this.logger.log(result.usage);
+      const ext = result.mimeType === 'audio/wav' ? 'wav' : 'mp3';
+      const objectKey = `chat-audio/${chat.sessionId}/${chat.pageId}/${chat.id}-${randomUUID()}.${ext}`;
+      uploadedKey = await this.storage.upload(objectKey, result.audio, result.mimeType);
+      const saved = await this.chats.update(
+        { id: chat.id, replyAudioStatus: 'pending' },
+        {
+          replyAudioKey: uploadedKey,
+          replyAudioStatus: 'completed',
+          replyAudioUpdatedAt: new Date(),
+        },
+      );
+      if (saved.affected !== 1) {
+        await this.storage.delete(uploadedKey).catch(() => undefined);
+      }
+    } catch (error) {
+      if (uploadedKey !== null) await this.storage.delete(uploadedKey).catch(() => undefined);
+      await this.chats
+        .update(
+          { id: chat.id, replyAudioStatus: 'pending' },
+          { replyAudioStatus: 'failed', replyAudioUpdatedAt: new Date() },
+        )
+        .catch(() => undefined);
+      this.logger.warn(
+        `캐릭터 답변 음성 생성 실패: chat ${chat.id}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
+  }
+
+  private isStaleReplyAudio(chat: StoryPageChat): boolean {
+    return (
+      chat.replyAudioStatus === 'pending' &&
+      chat.replyAudioUpdatedAt !== null &&
+      Date.now() - chat.replyAudioUpdatedAt.getTime() > REPLY_AUDIO_STALE_MS
+    );
+  }
+
+  private async toView(
+    chat: StoryPageChat,
+    characters: StoryCharacterSummary[],
+  ): Promise<StoryChatView> {
     // 서버가 호출 중 종료되어도 무한 대기시키지 않는다. 만료는 표시만 바꾸며 재호출은 허용하지 않는다.
     const interrupted =
       chat.status === 'pending' &&
       Date.now() - chat.createdAt.getTime() > STORY_CHAT_TIMEOUT_MS + 30_000;
+    const replyAudioStatus = this.isStaleReplyAudio(chat) ? 'failed' : chat.replyAudioStatus;
+    let replyAudioUrl: string | null = null;
+    if (replyAudioStatus === 'completed' && chat.replyAudioKey !== null) {
+      try {
+        replyAudioUrl = await this.storage.getPresignedUrl(chat.replyAudioKey);
+      } catch {
+        replyAudioUrl = null;
+      }
+    }
     return {
       characters,
       status: interrupted ? 'failed' : chat.status,
@@ -146,6 +305,8 @@ export class StoryChatService {
         displayName: chat.displayName,
         message: chat.message,
         reply: chat.reply,
+        replyAudioUrl,
+        replyAudioStatus,
       },
     };
   }

@@ -73,7 +73,14 @@ describe('채팅의 기존 개인 동화·분기 장면 조회', () => {
     expect(result.character.persona).toBe('능글맞고 말이 많다.');
     expect(characters.findOne).toHaveBeenCalledWith({
       where: { templateId: 1, role: 'wolf' },
-      select: { id: true, role: true, displayName: true, persona: true },
+      select: {
+        id: true,
+        role: true,
+        displayName: true,
+        persona: true,
+        ttsVoiceId: true,
+        ttsSettings: true,
+      },
     });
     expect(appearances.findOneBy).toHaveBeenCalledWith({ pageId: 62, characterId: 11 });
     await expect(context.getChatContext(1, 6, 'wolf', 'b')).rejects.toBeInstanceOf(

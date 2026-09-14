@@ -5,6 +5,7 @@ import { ActionLink } from "@/components/ui/ActionLink";
 import { actionClass } from "@/components/ui/actionStyles";
 
 import type { CharacterChatController } from "./useCharacterChat";
+import { CharacterReplyPlayer } from "./CharacterReplyPlayer";
 
 /**
  * 등장인물 대화의 **내용물**. 상태는 `useCharacterChat` 이, 껍데기(시트·모달·dock)는 `ChatSurface` 가 갖는다.
@@ -18,9 +19,11 @@ import type { CharacterChatController } from "./useCharacterChat";
 export function CharacterChat({
   chat,
   loginHref,
+  onInteraction,
 }: {
   chat: CharacterChatController;
   loginHref: string;
+  onInteraction: () => void;
 }) {
   const {
     status,
@@ -37,6 +40,10 @@ export function CharacterChat({
     submit,
     updateDraft,
     recheck,
+    retryAudio,
+    retryingAudio,
+    autoPlayReply,
+    markReplyPlayed,
   } = chat;
 
   return (
@@ -189,6 +196,16 @@ export function CharacterChat({
                 <div className="max-w-2xl rounded-2xl border-2 border-primary p-4">
                   <p className="mb-1 font-bold text-ink">{exchange.displayName}</p>
                   <p className="whitespace-pre-wrap text-ink">{exchange.reply}</p>
+                  <CharacterReplyPlayer
+                    displayName={exchange.displayName}
+                    audioUrl={exchange.replyAudioUrl}
+                    audioStatus={exchange.replyAudioStatus}
+                    autoPlay={autoPlayReply}
+                    retrying={retryingAudio}
+                    onAutoPlayed={markReplyPlayed}
+                    onRetry={retryAudio}
+                    onInteraction={onInteraction}
+                  />
                 </div>
               ) : null}
             </div>
@@ -199,9 +216,12 @@ export function CharacterChat({
             </p>
           ) : null}
           {status === "completed" ? (
-            <p className="font-bold text-ink-muted">
-              다음에 이 책을 열어도 우리 대화를 다시 볼 수 있어요.
-            </p>
+            <>
+              {error ? <p role="alert" className="text-sm font-bold text-accent-b-strong">{error}</p> : null}
+              <p className="font-bold text-ink-muted">
+                다음에 이 책을 열어도 우리 대화를 다시 볼 수 있어요.
+              </p>
+            </>
           ) : null}
           {status === "failed" ? (
             <p role="alert" className="text-ink">

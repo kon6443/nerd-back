@@ -150,6 +150,7 @@ export class StorySessionService {
         bodyText: page.bodyText,
         status: image?.status ?? 'pending',
         imageUrl: image?.status === 'succeeded' && image.imageKey ? await this.storagePort.getPresignedUrl(image.imageKey) : null,
+        narrationAudioUrl: await this.getNarrationAudioUrl(page.narrationAudioKey),
         errorMessage: image?.errorMessage ?? null,
       };
     });
@@ -159,6 +160,15 @@ export class StorySessionService {
       firstBranchChoice: firstChoice?.branchKey ?? null,
       choices: (await Promise.all(result)) as AfterStoryResponse['choices'],
     };
+  }
+
+  private async getNarrationAudioUrl(key: string | null): Promise<string | null> {
+    if (key === null) return null;
+    try {
+      return await this.storagePort.getPresignedUrl(key);
+    } catch {
+      return null;
+    }
   }
 
   async selectAfterStoryChoice(
