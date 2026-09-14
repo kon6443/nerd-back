@@ -1,4 +1,5 @@
 import { AuthCta } from "@/components/layout/AuthCta";
+import { HOME_AUTHENTICATED_CTA } from "@/components/layout/authLinks";
 import { ActionLink } from "@/components/ui/ActionLink";
 
 export default function Home() {
@@ -6,7 +7,7 @@ export default function Home() {
     <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center px-5 py-12 text-center sm:px-8 md:py-16">
       <h1 className="max-w-3xl text-balance text-4xl font-extrabold leading-tight tracking-tight text-ink sm:text-5xl md:text-6xl">
         <span className="md:block">동화 속 주인공이</span>{" "}
-        <span className="md:block">바로 나예요</span>
+        <span className="md:block">되러 가볼까요?</span>
       </h1>
       <p className="mt-5 max-w-xl text-pretty text-base leading-7 text-ink-muted sm:text-lg">
         시연 동화를 펼치고, 이야기 속 주인공을 만나 보세요.
@@ -16,9 +17,9 @@ export default function Home() {
         <ActionLink href="/library" variant="primary" className="w-full sm:w-56">
           동화 체험하기
         </ActionLink>
-        {/* 로그인 상태에 따라 「로그인하기」 ↔ 「마이페이지」로 갈린다.
+        {/* 로그인 상태에 따라 「로그인하기」 ↔ 「내 얼굴로 만들기」로 갈린다.
             🚫 문구를 여기 적지 않는다 — `authLinks.ts` 가 소스다. */}
-        <AuthCta className="w-full sm:w-56" />
+        <AuthCta className="w-full sm:w-56" authenticated={HOME_AUTHENTICATED_CTA} />
       </div>
       <p className="mt-4 text-sm font-medium text-ink-muted">시연은 로그인 없이 바로 볼 수 있어요.</p>
     </main>

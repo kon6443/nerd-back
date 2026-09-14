@@ -126,7 +126,8 @@ export function AppHeader() {
         {/* 🚫 여기서 CTA 를 다시 그리지 않는다 — `AuthCta` 가 상태·문구·aria-current 를 모두
             소유한다. 두 곳에서 그리면 한쪽만 고쳐져 갈린다. */}
         <div className="hidden lg:block">
-          <AuthCta />
+          {/* 헤더 CTA 는 본문 CTA 보다 한 단계 작다 — 같은 크기면 화면의 주 동작과 경쟁한다. */}
+          <AuthCta size="compact" />
         </div>
       </nav>
     </header>
