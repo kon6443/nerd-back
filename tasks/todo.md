@@ -1,4 +1,41 @@
-# main 기준 등장인물 채팅 통합 Implementation Plan
+# 현재 작업: 동화 낭독·캐릭터 답변 TTS
+
+> 상태: **명세·계획 작성 완료, 구현 승인 대기**
+> Spec: [`docs/tasks/slice-7-tts-spec.md`](../docs/tasks/slice-7-tts-spec.md)
+> Plan: [`tasks/plan.md`](plan.md)
+
+- [ ] Task 1 — 데이터·공유 계약과 공식 동화 낭독 키
+  - Acceptance: 본편 1~5와 6A/6B 키, 캐릭터 음성 설정, 답변 음성 상태가 타입과 스키마에서 일치한다.
+  - Verify: migration SQL/metadata, contracts, official story fixture tests. 실제 DB 명령은 실행하지 않는다.
+  - Files: contracts 3개 이하, 엔티티 3개, migration 1개, official story data/test
+- [ ] Task 2 — 본편·비하인드 낭독 URL API
+  - Acceptance: 시연·체험이 키가 아닌 서명 URL을 받고, 키 누락·서명 실패에도 본문을 받는다.
+  - Verify: story service와 story-session service 단위 테스트, backend build.
+  - Files: story contract/DTO/service, story-session service와 tests
+- [ ] Task 3 — OpenRouter Gemini TTS Port·Adapter
+  - Acceptance: voice/model/settings가 올바르게 전달되고 API key 누락·타임아웃·비정상 응답이 음성 실패로 격리된다.
+  - Verify: adapter와 env validation tests. 실제 과금 호출은 하지 않는다.
+  - Files: TTS port/adapter/tests, `OPENROUTER_TTS_MODEL` env validation/example, module wiring
+- [ ] Task 4 — 캐릭터 답변 음성 생성·재시도 API
+  - Acceptance: 답변 텍스트를 먼저 보존하고 동일 채팅 TTS를 한 번만 생성하며 실패 시 음성만 재시도한다.
+  - Verify: 동시 선점, 저장 재사용, 실패·중단·재시도 service/controller tests.
+  - Files: chat contract/DTO/controller/service/tests
+- [ ] Task 5 — 공통 낭독 UI
+  - Acceptance: Q1~Q12, Q15~Q17, Q24~Q27이 시연·체험에서 같은 방식으로 동작한다.
+  - Verify: Vitest와 1024×768/390×844 수동 리더 흐름.
+  - Files: audio controller, `NarrationPlayer.tsx`, BookPager/BookReader, trial reader integration/tests
+- [ ] Task 6 — 캐릭터 답변 음성 UI
+  - Acceptance: 새 답변만 자동재생하고 저장 답변은 수동재생하며 채팅 조작 시 내레이션이 정지한다.
+  - Verify: 준비·완료·실패·재방문·배타 재생 Vitest 및 수동 QA.
+  - Files: story-chat API, useCharacterChat, CharacterChat, audio integration/tests
+- [ ] Task 7 — 전체 검증과 운영 게이트
+  - Acceptance: `pnpm ci:all` 통과, 캐릭터 Gemini voice 설정과 `OPENROUTER_API_KEY`·`OPENROUTER_TTS_MODEL`이 배포 전 게이트로 정리된다.
+  - Verify: CI, diff/check, 시연·체험 A/B와 채팅 수동 QA.
+  - Files: 계획 Verification Story와 필요한 운영 문서
+
+---
+
+# 이전 완료 기록: main 기준 등장인물 채팅 통합 Implementation Plan
 
 > **For implementers:** main 구현을 유지하고 채팅만 이식하며 아래 검증을 완료한다.
 

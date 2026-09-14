@@ -5,7 +5,7 @@
 > 입력: [`ideas/my-story/`](../../ideas/my-story/) · 팀 회의 2026-08-31 · **2026-09-02** · 작업 지시 2026-09-04
 > 참고: AI 시안 5장(팀 공유) · 사내 참고 프로젝트 2곳 — 본 문서에서 **참고 A**(NestJS 백엔드) · **참고 B**(Next.js 프론트)
 > 범위: `apps/back` + `apps/front` 의 도메인 모듈·API 계약·화면·연동
-> 비목표: 동화 원고·삽화 제작, AI 모델 선정(실험 중), TTS, 인프라 변경
+> 비목표: 동화 원고·삽화 제작, 이미지 생성 모델 재선정, 인프라 변경
 > 원칙: 이 문서가 **My Story 결정의 SSOT** 다. 결정이 바뀌면 코드보다 이 문서를 먼저 고친다.
 
 > **SSOT 경계** — 여기 없는 것은 다른 문서가 소유한다. 옮겨 적지 않는다.
@@ -48,12 +48,12 @@
 
 | 항목 | 사유 |
 |---|---|
-| **TTS** | 낭독은 팀이 직접 녹음한다. 정적 오디오 파일이지 API 가 아니다 |
+| ~~**TTS**~~ | **범위에 포함 (09-14).** 본문은 팀이 제작한 정적 MP3, 캐릭터 답변만 OpenRouter의 `google/gemini-3.1-flash-tts-preview`를 사용한다. [`slice-7-tts-spec.md`](slice-7-tts-spec.md) |
 | **이미지 생성 모델 선정** | 실험 중. **Port 인터페이스는 지금 만들고 어댑터만 대기**한다 |
 | STT | 스펙에 없다 |
 
-> [`tasks-ai-fairy-tale-cost.md`](tasks-ai-fairy-tale-cost.md) 는 TTS·STT·부모캐릭터 전제다. 셋 다 범위 밖이므로
-> **그 합계($0.16)를 My Story 예산으로 쓰지 않는다.** 유효한 것은 그 문서의 「비용 통제 규칙」 8개뿐이다.
+> [`tasks-ai-fairy-tale-cost.md`](tasks-ai-fairy-tale-cost.md)의 Gemini 2.5 전체 낭독 비용은 현재 정적 낭독 + Gemini 3.1 캐릭터 답변 결정에 적용하지 않는다.
+> 유효한 것은 저장 결과 재사용과 호출 상한 같은 비용 통제 원칙이다.
 
 ---
 
@@ -70,7 +70,7 @@
 | AI 호출 | **없음** | 있음 |
 | 얼굴 | **미리 합성해 둔 파일**을 AI 가 만든 것처럼 보여준다 | 실제 촬영 → 업로드 → 생성 |
 | 대상 동화 | **1권 고정** | 템플릿 **2권** 중 선택 |
-| 낭독 | 팀 녹음 (D9 보류) | 팀 녹음 (D9 보류) |
+| 낭독 | 팀 제작 MP3 | 팀 제작 MP3 + 캐릭터 답변 OpenRouter Gemini 3.1 Flash TTS |
 | 인터랙션 | 버튼으로 플로우 진행만 | 등장인물 대화 |
 | 제한 | 없음 | **동화 1권당 1회.** 만든 책은 다시 못 만든다 |
 | 진입 | 첫 화면 | 시연 화면 우측 상단 버튼 |
@@ -106,7 +106,7 @@
 | **D10** | 계정·데이터 삭제 | **열림 · 신규** | 생성 결과를 **영구 보관**하기로 해서 생긴 항목이다. 탈퇴·삭제 요구에 어떻게 응할지 정해야 한다 |
 | ~~D7~~ | ~~프론트·백 타입 공유~~ | **✅ 해소 (09-04)** | 공유 패키지 `packages/contracts`. ↓ 「타입·검증 공유」 |
 | ~~D8~~ | ~~백엔드 검증 체계~~ | **✅ 해소 (09-04)** | **전면 교체** — 전역 파이프를 스키마 기반으로 바꾸고 class-validator 를 걷어낸다. ↓ 「D8 확정」 |
-| **D9** | 오디오 낭독 | **보류 (09-04)** | 할지 말지 미정. `story_pages.audio_key` 는 **결정 전까지 추가하지 않는다** — 안 쓸 컬럼을 미리 만들지 않는다 |
+| ~~**D9**~~ | ~~오디오 낭독~~ | **✅ 해소 (09-14)** | `story_pages.narration_audio_key`로 정적 낭독을 연결하고 캐릭터 답변만 OpenRouter Gemini 3.1 Flash TTS로 생성·저장한다. [`slice-7-tts-spec.md`](slice-7-tts-spec.md) |
 
 **지금 무엇이 막혀 있는가 (2026-09-08)** — 슬라이스마다 흩어져 있어 한눈에 안 보이므로 여기 모은다.
 
@@ -116,7 +116,7 @@
 | ~~**D3** 이미지 생성 모델~~ | ~~Slice 4 (어댑터만)~~ | **✅ 해소 (09-08)** — Port & Adapter (Mock 기본 + OpenRouter 병행) 확정 |
 | ~~**D4** 비하인드 분기 구조~~ | ~~Slice 6 · 분기 모델 마이그레이션~~ | **✅ 해소 (09-10)** — 상세 설계: [`slice-6-behind-branch-spec.md`](slice-6-behind-branch-spec.md) |
 | **D5** 저작권 | 실 콘텐츠 투입 | 개발용 픽스처로 우회 중이라 **구현은 막지 않는다** |
-| **D9** 오디오 | `audio_key` 컬럼 · `AudioPlayer` | 안 하기로 하면 할 일이 사라진다 |
+| ~~**D9** 오디오~~ | ~~낭독·캐릭터 답변 TTS~~ | **✅ 해소 (09-14)** — Slice 7 상세 설계 확정 |
 | **D10** 계정·데이터 삭제 | 없음 (정책) | 출시 전까지 |
 
 **→ 이제 Slice 3 이 최우선이다.** D1·D3 이 모두 풀려 `StoragePort`와 `ImageGenerationPort` 설계가 확정되었다.
@@ -238,7 +238,7 @@ AI 시안 5장(홈·리더·비하인드 선택·생성 대기·개인화 결과
 | **`BookFrame.tsx`** (조각 모음) | 리더 · 비하인드 | ✅ | 겉틀 `BookVolume` · 삽화 면 · 본문 면 · 대기 골격. 종이 결·책등·단면은 `BookFrame.module.css`. ⚠️ **한 판을 그리는 `BookFrame` 컴포넌트는 없다** — 조립은 `BookPager` 한 곳이다(2026-09-14 제거) |
 | **`BookPager`** | 리더 (시연 · 체험) | ✅ (2026-09-14) | ⭐ **쪽 넘김만** 소유하고 데이터 출처를 모른다 — `renderArt`/`renderText` 로 내용을 받는다 (Slice 7) |
 | `ChatSurface` · `ChatLauncher` | 체험 리더의 등장인물 대화 | ✅ (2026-09-14) | 한 라우트만 써서 **`components/` 로 올리지 않는다**(colocate). 상태는 `useCharacterChat` 이 소유 |
-| ~~`AudioPlayer`~~ | 리더 | 보류 | **보류 (D9)** — 낭독을 할지 자체가 미정이다. 쓸지 모르는 컴포넌트를 먼저 만들지 않는다 |
+| `NarrationPlayer` | 리더 | Slice 7 구현 대기 | 첫 사용자 입력 후 페이지별 정적 MP3를 재생한다. [`slice-7-tts-spec.md`](slice-7-tts-spec.md) |
 | `ProgressWithTip` | 생성 대기 | 미구현 | 진행률 + 팁 텍스트. **Slice 4 의 UX 답이다** |
 
 **variant 는 `Record<Variant, string>` 객체 맵으로 관리한다.** 참고 B 의 방식이고 `cva`·`tailwind-merge`·`clsx` **의존성이 0개**로 해결된다. 새 의존성은 승인 대상이므로 이쪽이 유리하다.
@@ -260,7 +260,7 @@ apps/front/
     layout.tsx  globals.css
   components/
     ui/                  Button · Card · Modal — 도메인을 모른다
-    story/               StoryCard · BookFrame · AudioPlayer
+    story/               StoryCard · BookFrame · NarrationPlayer
   hooks/
   lib/api/               fetch 클라이언트 · 에러 타입
   types/
@@ -332,7 +332,7 @@ AI 시안 5장을 보고 **현재 스키마에 없는데 필요한 것**이 드�
 
 | 필요한 것 | 어디에 | 왜 |
 |---|---|---|
-| ~~`story_pages.audio_key`~~ | — | **보류 (D9).** 시안에는 오디오 플레이어가 있지만 낭독을 할지 자체가 미정이다. 하기로 하면 컬럼 1개 추가 마이그레이션이면 된다 — **미리 만들지 않는다** |
+| `story_pages.narration_audio_key` | 콘텐츠 | 팀이 제작한 페이지별 MP3 오브젝트 키. 본편 1~5와 A/B 결과를 각 `story_pages` 행에 연결한다 (D9) |
 | 분기 선택 메타 (`title` · `description` · `branch_key`) | 콘텐츠 | 비하인드 A/B 화면은 **삽화 없는 UI**다. 제목·설명·분기 키는 콘텐츠 데이터이며, 썸네일은 필요해질 때 추가한다 |
 | 콘텐츠·개인화 결과의 `branch_key` | `story_pages` · `session_page_images` | 동일한 결과 6쪽의 A/B를 구분한다. 공통값은 `common`으로 저장하고, 세션 이미지는 `(session_id, page_no, branch_key)`로 유일해야 한다 |
 | 최초 선택 기록 | `session_branch_choices` | 첫 A/B 선택만 영구 보존하고, 재독 중 다른 결과 열람은 기록을 바꾸지 않는다 |
@@ -341,7 +341,7 @@ AI 시안 5장을 보고 **현재 스키마에 없는데 필요한 것**이 드�
 
 **D4 확정 (2026-09-10)** — 본편은 5쪽, 그 뒤 삽화 없는 A/B 선택 UI를 열고 A/B별 결과를 동일한 6쪽으로 보여 준다. 개인화 이미지는 공통 5장과 A/B 결과 2장을 모두 선생성한다. 상세는 [`slice-6-behind-branch-spec.md`](slice-6-behind-branch-spec.md)를 따른다.
 
-⚠️ 오디오는 **D9 로 보류**다. 리더의 `AudioPlayer` 컴포넌트도 같이 보류한다 — 쓸지 모르는 컴포넌트를 먼저 만들지 않는다.
+**D9 확정 (2026-09-14)** — 본문 낭독은 정적 MP3를 사용하고, 캐릭터 답변만 OpenRouter의 `google/gemini-3.1-flash-tts-preview`로 생성해 저장·재사용한다. 기존 `OPENROUTER_API_KEY`와 크레딧을 공유하며 별도 ElevenLabs 구독은 사용하지 않는다. 재생 상태와 데이터/API 상세는 [`slice-7-tts-spec.md`](slice-7-tts-spec.md)를 따른다.
 
 ### 시연 콘텐츠를 어떻게 둘 것인가
 
@@ -930,7 +930,7 @@ Next 는 서버 코드를 번들링하므로 contracts 는 산출물에 인라�
 - [x] API 1·2·3 + Swagger + 도메인 에러 2종
 - [x] 단위 7건 · E2E 9건
 - [x] **픽스처 시드 스크립트** — `pnpm db:seed:dev [--publish]` ← ↓ 「픽스처를 러너와 분리했다」
-- [x] **프론트**: 서재 목록 → 상세 → 시연 리더(`BookFrame`) + **전역 네비(`AppHeader`)**. `AudioPlayer` 는 D9 대기
+- [x] **프론트**: 서재 목록 → 상세 → 시연 리더(`BookFrame`) + **전역 네비(`AppHeader`)**. 낭독 UI는 Slice 7 구현 대기
 - [ ] **스키마 결손 보강 마이그레이션** — 분기 키·선택 메타·최초 선택 기록·앨범 썸네일 ← ↑ 「시안이 드러낸 스키마 결손」
 - [x] 마이그레이션 실행 + 시드 투입 (사람이, 2026-09-04 · 09-07) — ↓ 「Verification Story」에 시각과 근거
 
