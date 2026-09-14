@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FOCUS_RING } from "@/components/ui/actionStyles";
+import { actionClass } from "@/components/ui/actionStyles";
 import {
   CHAT_SURFACES,
   CHAT_SURFACE_LABEL,
@@ -35,13 +35,13 @@ function OptionRow({
   onSelect: () => void;
 }) {
   return (
-    <label className="flex min-h-touch cursor-pointer items-center gap-3 rounded-btn px-3 text-sm text-ink has-checked:bg-primary-tint has-checked:font-bold has-focus-visible:ring-4 has-focus-visible:ring-magic-strong">
+    <label className="flex min-h-touch cursor-pointer items-center gap-3 rounded-btn px-3 text-sm text-ink has-checked:bg-accent-a-soft has-checked:font-bold has-focus-visible:ring-4 has-focus-visible:ring-magic-strong">
       <input
         type="radio"
         name={name}
         checked={checked}
         onChange={onSelect}
-        className="size-4 shrink-0 accent-primary-strong"
+        className="size-4 shrink-0 accent-accent-a"
       />
       <span className="break-keep">{label}</span>
     </label>
@@ -58,12 +58,13 @@ export function ReaderPreviewSettings({ options }: { options: ReaderOptions }) {
 
   return (
     // 🚫 자기 좌표를 갖지 않는다 — 리더의 하단 바가 위치를 소유한다(`ChatLauncher` 와 같은 이유).
-    <div className="pointer-events-auto flex flex-col items-center gap-2">
+    //    패널은 버튼 **위로** 뜬다(`bottom-full`). 흐름 안에 두면 열 때마다 하단바 높이가 커진다.
+    <div className="relative">
       {open ? (
         <div
           aria-labelledby={SETTINGS_TITLE_ID}
           role="group"
-          className="max-h-[70dvh] w-[17rem] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-card border-2 border-line bg-surface-raised p-4 shadow-xl"
+          className="absolute bottom-full left-0 mb-3 max-h-[70dvh] w-[17rem] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-card border-2 border-line bg-surface-raised p-4 text-left shadow-xl"
           onKeyDown={(event) => {
             if (event.key === "Escape") setOpen(false);
           }}
@@ -114,10 +115,11 @@ export function ReaderPreviewSettings({ options }: { options: ReaderOptions }) {
         type="button"
         onClick={() => setOpen((previous) => !previous)}
         aria-expanded={open}
-        className={`inline-flex min-h-touch items-center gap-2 rounded-pill border-2 border-line bg-surface-raised px-5 text-sm font-bold text-ink-muted shadow-md hover:text-ink ${FOCUS_RING}`}
+        // 임시 도구라 **텍스트 버튼(tertiary)** — 읽기 조작보다 눈에 띄면 안 된다.
+        className={actionClass("tertiary", "gap-2 px-3", "compact")}
       >
         <span aria-hidden="true">⚙️</span>
-        {/* 좁은 화면에서는 런처와 한 줄에 서지 못해 조작줄을 덮는다 — 글자를 접고 아이콘만 남긴다. */}
+        {/* 좁은 화면에서는 하단바 한 줄에 서지 못한다 — 글자를 접고 아이콘만 남긴다. */}
         <span className="hidden sm:inline">보기 설정</span>
         <span className="sr-only sm:hidden">보기 설정</span>
       </button>

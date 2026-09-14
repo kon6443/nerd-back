@@ -551,10 +551,9 @@ function StoryReadContent({ params }: PageProps) {
   const dockOpen = readerOptions.chat === "dock" && chatOpen;
 
   // 🚫 클래스를 JSX 안에서 조립하지 않는다 — 후보를 지울 때 조건을 하나씩 찾아다니게 된다.
-  //    아래 여백은 하단 가운데 플로팅 바의 자리다. 없으면 그 바가 책의 조작줄을 덮는다.
-  //    ⚠️ 좁은 화면에서는 「보기 설정」과 런처가 **두 줄로 접히므로** 더 많이 비운다.
+  //    아래 여백(`pb-28`)은 화면 하단에 붙은 조작 바의 자리다. 없으면 바가 책 아래를 덮는다.
   const mainClass = [
-    "mx-auto flex w-full flex-1 gap-4 px-4 pt-5 pb-40 md:px-8 md:pt-6 md:pb-24",
+    "mx-auto flex w-full flex-1 gap-4 px-4 pt-5 pb-28 md:px-8 md:pt-6",
     readerOptions.immersive ? "max-w-7xl md:h-dvh" : "max-w-5xl",
     dockOpen ? "flex-col md:flex-row" : "flex-col",
   ].join(" ");
@@ -580,8 +579,10 @@ function StoryReadContent({ params }: PageProps) {
             )}
           </h1>
 
+          {/* 넓은 화면에서는 하단바 가운데가 진행을 보여 준다 — 여기는 좁은 화면(바 가운데가 접힘) 전용.
+              `aria-live` 는 이 한 곳에만 둔다. 바의 숫자까지 읽히면 쪽마다 두 번 읽힌다. */}
           <p
-            className="rounded-pill bg-surface-raised px-4 py-2 text-sm font-bold text-ink-muted shadow-sm"
+            className="rounded-pill bg-surface-raised px-4 py-2 text-sm font-bold text-ink-muted shadow-sm sm:sr-only"
             aria-live="polite"
           >
             {currentPageNo} / {totalPages}
@@ -601,93 +602,6 @@ function StoryReadContent({ params }: PageProps) {
           )}
         />
 
-        <div className={READER_BAR}>
-          {isFirstPage ? (
-            <span
-              aria-disabled="true"
-              className={actionClass("secondary", "pointer-events-none opacity-40")}
-            >
-              이전
-            </span>
-          ) : currentPageNo === 6 ? (
-            <button onClick={openBranchScreen} className={actionClass("secondary")}>
-              선택지로
-            </button>
-          ) : (
-            <button
-              onClick={() => setCurrentPageNo((prev) => Math.max(1, prev - 1))}
-              className={actionClass("secondary")}
-            >
-              이전
-            </button>
-          )}
-
-          {/* 도트 인디케이터 (1~6쪽) */}
-          <div className="flex items-center">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
-              const isCur = num === currentPageNo;
-              const isBehind = num > 4;
-              return (
-                <button
-                  key={num}
-                  onClick={() => {
-                    if (num === 6) {
-                      openBranchScreen();
-                      return;
-                    }
-                    setActiveBranchKey(null);
-                    setCurrentPageNo(num);
-                  }}
-                  title={`${num}쪽`}
-                  // 🚫 title 에만 기대지 않는다 — 스크린리더가 일관되게 읽지 않는다.
-                  //    현재 위치도 색으로만 표시하면 화면을 못 보는 사용자에게는 없는 정보다.
-                  aria-label={`${num}쪽으로 이동`}
-                  aria-current={isCur ? "true" : undefined}
-                  // ⭐ 보이는 점(10px)은 그대로 두고 **히트 영역만** 넓힌다. 10px 짜리 점을
-                  //    직접 누르게 하면 아이 손가락으로는 거의 맞출 수 없다.
-                  //    ⚠️ 56px(`--spacing-touch`) 규약에는 못 미친다 — 6개가 한 줄에 들어가야 해
-                  //    30px 로 절충했다(기존 대비 3배). 대신 컨테이너 gap 을 없애 총폭을 억제했다.
-                  className={`group grid place-items-center rounded-full p-2.5 ${FOCUS_RING}`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`h-2.5 rounded-full transition-all motion-reduce:transition-none ${
-                      isCur
-                        ? "w-6 bg-primary"
-                        : isBehind
-                        ? "w-2.5 bg-magic/40 group-hover:bg-magic"
-                        : "w-2.5 bg-line group-hover:bg-ink-muted"
-                    }`}
-                  />
-                </button>
-              );
-            })}
-        </div>
-
-        {/* 다음 버튼 분기 처리 */}
-        {currentPageNo === 5 ? (
-          <button
-            onClick={openBranchScreen}
-            className={actionClass("primary", "font-bold")}
-          >
-            비하인드 선택하기 →
-          </button>
-        ) : currentPageNo >= totalPages ? (
-          <button
-            onClick={() => setViewState("end")}
-            className={actionClass("primary", "font-bold")}
-          >
-            다 읽었어요 🎉
-          </button>
-        ) : (
-          <button
-            onClick={() => setCurrentPageNo((prev) => Math.min(totalPages, prev + 1))}
-            className={actionClass("primary")}
-          >
-            다음 페이지 →
-          </button>
-        )}
-      </div>
 
         </div>
 
@@ -706,22 +620,122 @@ function StoryReadContent({ params }: PageProps) {
       </main>
 
       {/*
-        화면 **아래 가운데**. 구석에 두었더니 몰입 화면에서 눈에 들어오지 않았다(2026-09-14 피드백).
-        ⭐ 위치는 이 컨테이너가 **혼자** 소유한다 — 버튼마다 `fixed` 를 달면 둘이 따로 놀고,
-        안전영역·겹침을 두 곳에서 관리하게 된다.
-        `pointer-events-none` 은 버튼 사이 빈 곳으로 책을 계속 누를 수 있게 한다(자식만 되살린다).
+        ⭐ **하단바 — 왼쪽 되돌아가기 · 가운데 진행 · 오른쪽 나아가기**(2026-09-14 요청).
+        한때 진행 점이 배경(언덕 그림) 위에 떠 있어 묻혔고, 「보기 설정」·대화 버튼은 따로 떠 있었다.
+        흰 바 하나에 모아 **자리가 곧 의미**가 되게 한다: 왼쪽=뒤로, 가운데=어디쯤, 오른쪽=앞으로·도구.
+        위치는 이 바가 **혼자** 소유한다 — 버튼마다 `fixed` 를 달면 안전영역·겹침을 여러 곳에서 관리하게 된다.
+        책과 겹치지 않게 비우는 여백은 `mainClass` 의 `pb-28` 이 맡는다.
       */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-30 flex flex-wrap items-end justify-center gap-3 px-4">
-        <ReaderPreviewSettings options={readerOptions} />
-        {chatOpen ? null : (
-          <ChatLauncher
-            chat={chat}
-            onOpen={() => setChatOpen(true)}
-            buttonRef={launcherRef}
-            disabled={dockLocked}
-          />
-        )}
-      </div>
+      <nav
+        aria-label="동화 읽기 조작"
+        className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-line bg-surface-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm"
+      >
+        {/* 좁은 화면은 가운데가 접히므로 grid 3칸이 아니라 양끝 정렬이다 — 3칸으로 두면 오른쪽 칸이 폭의 절반에 갇혀
+            「다음 페이지」가 네 줄로 꺾였다(2026-09-14 390px 실측). */}
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:grid sm:grid-cols-[1fr_auto_1fr] md:gap-4 md:px-8">
+          {/* 왼쪽 — 뒤로 */}
+          <div className="flex items-center gap-2 justify-self-start">
+            {isFirstPage ? (
+              // 🚫 버튼을 숨기지 않는다 — 사라졌다 나타나면 위치가 흔들려 오터치가 는다.
+              <span
+                aria-disabled="true"
+                className={actionClass("secondary", "pointer-events-none opacity-40", "compact")}
+              >
+                이전
+              </span>
+            ) : currentPageNo === 6 ? (
+              <button onClick={openBranchScreen} className={actionClass("secondary", "", "compact")}>
+                선택지로
+              </button>
+            ) : (
+              <button
+                onClick={() => setCurrentPageNo((prev) => Math.max(1, prev - 1))}
+                className={actionClass("secondary", "", "compact")}
+              >
+                이전
+              </button>
+            )}
+            <ReaderPreviewSettings options={readerOptions} />
+          </div>
+
+          {/* 가운데 — 진행. 좁은 화면에서는 상단의 쪽 표시가 대신한다. */}
+          <div className="hidden items-center gap-3 justify-self-center sm:flex">
+            <div className="flex items-center">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
+                const isCur = num === currentPageNo;
+                const isBehind = num > 4;
+                return (
+                  <button
+                    key={num}
+                    onClick={() => {
+                      if (num === 6) {
+                        openBranchScreen();
+                        return;
+                      }
+                      setActiveBranchKey(null);
+                      setCurrentPageNo(num);
+                    }}
+                    title={`${num}쪽`}
+                    // 🚫 title 에만 기대지 않는다 — 스크린리더가 일관되게 읽지 않는다.
+                    //    현재 위치도 색으로만 표시하면 화면을 못 보는 사용자에게는 없는 정보다.
+                    aria-label={`${num}쪽으로 이동`}
+                    aria-current={isCur ? "true" : undefined}
+                    // ⭐ 보이는 점(10px)은 그대로 두고 **히트 영역만** 넓힌다. 10px 짜리 점을
+                    //    직접 누르게 하면 아이 손가락으로는 거의 맞출 수 없다.
+                    //    ⚠️ 56px(`--spacing-touch`) 규약에는 못 미친다 — 6개가 한 줄에 들어가야 해
+                    //    30px 로 절충했다(기존 대비 3배). 대신 컨테이너 gap 을 없애 총폭을 억제했다.
+                    className={`group grid place-items-center rounded-full p-2.5 ${FOCUS_RING}`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      // 진행 표시는 버튼이 아니라 **위치**다 — 초록(GNB 전용)이 아니라 주 동작과 같은 파랑.
+                      className={`h-2.5 rounded-full transition-all motion-reduce:transition-none ${
+                        isCur
+                          ? "w-6 bg-accent-a"
+                          : isBehind
+                          ? "w-2.5 bg-magic/40 group-hover:bg-magic"
+                          : "w-2.5 bg-line group-hover:bg-ink-muted"
+                      }`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-sm font-bold text-ink-muted tabular-nums" aria-hidden="true">
+              {currentPageNo} / {totalPages}
+            </p>
+          </div>
+
+          {/* 오른쪽 — 도구와 앞으로. 가장 오른쪽 끝이 늘 **다음 동작(primary)** 이다. */}
+          <div className="flex items-center gap-2 justify-self-end sm:col-start-3">
+            {chatOpen ? null : (
+              <ChatLauncher
+                chat={chat}
+                onOpen={() => setChatOpen(true)}
+                buttonRef={launcherRef}
+                disabled={dockLocked}
+              />
+            )}
+            {currentPageNo === 5 ? (
+              <button onClick={openBranchScreen} className={actionClass("primary", "whitespace-nowrap", "compact")}>
+                <span className="hidden sm:inline">비하인드 </span>선택하기 →
+              </button>
+            ) : currentPageNo >= totalPages ? (
+              <button onClick={() => setViewState("end")} className={actionClass("primary", "whitespace-nowrap", "compact")}>
+                다 읽었어요 🎉
+              </button>
+            ) : (
+              <button
+                onClick={() => setCurrentPageNo((prev) => Math.min(totalPages, prev + 1))}
+                className={actionClass("primary", "whitespace-nowrap", "compact")}
+              >
+                {/* 좁은 화면은 「다음」만 — 바 한 줄에 네 버튼이 서야 한다. */}
+                다음<span className="hidden sm:inline"> 페이지</span> →
+              </button>
+            )}
+          </div>
+        </div>
+      </nav>
     </>
   );
 }
