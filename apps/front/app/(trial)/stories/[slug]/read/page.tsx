@@ -288,6 +288,10 @@ function StoryReadContent({ params }: PageProps) {
           await preloadImages([getFirstPageImageUrl(sessionData)]);
           if (!active) return;
           setViewState("reader");
+          // ⭐ 나머지 삽화는 **기다리지 않고 바로** 받기 시작한다. 화면에 그려진 첫 삽화의
+          //    `onLoad` 를 기다리면 배포처럼 이미지가 느린 곳에서 프리로드가 몇 초씩 늦어지고,
+          //    그 사이에 넘기면 밑면 삽화가 빈 채로 스친다(2026-09-14 재현).
+          void preloadImages(sessionData.pages.map((page) => page.imageUrl));
         } else {
           setViewState("generating");
         }
@@ -326,6 +330,7 @@ function StoryReadContent({ params }: PageProps) {
           // 폴링으로 본편 완료를 처음 받는 경로도 초기 조회와 똑같이 독서 화면으로 전환한다.
           // 이 전환이 없으면 5/7 상태에서 폴링만 멈춰 생성 화면이 그대로 남는다.
           setViewState("reader");
+          void preloadImages(data.pages.map((page) => page.imageUrl));
         });
       }
     },
@@ -582,16 +587,6 @@ function StoryReadContent({ params }: PageProps) {
   const isFirstPage = currentPageNo <= 1;
   const isBehindPage = currentPageNo === 6;
 
-  /**
-   * 첫 삽화가 뜨는 순간 **나머지 삽화를 전부** 받아 둔다(비하인드 A/B 포함).
-   * ⭐ 다음 한 장만 받으면 넘김 뒷면에 삽화가 늦게 도착해 빈 종이가 스친다. 6~7장뿐이고
-   *    이미지 요청은 스토리지로 직접 가므로 API 레이트리밋과 무관하다.
-   */
-  function preloadRemainingArtwork() {
-    if (!sessionPages) return;
-    void preloadImages(sessionPages.pages.map((page) => page.imageUrl));
-  }
-
   // `dock` 은 책 옆에 나란히 놓인다 — 열리면 책 칸이 그만큼 좁아진다.
   const dockOpen = readerOptions.chat === "dock" && chatOpen;
 
@@ -640,13 +635,7 @@ function StoryReadContent({ params }: PageProps) {
           fill={readerOptions.immersive}
           onRequestPage={requestPage}
           onTurningChange={setTurning}
-          renderArt={(pageNo) => (
-            <BookArtContent
-              pageNo={pageNo}
-              imageUrl={imageUrlAt(pageNo)}
-              onImageLoad={preloadRemainingArtwork}
-            />
-          )}
+          renderArt={(pageNo) => <BookArtContent pageNo={pageNo} imageUrl={imageUrlAt(pageNo)} />}
           renderText={(pageNo) => (
             <BookTextContent pageNo={pageNo}>{bodyTextAt(pageNo)}</BookTextContent>
           )}
