@@ -19,14 +19,19 @@ import type { ChatSurfaceKind } from "./readerOptions";
  */
 const CHAT_TITLE = "등장인물에게 물어봐요";
 
+/**
+ * ⚠️ **배경을 어둡게 덮지 않는다**(`backdrop:bg-transparent`, 2026-09-14 요청). 대화하면서도 책이 그대로
+ * 보여야 한다. 배경은 여전히 inert 라 누르면 닫힌다(아래 `onClick`) — 딤이 없어도 닫힘 경로는 같다.
+ */
 const DIALOG_BASE =
-  "m-0 border-2 border-primary bg-surface-raised p-0 text-ink shadow-xl backdrop:bg-ink/40 open:flex open:flex-col";
+  "m-0 border-2 border-primary bg-surface-raised p-0 text-ink shadow-xl backdrop:bg-transparent open:flex open:flex-col";
 
 /** 🚫 클래스를 컴포넌트 안에 흩지 않는다 — 후보를 지울 때 한 줄씩 찾아다니게 된다. */
 const DIALOG_CLASS: Record<"sheet" | "modal", string> = {
   sheet:
     "fixed inset-x-0 bottom-0 top-auto max-h-[85dvh] w-full max-w-none rounded-t-3xl " +
-    "md:inset-y-0 md:left-auto md:right-0 md:h-dvh md:max-h-none md:w-[26rem] md:max-w-[92vw] md:rounded-l-3xl md:rounded-tr-none",
+    // 넓은 화면: 화면 가장자리에 붙이지 않고 위·아래·오른쪽을 32px 띄운 **떠 있는 패널**(R 20).
+    "md:inset-y-8 md:left-auto md:right-8 md:h-auto md:max-h-none md:w-[26rem] md:max-w-[calc(100vw-4rem)] md:rounded-[1.25rem]",
   modal: "fixed inset-0 max-h-[85dvh] w-[min(36rem,92vw)] rounded-3xl",
 };
 
