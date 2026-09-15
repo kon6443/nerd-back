@@ -1,8 +1,9 @@
 # Slice 7: 동화 낭독과 캐릭터 답변 TTS 명세
 
-> 상태: **구현 완료 · 운영 DB 적용 및 수동 QA 전**
+> 상태: **구현·공유 DB 마이그레이션·실제 TTS 확인 완료 · 정적 낭독 및 수동 QA 전**
 > 확정일: 2026-09-14
 > TTS 공급자 확정: 2026-09-14 OpenRouter `google/gemini-3.1-flash-tts-preview`
+> 운영 확인: 2026-09-15 사용자 확인으로 공유 DB 마이그레이션 적용 및 실제 TTS 동작 검증
 > 입력: 2026-09-14 `/grill-me` Q1~Q27 합의
 > 관련 문서: [`tasks-my-story.md`](tasks-my-story.md) D9 · [`slice-6-behind-branch-spec.md`](slice-6-behind-branch-spec.md)
 
@@ -322,5 +323,6 @@ const audioStatus: StoryReplyAudioStatus = chat.replyAudioKey ? "completed" : "f
 ## Open Questions
 
 - 구현을 막는 제품 결정은 없다.
-- 배포 전 각 등장인물의 Gemini voice ID·settings 값과 `OPENROUTER_TTS_MODEL`을 검증해야 한다.
+- 공식 동화 시드 적용 여부와 본편 1~5·6A·6B 정적 낭독 MP3 14개 전체 재생을 확인해야 한다.
+- 실제 TTS는 동작했지만 각 등장인물의 Gemini voice ID·settings 조합은 수동 QA에서 확인해야 한다.
 - 계정·콘텐츠 삭제 정책(D10)이 정해지면 캐릭터 답변 음성 삭제 범위를 함께 갱신한다.

@@ -1,6 +1,6 @@
 # 현재 작업: 동화 낭독·캐릭터 답변 TTS
 
-> 상태: **구현 완료, 운영 DB 적용·수동 QA 대기**
+> 상태: **구현·운영 DB 적용·실제 TTS 확인 완료, 정적 낭독·수동 QA 대기**
 > Spec: [`docs/tasks/slice-7-tts-spec.md`](../docs/tasks/slice-7-tts-spec.md)
 > Plan: [`tasks/plan.md`](plan.md)
 
@@ -29,8 +29,8 @@
   - Verify: 준비·완료·실패·재방문·배타 재생 Vitest 및 수동 QA.
   - Files: story-chat API, useCharacterChat, CharacterChat, audio integration/tests
 - [ ] Task 7 — 전체 검증과 운영 게이트
-  - Acceptance: `pnpm ci:all` 통과, 캐릭터 Gemini voice 설정과 `OPENROUTER_API_KEY`·`OPENROUTER_TTS_MODEL`이 배포 전 게이트로 정리된다.
-  - Verify: CI, diff/check, 시연·체험 A/B와 채팅 수동 QA.
+  - 완료: backend·frontend CI, diff/check, PR #50 병합·배포, 공유 DB 마이그레이션, 실제 OpenRouter TTS 동작.
+  - 남음: 공식 동화 시드 적용 여부, 정적 낭독 MP3 14개 전체 재생, 시연·체험 A/B와 채팅의 화면 크기별 수동 QA.
   - Files: 계획 Verification Story와 필요한 운영 문서
 
 ---
