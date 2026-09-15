@@ -1,4 +1,139 @@
-# 현재 작업: 동화 낭독·캐릭터 답변 TTS
+# 얼굴 등록 화면 UI/UX 개선 — 2026-09-15
+
+**Goal:** 정면 사진 한 장으로 시작하는 흐름을 아이가 이해하기 쉬운 동화 속 촬영 공간으로 다듬는다.
+**Architecture:** 기존 하늘·풀밭 배경과 파랑 CTA를 유지한다. 촬영 표현은 라우트 전용 `CaptureStudio`와 CSS Module로 분리하고, 사진·세션·카메라 상태는 기존 페이지가 소유한다.
+**Spec:** 사용자 요청 — 현재 촬영 페이지의 투박함을 줄이고 아이들이 좋아할 UI/UX로 개선. 정면 한 장, 사진 이용 안내를 유지한다.
+
+## Design / Acceptance Criteria
+
+- 태블릿에서는 동화책 친구·짧은 안내와 촬영 공간을 나란히 배치하고, 모바일에서는 한 열로 읽히게 한다.
+- 추가 피드백: 왼쪽은 큰 제목·짧은 설명·책 캐릭터·사진 이용 안내로 단순화한다. 작은 제목·말풍선·촬영 팁을 제거하고 오른쪽은 유지한다.
+- 직접 그린 SVG 책 캐릭터, 부드러운 사진 프레임, 친근한 문구를 사용한다. 시스템 폰트·기존 색상·버튼 위계와 최소 56px 타깃을 유지한다.
+- 페이지 진입만으로 카메라 권한을 요청하지 않는다. 사용자가 카메라 켜기를 눌러 시작하며 파일 선택은 항상 대안으로 제공한다.
+- 사진 선택 전에는 촬영/카메라 켜기, 선택 후에는 이 얼굴로 만들기가 주 동작이다. 재촬영·파일 교체·오류·대기·완료·기존 동화 복원 흐름을 유지한다.
+- 사진 이용 안내는 카메라 조작 전에 보이고, 정면 한 장만 제출한다. 모션 줄이기 설정을 존중한다.
+
+### Task 1: 촬영 경험과 상태 화면 개선
+
+**Files:** `apps/front/app/(trial)/stories/[slug]/capture/page.tsx`, 새 `CaptureStudio.tsx`, 새 `CaptureStudio.module.css`(같은 라우트).
+**Interfaces:** `CaptureStudio`는 미리보기 URL·카메라/제출 상태·오류·DOM ref 및 조작 콜백을 받는다. 세션 API·사진 버퍼와 FormData 처리는 페이지가 유지한다.
+- [x] 촬영 스튜디오·동화책 친구·반응형 레이아웃·명시적 카메라 시작과 상태 화면을 구현한다.
+**Verification:** 사진 1개 FormData 유지, 클릭 전 카메라 요청 0회, 카메라 접근 실패와 화면 이탈 시 스트림 정리.
+
+### Task 2: 화면·상호작용 검증
+
+**Files:** 위 UI 파일과 기존 frontend 검증 명령, `tasks/todo.md`.
+- [x] 합성 카메라·API로 촬영/재촬영/파일/제출 대기/실패/성공/기존 세션을 확인한다. 1024×768·1440×900·390×844에서 화면과 키보드/모션 줄이기를 검증한다.
+- [x] frontend ci:all, foreground lint, diff 검사와 실제 개발 서버 헬스체크를 통과하고 근거를 기록한다.
+**Verification:** `npx --yes pnpm@10.26.2 front ci:all`, frontend 폴더에서 `npm run lint`, `git diff --check`, 브라우저 요청·화면 검증. 첫 시각 검증 후 필요한 수정은 한 번에 모아 최종 확인한다.
+
+## Risk & Rollback
+
+기존 카메라 자동 시작을 명시적 시작으로 바꾸므로 재촬영·세션 복원·늦은 권한 응답을 확인한다. 실제 DB·유료 생성·개인 사진을 검증에 사용하지 않는다. 작업 범위는 촬영 페이지이며 전역 스타일·백엔드·의존성은 변경하지 않는다. 기존 변경을 보존하며 커밋·푸시·배포하지 않는다.
+
+
+## Verification Story — UI/UX 개선
+
+| 수용 기준 | 근거 |
+|---|---|
+| 아이 친화적인 촬영 공간·왼쪽 단순화 | 태블릿 2열·모바일 1열을 확인. 추가 피드백에 따라 작은 제목·말풍선·3개 촬영 팁을 제거하고 설명을 한 문장으로 축약. `/tmp/nerd-capture-simple-left-tablet.png`, `/tmp/nerd-capture-simple-left-mobile.png` |
+| 촬영 시작을 직접 선택 | 진입 시 비디오·자동 카메라 요청 없음, 버튼 선택 후 요청 1회. 카메라 거부 시 한국어 오류와 사진 선택 대안 표시 |
+| 사진 한 장·재촬영·교체 | 촬영 후 다시 찍기로 미리보기 복귀. 확인한 FormData 2건 모두 `front.jpg` 1개: 촬영 640×640 JPEG, 파일 교체 후 1024×768 JPEG. 선택한 파랑 합성 이미지의 픽셀 확인 |
+| 대기·실패·성공 | 제출 중 3개 버튼 잠금, 실패 알림 후 사진 유지·재시도 가능. 성공 후 `sessionId`·`autoStart=true` 링크와 결과 화면 확인 |
+| 카메라 정리 | 파일 선택 후 활성 track 종료. 권한 대기 중에도 파일 선택 가능, 늦게 도착한 stream의 track 즉시 종료. SPA 화면 이탈 시 track `ended` 확인 |
+| 기존 동화·키보드·모션 | completed/face_ready 복원, 결과 제목으로 focus 이동, 읽기 링크·삭제 확인 취소 보존. Tab 포커스 링·Enter 카메라 시작·56px 버튼·reduced-motion에서 animation none 확인 |
+| 반응형·사진 이용 안내 | 1440×900·1024×768·390×844에서 가로 넘침 없음. 모바일 주요 버튼 하단 약 820px. 사진 안내가 조작 영역보다 먼저 읽힘 |
+| 프로젝트 검증 | 최종 frontend ci:all 통과: 79 tests·lint·types·build. 별도 foreground `npm run lint` exit 0, `git diff --check` 통과, 5502·5501 health 200. 브라우저 page errors 0 |
+
+브라우저 촬영은 합성 카메라·색상 이미지로 확인했다. 생성·업로드 요청과 세션 복원은 페이지의 fetch 응답을 대체했고 실제 유료 생성·DB 변경은 하지 않았다. 브라우저 network route만으로는 일부 GET을 가로채지 못해 미로그인 조회 401이 관찰되었으며, 세션 복원 검증은 fetch 대체 후 SPA 재진입으로 확인했다. 실제 사진의 생성 품질은 검증 범위 밖이다. main 개발 서버는 계속 실행 중이다.
+
+
+## PR 준비 — 사용자 승인 2026-09-15
+
+**Goal:** 현재 얼굴 등록 화면 변경을 main 대상 PR로 올리고 정면 단독 입력이 기존 이미지 합성 경로와 호환되는지 확인한다.
+**Files:** 촬영 페이지 3개 파일과 `tasks/todo.md`. 백엔드·API 계약은 읽기/검증 범위다.
+**Interfaces:** `front` 1장 → `generateReference` → 저장된 캐릭터 레퍼런스와 `baseImage` → `generatePageIllustration`.
+- [x] 얼굴 입력·캐릭터 생성·삽화 합성의 연결과 기존 테스트를 검토한다.
+- [x] 전체 `npx --yes pnpm@10.26.2 ci:all`, diff 및 공개 저장소에 올릴 파일 범위를 확인한다.
+- [x] 작업 브랜치에 관련 변경을 커밋·푸시하고 main 대상 PR을 만든 뒤 원격 SHA·변경 파일·검증 상태를 확인한다.
+**Verification:** 서비스·이미지 어댑터의 정면 단독/이미지 순서 tests, 전체 CI, PR head SHA와 로컬 SHA 일치. 실제 AI 생성 품질과 외부 서비스 상태는 별도로 구분한다.
+**Risk & Rollback:** 사용자 요청으로 이번 변경의 커밋·푸시·PR 생성이 승인되었다. main 직접 푸시·머지·배포·운영 DB 변경은 수행하지 않는다.
+
+**검증 결과:** 루트 ci:all exit 0. Frontend 79, backend unit 268, backend E2E 66 — 총 413 tests 및 lint·types·build 통과. `story-session.service.spec.ts:301`에서 정면 단독 입력으로 레퍼런스를 만들고, `openrouter-image.adapter.spec.ts:104`에서 삽화 1번·주인공 레퍼런스 2번 전달을 검증한다. Backend와 공유 계약 diff는 없다.
+
+**확인된 한계:** 실제 유료 AI 생성과 얼굴 유사도·배경 보존 품질은 미검증이다. 기존 `story-session.service.ts:674`는 템플릿 다운로드 실패를 무시하고 생성하므로 이 예외 상황에서는 기존 구도 보존을 보장할 수 없다. 일반 모드는 얼굴을 먼저 캐릭터로 변환하며, `DIRECT_FACE_MODE=true` 테스트 옵션은 원본 사진을 직접 저장·사용하므로 원본 미보관 안내는 일반 모드 기준이다. 이 PR은 기존 합성 정책을 변경하지 않는다.
+
+**PR:** [#53](https://github.com/kon6443/nerd-back/pull/53), `feat/front-single-photo-studio` → `main`. 관련 UI와 검증 기록만 포함하며 실제 AI 생성 품질의 미검증 범위·기존 예외 동작을 PR 본문에 명시했다.
+
+---
+
+# 정면 사진 한 장으로 동화 만들기 Implementation Plan
+
+> 체크리스트로 구현과 검증을 추적한다. 현재 작업은 이 항목이며 아래 기록은 보존한다.
+
+**Goal:** 얼굴 등록 화면에서 정면 사진 한 장만 촬영하거나 첨부한 뒤 동화를 만들 수 있게 한다.
+**Architecture:** 촬영 페이지의 3방향 슬롯 상태를 사진 1개와 미리보기로 단순화한다. 기존 얼굴 생성 API의 필수 `front` 필드만 전송하고, 이미 정면 단독 입력을 지원하는 백엔드 계약을 재사용한다.
+**Tech Stack:** Next.js 16.3.3, React 19, TypeScript, 기존 Tailwind UI, NestJS 단위 테스트.
+**Spec:** 2026-09-15 사용자 요청 및 첨부 화면 — 정면 사진만으로 동화 생성.
+
+## Goal & Acceptance Criteria
+
+- 좌·우 촬영 칸과 다음 방향으로 자동 전환하는 동작을 제거한다.
+- 사진이 없으면 제출할 수 없고, 촬영 또는 첨부 1회 후 즉시 미리보기와 제출 버튼을 사용할 수 있다.
+- 다시 찍기·파일 교체가 정상 동작하며, 제출하는 multipart에는 `front` 사진 1개만 있다.
+- 캐릭터 생성 성공 후 기존 동화 만들기 링크로 이어진다. 카메라 사용 불가·오류·기존 세션 안내를 유지한다.
+
+## Existing Patterns / Source of Truth
+
+- `apps/front/app/(trial)/stories/[slug]/capture/page.tsx`: 촬영·첨부·제출·완료 화면.
+- `apps/back/src/modules/story-session/story-session.controller.ts`: 정면 필수, 좌우 선택인 기존 API.
+- `apps/back/src/modules/story-session/story-session.service.spec.ts`: 정면 단독 입력으로 레퍼런스를 생성하는 기존 검증.
+- `.claude/rules/front-code-patterns.md`: 기존 파랑 버튼 위계, 터치 영역 56px, 접근성 안내.
+
+## Design (Minimal Approach + Key Decisions)
+
+사진 하나를 고르고 확인하는 흐름으로 정리한다. 안내는 정면 사진 한 장임을 명시하고 촬영·파일 첨부를 모두 제공한다. 사진 교체·화면 이탈 시 미리보기 URL을 해제한다. 화면 디자인과 API·DB·이미지 생성 모델은 기존 구성을 사용한다.
+
+### Task 1: 촬영 화면 단순화
+
+**Files:** `apps/front/app/(trial)/stories/[slug]/capture/page.tsx`.
+**Interfaces:** 기존 `uploadFace(sessionId, formData)`에 `front` 한 장을 보내고 `UploadFaceResponse` 성공 화면으로 전환한다.
+- [x] 단일 사진 상태, 정면 안내, 미리보기·다시 찍기 및 단일 multipart 제출을 구현한다.
+**Acceptance criteria:** 좌·우 선택 UI 없음, 한 장으로 제출 활성화, 교체 후 새 사진 제출, 완료 후 동화 제작 링크 유지.
+**Verification:** 실제 브라우저의 촬영·첨부·다시 찍기·제출 요청 검사와 태블릿/모바일 화면 확인.
+
+### Task 2: 동작·회귀 검증
+
+**Files:** `tasks/todo.md`; 기존 frontend CI와 backend `story-session.service.spec.ts` 실행.
+**Interfaces:** 브라우저 API 요청은 합성 응답으로 확인하고 기존 backend 정면 단독 입력 테스트를 실행한다.
+- [x] 실제 브라우저에서 카메라·파일 첨부·사진 교체·정면 단독 요청·성공/실패 상태를 검증한다.
+- [x] frontend ci:all, backend 정면 입력 관련 tests, diff 검사를 통과하고 결과를 기록한다.
+**Acceptance criteria:** 1024×768 및 390×844에서 가로 넘침 없이 조작 가능, `front` 1개 요청 및 생성 완료 링크 확인, 기존 tests·lint·types·build 통과.
+**Verification:** `npx --yes pnpm@10.26.2 front ci:all`; `npx --yes pnpm@10.26.2 back test --runInBand --testPathPatterns=story-session.service.spec.ts`; `git diff --check`.
+
+## Risk & Rollback
+
+카메라와 파일 선택의 기존 동작을 회귀 확인한다. 운영 DB·실제 유료 이미지 생성은 브라우저 검증에서 호출하지 않는다. 변경은 촬영 페이지 diff로 되돌릴 수 있다. 커밋·푸시·배포는 수행하지 않는다.
+
+## Verification Story — 2026-09-15
+
+정면 사진 1개의 상태와 미리보기만 사용하며, 좌·우 슬롯과 자동 이동을 제거했다. 성공 후 원본 미리보기를 비우고 다시 찍기·교체·화면 이탈 시 Object URL을 해제한다. 촬영 페이지 이외의 앱 소스는 변경하지 않았다.
+
+| 수용 기준 | 검증 근거 |
+|---|---|
+| 정면 사진 한 장 안내·좌우 칸 제거 | 실제 화면과 소스 잔존 심볼 검사. 정면 촬영 뒤 미리보기 1개, 제출 활성화 |
+| 한 장만 전송 | 카메라 640×640 JPEG, 첨부 1600×1200 PNG→1024×768 JPEG. 검사한 요청 3개 모두 `front.jpg` 1개, `left`/`right` 없음 |
+| 사진 교체·다시 찍기 | 촬영→다시 찍기 시 제출 비활성화·카메라 복귀, 파일 변경 및 같은 파일 재선택 성공, 이전 미리보기 URL 해제 확인 |
+| 대기·실패·완료 | 요청 중 조작 잠금, 실패 시 role=alert·사진 유지·재시도 활성화. 성공 후 face_ready 화면과 sessionId·autoStart=true를 포함한 동화 제작 링크 확인 |
+| 카메라 불가 | 카메라 접근 실패 후 파일 첨부만으로 미리보기·제출 활성화, 오류 안내 해제 확인 |
+| 태블릿·모바일 | 1024×768·390×844에서 가로 넘침 없음. 모바일 조작 버튼 높이 56px, 긴 대기 문구 넘침 없음. `/tmp/nerd-single-photo-tablet.png`, `/tmp/nerd-single-photo-mobile.png` 확인 |
+| 회귀·실행 상태 | frontend ci:all 통과(79 tests, lint/types/build), backend story-session.service 30 tests 통과, git diff --check 통과. 5502·5501 헬스체크 200 유지 |
+
+브라우저는 합성 카메라·이미지와 API 응답 대체를 사용했고 `/api/v2/**` 실제 네트워크 요청을 차단했다. 운영 DB와 유료 이미지 생성은 호출하지 않았다. 실제 얼굴 사진에 대한 생성 품질은 이번 검증 범위에 포함하지 않았다.
+
+---
+
+# 이전 작업: 동화 낭독·캐릭터 답변 TTS
 
 > 상태: **구현 완료, 운영 DB 적용·수동 QA 대기**
 > Spec: [`docs/tasks/slice-7-tts-spec.md`](../docs/tasks/slice-7-tts-spec.md)
