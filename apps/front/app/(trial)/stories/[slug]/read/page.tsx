@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { StatusEmblem } from "@/components/ui/StatusEmblem";
 import { CenteredPage } from "@/components/ui/CenteredPage";
 import { LoadingView } from "@/components/ui/LoadingView";
-import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
+import { actionClass } from "@/components/ui/actionStyles";
 import { BookArtContent, BookTextContent } from "@/components/story/BookFrame";
 import { BookPager, READER_BAR } from "@/components/story/BookPager";
 import { NarrationPlayer } from "@/components/story/NarrationPlayer";
@@ -708,48 +708,25 @@ function StoryReadContent({ params }: PageProps) {
             <ReaderPreviewSettings options={readerOptions} />
           </div>
 
-          {/* 가운데 — 진행. 좁은 화면에서는 상단의 쪽 표시가 대신한다. */}
+          {/* 가운데 — 진행 막대. 좁은 화면에서는 상단의 쪽 표시가 대신한다.
+              ⭐ 점(도트)이 아니라 **막대**다(2026-09-14 요청) — 점 6개는 작고 흐려 어디쯤인지 한눈에 안 읽혔다.
+              🚫 막대로 쪽 이동을 받지 않는다. 이동은 좌우 버튼과 방향키가 맡는다(누를 곳이 한 가지여야 오터치가 준다).
+              ⚠️ 1쪽에서도 막대가 비어 보이지 않게 **읽은 쪽까지 포함한** 비율이다(1/6 = 첫 칸이 차 있음). */}
           <div className="hidden items-center gap-3 justify-self-center sm:flex">
-            <div className="flex items-center">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((num) => {
-                const isCur = num === currentPageNo;
-                const isBehind = num > 4;
-                return (
-                  <button
-                    key={num}
-                    onClick={() => {
-                      if (num === 6) {
-                        openBranchScreen();
-                        return;
-                      }
-                      setActiveBranchKey(null);
-                      setCurrentPageNo(num);
-                    }}
-                    title={`${num}쪽`}
-                    // 🚫 title 에만 기대지 않는다 — 스크린리더가 일관되게 읽지 않는다.
-                    //    현재 위치도 색으로만 표시하면 화면을 못 보는 사용자에게는 없는 정보다.
-                    aria-label={`${num}쪽으로 이동`}
-                    aria-current={isCur ? "true" : undefined}
-                    // ⭐ 보이는 점(10px)은 그대로 두고 **히트 영역만** 넓힌다. 10px 짜리 점을
-                    //    직접 누르게 하면 아이 손가락으로는 거의 맞출 수 없다.
-                    //    ⚠️ 56px(`--spacing-touch`) 규약에는 못 미친다 — 6개가 한 줄에 들어가야 해
-                    //    30px 로 절충했다(기존 대비 3배). 대신 컨테이너 gap 을 없애 총폭을 억제했다.
-                    className={`group grid place-items-center rounded-full p-2.5 ${FOCUS_RING}`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      // 진행 표시는 버튼이 아니라 **위치**다 — 초록(GNB 전용)이 아니라 주 동작과 같은 파랑.
-                      className={`h-2.5 rounded-full transition-all motion-reduce:transition-none ${
-                        isCur
-                          ? "w-6 bg-accent-a"
-                          : isBehind
-                          ? "w-2.5 bg-magic/40 group-hover:bg-magic"
-                          : "w-2.5 bg-line group-hover:bg-ink-muted"
-                      }`}
-                    />
-                  </button>
-                );
-              })}
+            <div
+              role="progressbar"
+              aria-label="읽은 쪽"
+              aria-valuemin={1}
+              aria-valuemax={totalPages}
+              aria-valuenow={currentPageNo}
+              aria-valuetext={`${totalPages}쪽 중 ${currentPageNo}쪽`}
+              className="h-2.5 w-40 overflow-hidden rounded-pill bg-line md:w-64"
+            >
+              <div
+                // 진행 표시는 버튼이 아니라 위치다 — 초록(GNB 전용)이 아니라 주 동작과 같은 파랑.
+                className="h-full rounded-pill bg-accent-a transition-[width] duration-500 motion-reduce:transition-none"
+                style={{ width: `${(currentPageNo / totalPages) * 100}%` }}
+              />
             </div>
             <p className="text-sm font-bold text-ink-muted tabular-nums" aria-hidden="true">
               {currentPageNo} / {totalPages}
@@ -760,6 +737,7 @@ function StoryReadContent({ params }: PageProps) {
           <div className="flex items-center gap-2 justify-self-end sm:col-start-3">
             {chatOpen ? null : (
               <ChatLauncher
+                className={BAR_END_BUTTON_WIDTH}
                 chat={chat}
                 onOpen={() => {
                   // 대화를 열면 낭독을 멈춘다 — 답변 음성과 낭독이 겹치지 않게(main #50).
@@ -773,19 +751,19 @@ function StoryReadContent({ params }: PageProps) {
             {currentPageNo === 5 ? (
               // ⚠️ 띄어쓰기는 `gap` 이 만든다. 버튼이 inline-flex 라 글자·span 이 각각 flex 항목이 되어
               //    항목 끝의 공백 문자는 잘린다(「비하인드선택하기→」로 붙어 보였다).
-              <button onClick={openBranchScreen} className={actionClass("primary", "gap-1.5 whitespace-nowrap", "compact")}>
+              <button onClick={openBranchScreen} className={actionClass("primary", `gap-1.5 whitespace-nowrap ${BAR_END_BUTTON_WIDTH}`, "compact")}>
                 <span className="hidden sm:inline">비하인드</span>
                 <span>선택하기</span>
                 <span aria-hidden="true">→</span>
               </button>
             ) : currentPageNo >= totalPages ? (
-              <button onClick={() => setViewState("end")} className={actionClass("primary", "whitespace-nowrap", "compact")}>
+              <button onClick={() => setViewState("end")} className={actionClass("primary", `whitespace-nowrap ${BAR_END_BUTTON_WIDTH}`, "compact")}>
                 다 읽었어요 🎉
               </button>
             ) : (
               <button
                 onClick={() => setCurrentPageNo((prev) => Math.min(totalPages, prev + 1))}
-                className={actionClass("primary", "gap-1.5 whitespace-nowrap", "compact")}
+                className={actionClass("primary", `gap-1.5 whitespace-nowrap ${BAR_END_BUTTON_WIDTH}`, "compact")}
               >
                 {/* 좁은 화면은 「다음」만 — 바 한 줄에 네 버튼이 서야 한다. 띄어쓰기는 `gap` 이 만든다(위 참고). */}
                 <span>다음</span>
@@ -799,6 +777,13 @@ function StoryReadContent({ params }: PageProps) {
     </>
   );
 }
+
+/**
+ * 하단바 오른쪽 두 버튼(「등장인물에게 물어보기」·「다음」)의 **같은 폭**(2026-09-14 요청).
+ * 둘이 나란히 서므로 크기가 다르면 한쪽이 더 중요해 보인다 — 중요도는 크기가 아니라 **색**(dark < primary)이 말한다.
+ * 좁은 화면은 대화 버튼이 아이콘만 남아 최소 폭만 맞춘다.
+ */
+const BAR_END_BUTTON_WIDTH = "min-w-24 sm:w-60";
 
 export default function StoryReadPage({ params }: PageProps) {
   // ⚠️ 폴백에 스피너만 두면 화면을 못 보는 사용자에게는 **아무 일도 안 일어난 것**과 같다.
