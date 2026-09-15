@@ -1,9 +1,10 @@
 import { storySlugParamsSchema } from "@nerd/contracts";
 import { notFound } from "next/navigation";
 import { ActionLink } from "@/components/ui/ActionLink";
-import { StoryArtwork } from "@/components/story/StoryArtwork";
+import { StoryDetailArtwork } from "@/components/story/StoryDetailArtwork";
 import { StorySessionActions } from "@/components/story/StorySessionActions";
 import { fetchStoryDetail, orNotFound } from "@/lib/api";
+import { getLibraryHref, isLibraryCreateMode } from "@/lib/libraryMode";
 
 /**
  * 동화 상세 — 읽기 전에 무엇을 읽는지 보여준다.
@@ -13,18 +14,22 @@ import { fetchStoryDetail, orNotFound } from "@/lib/api";
  */
 export const dynamic = "force-dynamic";
 
-export default async function StoryDetailPage({ params }: PageProps<"/library/[slug]">) {
+export default async function StoryDetailPage({
+  params,
+  searchParams,
+}: PageProps<"/library/[slug]">) {
   const parsed = storySlugParamsSchema.safeParse(await params);
   // 주소창에서 아무 값이나 넣을 수 있다. 형식이 아니면 백엔드를 부르지 않고 끝낸다 —
   // 검증 스키마는 백엔드와 **같은 것**이라 두 곳의 판정이 갈리지 않는다.
   if (!parsed.success) notFound();
+  const isCreateMode = isLibraryCreateMode((await searchParams).mode);
 
   const story = await orNotFound(fetchStoryDetail(parsed.data.slug));
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-5 py-6 md:px-10 md:py-8">
       <div>
-        <ActionLink href="/library" variant="secondary" size="compact">
+        <ActionLink href={getLibraryHref(isCreateMode)} variant="secondary" size="compact">
           서재로 돌아가기
         </ActionLink>
       </div>
@@ -32,7 +37,7 @@ export default async function StoryDetailPage({ params }: PageProps<"/library/[s
           위에 떠 있어 읽기 어려웠다. 상자 하나에 소개와 등장인물을 위아래로 담고 가는 선으로 나눈다. */}
       <div className="flex flex-col gap-8 rounded-card border-2 border-line bg-surface-raised p-6 md:p-8">
         <section className="grid items-center gap-8 md:grid-cols-2">
-          <StoryArtwork className="aspect-4/3 rounded-xl" />
+          <StoryDetailArtwork slug={story.slug} isCreateMode={isCreateMode} />
 
           <div className="flex min-w-0 flex-col gap-4">
             <h1 className="text-3xl leading-tight font-bold text-balance break-keep wrap-anywhere text-ink md:text-4xl">
@@ -49,7 +54,11 @@ export default async function StoryDetailPage({ params }: PageProps<"/library/[s
 
             {story.pageCount > 0 ? (
               // `key` 로 동화가 바뀌면 새로 마운트시킨다 — 이전 동화의 세션이 남지 않게.
-              <StorySessionActions key={story.slug} slug={story.slug} />
+              <StorySessionActions
+                key={story.slug}
+                slug={story.slug}
+                isCreateMode={isCreateMode}
+              />
             ) : (
               // 페이지가 아직 안 들어온 동화다. 링크를 걸면 첫 페이지에서 404 를 만난다.
               <p className="pt-2 text-ink-muted">아직 페이지가 준비되지 않았어요.</p>

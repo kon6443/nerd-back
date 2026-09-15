@@ -1,4 +1,67 @@
-# 얼굴 등록 화면 UI/UX 개선 — 2026-09-15
+# 현재 작업: 제작형 서재와 삽화 속 캐릭터 대화
+
+> 상태: **구현 및 전체 검증 완료 (CI 통과)**
+> Spec: [`docs/tasks/slice-8-library-character-interaction-spec.md`](../docs/tasks/slice-8-library-character-interaction-spec.md)
+> Plan: [`tasks/plan.md`](plan.md)
+
+- [x] Task 1 — 계약과 세션 API 확장
+  - Acceptance: 완성 세션의 1쪽 썸네일 URL과 6A/6B 등장인물 히트박스가 공개 계약에 포함되며, 누락·서명 실패가 응답 전체를 막지 않는다.
+  - Verify: contracts build, story-session service tests, backend build.
+  - Files: session contract, story-session service/test.
+- [x] Task 2 — 서재 카드의 개인화 썸네일
+  - Acceptance: 로그인 사용자의 완성 동화만 개인화 1쪽을 표시하고 공개·미완성·오류 상태는 기존 삽화로 폴백한다.
+  - Verify: 매칭 Vitest, frontend typecheck/build, 공개·로그인 서재 수동 확인.
+  - Files: LibraryStoryList, matching helper/test, library page, session API test.
+- [x] Task 3 — 제작 모드 URL과 상세 CTA
+  - Acceptance: 홈의 `내 얼굴로 만들기` 흐름만 `mode=create`를 상세까지 보존하고 일반 체험 흐름과 갈린다.
+  - Verify: URL helper Vitest, 일반/제작 브라우저 흐름.
+  - Files: libraryMode/test, authLinks, library list/detail.
+- [x] Task 4 — 제작 모드의 시연 CTA 제거
+  - Acceptance: 제작 모드 상세의 모든 세션 상태와 로딩 자리표시에서 시연 CTA가 없고 개인화 동작은 유지된다.
+  - Verify: frontend typecheck/build와 세션 상태별 수동 확인.
+  - Files: StorySessionActions, detail loading.
+- [x] Task 5 — 정적 삽화 hotspot 기반
+  - Acceptance: `object-cover` 크롭을 반영한 히트박스가 정적 삽화 면에 한 번만 존재하고 쪽 넘김에는 복제되지 않는다.
+  - Verify: 좌표 변환 Vitest, BookPager 회귀 및 두 해상도 수동 확인.
+  - Files: geometry/test, BookPager, BookFrame CSS.
+- [x] Task 6 — 캐릭터 선택과 기존 채팅 연결
+  - Acceptance: hover·focus·touch로 본편과 6A/6B 캐릭터를 선택해 대화를 열며 하단 런처 없이 모든 채팅 상태에 재진입한다.
+  - Verify: frontend tests/build, 키보드·터치·음성 배타·포커스 복귀 수동 QA.
+  - Files: CharacterHotspots, reader page/useCharacterChat, ChatLauncher 제거.
+- [x] Task 7 — 전체 검증
+  - Acceptance: `pnpm ci:all`, `git diff --check`, 1024×768/390×844의 두 공식 동화 전체 흐름이 통과한다.
+  - Verify: CI와 Verification Story.
+  - Files: 작업 문서.
+
+## 🚨 최우선 다음 작업 (Next Priority)
+
+- [ ] **피드백 5 캐릭터 테두리 시각 효과 고도화 (최우선)**
+  - **현상 및 사용자 피드백**: "캐릭터 챗 동작 자체는 하는데 캐릭터의 테두리라기보단 그냥 타원형으로 쳐져 있는데 맞아?"
+  - **현재 상태**: 클릭 동작 및 타원형 광원 애니메이션(`hotspotPulse`)은 연결되었으나, 단순 타원형(oval) 형태로 인해 캐릭터 삽화 외곽선에 맞춘 자연스러운 테두리 광선 느낌이 부족함.
+  - **개선 목표**:
+    - 사각/타원형 영역 대신 캐릭터의 자연스러운 아우라 또는 테두리 느낌을 주는 마법 발광 효과(예: SVG drop-shadow filter, 캐릭터 형태에 맞춘 다층 글로우, radial-gradient 블렌딩 마스킹 등)로 시각 디자인 전면 개편.
+    - 호버/포커스/터치 시 캐릭터가 살아 움직이는 듯한 은은한 테두리 광선 인터랙션 구현.
+
+## 2026-09-15 사용자 피드백 반영 및 해결 내역
+
+- [x] **피드백 1**: `/library/{동화}?mode=create` 상세 페이지 표지 삽화에 1쪽 개인화 썸네일 노출 ([`StoryDetailArtwork.tsx`](../apps/front/components/story/StoryDetailArtwork.tsx))
+- [x] **피드백 2**: 썸네일 프리로드 체감 속도 극대화
+  - 마운트 즉시 `getMySessions()` 병렬 요청으로 `useSession` 대기 병목 완전 제거
+  - 전역 인메모리 썸네일 캐시 구축으로 서재 목록 → 상세 페이지 진입 시 **0ms 즉시 렌더링**
+  - 브라우저 백그라운드 이미지 디코딩(`img.decode()`) 프리로드 및 카드 호버/터치 사전 워밍업
+  - 카드 및 상세 이미지 컨테이너에 `bg-surface-raised` 플레이스홀더 및 부드러운 페이드인(`transition-opacity duration-300`) 적용
+- [x] **피드백 3 & 후속 과제 (문서화)**: 이미 다 만들어진 동화(`status === 'completed'`, `isAllCompleted === true`)를 읽을 때 리더 헤더의 `← 제작 현황 보기` 버튼 숨김 가드 적용 및 스펙/할일 문서에 기록 완료
+- [x] **피드백 4**: 낭독 플레이어 로딩바 및 시간초 멈춤 버그 해결
+  - 원인: React 18/19 StrictMode의 마운트 시뮬레이션 시 `useEffect` 언마운트 클린업(`destroy()`)이 실행되어 `Audio` 객체의 이벤트 리스너가 제거된 채 유지됨
+  - 해결: `ReaderAudioController`에 `attach()` / `detach()` 수명 주기 및 `play()` 시 자동 리스너 복원(Self-healing) 구조 도입
+  - 누락되었던 `durationchange`, `canplay`, `playing`, `seeking`, `seeked` 이벤트 리스너 보강
+  - `NarrationPlayer`: 오디오 준비 중일 때 `"불러오는 중..."` 버튼 상태 제공 및 프로그레스 바 부드러운 전환(`transition-[width] duration-200 ease-linear`) 적용
+- [x] **피드백 5**: 캐릭터 챗 클릭 불가 수정 (`.art` 컨테이너 내 `img` 탐색) 및 평상시에도 캐릭터 테두리가 은은하게 숨쉬듯 빛나는 타원형 광원 애니메이션 추가 ([`CharacterHotspots.tsx`](../apps/front/app/(trial)/stories/[slug]/read/CharacterHotspots.tsx), [`BookFrame.module.css`](../apps/front/components/story/BookFrame.module.css))
+- [x] **피드백 6**: 일반 동화 체험하기(`!isCreateMode`)에서는 `내 얼굴 읽기`를 노출하지 않고 `시연 동화 읽기`를 주 행동(primary)으로 제공 ([`StorySessionActions.tsx`](../apps/front/components/story/StorySessionActions.tsx))
+
+---
+
+# 이전 완료 기록: 얼굴 등록 화면 UI/UX 개선 — 2026-09-15
 
 **Goal:** 정면 사진 한 장으로 시작하는 흐름을 아이가 이해하기 쉬운 동화 속 촬영 공간으로 다듬는다.
 **Architecture:** 기존 하늘·풀밭 배경과 파랑 CTA를 유지한다. 촬영 표현은 라우트 전용 `CaptureStudio`와 CSS Module로 분리하고, 사진·세션·카메라 상태는 기존 페이지가 소유한다.

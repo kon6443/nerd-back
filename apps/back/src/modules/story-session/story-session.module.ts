@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
+import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
 import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
 import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
@@ -22,6 +23,7 @@ import { StorageModule } from '../../common/storage/storageModule';
       StorySession,
       StoryTemplate,
       StoryPage,
+      StoryPageCharacter,
       SessionPageImage,
       StoryAfterStoryChoice,
       SessionBranchChoice,

@@ -152,6 +152,8 @@ export interface BookPagerProps {
   pageCount: number;
   renderArt: (pageNo: number) => ReactNode;
   renderText: (pageNo: number) => ReactNode;
+  /** 정적인 삽화 면에만 그리는 조작 UI. 직전 삽화와 넘기는 종이에는 복제하지 않는다. */
+  renderArtControls?: (pageNo: number) => ReactNode;
   /** 정적인 본문 면에만 그리는 조작 UI. 넘기는 종이에는 복제하지 않는다. */
   renderTextControls?: (pageNo: number) => ReactNode;
   /**
@@ -173,6 +175,7 @@ export function BookPager({
   pageCount,
   renderArt,
   renderText,
+  renderArtControls,
   renderTextControls,
   onRequestPage,
   onTurningChange,
@@ -274,6 +277,9 @@ export function BookPager({
                 </div>
               ) : null}
               {renderArt(artPair.over)}
+              {!turn && renderArtControls ? (
+                <div className={styles.artControls}>{renderArtControls(artPair.over)}</div>
+              ) : null}
             </div>
             <div className={styles.page}>
               {renderText(baseText)}

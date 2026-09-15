@@ -1,8 +1,9 @@
-import { StoryCard } from "@/components/story/StoryCard";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { Card } from "@/components/ui/Card";
 import { fetchStories } from "@/lib/api";
-import { LibraryShell, STORY_GRID } from "./LibraryShell";
+import { isLibraryCreateMode } from "@/lib/libraryMode";
+import { LibraryShell } from "./LibraryShell";
+import { LibraryStoryList } from "./LibraryStoryList";
 
 /**
  * 서재 — 시연 모드의 첫 진입.
@@ -22,7 +23,8 @@ export const dynamic = "force-dynamic";
  * 본 것이었다. 여기서 최상단 `await` 를 쓰는 이유는 에러 때문이 아니라 **`loading.tsx` 가 이미
  * 같은 틀을 그려서 구조가 더 단순하기 때문**이다.
  */
-export default async function LibraryPage() {
+export default async function LibraryPage({ searchParams }: PageProps<"/library">) {
+  const isCreateMode = isLibraryCreateMode((await searchParams).mode);
   const stories = await fetchStories();
 
   if (stories.length === 0) {
@@ -42,26 +44,7 @@ export default async function LibraryPage() {
 
   return (
     <LibraryShell>
-      <ul className={STORY_GRID}>
-      {stories.map((story) => (
-        <li key={story.slug} className="min-w-0">
-          <StoryCard
-            title={story.title}
-            description={story.summary ?? undefined}
-            action={
-              <ActionLink
-                href={`/library/${story.slug}`}
-                variant="primary"
-                size="compact"
-                className="w-full"
-              >
-                동화 펼쳐 보기
-              </ActionLink>
-            }
-          />
-        </li>
-      ))}
-      </ul>
+      <LibraryStoryList stories={stories} isCreateMode={isCreateMode} />
     </LibraryShell>
   );
 }
