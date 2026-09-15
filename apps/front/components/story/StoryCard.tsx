@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
-import { Card } from "@/components/ui/Card";
+import { CARD_NESTED_BUTTON_RADIUS, CARD_NESTED_RADIUS, Card } from "@/components/ui/Card";
 import { StoryArtwork } from "@/components/story/StoryArtwork";
 
 /**
@@ -53,10 +53,11 @@ export function StoryCard({
   action,
 }: StoryCardProps) {
   return (
-    <Card tone={tone ?? variantTone[variant]} className={variantLayout[variant]}>
+    // 썸네일·버튼이 카드 모서리에 붙어 있어 동심원 R 이 필요하다 — `snug`(안쪽 R 8px).
+    <Card tone={tone ?? variantTone[variant]} inset="snug" className={variantLayout[variant]}>
       <div className="flex h-full flex-col gap-4">
         {imageUrl ? (
-          <div className="relative aspect-4/3 w-full overflow-hidden rounded-card">
+          <div className={`relative aspect-4/3 w-full overflow-hidden ${CARD_NESTED_RADIUS}`}>
             <Image
               src={imageUrl}
               alt=""
@@ -67,7 +68,7 @@ export function StoryCard({
             />
           </div>
         ) : (
-          <StoryArtwork className="aspect-4/3 w-full rounded-xl" />
+          <StoryArtwork className={`aspect-4/3 w-full ${CARD_NESTED_RADIUS}`} />
         )}
 
         <div className="flex flex-col gap-1">
@@ -78,7 +79,8 @@ export function StoryCard({
           ) : null}
         </div>
 
-        {action ? <div className="mt-auto pt-1">{action}</div> : null}
+        {/* 버튼 R 은 이 칸이 `--btn-radius` 로 내려준다. */}
+        {action ? <div className={`mt-auto pt-1 ${CARD_NESTED_BUTTON_RADIUS}`}>{action}</div> : null}
       </div>
     </Card>
   );

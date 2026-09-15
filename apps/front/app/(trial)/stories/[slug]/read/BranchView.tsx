@@ -2,7 +2,7 @@
 
 import type { AfterStoryResponse, StoryBranchKey } from "@nerd/contracts";
 import { Badge } from "@/components/ui/Badge";
-import { Card } from "@/components/ui/Card";
+import { CARD_NESTED_BUTTON_RADIUS, Card } from "@/components/ui/Card";
 import { actionClass } from "@/components/ui/actionStyles";
 
 /**
@@ -76,7 +76,8 @@ export function BranchView({
             const isReady = choice.status === "succeeded";
             const isSelecting = isSelectingBranch === choice.branchKey;
             return (
-              <Card key={choice.branchKey} className="border-2 border-magic/40 bg-surface text-left">
+              // 버튼이 카드 모서리 가까이 붙어 동심원 R 이 필요하다 — `snug`.
+              <Card key={choice.branchKey} inset="snug" className={`border-2 border-magic/40 bg-surface text-left ${CARD_NESTED_BUTTON_RADIUS}`}>
                 <p className="text-xs font-bold tracking-wider text-magic-strong">선택 {choice.branchKey.toUpperCase()}</p>
                 <h2 className="mt-1 text-lg font-bold text-ink">{choice.title}</h2>
                 <p className="mt-2 text-sm leading-relaxed text-ink-muted">{choice.description}</p>
