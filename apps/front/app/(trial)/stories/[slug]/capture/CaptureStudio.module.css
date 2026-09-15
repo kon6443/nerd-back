@@ -1,0 +1,120 @@
+.page {
+  width: 100%;
+  max-width: 1064px;
+  margin-inline: auto;
+  padding: 14px 28px 40px;
+  flex: 1;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.pageLabel {
+  color: var(--color-book-cover);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.backLink { gap: 8px; }
+.icon { width: 22px; height: 22px; flex-shrink: 0; }
+
+.studio {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 32px;
+  padding: 28px;
+  border: 1px solid var(--color-paper-edge);
+  border-radius: 32px;
+  background: var(--color-surface-raised);
+  box-shadow: 0 12px 36px rgb(47 91 105 / 12%);
+}
+
+.welcome { min-width: 0; padding: 4px 8px; }
+.title { color: var(--color-ink); font-size: clamp(32px, 3.4vw, 44px); font-weight: 850; line-height: 1.22; letter-spacing: -.025em; }
+.title em { color: var(--color-accent-a-strong); font-style: normal; }
+.description { max-width: 310px; margin-top: 16px; color: var(--color-ink); font-size: 16px; line-height: 1.7; word-break: keep-all; }
+
+.companion { margin: 20px 0 4px; }
+.buddy { display: block; width: 202px; max-width: 100%; height: auto; flex-shrink: 0; animation: bookHello 4s ease-in-out; }
+
+.privacy { display: flex; align-items: flex-start; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-paper-line); color: var(--color-ink); font-size: 12px; line-height: 1.75; word-break: keep-all; }
+.privacy > .icon { margin-top: 2px; color: var(--color-book-cover); }
+.privacyTitle { margin-bottom: 4px; font-weight: 750; }
+
+.capturePanel { min-width: 0; padding: 18px; border-radius: 24px; background: var(--color-accent-a-soft); }
+.panelHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; color: var(--color-book-cover); }
+.panelHeader h2 { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; }
+.panelHeader h2 > .icon { width: 19px; height: 19px; }
+.photoCount { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; background: var(--color-surface-raised); color: var(--color-book-cover); font-size: 11px; font-weight: 750; }
+
+.photoMat { max-width: 284px; margin-inline: auto; padding: 10px 10px 0; border-radius: 22px; background: var(--color-surface-raised); box-shadow: 0 5px 16px rgb(47 91 105 / 8%); }
+.viewfinder { position: relative; aspect-ratio: 1; width: 100%; overflow: hidden; border-radius: 15px; background: var(--color-accent-a-soft); }
+.photo, .video { width: 100%; height: 100%; object-fit: cover; }
+.video { transform: scaleX(-1); }
+.faceGuide { position: absolute; inset: 9% 18% 15%; border: 3px dashed rgb(255 255 255 / 90%); border-radius: 48%; pointer-events: none; }
+.cameraCaption { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); padding: 6px 10px; border-radius: 999px; background: rgb(36 49 41 / 82%); color: white; font-size: 11px; white-space: nowrap; }
+.emptyCamera { display: flex; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 12px; color: var(--color-book-cover); text-align: center; }
+.portraitGuide { width: 72%; max-height: 190px; }
+.emptyCamera p { font-size: 12px; font-weight: 650; }
+.photoSignature { display: flex; align-items: center; justify-content: center; gap: 6px; height: 35px; color: var(--color-book-cover); font-size: 12px; font-weight: 750; }
+.photoSignature > .icon { width: 15px; height: 15px; color: var(--color-gold-strong); }
+.readyFlag { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 4px; padding: 5px 8px; border-radius: 999px; background: var(--color-surface-raised); color: var(--color-book-cover); font-size: 11px; font-weight: 750; }
+.readyFlag > .icon { width: 14px; height: 14px; }
+
+.helper { min-height: 22px; margin: 12px 0; color: var(--color-book-cover); font-size: 12px; line-height: 1.75; text-align: center; word-break: keep-all; }
+.actions { display: flex; flex-direction: column; gap: 12px; padding-bottom: 4px; }
+.mainAction { width: 100%; gap: 8px; }
+.mainAction > span { display: inline-flex; }
+.alternatives { display: flex; gap: 10px; }
+.choosePhoto { flex: 1; gap: 8px; }
+.error { margin-bottom: 12px; padding: 12px; border-radius: 12px; color: var(--color-danger-strong); background: var(--color-danger-soft); font-size: 13px; line-height: 1.65; word-break: keep-all; }
+.busySpark { animation: makingMagic 1.5s ease-in-out infinite; }
+
+.resultCard { width: 100%; max-width: 640px; margin-inline: auto; padding: 28px; border-color: var(--color-paper-edge); border-radius: 32px; box-shadow: 0 12px 36px rgb(47 91 105 / 12%); }
+.resultBuddy { width: 146px; }
+.resultError { max-width: 640px; margin: 16px auto 0; }
+
+@keyframes bookHello {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-6px) rotate(1deg); }
+}
+
+@keyframes makingMagic {
+  0%, 100% { transform: scale(.9); }
+  50% { transform: scale(1.15); }
+}
+
+@media (min-width: 1200px) {
+  .studio { gap: 48px; padding: 32px 40px; }
+}
+
+@media (max-width: 767px) {
+  .page { padding: 8px 16px 28px; }
+  .pageLabel { font-size: 11px; }
+  .studio { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px 16px 16px; border-radius: 26px; }
+  .welcome { position: relative; padding: 0 4px; }
+  .title { padding-right: 70px; font-size: 28px; }
+  .description { margin-top: 8px; font-size: 14px; line-height: 1.5; }
+  .companion { position: absolute; top: 0; right: -7px; margin: 0; }
+  .companion .buddy { width: 92px; }
+  .privacy { gap: 8px; margin-top: 12px; padding-top: 10px; font-size: 11px; }
+  .privacy > .icon { width: 19px; height: 19px; }
+  .capturePanel { padding: 14px; border-radius: 20px; }
+  .panelHeader h2 { font-size: 13px; }
+  .photoCount { padding-inline: 8px; font-size: 10px; }
+  .photoMat { max-width: 240px; padding: 8px 8px 0; border-radius: 18px; }
+  .viewfinder { border-radius: 12px; }
+  .photoSignature { height: 30px; font-size: 11px; }
+  .helper { font-size: 11px; }
+  .resultCard { padding: 22px; border-radius: 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy, .busySpark { animation: none; }
+}

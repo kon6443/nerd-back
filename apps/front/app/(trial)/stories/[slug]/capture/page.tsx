@@ -4,32 +4,28 @@ import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
-import { StatusEmblem } from "@/components/ui/StatusEmblem";
-import { Badge } from "@/components/ui/Badge";
-import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
+import { actionClass } from "@/components/ui/actionStyles";
 import { ApiError, createSession, deleteSession, findMySessionBySlug, uploadFace } from "@/lib/api";
 import type { MyStorySessionItem, UploadFaceResponse } from "@nerd/contracts";
+import { BookBuddy, CaptureStudio, StudioIcon } from "./CaptureStudio";
+import styles from "./CaptureStudio.module.css";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-type Slot = "front" | "left" | "right";
-
-const SLOT_LABEL: Record<Slot, { title: string; required: boolean; desc: string }> = {
-  front: { title: "정면 얼굴", required: true, desc: "카메라를 정면으로 바라봐 주세요." },
-  left: { title: "왼쪽 얼굴", required: false, desc: "고개를 살짝 왼쪽으로 돌려주세요 (선택)." },
-  right: { title: "오른쪽 얼굴", required: false, desc: "고개를 살짝 오른쪽으로 돌려주세요 (선택)." },
-};
+interface FacePhoto {
+  blob: Blob;
+  previewUrl: string;
+}
 
 export default function CapturePage({ params }: PageProps) {
   const { slug } = use(params);
   const router = useRouter();
 
-  const [activeSlot, setActiveSlot] = useState<Slot>("front");
-  const [photos, setPhotos] = useState<Partial<Record<Slot, Blob>>>({});
-  const [previews, setPreviews] = useState<Partial<Record<Slot, string>>>({});
+  const [photo, setPhoto] = useState<FacePhoto | null>(null);
   const [isWebcamActive, setIsWebcamActive] = useState(false);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [result, setResult] = useState<UploadFaceResponse | null>(null);
@@ -38,7 +34,19 @@ export default function CapturePage({ params }: PageProps) {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const cameraRequestRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resultTitleRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (result || existingSession) resultTitleRef.current?.focus();
+  }, [result, existingSession]);
+
+  useEffect(() => {
+    return () => {
+      if (photo) URL.revokeObjectURL(photo.previewUrl);
+    };
+  }, [photo]);
 
   // 비디오 DOM 노드가 마운트될 때 스트림을 즉시 연결하는 콜백 ref
   const setVideoRef = (node: HTMLVideoElement | null) => {
@@ -53,7 +61,9 @@ export default function CapturePage({ params }: PageProps) {
 
   // 웹캠 시작
   async function startWebcam() {
+    const requestId = ++cameraRequestRef.current;
     setErrorMsg("");
+    setIsStartingCamera(true);
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error("카메라를 사용할 수 없는 환경입니다. 사진 파일 첨부를 이용해 주세요.");
@@ -61,24 +71,28 @@ export default function CapturePage({ params }: PageProps) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
       });
+      if (requestId !== cameraRequestRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       mediaStreamRef.current = stream;
       setIsWebcamActive(true);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        videoRef.current.play().catch(() => {});
       }
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "카메라 권한을 얻지 못했습니다. 사진 파일을 직접 첨부해 주세요.";
-      setErrorMsg(msg);
+    } catch {
+      if (requestId !== cameraRequestRef.current) return;
+      setErrorMsg("카메라를 켤 수 없어요. 카메라 권한을 확인하거나 아래에서 사진을 골라 주세요.");
       setIsWebcamActive(false);
+    } finally {
+      if (requestId === cameraRequestRef.current) setIsStartingCamera(false);
     }
   }
 
   // 웹캠 종료
   function stopWebcam() {
+    cameraRequestRef.current += 1;
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
@@ -87,42 +101,14 @@ export default function CapturePage({ params }: PageProps) {
       videoRef.current.srcObject = null;
     }
     setIsWebcamActive(false);
+    setIsStartingCamera(false);
   }
 
   useEffect(() => {
-    let active = true;
-    async function init() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        return;
-      }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 640 } },
-        });
-        if (!active) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        mediaStreamRef.current = stream;
-        setIsWebcamActive(true);
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-      } catch (err: unknown) {
-        if (!active) return;
-        const msg =
-          err instanceof Error
-            ? err.message
-            : "카메라 권한을 얻지 못했습니다. 사진 파일을 직접 첨부해 주세요.";
-        setErrorMsg(msg);
-        setIsWebcamActive(false);
-      }
-    }
-    void init();
     return () => {
-      active = false;
-      stopWebcam();
+      cameraRequestRef.current += 1;
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
     };
   }, []);
 
@@ -181,7 +167,7 @@ export default function CapturePage({ params }: PageProps) {
     }
   }
 
-  // 비디오 노드 마운트 또는 슬롯 전환 시 스트림 연결 보장
+  // 다시 찍기로 비디오 노드가 마운트될 때 스트림 연결 보장
   useEffect(() => {
     const video = videoRef.current;
     const stream = mediaStreamRef.current;
@@ -191,7 +177,7 @@ export default function CapturePage({ params }: PageProps) {
       video.srcObject = stream;
     }
     video.play().catch(() => {});
-  }, [isWebcamActive, activeSlot, previews]);
+  }, [isWebcamActive, photo]);
 
   // 웹캠 캡처
   function handleCapture() {
@@ -224,11 +210,8 @@ export default function CapturePage({ params }: PageProps) {
     canvas.toBlob(
       (blob) => {
         if (!blob) return;
-        setPhotos((prev) => ({ ...prev, [activeSlot]: blob }));
-        setPreviews((prev) => ({ ...prev, [activeSlot]: URL.createObjectURL(blob) }));
-        // 다음 슬롯으로 자동 전환 (정면 -> 좌 -> 우)
-        if (activeSlot === "front" && !photos.left) setActiveSlot("left");
-        else if (activeSlot === "left" && !photos.right) setActiveSlot("right");
+        setPhoto({ blob, previewUrl: URL.createObjectURL(blob) });
+        setErrorMsg("");
       },
       "image/jpeg",
       0.85,
@@ -239,6 +222,7 @@ export default function CapturePage({ params }: PageProps) {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = "";
 
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
@@ -264,22 +248,25 @@ export default function CapturePage({ params }: PageProps) {
       canvas.toBlob(
         (blob) => {
           if (!blob) return;
-          setPhotos((prev) => ({ ...prev, [activeSlot]: blob }));
-          setPreviews((prev) => ({ ...prev, [activeSlot]: URL.createObjectURL(blob) }));
-          if (activeSlot === "front" && !photos.left) setActiveSlot("left");
-          else if (activeSlot === "left" && !photos.right) setActiveSlot("right");
+          setPhoto({ blob, previewUrl: URL.createObjectURL(blob) });
+          setErrorMsg("");
+          stopWebcam();
         },
         "image/jpeg",
         0.85,
       );
       URL.revokeObjectURL(objectUrl);
     };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      setErrorMsg("사진을 불러올 수 없습니다. 다른 사진을 첨부해 주세요.");
+    };
     img.src = objectUrl;
   }
 
   // 얼굴 사진 제출
   async function handleSubmit() {
-    if (!photos.front) {
+    if (!photo) {
       setErrorMsg("정면 얼굴 사진은 필수입니다.");
       return;
     }
@@ -293,13 +280,12 @@ export default function CapturePage({ params }: PageProps) {
 
       // 2. FormData 조립
       const formData = new FormData();
-      formData.append("front", photos.front, "front.jpg");
-      if (photos.left) formData.append("left", photos.left, "left.jpg");
-      if (photos.right) formData.append("right", photos.right, "right.jpg");
+      formData.append("front", photo.blob, "front.jpg");
 
       // 3. 얼굴 업로드 & 캐릭터 레퍼런스 생성
       const res = await uploadFace(session.id, formData);
       setResult(res);
+      setPhoto(null);
       stopWebcam();
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -329,29 +315,25 @@ export default function CapturePage({ params }: PageProps) {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-6 p-6">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <Link href={`/library/${slug}`} className="text-sm font-semibold text-primary hover:underline">
-          ← 동화로 돌아가기
+    <main className={`${styles.page} flex w-full flex-1 flex-col`}>
+      <div className={styles.pageHeader}>
+        <Link href={`/library/${slug}`} className={actionClass("tertiary", styles.backLink, "compact")}>
+          <StudioIcon name="back" />동화로 돌아가기
         </Link>
-        {/* 톤을 적어 둔다. 기본값에 기대면 `Badge` 의 기본이 바뀔 때 이 화면 색이 조용히 따라 바뀐다
-            — 실제로 팔레트 교체 때 초록으로 바뀌었다가 파랑으로 되돌아왔다(2026-09-10). */}
-        <Badge tone="info">Slice 3: 얼굴 등록</Badge>
+        <span className={styles.pageLabel}>주인공 준비하기</span>
       </div>
 
-      {/* 완료 화면 또는 기존 동화 안내 */}
       {existingSession ? (
-        <Card className="flex flex-col items-center gap-6 text-center">
-          <StatusEmblem tone="notice">📚</StatusEmblem>
-          <h1 className="text-2xl font-bold text-ink">이미 완성된 동화책이 있습니다!</h1>
-          <p className="text-sm text-neutral-600">
-            회원님께서 이미 얼굴을 등록하여 완성하신 동화책이 존재합니다.<br />
-            완성된 동화책을 바로 읽으시거나, 기존 동화를 삭제하고 새로운 얼굴로 다시 만드실 수 있습니다.
+        <Card className={`${styles.resultCard} flex w-full flex-col items-center gap-5 text-center`}>
+          <BookBuddy className={styles.resultBuddy} />
+          <h1 ref={resultTitleRef} tabIndex={-1} className="text-2xl font-bold text-ink">나의 동화책이 기다리고 있어요!</h1>
+          <p className="break-keep text-sm leading-relaxed text-ink-muted">
+            내가 주인공인 동화가 이미 완성되어 있어요.<br />
+            책을 펼쳐 모험을 이어가 볼까요?
           </p>
 
           {existingSession.referenceImageUrl && (
-            <div className="relative h-48 w-48 overflow-hidden rounded-card border-4 border-primary shadow-md">
+            <div className="relative h-48 w-48 overflow-hidden rounded-card border-4 border-white shadow-md">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={existingSession.referenceImageUrl}
@@ -365,51 +347,48 @@ export default function CapturePage({ params }: PageProps) {
           <div className="flex w-full flex-col gap-3">
             <Link
               href={`/stories/${slug}/read?sessionId=${existingSession.id}`}
-              className={actionClass("primary", "w-full py-3.5 text-base font-bold shadow-md")}
+              className={actionClass("primary", "w-full")}
             >
-              📖 내 동화책 바로 읽기
+              내 동화책 읽기
             </Link>
             <button
               type="button"
               onClick={handleDeleteAndReset}
               disabled={isDeleting}
-              className={actionClass("secondary", "w-full text-rose-600 hover:border-rose-400")}
+              className={actionClass("secondary", "w-full text-danger-strong", "compact")}
             >
-              {isDeleting ? "삭제 중..." : "🔄 기존 동화 삭제하고 새 얼굴로 만들기"}
+              {isDeleting ? "삭제 중..." : "기존 동화 삭제하고 새로 만들기"}
             </button>
-            <Link href={`/library/${slug}`} className={actionClass("secondary", "w-full")}>
-              동화 소개로 돌아가기
-            </Link>
           </div>
         </Card>
       ) : result ? (
-        <Card className="flex flex-col items-center gap-6 text-center">
-          <StatusEmblem tone="success">✨</StatusEmblem>
-          <h1 className="text-2xl font-bold text-ink">주인공 캐릭터가 완성되었어요!</h1>
-          <p className="text-sm text-neutral-600">
-            아이의 얼굴을 바탕으로 동화 속 주인공 캐릭터 레퍼런스가 만들어졌습니다.<br />
-            입력하신 원본 얼굴 사진은 개인정보 보호 원칙에 따라 즉시 안전하게 폐기되었습니다.
+        <Card className={`${styles.resultCard} flex w-full flex-col items-center gap-5 text-center`}>
+          <BookBuddy className={styles.resultBuddy} />
+          <h1 ref={resultTitleRef} tabIndex={-1} className="text-2xl font-bold text-ink">짜잔, 동화 속 나예요!</h1>
+          <p className="break-keep text-sm leading-relaxed text-ink-muted">
+            멋진 주인공이 준비됐어요.<br />
+            이제 나만의 동화를 만들어 볼까요?
           </p>
 
-          <div className="relative h-64 w-64 overflow-hidden rounded-card border-4 border-primary shadow-md">
+          <div className="relative h-56 w-56 overflow-hidden rounded-card border-4 border-white shadow-md">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={result.referenceImageUrl}
-              alt="주인공 캐릭터 레퍼런스"
+              alt="내 얼굴로 만든 동화 주인공"
               decoding="async"
               className="h-full w-full object-cover"
             />
           </div>
+          <p className="break-keep text-xs leading-relaxed text-ink-muted">
+            원본 얼굴 사진은 동화나라 서버에 보관하지 않아요.
+          </p>
 
           <div className="flex w-full flex-col gap-3">
             <Link
               href={`/stories/${slug}/read?sessionId=${result.id}&autoStart=true`}
-              className={actionClass("primary", "w-full py-3.5 text-base font-bold shadow-md")}
+              className={actionClass("primary", "w-full")}
             >
-              ✨ 이 얼굴로 동화책 만들기 시작
-            </Link>
-            <Link href={`/library/${slug}`} className={actionClass("secondary", "w-full")}>
-              동화 소개로
+              나의 동화 만들기
             </Link>
             <button
               type="button"
@@ -417,167 +396,39 @@ export default function CapturePage({ params }: PageProps) {
                 setResult(null);
                 startWebcam();
               }}
-              className={actionClass("secondary", "w-full text-xs text-neutral-500")}
+              className={actionClass("secondary", "w-full", "compact")}
             >
               다른 사진으로 다시 찍기
             </button>
           </div>
         </Card>
       ) : (
-        /* 촬영 / 업로드 화면 */
-        <Card className="flex flex-col gap-6">
-          <div>
-            <h1 className="text-2xl font-bold text-ink">주인공 얼굴을 찍어요</h1>
-            <p className="mt-1 text-sm text-neutral-600">
-              {SLOT_LABEL[activeSlot].title} — {SLOT_LABEL[activeSlot].desc}
-            </p>
-          </div>
-
-          {/* 슬롯 선택 탭 */}
-          <div className="flex gap-2">
-            {(["front", "left", "right"] as Slot[]).map((slot) => {
-              const hasPhoto = Boolean(photos[slot]);
-              const isActive = activeSlot === slot;
-              return (
-                <button
-                  key={slot}
-                  type="button"
-                  onClick={() => setActiveSlot(slot)}
-                  aria-pressed={isActive}
-                  className={`flex flex-1 flex-col items-center rounded-lg border-2 p-2 text-xs font-bold transition motion-reduce:transition-none ${FOCUS_RING} ${
-                    isActive
-                      ? "border-accent-a bg-accent-a-soft text-accent-a-strong"
-                      : "border-neutral-200 bg-white text-neutral-600"
-                  }`}
-                >
-                  <span>
-                    {SLOT_LABEL[slot].title}
-                    {SLOT_LABEL[slot].required ? " *" : ""}
-                  </span>
-                  <span className="mt-1 font-normal text-neutral-400">
-                    {hasPhoto ? "✅ 등록됨" : "미등록"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* 뷰파인더 또는 미리보기 */}
-          <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-neutral-900 shadow-inner">
-            {previews[activeSlot] ? (
-              <div className="relative h-full w-full">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={previews[activeSlot]}
-                  alt="미리보기"
-                  decoding="async"
-                  className="h-full w-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPhotos((prev) => {
-                      const next = { ...prev };
-                      delete next[activeSlot];
-                      return next;
-                    });
-                    setPreviews((prev) => {
-                      const next = { ...prev };
-                      delete next[activeSlot];
-                      return next;
-                    });
-                  }}
-                  className={`absolute right-3 top-3 min-h-[40px] rounded-full bg-black/60 px-4 text-xs font-bold text-white hover:bg-black/80 ${FOCUS_RING}`}
-                >
-                  다시 찍기
-                </button>
-              </div>
-            ) : isWebcamActive ? (
-              <div className="relative h-full w-full">
-                <video
-                  ref={setVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="h-full w-full object-cover scale-x-[-1]"
-                />
-                {/* 원형 가이드 오버레이 */}
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="h-3/4 w-3/4 rounded-full border-4 border-dashed border-white/70 shadow-lg" />
-                </div>
-              </div>
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-white">
-                <p className="text-sm text-neutral-400">카메라가 꺼져 있거나 연결되지 않았습니다.</p>
-                <button
-                  type="button"
-                  onClick={startWebcam}
-                  className={`min-h-touch rounded-pill bg-white/20 px-5 text-sm font-bold hover:bg-white/30 ${FOCUS_RING}`}
-                >
-                  카메라 켜기
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 촬영 및 첨부 버튼 */}
-          <div className="flex gap-3">
-            {isWebcamActive && !previews[activeSlot] && (
-              <button
-                type="button"
-                onClick={handleCapture}
-                className={actionClass("primary", "flex-1")}
-              >
-                📷 촬영하기
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              // 촬영이 가능하면 촬영이 주 동작이고 첨부는 대안이다. 카메라가 없을 때만 첨부가 주 동작이 된다.
-              className={actionClass(
-                isWebcamActive && !previews[activeSlot] ? "secondary" : "primary",
-                "flex-1",
-              )}
-            >
-              📁 파일 첨부
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </div>
-
-          {errorMsg && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-600">
-              {errorMsg}
-            </div>
-          )}
-
-          {/* 최종 제출 버튼 */}
-          <div className="mt-2 border-t pt-4">
-            <button
-              type="button"
-              disabled={!photos.front || isSubmitting}
-              onClick={handleSubmit}
-              className={actionClass(
-                "primary",
-                `w-full ${!photos.front || isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`,
-              )}
-            >
-              {isSubmitting
-                ? "✨ 얼굴을 분석하고 캐릭터를 만드는 중..."
-                : "✨ 이 얼굴로 만들기"}
-            </button>
-            <p className="mt-2 text-center text-xs text-neutral-400">
-              * 정면 사진은 필수이며, 좌/우 사진은 선택입니다.
-            </p>
-          </div>
-        </Card>
+        <>
+          <CaptureStudio
+            previewUrl={photo?.previewUrl}
+            isCameraActive={isWebcamActive}
+            isStartingCamera={isStartingCamera}
+            isSubmitting={isSubmitting}
+            errorMessage={errorMsg}
+            onVideoRef={setVideoRef}
+            onStartCamera={startWebcam}
+            onCapture={handleCapture}
+            onRetake={() => setPhoto(null)}
+            onChoosePhoto={() => fileInputRef.current?.click()}
+            onSubmit={handleSubmit}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            aria-label="정면 사진 첨부"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </>
+      )}
+      {(existingSession || result) && errorMsg && (
+        <p role="alert" className={`${styles.error} ${styles.resultError}`}>{errorMsg}</p>
       )}
     </main>
   );
