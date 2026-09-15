@@ -37,15 +37,9 @@ export function BranchView({
   const savedChoice = afterStory?.firstBranchChoice;
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-6 px-4 py-8 text-center">
-      {/* 되돌아가기는 **텍스트 버튼(tertiary)** 이고 화면 왼쪽 위에 둔다 — 아래쪽은 언덕 그림 위라 글자가 묻혔다. */}
-      <button
-        type="button"
-        onClick={onBackToStory}
-        className={actionClass("tertiary", "-ml-3 self-start", "compact")}
-      >
-        ← 5쪽으로 돌아가기
-      </button>
+    // ⭐ 세로 가운데가 아니라 **위에서부터** 쌓는다. 가운데 정렬이면 콘텐츠가 화면 아래(언덕 그림 위)로
+    //    쏠려 보였다(2026-09-14 지적). 완독 화면(`EndView`)과 같은 여백을 쓴다.
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center gap-6 px-4 pt-10 pb-8 text-center md:pt-14">
       <div className="rounded-full bg-magic-strong/10 p-5 text-4xl shadow-inner">
         🌙
       </div>
@@ -127,11 +121,17 @@ export function BranchView({
         <p className="max-w-md text-sm font-medium text-red-600" role="alert">{afterStoryError}</p>
       )}
 
-      {/* ⭐ 이 화면의 주인공은 선택 A·B 다 — 「건너뛰기」는 그보다 낮은 **세 번째 선택**이라 작은 secondary.
-          「돌아가기」는 선택이 아니라 이동이라 위쪽의 텍스트 버튼으로 뺐다(2026-09-14 요청). */}
-      <button type="button" onClick={onSkip} className={actionClass("secondary", "", "compact")}>
-        건너뛰기
-      </button>
+      {/* ⭐ 이 화면의 주인공은 선택 A·B 다. 아래 두 버튼은 그보다 낮고 **서로는 같은 위계**라
+          같은 모양·크기로 나란히 둔다 — 되돌아가기가 왼쪽, 건너뛰기가 오른쪽(2026-09-14 요청). */}
+      <div className="flex flex-wrap justify-center gap-3">
+        {/* 폭도 같게 — 문구 길이에 맡기면 크기가 달라 한쪽이 더 중요해 보인다. */}
+        <button type="button" onClick={onBackToStory} className={actionClass("secondary", "w-48", "compact")}>
+          ← 5쪽으로 돌아가기
+        </button>
+        <button type="button" onClick={onSkip} className={actionClass("secondary", "w-48", "compact")}>
+          건너뛰기
+        </button>
+      </div>
     </main>
   );
 }

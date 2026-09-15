@@ -16,7 +16,8 @@ export function EndView({
   const coverImage = sessionPages?.pages.find((p) => p.pageNo === 1)?.imageUrl;
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-6 px-4 py-8 text-center">
+    // 선택지 화면(`BranchView`)과 같이 위에서부터 쌓는다 — 가운데 정렬이면 아래로 쏠려 보였다.
+    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center gap-6 px-4 pt-10 pb-8 text-center md:pt-14">
       <div className="text-5xl animate-bounce">🎉</div>
 
       <div>
@@ -39,16 +40,14 @@ export function EndView({
         </div>
       )}
 
+      {/* 다 읽은 뒤의 주 동작은 **다른 동화로 가기**다 — 서재가 위(primary), 다시 읽기가 아래(secondary). */}
       <div className="flex w-full flex-col gap-3">
-        <button
-          onClick={onRestart}
-          className={actionClass("primary", "w-full py-3")}
-        >
-          처음부터 다시 읽기
-        </button>
-        <Link href="/library" className={actionClass("secondary", "w-full")}>
+        <Link href="/library" className={actionClass("primary", "w-full")}>
           서재로 돌아가기
         </Link>
+        <button onClick={onRestart} className={actionClass("secondary", "w-full")}>
+          처음부터 다시 읽기
+        </button>
       </div>
     </main>
   );
