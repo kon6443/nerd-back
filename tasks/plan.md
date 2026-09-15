@@ -90,18 +90,19 @@
 
 ### Step 6 — 통합 검증과 운영 준비
 
-- [ ] `pnpm ci:core`, 최종 `pnpm ci:all`, `git diff --check`를 수행한다.
+- [x] `pnpm ci:core`, 최종 `pnpm ci:all`, `git diff --check`를 수행한다.
 - [ ] 1024×768 및 390×844에서 시연·체험·A/B·채팅을 수동 검증한다.
 - [x] 운영 환경변수와 캐릭터 voice 설정 누락을 배포 전 게이트로 문서화한다.
-- [ ] 사용자 승인 후에만 마이그레이션·시드 실행, 커밋·푸시·PR을 진행한다.
+- [x] 사용자 승인 아래 DB 마이그레이션을 적용하고 커밋·푸시·PR·배포를 완료한다.
+- [ ] 공식 동화 시드 적용 여부와 정적 낭독 MP3 14개 전체 재생을 확인한다.
 
 ## Tests / Verification
 
 - [x] Backend: migration/entity, adapter, story service, after-story, chat service/controller tests
 - [x] Frontend: audio controller, narration UI, reader integration, chat audio states tests
-- [ ] Commands: `pnpm back ci:core`, `pnpm front ci:core`, `pnpm ci:all`
+- [x] Commands: backend·frontend CI 전체 검사와 `git diff --check`
 - [ ] Manual: 시연·체험 각각 1→5→선택→6A/6B, 일시정지·탭 전환·느린/실패 음성
-- [ ] 미검증으로 남길 수 있는 경로: 실제 OpenRouter TTS 과금 호출과 운영 DB 적용은 별도 승인 전 실행하지 않는다.
+- [x] Runtime: 2026-09-15 사용자 확인 기준 공유 DB 마이그레이션 적용 및 실제 OpenRouter TTS 동작 확인
 
 ## Risk & Rollback
 
@@ -116,7 +117,7 @@
 ## Verification Story (작업 완료 후 채움)
 
 - 무엇이 어떻게 바뀌었는가: 본편·A/B 정적 낭독 URL, OpenRouter Gemini 캐릭터 답변 TTS 생성·저장·재시도, 두 음원의 배타 재생 UI를 계약부터 리더까지 연결했다.
-- 어떻게 동작을 확인했는가: contracts 검사, backend lint·267 unit·66 E2E·build, frontend lint·typecheck·79 tests·stub/health 검사와 Next Webpack production build, `git diff --check`를 통과했다. 운영 DB와 유료 TTS 호출은 실행하지 않았다.
+- 어떻게 동작을 확인했는가: contracts 검사, backend lint·267 unit·66 E2E·build, frontend lint·typecheck·79 tests·stub/health 검사와 Next Webpack production build, `git diff --check`를 통과했다. PR #50 병합과 front/back 배포 성공을 확인했으며, 2026-09-15 사용자 확인으로 공유 DB 마이그레이션과 실제 OpenRouter TTS 동작까지 검증했다. 정적 낭독 14개 전체 및 화면 크기별 수동 QA는 남아 있다.
 
 ## Lessons (해당 시)
 
