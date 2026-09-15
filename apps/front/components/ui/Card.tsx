@@ -8,6 +8,33 @@ import type { ReactNode } from "react";
  */
 type Tone = "neutral" | "accentA" | "accentB";
 
+/**
+ * 카드의 R·padding 조합. **안에 둥근 요소(버튼·썸네일)가 모서리 가까이 붙는 카드는 `snug`** 를 쓴다.
+ *
+ * ⭐ 중첩 R 규칙: **안쪽 R = 바깥 R − padding.** `default`(R 16 · padding 20)는 안쪽이 음수라 동심원이
+ * 성립하지 않는다 — 그런 카드에 둥근 버튼을 넣으면 카드와 버튼 R 이 같아 보여 어색했다(2026-09-14 지적).
+ * `snug`(R 24 · padding 16)는 안쪽 8px 로 딱 떨어진다.
+ * 🚫 padding 을 `className` 으로 덧대지 않는다 — 규칙이 깨진다. 모양은 `inset` 으로 고른다.
+ */
+type Inset = "default" | "snug";
+
+const insetStyles: Record<Inset, string> = {
+  default: "[--card-radius:var(--radius-card)] [--card-padding:1.25rem]",
+  snug: "[--card-radius:1.5rem] [--card-padding:1rem]",
+};
+
+/**
+ * 카드 **안쪽** 둥근 요소(썸네일 등)의 R.
+ * ⚠️ `snug` 카드 안에서만 쓴다 — `default` 에서는 계산값이 음수라 0 으로 떨어진다.
+ */
+export const CARD_NESTED_RADIUS = "rounded-[calc(var(--card-radius)-var(--card-padding))]";
+
+/**
+ * 카드 안 **버튼**의 R 을 내려준다. 버튼을 감싼 요소(또는 카드 자신)에 붙이면 자손 버튼이 물려받는다
+ * (`actionStyles.ts` 의 `--btn-radius`). 버튼에 직접 `rounded-*` 를 덧대지 않기 위한 통로다.
+ */
+export const CARD_NESTED_BUTTON_RADIUS = "[--btn-radius:calc(var(--card-radius)-var(--card-padding))]";
+
 const toneStyles: Record<Tone, string> = {
   neutral: "border-line bg-surface-raised",
   accentA: "border-accent-a bg-accent-a-soft",
@@ -16,14 +43,15 @@ const toneStyles: Record<Tone, string> = {
 
 export interface CardProps {
   tone?: Tone;
+  inset?: Inset;
   className?: string;
   children: ReactNode;
 }
 
-export function Card({ tone = "neutral", className = "", children }: CardProps) {
+export function Card({ tone = "neutral", inset = "default", className = "", children }: CardProps) {
   return (
     <div
-      className={`rounded-card border-2 p-5 shadow-sm ${toneStyles[tone]} ${className}`}
+      className={`rounded-(--card-radius) border-2 p-(--card-padding) shadow-sm ${insetStyles[inset]} ${toneStyles[tone]} ${className}`}
     >
       {children}
     </div>

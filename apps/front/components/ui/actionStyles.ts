@@ -55,8 +55,15 @@ const variantStyles: Record<ActionVariant, string> = {
 export const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-magic-strong focus-visible:ring-offset-2";
 
+/**
+ * ⭐ **모서리 R 은 `--btn-radius` 가 있으면 그것을 따른다.** 카드 안에 든 버튼은 카드가
+ * `바깥 R − padding` 을 이 변수로 내려준다(`Card` 의 `CARD_NESTED_RADIUS`) — 모서리가 동심원을 이뤄야
+ * 버튼이 카드에서 떠 보이지 않는다(2026-09-14 요청).
+ * 🚫 호출부에서 `rounded-*` 를 `extra` 로 덧대지 않는다. BASE 의 R 과 겹치면 Tailwind 는 생성 순서로 이겨
+ *    어느 쪽이 적용될지 보장되지 않는다. 변수로 받는다.
+ */
 const BASE =
-  `inline-flex min-h-touch items-center justify-center rounded-btn font-extrabold transition-[filter,transform,box-shadow] motion-reduce:transition-none ${FOCUS_RING} disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50`;
+  `inline-flex min-h-touch items-center justify-center rounded-[var(--btn-radius,var(--radius-btn))] font-extrabold transition-[filter,transform,box-shadow] motion-reduce:transition-none ${FOCUS_RING} disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50`;
 
 /**
  * 누르면 립만큼 내려앉는 입체감. **텍스트 버튼(`tertiary`)에는 주지 않는다** — 면이 없는데 그림자가 생긴다.

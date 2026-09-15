@@ -4,7 +4,9 @@ import { ActionLink } from "@/components/ui/ActionLink";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center px-5 py-12 text-center sm:px-8 md:py-16">
+    // ⭐ 세로 가운데가 아니라 **위에서부터** 쌓는다 — 가운데 정렬이면 제목·CTA 가 화면 한가운데(언덕 그림 위)로
+    //    쏠려 보였다(2026-09-14 지적). 반대로 너무 붙이면 헤더에 눌려 보여 50px 을 되돌렸다(104 · md 128px).
+    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center px-5 pt-26 pb-12 text-center sm:px-8 md:pt-32">
       <h1 className="max-w-3xl text-balance text-4xl font-extrabold leading-tight tracking-tight text-ink sm:text-5xl md:text-6xl">
         <span className="md:block">동화 속 주인공이</span>{" "}
         <span className="md:block">되러 가볼까요?</span>
