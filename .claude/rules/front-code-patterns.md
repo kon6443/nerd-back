@@ -137,6 +137,7 @@ variant 이름은 **색이 아니라 위계**다. 정의와 근거는 `component
 - 🚫 **초록 CTA 금지** — 초록은 GNB(현재 위치)만 쓴다. 🚫 **노랑·보라 버튼 금지.** 선택 칩·진행 표시 같은 조작 요소도 초록 대신 파랑 계열을 쓴다.
 - 🚫 나란히 놓인 두 버튼을 둘 다 `primary` 로 두지 않는다. 무엇이 중요한지 정하고 하나를 내린다.
 - 색 variant 를 되살리지 않는다(`accentA`·`gold` 등). 타입에서 지웠기 때문에 새로 쓰면 타입 검사가 막는다.
+- ⭐ **중첩 R: 안쪽 R = 바깥 R − padding.** 버튼·썸네일이 카드 모서리 가까이 붙으면 `Card inset="snug"`(R 24 · padding 16 → 안쪽 8)를 쓰고, 안쪽에는 `CARD_NESTED_RADIUS`(썸네일)·`CARD_NESTED_BUTTON_RADIUS`(버튼, `--btn-radius` 로 내려줌)를 붙인다. 🚫 버튼에 `rounded-*` 를 덧대지 않는다 — BASE 의 R 과 겹쳐 적용 순서가 보장되지 않는다.
 
 🚫 `cva`·`tailwind-merge`·`clsx` 를 도입하지 않는다. 객체 맵으로 같은 일이 되고, 새 의존성은 승인 대상이다 (`CLAUDE.md` Ask).
 

@@ -28,60 +28,64 @@ export default async function StoryDetailPage({ params }: PageProps<"/library/[s
           서재로 돌아가기
         </ActionLink>
       </div>
-      <section className="grid items-center gap-8 rounded-card border-2 border-line bg-surface-raised p-6 md:grid-cols-2 md:p-8">
-        <StoryArtwork className="aspect-4/3 rounded-xl" />
+      {/* ⭐ **콘텐츠는 전부 이 흰 상자 안에 둔다**(2026-09-14 요청). 「이야기 속 친구들」이 상자 밖 언덕 그림
+          위에 떠 있어 읽기 어려웠다. 상자 하나에 소개와 등장인물을 위아래로 담고 가는 선으로 나눈다. */}
+      <div className="flex flex-col gap-8 rounded-card border-2 border-line bg-surface-raised p-6 md:p-8">
+        <section className="grid items-center gap-8 md:grid-cols-2">
+          <StoryArtwork className="aspect-4/3 rounded-xl" />
 
-        <div className="flex min-w-0 flex-col gap-4">
-          <h1 className="text-3xl leading-tight font-bold text-balance break-keep wrap-anywhere text-ink md:text-4xl">
-            {story.title}
-          </h1>
-          {story.summary ? (
-            <p className="text-lg leading-relaxed break-keep wrap-anywhere text-ink-muted">
-              {story.summary}
+          <div className="flex min-w-0 flex-col gap-4">
+            <h1 className="text-3xl leading-tight font-bold text-balance break-keep wrap-anywhere text-ink md:text-4xl">
+              {story.title}
+            </h1>
+            {story.summary ? (
+              <p className="text-lg leading-relaxed break-keep wrap-anywhere text-ink-muted">
+                {story.summary}
+              </p>
+            ) : null}
+            <p className="w-fit rounded-pill bg-primary-tint px-4 py-2 text-sm font-bold text-ink-muted">
+              전 {story.pageCount}장
             </p>
-          ) : null}
-          <p className="w-fit rounded-pill bg-primary-tint px-4 py-2 text-sm font-bold text-ink-muted">
-            전 {story.pageCount}장
-          </p>
 
-          {story.pageCount > 0 ? (
-            // `key` 로 동화가 바뀌면 새로 마운트시킨다 — 이전 동화의 세션이 남지 않게.
-            <StorySessionActions key={story.slug} slug={story.slug} />
-          ) : (
-            // 페이지가 아직 안 들어온 동화다. 링크를 걸면 첫 페이지에서 404 를 만난다.
-            <p className="pt-2 text-ink-muted">아직 페이지가 준비되지 않았어요.</p>
-          )}
-        </div>
-      </section>
-
-      {story.characters.length > 0 ? (
-        <section className="flex flex-col gap-4 px-1" aria-labelledby="characters-title">
-          <h2 id="characters-title" className="text-xl font-bold text-ink">
-            이야기 속 친구들
-          </h2>
-          <ul className="flex flex-wrap gap-3">
-            {story.characters.map((character) => (
-              <li key={character.role}>
-                {/* 🚫 persona 는 응답에 없다 — 프롬프트 설계가 노출되면 스포일러의 재료가 된다. */}
-                <span className="inline-flex min-h-touch items-center gap-3 rounded-pill border border-line bg-surface-raised px-5 py-3 font-bold text-ink">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className="size-6 shrink-0 text-primary-strong"
-                    aria-hidden="true"
-                  >
-                    <circle cx="12" cy="8" r="4" />
-                    <path d="M4 21v-2a8 8 0 0 1 16 0v2" strokeLinecap="round" />
-                  </svg>
-                  <span className="wrap-anywhere">{character.displayName}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+            {story.pageCount > 0 ? (
+              // `key` 로 동화가 바뀌면 새로 마운트시킨다 — 이전 동화의 세션이 남지 않게.
+              <StorySessionActions key={story.slug} slug={story.slug} />
+            ) : (
+              // 페이지가 아직 안 들어온 동화다. 링크를 걸면 첫 페이지에서 404 를 만난다.
+              <p className="pt-2 text-ink-muted">아직 페이지가 준비되지 않았어요.</p>
+            )}
+          </div>
         </section>
-      ) : null}
+
+        {story.characters.length > 0 ? (
+          <section className="flex flex-col gap-4 border-t border-line pt-6" aria-labelledby="characters-title">
+            <h2 id="characters-title" className="text-xl font-bold text-ink">
+              이야기 속 친구들
+            </h2>
+            <ul className="flex flex-wrap gap-3">
+              {story.characters.map((character) => (
+                <li key={character.role}>
+                  {/* 🚫 persona 는 응답에 없다 — 프롬프트 설계가 노출되면 스포일러의 재료가 된다. */}
+                  <span className="inline-flex min-h-touch items-center gap-3 rounded-pill border border-line bg-surface-raised px-5 py-3 font-bold text-ink">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      className="size-6 shrink-0 text-primary-strong"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 21v-2a8 8 0 0 1 16 0v2" strokeLinecap="round" />
+                    </svg>
+                    <span className="wrap-anywhere">{character.displayName}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+      </div>
     </main>
   );
 }
