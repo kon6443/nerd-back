@@ -173,6 +173,7 @@ describe("session api", () => {
         templateTitle: "빨간 모자",
         status: "completed",
         referenceImageUrl: "https://storage.local/ref.png",
+        thumbnailImageUrl: "https://storage.local/page-1.png",
         createdAt: "2026-09-08T00:00:00.000Z",
         updatedAt: "2026-09-08T00:00:00.000Z",
       },
@@ -185,6 +186,7 @@ describe("session api", () => {
     });
     expect(result).toHaveLength(1);
     expect(result[0].templateSlug).toBe("red-riding-hood");
+    expect(result[0].thumbnailImageUrl).toBe("https://storage.local/page-1.png");
   });
 
   it("deleteSession 은 /sessions/:id 로 DELETE 요청을 보낸다", async () => {
@@ -202,8 +204,8 @@ describe("session api", () => {
    */
   it("findMySessionBySlug 는 목록에서 slug 가 같은 세션을 찾는다", async () => {
     vi.spyOn(client, "apiFetch").mockResolvedValue([
-      { id: "s1", templateId: 1, templateSlug: "jack", templateTitle: "잭", status: "completed", referenceImageUrl: null, createdAt: "", updatedAt: "" },
-      { id: "s2", templateId: 2, templateSlug: "hood", templateTitle: "모자", status: "draft", referenceImageUrl: null, createdAt: "", updatedAt: "" },
+      { id: "s1", templateId: 1, templateSlug: "jack", templateTitle: "잭", status: "completed", referenceImageUrl: null, thumbnailImageUrl: null, createdAt: "", updatedAt: "" },
+      { id: "s2", templateId: 2, templateSlug: "hood", templateTitle: "모자", status: "draft", referenceImageUrl: null, thumbnailImageUrl: null, createdAt: "", updatedAt: "" },
     ]);
 
     await expect(findMySessionBySlug("hood")).resolves.toMatchObject({ id: "s2" });

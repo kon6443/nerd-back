@@ -1,12 +1,13 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Transactional } from 'typeorm-transactional';
 import { randomUUID } from 'node:crypto';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
+import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
 import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
 import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
@@ -62,6 +63,8 @@ export class StorySessionService {
     private readonly templateRepo: Repository<StoryTemplate>,
     @InjectRepository(StoryPage)
     private readonly pageRepo: Repository<StoryPage>,
+    @InjectRepository(StoryPageCharacter)
+    private readonly pageCharacterRepo: Repository<StoryPageCharacter>,
     @InjectRepository(SessionPageImage)
     private readonly pageImageRepo: Repository<SessionPageImage>,
     @Inject(IMAGE_GENERATION_PORT)
@@ -136,6 +139,27 @@ export class StorySessionService {
       branchRepo.findOne({ where: { sessionId } }),
     ]);
 
+    const afterStoryPages = pages.filter(
+      (page) => page.pageNo === 6 && (page.branchKey === 'a' || page.branchKey === 'b'),
+    );
+    const appearances: StoryPageCharacter[] =
+      afterStoryPages.length === 0
+        ? []
+        : ((await this.pageCharacterRepo.find({
+            where: { pageId: In(afterStoryPages.map((page) => page.id)) },
+            relations: { character: true },
+            order: { id: 'ASC' },
+          })) ?? []);
+    const charactersByPage = new Map<number, StoryPageCharacter[]>();
+    for (const appearance of appearances) {
+      const pageCharacters = charactersByPage.get(appearance.pageId);
+      if (pageCharacters) {
+        pageCharacters.push(appearance);
+      } else {
+        charactersByPage.set(appearance.pageId, [appearance]);
+      }
+    }
+
     const byBranch = new Map(choices.map((choice) => [choice.branchKey, choice]));
     const result = (['a', 'b'] as const).map(async (branchKey) => {
       const choice = byBranch.get(branchKey);
@@ -152,6 +176,11 @@ export class StorySessionService {
         imageUrl: image?.status === 'succeeded' && image.imageKey ? await this.storagePort.getPresignedUrl(image.imageKey) : null,
         narrationAudioUrl: await this.getNarrationAudioUrl(page.narrationAudioKey),
         errorMessage: image?.errorMessage ?? null,
+        characters: (charactersByPage.get(page.id) ?? []).map((appearance) => ({
+          role: appearance.character.role,
+          displayName: appearance.character.displayName,
+          hitbox: appearance.hitbox,
+        })),
       };
     });
 
@@ -295,12 +324,34 @@ export class StorySessionService {
       order: { createdAt: 'DESC' },
     });
 
+    const sessionIds = sessions.map((session) => session.id);
+    const thumbnailImages: SessionPageImage[] =
+      sessionIds.length === 0
+        ? []
+        : ((await this.pageImageRepo.find({
+            where: {
+              sessionId: In(sessionIds),
+              pageNo: 1,
+              branchKey: 'common',
+              status: 'succeeded',
+            },
+          })) ?? []);
+    const thumbnailKeyBySession = new Map(
+      thumbnailImages
+        .filter((image): image is SessionPageImage & { imageKey: string } => Boolean(image.imageKey))
+        .map((image) => [image.sessionId, image.imageKey]),
+    );
+
     return Promise.all(
       sessions.map(async (s) => {
         let referenceImageUrl: string | null = null;
         if (s.referenceImageKey) {
           referenceImageUrl = await this.storagePort.getPresignedUrl(s.referenceImageKey);
         }
+        const thumbnailImageKey = thumbnailKeyBySession.get(s.id);
+        const thumbnailImageUrl = thumbnailImageKey
+          ? await this.getOptionalPresignedUrl(thumbnailImageKey)
+          : null;
         return {
           id: s.id,
           templateId: s.templateId,
@@ -308,11 +359,20 @@ export class StorySessionService {
           templateTitle: s.template?.title ?? '',
           status: s.status,
           referenceImageUrl,
+          thumbnailImageUrl,
           createdAt: s.createdAt.toISOString(),
           updatedAt: s.updatedAt.toISOString(),
         };
       }),
     );
+  }
+
+  private async getOptionalPresignedUrl(key: string): Promise<string | null> {
+    try {
+      return await this.storagePort.getPresignedUrl(key);
+    } catch {
+      return null;
+    }
   }
 
   /**

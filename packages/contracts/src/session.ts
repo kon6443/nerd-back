@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { storySlugSchema } from './story';
+import { storySlugSchema, type StoryPageCharacter } from './story';
 
 /**
  * 동화 제작 세션 상태.
@@ -139,7 +139,20 @@ export type RetryAfterStoryResponse = z.infer<typeof retryAfterStoryResponseSche
 export const selectAfterStoryChoiceSchema = z.object({ branchKey: storyBranchKeySchema }).strict();
 export type SelectAfterStoryChoiceInput = z.infer<typeof selectAfterStoryChoiceSchema>;
 
-export const afterStoryChoiceSchema = z.object({
+export interface AfterStoryChoice {
+  branchKey: StoryBranchKey;
+  title: string;
+  description: string;
+  pageNo: 6;
+  bodyText: string;
+  status: SessionPageStatus;
+  imageUrl: string | null;
+  narrationAudioUrl: string | null;
+  errorMessage: string | null;
+  characters: StoryPageCharacter[];
+}
+
+export const afterStoryChoiceSchema: z.ZodType<AfterStoryChoice> = z.object({
   branchKey: storyBranchKeySchema,
   title: z.string(),
   description: z.string(),
@@ -149,6 +162,20 @@ export const afterStoryChoiceSchema = z.object({
   imageUrl: z.string().nullable(),
   narrationAudioUrl: z.string().nullable(),
   errorMessage: z.string().nullable(),
+  characters: z.array(
+    z.object({
+      role: z.string(),
+      displayName: z.string(),
+      hitbox: z
+        .object({
+          x: z.number(),
+          y: z.number(),
+          width: z.number(),
+          height: z.number(),
+        })
+        .nullable(),
+    }),
+  ),
 });
 
 export const afterStoryResponseSchema = z.object({
@@ -173,6 +200,7 @@ export interface MyStorySessionItem {
   templateTitle: string;
   status: StorySessionStatus;
   referenceImageUrl: string | null;
+  thumbnailImageUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }

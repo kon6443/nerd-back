@@ -19,9 +19,9 @@ import { isAfterStoryGenerating } from "./polling";
 import { usePolling } from "./usePolling";
 import { BranchView } from "./BranchView";
 import { CharacterChat } from "./CharacterChat";
+import { CharacterHotspots } from "./CharacterHotspots";
 import { EndView } from "./EndView";
 import { GeneratingView } from "./GeneratingView";
-import { ChatLauncher } from "./ChatLauncher";
 import { ChatSurface } from "./ChatSurface";
 import { ReaderPreviewSettings } from "./ReaderPreviewSettings";
 import { parseReaderOptions } from "./readerOptions";
@@ -45,6 +45,7 @@ import type {
   StoryBranchKey,
   StoryChatBranchKey,
   StoryDetail,
+  StoryPageCharacter,
   StoryPageView,
 } from "@nerd/contracts";
 
@@ -156,7 +157,7 @@ function StoryReadContent({ params }: PageProps) {
   const [chatOpen, setChatOpen] = useState(false);
   // 넘김이 도는 동안 `dock` 을 여닫으면 책 폭이 변해 넘어가던 종이가 튄다(길이는 CSS 가 소유).
   const [turning, setTurning] = useState(false);
-  const launcherRef = useRef<HTMLButtonElement>(null);
+  const chatTriggerRef = useRef<HTMLButtonElement>(null);
   const chatWasOpen = useRef(false);
 
   const chatBranchKey: StoryChatBranchKey =
@@ -200,6 +201,22 @@ function StoryReadContent({ params }: PageProps) {
   }, [pauseNarration, suspendNarration, viewState]);
 
   const dockLocked = readerOptions.chat === "dock" && turning;
+  const selectChatRole = chat.selectRole;
+
+  const openChatForCharacter = useCallback(
+    (role: string, trigger: HTMLButtonElement) => {
+      // 정적 hotspot은 넘김 중 사라지지만, 같은 프레임에 시작된 dock 폭 변경도 막는다.
+      if (dockLocked) return;
+      chatTriggerRef.current = trigger;
+      // 이미 보낸 질문이 있으면 저장된 상대를 바꾸지 않고 대화 기록만 다시 연다.
+      if (chat.status !== "pending" && chat.status !== "completed" && chat.status !== "failed") {
+        selectChatRole(role);
+      }
+      pauseNarration();
+      setChatOpen(true);
+    },
+    [chat.status, dockLocked, pauseNarration, selectChatRole],
+  );
 
   const closeChat = useCallback(() => {
     // ⚠️ 여는 것만 막으면 폭 변화의 절반만 막은 것이다 — 닫을 때도 책이 넓어진다.
@@ -207,14 +224,15 @@ function StoryReadContent({ params }: PageProps) {
     setChatOpen(false);
   }, [dockLocked]);
 
-  // 닫은 뒤 포커스를 런처로 되돌린다. `<dialog>` 는 브라우저가 해 주지만 `dock`(aside)은 아니다.
+  // 닫은 뒤 포커스를 대화를 시작한 캐릭터로 되돌린다. `<dialog>` 는 브라우저가 해 주지만
+  // `dock`(aside)은 아니며, 명시해 두면 두 표면의 동작도 같아진다.
   // 🚫 첫 렌더에는 옮기지 않는다 — 화면에 들어오자마자 포커스가 튄다.
   useEffect(() => {
     if (chatOpen) {
       chatWasOpen.current = true;
       return;
     }
-    if (chatWasOpen.current) launcherRef.current?.focus();
+    if (chatWasOpen.current && chatTriggerRef.current?.isConnected) chatTriggerRef.current.focus();
   }, [chatOpen]);
 
   // 몰입 화면에서는 전역 헤더를 숨긴다 — CSS 가 `<html data-reader>` 를 보고 고른다.
@@ -584,6 +602,12 @@ function StoryReadContent({ params }: PageProps) {
     return source?.bodyText || "본문을 불러오는 중입니다...";
   }
 
+  /** 쪽 → 삽화에 실제로 나온 대화 가능한 캐릭터. 6쪽은 고른 A/B 장면의 목록을 쓴다. */
+  function charactersAt(pageNo: number): StoryPageCharacter[] {
+    if (pageNo === 6) return activeAfterStory?.characters ?? [];
+    return storyPages.find((page) => page.pageNo === pageNo)?.characters ?? [];
+  }
+
   const isFirstPage = currentPageNo <= 1;
   const isBehindPage = currentPageNo === 6;
 
@@ -603,12 +627,14 @@ function StoryReadContent({ params }: PageProps) {
       <main className={mainClass}>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
         <header className={READER_BAR}>
-          <button
-            onClick={() => setViewState("generating")}
-            className={actionClass("secondary", "text-sm")}
-          >
-            ← 제작 현황 보기
-          </button>
+          {!sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
+            <button
+              onClick={() => setViewState("generating")}
+              className={actionClass("secondary", "text-sm")}
+            >
+              ← 제작 현황 보기
+            </button>
+          ) : null}
 
           <h1 className="order-first w-full text-xl font-bold text-balance break-keep wrap-anywhere text-ink md:order-none md:w-auto md:flex-1 md:text-center">
             {story.title}
@@ -637,6 +663,15 @@ function StoryReadContent({ params }: PageProps) {
           onRequestPage={requestPage}
           onTurningChange={setTurning}
           renderArt={(pageNo) => <BookArtContent pageNo={pageNo} imageUrl={imageUrlAt(pageNo)} />}
+          renderArtControls={(pageNo) => (
+            <CharacterHotspots
+              imageUrl={imageUrlAt(pageNo)}
+              characters={charactersAt(pageNo)}
+              selectedRole={chat.role}
+              chatOpen={chatOpen}
+              onSelect={openChatForCharacter}
+            />
+          )}
           renderText={(pageNo) => (
             <BookTextContent pageNo={pageNo}>{bodyTextAt(pageNo)}</BookTextContent>
           )}
@@ -758,18 +793,6 @@ function StoryReadContent({ params }: PageProps) {
 
           {/* 오른쪽 — 도구와 앞으로. 가장 오른쪽 끝이 늘 **다음 동작(primary)** 이다. */}
           <div className="flex items-center gap-2 justify-self-end sm:col-start-3">
-            {chatOpen ? null : (
-              <ChatLauncher
-                chat={chat}
-                onOpen={() => {
-                  // 대화를 열면 낭독을 멈춘다 — 답변 음성과 낭독이 겹치지 않게(main #50).
-                  narration.pause();
-                  setChatOpen(true);
-                }}
-                buttonRef={launcherRef}
-                disabled={dockLocked}
-              />
-            )}
             {currentPageNo === 5 ? (
               // ⚠️ 띄어쓰기는 `gap` 이 만든다. 버튼이 inline-flex 라 글자·span 이 각각 flex 항목이 되어
               //    항목 끝의 공백 문자는 잘린다(「비하인드선택하기→」로 붙어 보였다).

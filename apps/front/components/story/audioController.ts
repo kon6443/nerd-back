@@ -40,19 +40,40 @@ export class ReaderAudioController {
     audio.preload = "metadata";
     this.eventHandlers = {
       play: () => this.updateFromAudio("playing"),
+      playing: () => this.updateFromAudio("playing"),
       pause: () => {
         if (this.snapshot.status !== "idle" && this.snapshot.status !== "ended") {
           this.updateFromAudio("paused");
         }
       },
       timeupdate: () => this.updateFromAudio(this.snapshot.status),
+      durationchange: () => this.updateFromAudio(this.snapshot.status),
       loadedmetadata: () => this.updateFromAudio(this.snapshot.status),
+      canplay: () => this.updateFromAudio(this.snapshot.status),
+      seeking: () => this.updateFromAudio(this.snapshot.status),
+      seeked: () => this.updateFromAudio(this.snapshot.status),
       ended: () => this.updateFromAudio("ended"),
       error: () => this.updateFromAudio("error"),
     };
+    this.attach();
+  }
+
+  private attached = false;
+
+  attach(): void {
+    if (this.attached) return;
     for (const [event, handler] of Object.entries(this.eventHandlers)) {
-      audio.addEventListener(event, handler);
+      this.audio.addEventListener(event, handler);
     }
+    this.attached = true;
+  }
+
+  detach(): void {
+    if (!this.attached) return;
+    for (const [event, handler] of Object.entries(this.eventHandlers)) {
+      this.audio.removeEventListener(event, handler);
+    }
+    this.attached = false;
   }
 
   getSnapshot = (): ReaderAudioSnapshot => this.snapshot;
@@ -63,6 +84,7 @@ export class ReaderAudioController {
   };
 
   async play(url: string, kind: ReaderAudioKind, restart = false): Promise<boolean> {
+    this.attach();
     const version = ++this.playVersion;
     const changed = this.snapshot.url !== url;
     if (changed) {
@@ -102,9 +124,7 @@ export class ReaderAudioController {
 
   destroy(): void {
     this.stop();
-    for (const [event, handler] of Object.entries(this.eventHandlers)) {
-      this.audio.removeEventListener(event, handler);
-    }
+    this.detach();
     this.listeners.clear();
   }
 

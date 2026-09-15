@@ -1,123 +1,170 @@
-# 동화 낭독·캐릭터 답변 TTS Implementation Plan
+# 제작형 서재와 삽화 속 캐릭터 대화 Implementation Plan
 
-**Goal:** 시연·체험 리더에 페이지별 낭독을 추가하고, 캐릭터 답변을 별도 목소리로 생성·저장·재생한다.
+**Goal:** 개인화 동화를 서재에서 1쪽 삽화로 식별하고, 제작 흐름의 CTA를 단순화하며, 개인화 리더에서 그림 속 캐릭터를 직접 선택해 대화를 연다.
 
-**Architecture:** 정적 낭독은 `story_pages`의 오브젝트 키를 서명 URL로 제공한다. 동적 답변은 `TextToSpeechPort`와 OpenRouter Gemini 3.1 Flash TTS 어댑터를 거쳐 생성하며 DB 상태 선점으로 중복 과금을 막는다. 프론트는 리더 범위의 단일 오디오 컨트롤러로 내레이션과 답변 음성을 배타적으로 재생한다.
+**Architecture:** `GET /sessions/my`가 완성 세션의 1쪽 썸네일 URL을 선택적으로 제공하고, 공개 서재는 서버 렌더를 유지한 채 로그인 확인 후 개인화 카드만 보강한다. 제작 의도는 `/library?mode=create`로 상세까지만 전달한다. 리더는 기존 히트박스를 `object-cover` 좌표로 변환해 정적 삽화 면에 접근 가능한 hotspot을 한 번만 렌더하고 기존 채팅 상태·표면을 재사용한다.
 
-**Tech Stack:** NestJS 11, TypeORM/MySQL, Next.js 16, React 19, zod contracts, MinIO/S3, OpenRouter Audio Speech API, Gemini 3.1 Flash TTS Preview, Jest, Vitest.
+**Tech Stack:** Next.js 16.3.3, React 19.2.8, NestJS 11.1.9, TypeORM 0.3.31, MySQL, TypeScript, Vitest, Jest.
 
-**Spec:** [`docs/tasks/slice-7-tts-spec.md`](../docs/tasks/slice-7-tts-spec.md)
-
-## Goal & Acceptance Criteria
-
-- 첫 사용자 입력 뒤 본편 1~5 및 선택한 6A/6B 낭독이 페이지 이동에 맞춰 재생된다.
-- A/B 선택 화면과 사용자 질문은 읽지 않는다.
-- 캐릭터 답변 텍스트를 먼저 표시하고, 음성은 생성 완료 후 저장·재사용한다.
-- 음성 장애가 책과 텍스트 채팅을 막지 않는다.
-- `/grill-me` Q1~Q27의 상태·배치·접근성 결정이 테스트와 수동 QA로 고정된다.
-
-### 비목표
-
-- 문장 하이라이트, seek, 배속, 별도 볼륨, 백그라운드 재생
-- 음성 복제, 본문 런타임 TTS, 오디오 포맷 변환
-- 새 큐·상태관리 라이브러리 도입
+**Spec:** [`docs/tasks/slice-8-library-character-interaction-spec.md`](../docs/tasks/slice-8-library-character-interaction-spec.md)
 
 ## Existing Patterns / Source of Truth
 
-- 요구사항: `docs/tasks/slice-7-tts-spec.md`
-- 분기 모델: `docs/tasks/slice-6-behind-branch-spec.md`
-- API 계약: `packages/contracts/src/story.ts`, `story-chat.ts`, `session.ts`
-- 저장소: `StoragePort`와 `S3StorageAdapter`
-- 외부 AI: Port & Adapter, DB 선점, 외부 요청·응답 본문 로그 금지
-- 리더: `BookPager`가 쪽 넘김을, `BookFrame` 조각이 본문 배치를 소유
-- 채팅: `useCharacterChat`이 상태를, `CharacterChat`이 내용 UI를 소유
-- 충돌 가능성: 기존 `story_page_chats.status`는 LLM 상태이므로 오디오 상태로 재사용하지 않는다.
+- 개인화 삽화 키와 상태는 `session_page_images`가 소유한다.
+- 공개 응답은 `@nerd/contracts`를 먼저 변경한다.
+- 공개 `/library`는 백엔드 동화 목록을 서버에서 렌더하고 인증 전용 세션 조회는 클라이언트에서 게이트한다.
+- 제작 모드는 URL이 소유하며 컴포넌트 전역 상태나 localStorage를 추가하지 않는다.
+- 캐릭터 위치는 `StoryPageCharacter.hitbox`의 0~1 정규 좌표가 정본이다.
+- `BookPager.renderArt`는 넘김 종이에 반복되므로 상호작용은 별도 정적 오버레이 슬롯에 둔다.
+- 채팅의 상태·폴링·초안·음성은 기존 `useCharacterChat`이 계속 소유한다.
 
-## Design (Minimal Approach + Key Decisions)
+## Design Direction
 
-- 정적 낭독은 별도 테이블 없이 `story_pages.narration_audio_key`로 둔다. 6A/6B는 기존 `branch_key` 행으로 구분된다.
-- 캐릭터 목소리 설정은 `story_characters`에, 생성 결과는 `story_page_chats`에 둔다.
-- `StoryPageView`, `AfterStoryChoice`, `StoryChatExchange`는 키가 아닌 서명 URL을 반환한다.
-- LLM 답변 저장 뒤 TTS 상태를 선점하고 백엔드에서 생성을 계속한다. 서버 중단은 만료된 `pending`과 음성 전용 재시도로 복구한다.
-- 별도 큐가 없는 대신 강한 내구성을 보장하지 않는다. 현재 범위의 비용 중복 방지와 사용자 재시도는 DB가 보장한다.
-- 프론트 오디오 상태는 리더 생명주기에 두며 책을 다시 열면 초기화한다.
+- 기존 Green `#58cc02`, Blue `#1cb0f6`, Gold `#ffc800`, Purple `#ce82ff`, Paper `#fbf7ec`, Ink `#4b4b4b` 토큰만 사용한다.
+- 캐릭터 영역에는 사각형 개발용 히트박스를 노출하지 않고 타원형 광원과 짧은 이름표를 사용한다.
+- 포인터 환경은 hover/focus에 반응하고 터치 환경은 작은 말풍선 단서를 항상 보여 준다.
+- 대화 표면과 하단 조작 바는 현재 위계를 유지한다. 시각적 강조는 삽화 hotspot 한 곳에만 쓴다.
 
-## Implementation Steps (Thin Vertical Slices)
+## Dependency Order
 
-### Step 1 — 데이터·계약 기반
+```text
+계약·백엔드 응답
+  ├─ 서재 개인화 썸네일
+  └─ 6A/6B 캐릭터 위치
+       └─ BookPager 정적 오버레이
+            └─ CharacterHotspots와 채팅 연결
 
-- [x] 마이그레이션과 엔티티에 정적 낭독 키, 캐릭터 음성 설정, 답변 음성 키·상태를 추가한다.
-- [x] 공유 계약에 낭독 URL과 답변 음성 상태·URL을 추가한다.
-- [x] 공식 동화 시드에 이미 업로드된 14개 낭독 키를 연결한다.
-- [x] SQL·metadata·시드 정합성 테스트를 추가한다. 실제 DB에는 적용하지 않는다.
+제작 모드 URL 유틸
+  └─ 홈 → 서재 → 상세 CTA 분기
+```
 
-**Checkpoint:** 백엔드 build/test에서 스키마·계약이 일치하고 DB 쓰기 명령을 실행하지 않았다.
+## Implementation Steps
 
-### Step 2 — 정적 낭독 API
+### Task 1 — 계약과 세션 API 확장
 
-- [x] 본편 페이지 조회가 `narrationAudioUrl`을 발급한다.
-- [x] 비하인드 A/B 조회가 각 결과의 `narrationAudioUrl`을 발급한다.
-- [x] 오디오 키 누락과 서명 실패가 페이지 응답을 실패시키지 않는 테스트를 추가한다.
+**Files:**
+- Modify: `packages/contracts/src/session.ts`
+- Modify: `apps/back/src/modules/story-session/story-session.service.ts`
+- Modify: `apps/back/src/modules/story-session/story-session.service.spec.ts`
 
-**Checkpoint:** 본편 5개와 A/B 두 개의 URL 매핑 및 `null` 폴백이 서비스 테스트에서 확인된다.
+- [x] `MyStorySessionItem.thumbnailImageUrl`과 `AfterStoryChoice.characters`를 계약에 추가한다.
+- [x] 완료 세션 ID들의 1쪽 공통 성공 이미지를 한 번에 조회해 URL로 변환한다.
+- [x] 썸네일 키·서명 실패를 `null`로 격리한다.
+- [x] 비하인드 A/B 페이지 조회에 각 페이지의 등장인물과 히트박스를 포함한다.
 
-### Step 3 — 캐릭터 답변 TTS 백엔드
+**Checkpoint:** 계약 build와 story-session service tests가 통과하며 DB 스키마를 바꾸지 않는다.
 
-- [x] `TextToSpeechPort`와 `OpenRouterTextToSpeechAdapter`, `OPENROUTER_TTS_MODEL` 환경변수 검증을 추가한다. 인증은 기존 `OPENROUTER_API_KEY`를 공유한다.
-- [x] 답변 완료 뒤 음성을 선점·생성·업로드·저장한다.
-- [x] 음성 전용 재시도 API와 최신 상태 조회를 추가한다.
-- [x] 동시 요청, 공급자 실패, 업로드 실패, 서버 중단 상태, 완료 음성 재사용을 테스트한다.
+### Task 2 — 서재 카드의 개인화 썸네일
 
-**Checkpoint:** 같은 채팅의 TTS 호출은 한 번이며 실패해도 저장된 답변 텍스트가 유지된다.
+**Files:**
+- Create: `apps/front/app/(demo)/library/LibraryStoryList.tsx`
+- Create: `apps/front/app/(demo)/library/libraryStories.ts`
+- Create: `apps/front/app/(demo)/library/libraryStories.test.ts`
+- Modify: `apps/front/app/(demo)/library/page.tsx`
+- Modify: `apps/front/lib/api/session.test.ts`
 
-### Step 4 — 공통 내레이션 UX
+- [x] 서버가 받은 공개 동화 목록을 즉시 렌더하고, 로그인 확인 뒤 세션 목록을 한 번만 조회한다.
+- [x] 완성 세션과 같은 slug의 `thumbnailImageUrl`만 `StoryCard.imageUrl`로 전달한다.
+- [x] 미완성·누락·실패에서는 기존 `StoryArtwork`를 유지한다.
+- [x] 이미지가 뒤늦게 들어와도 카드 크기와 격자가 움직이지 않게 한다.
 
-- [x] 리더 범위 단일 오디오 컨트롤러와 `NarrationPlayer.tsx`를 추가한다.
-- [x] 시연 `BookReader`와 체험 리더 양쪽에 같은 조작·상태 UI를 연결한다.
-- [x] 현재/다음 음성 및 5쪽의 A/B 프리로드, 탭 숨김·화면 이탈 정지를 구현한다.
-- [x] 최초 입력, 자동재생, 일시정지 의미, 종료 시 쪽 유지, 누락 음성 동작을 컨트롤러·통합 로직 테스트로 검증한다.
+**Checkpoint:** 순수 매칭 tests와 frontend types/build에서 공개·로그인 서재가 모두 성립한다.
 
-**Checkpoint:** 내레이션 하나만 재생되고 페이지·분기 이동 시 Q1~Q12, Q15~Q17, Q24~Q27이 고정된다.
+### Task 3 — 제작 모드 URL과 상세 CTA
 
-### Step 5 — 캐릭터 답변 음성 UX
+**Files:**
+- Create: `apps/front/lib/libraryMode.ts`
+- Create: `apps/front/lib/libraryMode.test.ts`
+- Modify: `apps/front/components/layout/authLinks.ts`
+- Modify: `apps/front/app/(demo)/library/page.tsx`
+- Modify: `apps/front/app/(demo)/library/[slug]/page.tsx`
 
-- [x] `useCharacterChat`에 오디오 상태 폴링과 음성 전용 재시도를 연결한다.
-- [x] `CharacterChat`에 준비·재생·실패 UI를 추가하고 사용자 질문은 읽지 않는다.
-- [x] 새 답변만 자동재생하고 저장 답변은 수동재생하는 규칙을 구현한다.
-- [x] 채팅 조작 시 내레이션 정지와 전역 배타성을 검증한다.
+- [x] 홈 로그인 사용자용 CTA를 `/library?mode=create`로 보낸다.
+- [x] `mode=create`를 정확히 판정하고 카드 상세 링크와 돌아가기 링크에 보존한다.
+- [x] 일반 체험·헤더 서재·로그인 기본 이동은 일반 모드로 유지한다.
 
-**Checkpoint:** Q4~Q5, Q13~Q14, Q18~Q23의 새 답변·재방문·실패 흐름이 테스트된다.
+**Checkpoint:** URL helper tests와 Next 타입 검사에서 일반/제작 경로가 갈린다.
 
-### Step 6 — 통합 검증과 운영 준비
+### Task 4 — 모든 세션 상태에서 제작 모드 CTA 정리
 
-- [ ] `pnpm ci:core`, 최종 `pnpm ci:all`, `git diff --check`를 수행한다.
-- [ ] 1024×768 및 390×844에서 시연·체험·A/B·채팅을 수동 검증한다.
-- [x] 운영 환경변수와 캐릭터 voice 설정 누락을 배포 전 게이트로 문서화한다.
-- [ ] 사용자 승인 후에만 마이그레이션·시드 실행, 커밋·푸시·PR을 진행한다.
+**Files:**
+- Modify: `apps/front/components/story/StorySessionActions.tsx`
+- Modify: `apps/front/app/(demo)/library/[slug]/loading.tsx`
 
-## Tests / Verification
+- [x] 상세이 제작 모드임을 명시적 prop으로 전달한다.
+- [x] 확인 중 자리표시, 완료, 생성 중, 실패, 미생성 모든 상태에서 시연 CTA를 함께 숨긴다.
+- [x] 개인화 제작·읽기·재시도·초기화 버튼은 그대로 유지한다.
+- [x] 제작 모드 로딩 화면도 최종 CTA 폭과 같은 자리를 그린다.
 
-- [x] Backend: migration/entity, adapter, story service, after-story, chat service/controller tests
-- [x] Frontend: audio controller, narration UI, reader integration, chat audio states tests
-- [ ] Commands: `pnpm back ci:core`, `pnpm front ci:core`, `pnpm ci:all`
-- [ ] Manual: 시연·체험 각각 1→5→선택→6A/6B, 일시정지·탭 전환·느린/실패 음성
-- [ ] 미검증으로 남길 수 있는 경로: 실제 OpenRouter TTS 과금 호출과 운영 DB 적용은 별도 승인 전 실행하지 않는다.
+**Checkpoint:** 일반 모드의 시연 CTA와 제작 모드의 개인화 CTA가 각각 유지된다.
 
-## Risk & Rollback
+### Task 5 — cover 좌표 변환과 BookPager 정적 오버레이
 
-- **자동재생 차단:** 최초 사용자 입력을 게이트로 사용한다.
-- **중복 과금:** DB 조건부 선점과 완료 키 재사용으로 방지한다.
-- **서버 재시작:** 오래된 `pending`을 실패로 표시하고 음성만 재시도한다.
-- **서명 URL 만료:** 재생 실패 시 최신 페이지/채팅 조회로 URL을 갱신한다.
-- **공급자 장애:** 텍스트 우선, 음성만 실패하는 경계로 격리한다.
-- **Preview 모델 변경·불안정:** 모델 ID를 환경변수로 고정하고 응답 검증 실패 시 텍스트만 유지한다.
-- **롤백:** nullable 컬럼과 nullable 응답 필드로 단계 배포하고, 프론트 연결을 되돌려도 기존 읽기·채팅은 유지한다.
+**Files:**
+- Create: `apps/front/app/(trial)/stories/[slug]/read/characterHotspotGeometry.ts`
+- Create: `apps/front/app/(trial)/stories/[slug]/read/characterHotspotGeometry.test.ts`
+- Modify: `apps/front/components/story/BookPager.tsx`
+- Modify: `apps/front/components/story/BookFrame.module.css`
 
-## Verification Story (작업 완료 후 채움)
+- [x] 원본 이미지와 컨테이너 크기로 `object-cover` scale·center crop을 계산한다.
+- [x] 히트박스를 표시 좌표로 변환하고 컨테이너 경계로 안전하게 자른다.
+- [x] `BookPager`에 정적 삽화 면 전용 `renderArtControls` 슬롯을 추가한다.
+- [x] 넘김 중 오버레이를 숨기고 leaf/artHold에는 복제하지 않는다.
 
-- 무엇이 어떻게 바뀌었는가: 본편·A/B 정적 낭독 URL, OpenRouter Gemini 캐릭터 답변 TTS 생성·저장·재시도, 두 음원의 배타 재생 UI를 계약부터 리더까지 연결했다.
-- 어떻게 동작을 확인했는가: contracts 검사, backend lint·267 unit·66 E2E·build, frontend lint·typecheck·79 tests·stub/health 검사와 Next Webpack production build, `git diff --check`를 통과했다. 운영 DB와 유료 TTS 호출은 실행하지 않았다.
+**Checkpoint:** 정사각·세로 원본 좌표 tests가 통과하고 기존 넘김 시각이 변하지 않는다.
 
-## Lessons (해당 시)
+### Task 6 — 캐릭터 hotspot과 채팅 연결
 
-- 외부 TTS와 브라우저 자동재생에서 재발 가능한 함정을 발견하면 `docs/lessons.md`에 기록한다.
+**Files:**
+- Create: `apps/front/app/(trial)/stories/[slug]/read/CharacterHotspots.tsx`
+- Modify: `apps/front/app/(trial)/stories/[slug]/read/page.tsx`
+- Modify: `apps/front/app/(trial)/stories/[slug]/read/useCharacterChat.ts`
+- Delete: `apps/front/app/(trial)/stories/[slug]/read/ChatLauncher.tsx`
+
+- [x] 현재 본편 또는 6A/6B의 캐릭터 히트박스를 hotspot 버튼으로 그린다.
+- [x] 클릭한 available 캐릭터를 선택하고 내레이션을 멈춘 뒤 기존 대화 표면을 연다.
+- [x] 로그인·로딩·대기·완료·실패 상태도 hotspot을 통해 다시 열 수 있게 한다.
+- [x] 하단 런처를 제거하고 hotspot trigger로 닫힘 포커스를 복귀시킨다.
+- [x] hover·focus-visible·touch 단서와 reduced-motion을 적용한다.
+
+**Checkpoint:** 하단 바가 단순해지고 본편·비하인드 캐릭터가 같은 대화 상태를 연다.
+
+### Task 7 — 통합 검증과 문서 완료
+
+**Files:**
+- Modify: `tasks/todo.md`
+- Modify: `tasks/plan.md`
+- Modify: `docs/tasks/slice-8-library-character-interaction-spec.md`
+
+- [x] contracts, backend, frontend의 집중 tests/build를 수행한다.
+- [x] `pnpm ci:all`과 `git diff --check`를 수행한다.
+- [x] 1024×768 및 390×844에서 두 동화의 서재·제작 모드·본편·6A/6B를 수동 검증한다.
+- [x] 실제 화면에서 hover, 키보드, touch, 닫힘 포커스, 쪽 넘김, 채팅 상태와 이미지 크롭을 확인한다.
+
+**Checkpoint:** Success Criteria와 Verification Story가 근거로 채워진다.
+
+## Risks & Mitigations
+
+- **인증 요청 폭포:** 공개 목록은 서버에서 먼저 그리고 로그인 확인 후 세션 조회만 수행한다.
+- **DB N+1:** 완료 세션의 1쪽 이미지를 `IN(sessionIds)`로 한 번에 조회한다.
+- **서명 URL 장애:** 썸네일 URL만 `null`로 폴백해 서재 전체를 유지한다.
+- **히트박스 크롭 오차:** `object-cover`의 자연 크기와 컨테이너 크기를 반영하고 두 공식 동화를 실제 화면에서 검증한다.
+- **넘김 중 중복 버튼:** 상호작용을 `renderArt`에서 분리하고 정적 면·비전환 상태에서만 렌더한다.
+- **모바일 발견성:** hover에 기대지 않고 말풍선 단서를 항상 노출한다.
+- **포커스 유실:** 대화를 연 실제 hotspot을 기억하고 닫힐 때 연결 여부를 확인해 복귀한다.
+
+## Verification Story (작업 완료)
+
+- **무엇이 어떻게 바뀌었는가:**
+  - `GET /sessions/my` 응답에 완성 세션 1쪽 썸네일 URL(`thumbnailImageUrl`)을 1회 일괄 쿼리로 조회해 매핑하도록 백엔드와 계약(`@nerd/contracts`)을 확장함.
+  - 서재(`LibraryStoryList`)에서 로그인한 사용자의 완성된 동화 카드에 개인화 1쪽 썸네일을 표시하고 미완성/오류/비로그인 시에는 기본 삽화로 안전하게 폴백함.
+  - 홈 `내 얼굴로 만들기` CTA를 `/library?mode=create`로 연결하고 상세 페이지까지 제작 모드를 보존하며, 상세 화면의 모든 상태(로딩/완료/제작중/실패/미생성)에서 시연 읽기 CTA를 숨김.
+  - `BookPager`에 정적 삽화 전용 오버레이 슬롯(`renderArtControls`)을 신설하고, `object-cover` 비율 및 중앙 크롭을 반영한 `CharacterHotspots` 컴포넌트를 구현하여 그림 속 캐릭터를 직접 터치/클릭/포커스해 대화를 열 수 있게 연결함. 하단 `ChatLauncher`는 제거됨.
+- **어떻게 동작을 확인했는가:**
+  - 백엔드 단위 테스트 30 suites (270 passed), E2E 테스트 9 suites (66 passed) 전체 통과 (`pnpm back test`, `pnpm back test:e2e`).
+  - 프론트엔드 Vitest 15 test files (91 passed) 전체 통과 (`pnpm front test`).
+  - `@nerd/contracts` 빌드 및 NestJS / Next.js 프로덕션 빌드 성공.
+  - 전체 CI 검사 `pnpm ci:all` exit code 0 확인.
+  - `git diff --check` 공백 및 충돌 표식 검사 통과.
+- **미검증 또는 운영 확인이 필요한 항목:**
+  - 실제 S3 스토리지 및 실제 운영 DB 적용은 운영 배포 환경에서 확인 필요(코드 및 스키마 수준에서는 DB 변경 없음).
