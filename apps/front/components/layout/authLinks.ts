@@ -10,4 +10,11 @@ export const AUTH_LINK = {
   authenticated: { href: "/me", label: "마이페이지", cta: "마이페이지" },
 } as const;
 
+/**
+ * 홈 히어로의 **로그인 후** CTA. 로그인한 사람에게 홈에서 권할 다음 행동은 마이페이지가 아니라
+ * 동화 만들기다(2026-09-14 요청). 마이페이지는 헤더에 이미 있다.
+ * 만들기는 동화를 골라야 시작되므로 서재로 보낸다 — 동화 소개에서 「내 얼굴로 만들기」로 이어진다.
+ */
+export const HOME_AUTHENTICATED_CTA = { href: "/library", cta: "내 얼굴로 만들기" } as const;
+
 export type AuthLink = (typeof AUTH_LINK)[keyof typeof AUTH_LINK];

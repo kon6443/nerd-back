@@ -365,7 +365,7 @@ export default function CapturePage({ params }: PageProps) {
           <div className="flex w-full flex-col gap-3">
             <Link
               href={`/stories/${slug}/read?sessionId=${existingSession.id}`}
-              className={actionClass("gold", "w-full py-3.5 text-base font-bold shadow-md")}
+              className={actionClass("primary", "w-full py-3.5 text-base font-bold shadow-md")}
             >
               📖 내 동화책 바로 읽기
             </Link>
@@ -373,11 +373,11 @@ export default function CapturePage({ params }: PageProps) {
               type="button"
               onClick={handleDeleteAndReset}
               disabled={isDeleting}
-              className={actionClass("ghost", "w-full text-rose-600 hover:border-rose-400")}
+              className={actionClass("secondary", "w-full text-rose-600 hover:border-rose-400")}
             >
               {isDeleting ? "삭제 중..." : "🔄 기존 동화 삭제하고 새 얼굴로 만들기"}
             </button>
-            <Link href={`/library/${slug}`} className={actionClass("ghost", "w-full")}>
+            <Link href={`/library/${slug}`} className={actionClass("secondary", "w-full")}>
               동화 소개로 돌아가기
             </Link>
           </div>
@@ -408,7 +408,7 @@ export default function CapturePage({ params }: PageProps) {
             >
               ✨ 이 얼굴로 동화책 만들기 시작
             </Link>
-            <Link href={`/library/${slug}`} className={actionClass("ghost", "w-full")}>
+            <Link href={`/library/${slug}`} className={actionClass("secondary", "w-full")}>
               동화 소개로
             </Link>
             <button
@@ -417,7 +417,7 @@ export default function CapturePage({ params }: PageProps) {
                 setResult(null);
                 startWebcam();
               }}
-              className={actionClass("ghost", "w-full text-xs text-neutral-500")}
+              className={actionClass("secondary", "w-full text-xs text-neutral-500")}
             >
               다른 사진으로 다시 찍기
             </button>
@@ -446,7 +446,7 @@ export default function CapturePage({ params }: PageProps) {
                   aria-pressed={isActive}
                   className={`flex flex-1 flex-col items-center rounded-lg border-2 p-2 text-xs font-bold transition motion-reduce:transition-none ${FOCUS_RING} ${
                     isActive
-                      ? "border-primary bg-primary-soft text-primary"
+                      ? "border-accent-a bg-accent-a-soft text-accent-a-strong"
                       : "border-neutral-200 bg-white text-neutral-600"
                   }`}
                 >
@@ -526,7 +526,7 @@ export default function CapturePage({ params }: PageProps) {
               <button
                 type="button"
                 onClick={handleCapture}
-                className={actionClass("accentA", "flex-1")}
+                className={actionClass("primary", "flex-1")}
               >
                 📷 촬영하기
               </button>
@@ -535,8 +535,9 @@ export default function CapturePage({ params }: PageProps) {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
+              // 촬영이 가능하면 촬영이 주 동작이고 첨부는 대안이다. 카메라가 없을 때만 첨부가 주 동작이 된다.
               className={actionClass(
-                isWebcamActive && !previews[activeSlot] ? "accentB" : "primary",
+                isWebcamActive && !previews[activeSlot] ? "secondary" : "primary",
                 "flex-1",
               )}
             >

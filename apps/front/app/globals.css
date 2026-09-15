@@ -22,6 +22,9 @@
   --color-ink-muted: #777777; /* Wolf */
   --color-gold: #ffc800; /* Bee — 노랑 위에는 ink 를 얹는다 */
   --color-gold-strong: #e5a700;
+  /* secondary 검정 버튼(`dark`). 순검정이 아니라 초록빛을 섞는다 — 서비스의 초록 톤과 어울리게. */
+  --color-night: #243129;
+  --color-night-strong: #121a15;
   --color-magic: #ce82ff;
   --color-magic-strong: #9069cd;
   /* 실패·오류. 의미색이라 강조색(accent)과 역할이 다르다 — 섞어 쓰지 않는다.

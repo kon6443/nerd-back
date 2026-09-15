@@ -46,7 +46,7 @@ export function EndView({
         >
           처음부터 다시 읽기
         </button>
-        <Link href="/library" className={actionClass("ghost", "w-full")}>
+        <Link href="/library" className={actionClass("secondary", "w-full")}>
           서재로 돌아가기
         </Link>
       </div>

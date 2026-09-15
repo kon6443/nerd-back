@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { ActionLink } from "@/components/ui/ActionLink";
+import type { ActionSize } from "@/components/ui/actionStyles";
 import { AUTH_LINK } from "./authLinks";
 
 /**
@@ -14,25 +15,39 @@ import { AUTH_LINK } from "./authLinks";
  * `'use client'` 인 이유는 `aria-current` 계산(`usePathname`) 하나다. 호출부가 넘기게 두면 헤더만 넘기고
  * 홈은 빠지는 식으로 갈린다 — 실제로 그렇게 두 벌이 될 뻔했다.
  */
-export function AuthCta({ className = "" }: { className?: string }) {
+export function AuthCta({
+  className = "",
+  size = "default",
+  authenticated = AUTH_LINK.authenticated,
+}: {
+  className?: string;
+  size?: ActionSize;
+  /**
+   * 로그인 후 보일 링크. 기본은 마이페이지. 홈 히어로만 `HOME_AUTHENTICATED_CTA` 를 넘긴다.
+   * ⚠️ 문자열을 호출부에서 적지 않는다 — `authLinks.ts` 의 상수를 넘긴다.
+   */
+  authenticated?: { href: string; cta: string };
+}) {
   const pathname = usePathname();
   return (
     <>
       <ActionLink
         href={AUTH_LINK.guest.href}
-        variant="ghost"
+        variant="secondary"
+        size={size}
         className={`session-guest ${className}`}
         aria-current={pathname === AUTH_LINK.guest.href ? "page" : undefined}
       >
         {AUTH_LINK.guest.cta}
       </ActionLink>
       <ActionLink
-        href={AUTH_LINK.authenticated.href}
-        variant="ghost"
+        href={authenticated.href}
+        variant="secondary"
+        size={size}
         className={`session-authenticated ${className}`}
-        aria-current={pathname === AUTH_LINK.authenticated.href ? "page" : undefined}
+        aria-current={pathname === authenticated.href ? "page" : undefined}
       >
-        {AUTH_LINK.authenticated.cta}
+        {authenticated.cta}
       </ActionLink>
     </>
   );

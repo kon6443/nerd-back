@@ -79,7 +79,7 @@ export function CharacterChat({
           <p role="alert" className="text-ink">
             지금은 대화를 준비하지 못했어요. 잠시 후 다시 확인해 주세요.
           </p>
-          <button type="button" onClick={recheck} className={actionClass("ghost", "mt-4", "compact")}>
+          <button type="button" onClick={recheck} className={actionClass("secondary", "mt-4", "compact")}>
             이용 상태 다시 확인
           </button>
         </div>
@@ -103,7 +103,7 @@ export function CharacterChat({
                   {characters.map((character) => (
                     <label
                       key={character.role}
-                      className="flex min-h-touch cursor-pointer items-center gap-3 rounded-pill border-2 border-primary px-5 text-ink has-checked:border-primary-strong has-checked:bg-primary-tint has-focus-visible:ring-4 has-focus-visible:ring-magic-strong"
+                      className="flex min-h-touch cursor-pointer items-center gap-3 rounded-pill border-2 border-line px-5 text-ink has-checked:border-accent-a has-checked:bg-accent-a-soft has-focus-visible:ring-4 has-focus-visible:ring-magic-strong"
                     >
                       <input
                         type="radio"
@@ -111,7 +111,7 @@ export function CharacterChat({
                         value={character.role}
                         checked={role === character.role}
                         onChange={() => updateDraft(character.role, message)}
-                        className="size-5 accent-primary-strong"
+                        className="size-5 accent-accent-a"
                       />
                       <span className="font-bold break-keep wrap-anywhere">
                         {character.displayName}
@@ -131,7 +131,7 @@ export function CharacterChat({
                         key={question}
                         type="button"
                         disabled={sending}
-                        className={actionClass("ghost", "", "compact")}
+                        className={actionClass("secondary", "", "compact")}
                         onClick={() => {
                           updateDraft(role, question);
                           inputRef.current?.focus();

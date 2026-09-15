@@ -146,7 +146,7 @@ export function GeneratingView({
           본편 5장이 준비되면 바로 읽을 수 있어요. 한 장이 실패하더라도 해당 페이지만 다시 만들 수 있습니다.
         </p>
 
-        <Link href={`/library/${slug}`} className={actionClass("ghost", "w-full")}>
+        <Link href={`/library/${slug}`} className={actionClass("secondary", "w-full")}>
           동화 소개로 돌아가기
         </Link>
       </div>

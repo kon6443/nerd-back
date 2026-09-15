@@ -40,7 +40,7 @@ export default function LibraryError({ reset }: { reset: () => void }) {
           <button type="button" onClick={retry} className={actionClass("primary")}>
             다시 시도
           </button>
-          <ActionLink href="/" variant="ghost">
+          <ActionLink href="/" variant="secondary">
             홈으로 가기
           </ActionLink>
         </div>

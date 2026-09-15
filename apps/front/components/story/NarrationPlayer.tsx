@@ -42,7 +42,7 @@ export function NarrationPlayer({
       <button
         type="button"
         onClick={isPlaying && enabled ? onPause : onPlay}
-        className={actionClass("ghost", "min-h-touch", "compact")}
+        className={actionClass("secondary", "min-h-touch", "compact")}
         aria-label={isPlaying && enabled ? "낭독 일시정지" : "이 페이지 읽어주기"}
       >
         {isPlaying && enabled ? "일시정지" : "읽어주기"}
@@ -50,14 +50,15 @@ export function NarrationPlayer({
       <button
         type="button"
         onClick={onRestart}
-        className={actionClass("ghost", "min-h-touch", "compact")}
+        className={actionClass("secondary", "min-h-touch", "compact")}
         aria-label="낭독 처음부터 듣기"
       >
         처음부터
       </button>
       <div className="min-w-28 flex-1" aria-hidden="true">
         <div className="h-2 overflow-hidden rounded-pill bg-line">
-          <div className="h-full bg-primary" style={{ width: `${Math.min(100, progress)}%` }} />
+          {/* 진행 표시는 버튼이 아니라 위치다 — 초록(GNB 전용)이 아니라 하단바 진행 점과 같은 파랑. */}
+          <div className="h-full bg-accent-a" style={{ width: `${Math.min(100, progress)}%` }} />
         </div>
       </div>
       <p className="text-sm tabular-nums text-ink-muted">

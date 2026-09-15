@@ -45,6 +45,12 @@ function SessionCardSkeleton() {
   );
 }
 
+/**
+ * 제목 줄 오른쪽 버튼(「로그아웃」·「서재 가기」)의 폭. 두 버튼이 **같은 크기**로 보이게 한다 —
+ * 문구 길이에 맡기면 위아래로 놓였을 때 크기가 달라 어긋나 보인다(2026-09-14 요청).
+ */
+const HEADER_ACTION_WIDTH = "w-40";
+
 export default function MyPage() {
   const router = useRouter();
   const session = useSession();
@@ -122,7 +128,7 @@ export default function MyPage() {
           // 🚫 확인 전이라고 비활성으로 두지 않는다 — 확인이 끝나는 순간 흐렸다가 진해져 깜빡인다.
           //    이 화면은 비로그인이면 어차피 로그인으로 보내므로 누를 사람은 로그인한 사용자뿐이다.
           disabled={loggingOut}
-          className={actionClass("ghost", "text-sm disabled:opacity-60", "compact")}
+          className={actionClass("secondary", `${HEADER_ACTION_WIDTH} disabled:opacity-60`, "compact")}
         >
           {loggingOut ? "로그아웃 중…" : "로그아웃"}
         </button>
@@ -147,7 +153,7 @@ export default function MyPage() {
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-ink">내가 만든 동화책</h2>
-          <ActionLink href="/library" variant="ghost" size="compact">
+          <ActionLink href="/library" variant="secondary" size="compact" className={HEADER_ACTION_WIDTH}>
             📚 서재 가기
           </ActionLink>
         </div>
@@ -171,7 +177,7 @@ export default function MyPage() {
             <p className="text-sm text-ink-muted">
               서재에서 마음에 드는 동화를 골라 아이의 얼굴로 주인공 동화를 만들어 보세요.
             </p>
-            <ActionLink href="/library" variant="accentA">
+            <ActionLink href="/library" variant="primary">
               📷 첫 동화책 만들기
             </ActionLink>
           </Card>
@@ -226,28 +232,28 @@ export default function MyPage() {
                     {isCompleted ? (
                       <Link
                         href={`/stories/${s.templateSlug}/read?sessionId=${s.id}`}
-                        className={actionClass("gold", "text-sm", "compact")}
+                        className={actionClass("primary", "text-sm", "compact")}
                       >
                         📖 읽기
                       </Link>
                     ) : isGenerating ? (
                       <Link
                         href={`/stories/${s.templateSlug}/read?sessionId=${s.id}&autoStart=true`}
-                        className={actionClass("accentA", "text-sm", "compact")}
+                        className={actionClass("primary", "text-sm", "compact")}
                       >
                         ⏳ 이어보기
                       </Link>
                     ) : isFailed ? (
                       <Link
                         href={`/stories/${s.templateSlug}/read?sessionId=${s.id}`}
-                        className={actionClass("accentB", "text-sm", "compact")}
+                        className={actionClass("primary", "text-sm", "compact")}
                       >
                         ⚠️ 재시도
                       </Link>
                     ) : (
                       <Link
                         href={`/stories/${s.templateSlug}/capture`}
-                        className={actionClass("accentA", "text-sm", "compact")}
+                        className={actionClass("primary", "text-sm", "compact")}
                       >
                         📷 계속 만들기
                       </Link>
@@ -258,7 +264,7 @@ export default function MyPage() {
                       onClick={() => handleDeleteSession(s.id, s.templateTitle)}
                       disabled={isDeleting}
                       className={actionClass(
-                        "ghost",
+                        "secondary",
                         "text-sm text-neutral-600 hover:text-rose-600 hover:border-rose-300 disabled:opacity-50",
                         "compact",
                       )}

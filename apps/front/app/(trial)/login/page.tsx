@@ -140,7 +140,7 @@ export default function LoginPage() {
           </button>
         </form>
       </Card>
-      <ActionLink href="/library" variant="ghost" size="compact" className="self-center">
+      <ActionLink href="/library" variant="secondary" size="compact" className="self-center">
         로그인 없이 동화 보기
       </ActionLink>
     </main>

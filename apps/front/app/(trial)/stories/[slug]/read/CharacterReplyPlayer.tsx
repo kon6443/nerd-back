@@ -54,7 +54,7 @@ export function CharacterReplyPlayer({
             onInteraction();
             void onRetry();
           }}
-          className={actionClass("ghost", "min-h-touch", "compact")}
+          className={actionClass("secondary", "min-h-touch", "compact")}
         >
           {retrying ? "다시 만드는 중…" : "음성 다시 만들기"}
         </button>
@@ -70,7 +70,7 @@ export function CharacterReplyPlayer({
           onInteraction();
           void onRetry();
         }}
-        className={actionClass("ghost", "mt-3 min-h-touch", "compact")}
+        className={actionClass("secondary", "mt-3 min-h-touch", "compact")}
       >
         {retrying ? "음성을 확인하는 중…" : "답변 음성 다시 불러오기"}
       </button>
@@ -86,7 +86,7 @@ export function CharacterReplyPlayer({
         if (isPlaying) controller?.pause();
         else void controller?.play(audioUrl, "character", isCurrent && audio.status === "ended");
       }}
-      className={actionClass("ghost", "mt-3 min-h-touch", "compact")}
+      className={actionClass("secondary", "mt-3 min-h-touch", "compact")}
       aria-label={isPlaying ? `${displayName} 답변 음성 일시정지` : `${displayName} 답변 음성 듣기`}
     >
       {isPlaying ? "답변 음성 일시정지" : "답변 음성 듣기"}
