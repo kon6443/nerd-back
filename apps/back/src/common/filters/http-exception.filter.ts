@@ -4,10 +4,13 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Injectable,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ApiErrorResponseDto } from '../dto/api-error.dto';
+import { ServerErrorRateMonitor } from '../notification/server-error-rate-monitor.service';
 
 interface ErrorBody {
   code: string;
@@ -60,8 +63,16 @@ function isHealthCheckPayload(payload: unknown): payload is Record<string, unkno
  * ⚠️ 응답 바디에 `statusCode` 필드를 넣지 않는다. HTTP 상태와 `code` 로 분기한다.
  */
 @Catch()
+@Injectable()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
+
+  /**
+   * ⚠️ **선택 주입이다.** E2E 헬퍼와 단위 spec 이 `new HttpExceptionFilter()` 로 직접 만든다
+   * (`test/helpers/e2e-app.ts` · `http-exception.filter.spec.ts`). 필수로 두면 그 호출이 깨지고,
+   * 알림은 이 필터의 **부수 기능**이라 없어도 응답 정규화는 정확히 같아야 한다.
+   */
+  constructor(@Optional() private readonly errorMonitor?: ServerErrorRateMonitor) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -86,6 +97,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.error(
         `${where} → ${resolved.status} ${resolved.body.code}`,
         exception instanceof Error ? exception.stack : String(exception),
+      );
+
+      // 🚫 `await` 하지 않는다 — 여기는 **에러 응답을 돌려주는 길목**이다. 알림 집계가 늦으면
+      //    장애가 두 배로 느려 보인다. 실패는 모니터가 전부 삼킨다.
+      //    ⚠️ 라우트 **패턴**을 넘긴다(`/sessions/:id/pages`). 실제 URL 은 세션 ID 를 품어
+      //    고카디널리티이자 개인 식별 정보가 된다.
+      //    (헬스체크 passthrough 는 위에서 이미 return 했으므로 여기 오지 않는다.)
+      const routePattern = request.route?.path as string | undefined;
+      void this.errorMonitor?.record(
+        routePattern ? `${request.method} ${routePattern}` : undefined,
       );
     } else {
       this.logger.warn(
