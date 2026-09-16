@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { actionClass } from "@/components/ui/actionStyles";
 import { SESSION_STAGE_BADGE, classifySessionStatus } from "@/components/story/sessionStatus";
-import { deleteSession, getMySessions } from "@/lib/api";
+import { ApiError, deleteSession, getMySessions } from "@/lib/api";
 import { logout } from "@/lib/api/auth";
 import { useSession } from "@/lib/api/useSession";
 import type { MyStorySessionItem } from "@nerd/contracts";
@@ -58,6 +58,7 @@ export default function MyPage() {
   const [mySessions, setMySessions] = useState<MyStorySessionItem[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [sessionsError, setSessionsError] = useState("");
 
   useEffect(() => {
     if (loggingOut) return;
@@ -75,7 +76,11 @@ export default function MyPage() {
         if (active) setMySessions(data);
       })
       .catch((err) => {
-        console.warn("내 동화 목록 조회 실패:", err);
+        // 🚫 삼키지 않는다. 빈 배열은 곧 "아직 만든 동화책이 없어요" 로 그려지므로,
+        //    조회 실패를 삼키면 **이미 만든 동화가 사라진 것처럼 보인다.**
+        //    401 은 위 effect 가 로그인 화면으로 보내므로 여기서 문구를 띄우지 않는다.
+        if (err instanceof ApiError && err.isUnauthorized) return;
+        setSessionsError("동화 목록을 불러오지 못했어요.");
       })
       .finally(() => {
         if (active) setLoadingSessions(false);
@@ -89,6 +94,9 @@ export default function MyPage() {
     setLoggingOut(true);
     try {
       await logout();
+    } catch {
+      // 서버 세션 정리에 실패해도 화면에서는 로그아웃한다 — `catch` 가 없으면 예외가
+      // 그대로 새어 나가 개발 환경에서 오류 오버레이가 뜬다.
     } finally {
       router.replace("/");
     }
@@ -171,6 +179,26 @@ export default function MyPage() {
               <SessionCardSkeleton />
             </div>
           </>
+        ) : sessionsError ? (
+          // 실패를 "없음" 으로 그리지 않는다 — 만든 동화가 사라진 것처럼 보인다.
+          <Card className="flex flex-col items-center gap-4 py-8 text-center">
+            <p className="text-lg font-bold text-ink">{sessionsError}</p>
+            <p className="text-sm text-ink-muted">잠시 후 다시 시도해 주세요.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setSessionsError("");
+                setLoadingSessions(true);
+                getMySessions()
+                  .then(setMySessions)
+                  .catch(() => setSessionsError("동화 목록을 불러오지 못했어요."))
+                  .finally(() => setLoadingSessions(false));
+              }}
+              className={actionClass("primary")}
+            >
+              다시 불러오기
+            </button>
+          </Card>
         ) : mySessions.length === 0 ? (
           <Card className="flex flex-col items-center gap-4 py-8 text-center">
             <p className="text-lg font-bold text-ink">아직 만든 나만의 동화책이 없어요.</p>

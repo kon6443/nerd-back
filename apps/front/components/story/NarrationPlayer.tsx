@@ -22,6 +22,9 @@ export function NarrationPlayer({
   const isPlaying = isCurrent && audio.status === "playing";
   const progress = isCurrent && audio.duration > 0 ? (audio.currentTime / audio.duration) * 100 : 0;
   const isLoading = isCurrent && audio.status === "loading";
+  // 재생 실패(자동재생 차단·404·CORS)는 소리도 안 나고 버튼도 그대로라 **고장으로 읽힌다.**
+  // 읽어주는 문구만으로는 눈으로 보는 사람에게 닿지 않는다.
+  const hasError = isCurrent && audio.status === "error";
   const statusMessage = isPlaying
     ? "낭독을 재생하고 있어요."
     : isLoading
@@ -80,6 +83,12 @@ export function NarrationPlayer({
       <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {statusMessage}
       </p>
+      {hasError && (
+        // 화면에도 보여 준다. 「읽어주기」가 그대로 남아 있으므로 다시 누르면 재시도가 된다.
+        <p className="w-full text-sm font-medium text-red-600">
+          소리를 재생하지 못했어요. 「읽어주기」를 다시 눌러 주세요.
+        </p>
+      )}
     </div>
   );
 }

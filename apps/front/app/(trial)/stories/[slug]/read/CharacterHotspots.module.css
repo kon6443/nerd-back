@@ -7,8 +7,11 @@
 .hotspot {
   position: absolute;
   z-index: 1;
-  min-inline-size: 44px;
-  min-block-size: 44px;
+  /* ⚠️ `CharacterHotspots.tsx` 의 `MINIMUM_TARGET_SIZE` 와 **같은 값이어야 한다.**
+     크기는 보통 JS 가 인라인으로 정하지만, 컨테이너가 작아 클램프될 때는 이 하한이 남는다.
+     44px(WCAG 하한)로 두면 그 경우에만 조용히 규약(아이 손가락 56px)을 밑돈다. */
+  min-inline-size: 56px;
+  min-block-size: 56px;
   border: 0;
   padding: 0;
   background: transparent;

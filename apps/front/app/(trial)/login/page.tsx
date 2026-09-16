@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
-import { ApiError } from "@/lib/api";
 import { type FieldErrors, fetchMe, login, signup, validateLogin, validateSignup } from "@/lib/api/auth";
+import { errorMessage, validationDetails } from "@/lib/api/errorPresentation";
+import { safeRedirectPath } from "./redirectTarget";
 
 type Mode = "login" | "signup";
 
@@ -22,6 +23,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
+  /** 백엔드가 `details` 로 주는 필드별 사유. 가입에서만 쓴다. */
+  const [formDetails, setFormDetails] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
 
   // 이미 로그인되어 있으면 서재 또는 이전 목적지로 리다이렉트
@@ -32,8 +35,7 @@ export default function LoginPage() {
         if (!active) return;
         const search = typeof window !== "undefined" ? window.location.search : "";
         const params = new URLSearchParams(search);
-        const redirect = params.get("redirect");
-        router.replace(redirect && redirect.startsWith("/") ? redirect : "/library");
+        router.replace(safeRedirectPath(params.get("redirect")));
       })
       .catch(() => {
         // 미인증 상태이므로 로그인 폼 표시 유지
@@ -48,6 +50,7 @@ export default function LoginPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError("");
+    setFormDetails([]);
 
     const input = { loginId, password };
     // ⭐ 백엔드와 **같은 스키마**로 검증한다. 로그인은 가입 규칙을 적용하지 않는다 —
@@ -65,11 +68,15 @@ export default function LoginPage() {
       await (mode === "signup" ? signup(input) : login(input));
       const search = typeof window !== "undefined" ? window.location.search : "";
       const params = new URLSearchParams(search);
-      const redirect = params.get("redirect");
-      router.push(redirect && redirect.startsWith("/") ? redirect : "/library");
+      // 로그인 화면을 히스토리에 남기지 않는다 — 남기면 뒤로가기가 이 화면으로 돌아왔다가
+      // 위 effect 의 자동 리다이렉트로 다시 앞으로 튕겨 "뒤로 갈 수 없는" 것처럼 보인다.
+      router.replace(safeRedirectPath(params.get("redirect")));
     } catch (error) {
       // 서버가 준 메시지를 그대로 쓴다. 로그인 실패는 사유를 구분하지 않는 한 문장이다.
-      setFormError(error instanceof ApiError ? error.message : "잠시 후 다시 시도해 주세요.");
+      setFormError(errorMessage(error, "잠시 후 다시 시도해 주세요."));
+      // ⚠️ 필드별 사유는 **가입에서만** 보여 준다. 로그인에서 "아이디 형식이 틀렸다" 를
+      //    알리면 그 표시가 곧 계정 존재 여부의 신호가 된다(§9 폼 검증 규칙).
+      setFormDetails(mode === "signup" ? validationDetails(error) : []);
     } finally {
       setPending(false);
     }
@@ -119,6 +126,15 @@ export default function LoginPage() {
               className="rounded-xl bg-accent-b-soft px-4 py-3 text-sm leading-relaxed font-bold text-accent-b-strong"
             >
               {formError}
+              {/* 백엔드가 `details` 로 필드별 사유를 주는데 쓰는 곳이 없어, 가입 실패에도
+                  "요청 값이 올바르지 않습니다." 한 줄만 보였다. */}
+              {formDetails.length > 0 && (
+                <ul className="mt-2 list-disc space-y-1 pl-5 font-normal">
+                  {formDetails.map((detail) => (
+                    <li key={detail}>{detail}</li>
+                  ))}
+                </ul>
+              )}
             </p>
           ) : null}
 
@@ -134,6 +150,7 @@ export default function LoginPage() {
               setMode(mode === "login" ? "signup" : "login");
               setErrors({});
               setFormError("");
+              setFormDetails([]);
             }}
           >
             {label.switchTo}

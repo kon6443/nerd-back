@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/Card";
 import { actionClass } from "@/components/ui/actionStyles";
 import { ApiError, createSession, deleteSession, findMySessionBySlug, uploadFace } from "@/lib/api";
 import type { MyStorySessionItem, UploadFaceResponse } from "@nerd/contracts";
+import { errorMessage } from "@/lib/api/errorPresentation";
+import { getLibraryStoryHref } from "@/lib/libraryMode";
 import { BookBuddy, CaptureStudio, StudioIcon } from "./CaptureStudio";
 import styles from "./CaptureStudio.module.css";
 
@@ -293,7 +295,9 @@ export default function CapturePage({ params }: PageProps) {
           router.push(`/login?redirect=/stories/${slug}/capture`);
           return;
         }
-        if (err.status === 409) {
+        // 🚫 `status === 409` 로 보지 않는다 — 409 는 「이미 질문함」·「아이디 중복」에도 쓰인다.
+        //    어떤 실패인지는 **코드**가 말한다(`packages/contracts/src/envelope.ts`).
+        if (err.code === "STORY_ALREADY_COMPLETED") {
           findMySessionBySlug(slug)
             .then((matched) => {
               if (matched) {
@@ -305,7 +309,7 @@ export default function CapturePage({ params }: PageProps) {
           setErrorMsg("이미 제작이 완료된 동화책이 있습니다.");
           return;
         }
-        setErrorMsg(err.message);
+        setErrorMsg(errorMessage(err, "얼굴 사진 업로드 중 오류가 발생했습니다."));
       } else {
         setErrorMsg("얼굴 사진 업로드 중 오류가 발생했습니다. 다시 시도해 주세요.");
       }
@@ -317,7 +321,13 @@ export default function CapturePage({ params }: PageProps) {
   return (
     <main className={`${styles.page} flex w-full flex-1 flex-col`}>
       <div className={styles.pageHeader}>
-        <Link href={`/library/${slug}`} className={actionClass("tertiary", styles.backLink, "compact")}>
+        {/* 🚫 `/library/${slug}` 로 돌아가지 않는다 — `mode=create` 가 빠지면 소개 화면이
+            시연 모드로 바뀌어 「📷 내 얼굴로 만들기」가 사라진다. 이 화면에 오는 경로는
+            전부 제작 흐름이므로(소개 CTA·마이페이지·리더 에러·시연 리더) 항상 제작 모드다. */}
+        <Link
+          href={getLibraryStoryHref(slug, true)}
+          className={actionClass("tertiary", styles.backLink, "compact")}
+        >
           <StudioIcon name="back" />동화로 돌아가기
         </Link>
         <span className={styles.pageLabel}>주인공 준비하기</span>
