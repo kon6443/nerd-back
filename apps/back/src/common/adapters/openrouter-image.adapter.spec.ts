@@ -1,9 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import { OpenRouterImageAdapter } from './openrouter-image.adapter';
+import type { NotificationPort } from '../port/notification.port';
 
 describe('OpenRouterImageAdapter', () => {
   let configService: ConfigService;
   let adapter: OpenRouterImageAdapter;
+  let notifications: { notify: jest.Mock };
   const originalFetch = global.fetch;
 
   beforeEach(() => {
@@ -15,7 +17,8 @@ describe('OpenRouterImageAdapter', () => {
       }),
     } as unknown as ConfigService;
 
-    adapter = new OpenRouterImageAdapter(configService);
+    notifications = { notify: jest.fn() };
+    adapter = new OpenRouterImageAdapter(configService, notifications as NotificationPort);
   });
 
   afterEach(() => {
@@ -27,7 +30,7 @@ describe('OpenRouterImageAdapter', () => {
     const noKeyConfig = {
       get: jest.fn().mockReturnValue(undefined),
     } as unknown as ConfigService;
-    const noKeyAdapter = new OpenRouterImageAdapter(noKeyConfig);
+    const noKeyAdapter = new OpenRouterImageAdapter(noKeyConfig, notifications as NotificationPort);
 
     await expect(
       noKeyAdapter.generateReference({ front: Buffer.from('front-bytes') }),
@@ -231,35 +234,100 @@ describe('OpenRouterImageAdapter', () => {
     expect(result.toString('utf-8')).toBe('edited-page-png');
   });
 
-  it('402 크레딧 부족 시 명확한 안내 에러를 던진다', async () => {
+  // ⭐ 이 에러 메시지는 `session_page_images.error_message` 에 저장되어
+  //    `GET /sessions/:id/pages` 의 **성공 응답 본문**으로 사용자 브라우저까지 나간다.
+  //    전역 필터를 거치지 않으므로 필터 4단의 방어가 닿지 않는다 —
+  //    그래서 "던진다" 가 아니라 **"원문이 섞이지 않는다"** 를 고정한다.
+  it.each([
+    ['402 크레딧 부족', 402, 'Insufficient credits'],
+    ['429 한도 초과', 429, 'Rate limit exceeded'],
+  ])('%s 시 provider 원문을 감춘 사용자 문구로 던진다 ⭐', async (_label, status, providerMsg) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status,
+      json: jest.fn().mockResolvedValue({ error: { message: providerMsg, code: status } }),
+    });
+
+    // `toMatchObject` 로 **정확 일치**를 요구한다 — `toThrow` 의 부분 일치로는
+    // 뒤에 원문이 덧붙어도 통과해 버려 이 테스트의 목적을 놓친다.
+    await expect(
+      adapter.generateReference({ front: Buffer.from('front-bytes') }),
+    ).rejects.toMatchObject({
+      message: '그림을 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
+    });
+    // 위 정확 일치가 성립하면 provider 원문(`providerMsg`)과 상태코드(`status`)는
+    // 메시지에 들어 있을 수 없다.
+  });
+
+  // ⭐ 크레딧 부족은 **사람이 결제하지 않으면 영구히 복구되지 않는** 유일한 실패다.
+  //    로그에만 남기면 아무도 모르는 채로 동화가 한 장도 안 만들어진다.
+  it('402 면 운영 알림을 보낸다 ⭐', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 402,
-      json: jest.fn().mockResolvedValue({
-        error: { message: 'Insufficient credits', code: 402 },
-      }),
+      json: jest.fn().mockResolvedValue({ error: { message: 'Insufficient credits' } }),
     });
 
-    await expect(
-      adapter.generateReference({ front: Buffer.from('front-bytes') }),
-    ).rejects.toThrow('OpenRouter 크레딧이 부족합니다 (402)');
+    await adapter
+      .generateReference({ front: Buffer.from('front-bytes') })
+      .catch(() => undefined);
+
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'critical',
+        dedupeKey: 'openrouter:credit-exhausted',
+      }),
+    );
   });
 
-  it('429 한도 초과 시 안내 에러를 던진다', async () => {
+  it('429 면 경고 등급으로 알린다', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 429,
+      json: jest.fn().mockResolvedValue({ error: { message: 'Rate limited' } }),
+    });
+
+    await adapter
+      .generateReference({ front: Buffer.from('front-bytes') })
+      .catch(() => undefined);
+
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'warning', dedupeKey: 'openrouter:rate-limited' }),
+    );
+  });
+
+  // ⭐ 알림은 외부 채널로 나간다. provider 원문이 섞이면 응답 본문 유출과 같은 문제가 된다.
+  it('알림 본문에 provider 오류 원문을 담지 않는다 ⭐', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 402,
+      json: jest.fn().mockResolvedValue({ error: { message: 'Insufficient credits for org-xyz' } }),
+    });
+
+    await adapter
+      .generateReference({ front: Buffer.from('front-bytes') })
+      .catch(() => undefined);
+
+    const sent = JSON.stringify(notifications.notify.mock.calls[0][0]);
+    expect(sent).not.toContain('Insufficient credits');
+    expect(sent).not.toContain('org-xyz');
+  });
+
+  it('성공하면 알림을 보내지 않는다', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
       json: jest.fn().mockResolvedValue({
-        error: { message: 'Rate limit exceeded', code: 429 },
+        data: [{ b64_json: Buffer.from('ok').toString('base64') }],
       }),
     });
 
-    await expect(
-      adapter.generateReference({ front: Buffer.from('front-bytes') }),
-    ).rejects.toThrow('OpenRouter 요청 한도 초과 (429)');
+    await adapter.generateReference({ front: Buffer.from('front-bytes') });
+
+    expect(notifications.notify).not.toHaveBeenCalled();
   });
 
-  it('응답 본문에 b64_json 이 없으면 에러를 던진다', async () => {
+  it('응답 본문에 b64_json 이 없으면 사용자 문구로 던진다', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -270,6 +338,34 @@ describe('OpenRouterImageAdapter', () => {
 
     await expect(
       adapter.generateReference({ front: Buffer.from('front-bytes') }),
-    ).rejects.toThrow('OpenRouter 응답에서 이미지 데이터를 추출하지 못했습니다.');
+    ).rejects.toThrow('그림을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+  });
+
+  // ⭐ `signal` 이 없으면 업스트림이 매달릴 때 호출측의 `await Promise.all(chunk)` 가
+  //    풀리지 않아 남은 청크와 완료 판정이 통째로 멈춘다. 회귀하면 여기서 깨진다.
+  it('요청에 타임아웃 시그널을 붙인다 ⭐', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: jest.fn().mockResolvedValue({
+        data: [{ b64_json: Buffer.from('ok-png').toString('base64') }],
+      }),
+    });
+    global.fetch = fetchMock;
+
+    await adapter.generateReference({ front: Buffer.from('front-bytes') });
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('타임아웃이면 그 사실을 알리는 사용자 문구로 던진다', async () => {
+    const timeoutError = new Error('The operation was aborted due to timeout');
+    timeoutError.name = 'TimeoutError';
+    global.fetch = jest.fn().mockRejectedValue(timeoutError);
+
+    await expect(
+      adapter.generateReference({ front: Buffer.from('front-bytes') }),
+    ).rejects.toThrow('그림 만들기가 오래 걸려 중단했어요. 다시 시도해 주세요.');
   });
 });

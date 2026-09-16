@@ -1,10 +1,34 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NOTIFICATION_PORT, type NotificationPort } from '../port/notification.port';
 import type {
   GeneratePageIllustrationInput,
   GenerateReferenceInput,
   ImageGenerationPort,
 } from '../port/image-generation.port';
+
+/**
+ * 이미지 생성 요청 타임아웃.
+ *
+ * ⚠️ 채팅·TTS(각 30초)보다 **의도적으로 길다** — 이미지 한 장에 1분 이상 걸리는 것이 정상이다
+ * (`apps/front/lib/api/client.ts` 의 dev 프록시 우회 주석 참조). 30초로 맞추면 정상 요청을 죽인다.
+ *
+ * 🚫 `STALE_RUNNING_MS`(10분, `story-session.service.ts`) 보다 **확실히 작아야 한다** —
+ *    길면 claim 회수가 먼저 돌아 같은 페이지를 두 번 생성한다(유료 호출 2배).
+ *    청크(최대 4장)가 순차로 도므로 최악 소요는 `청크 수 × 이 값`이다.
+ */
+export const IMAGE_GENERATION_TIMEOUT_MS = 120_000;
+
+/**
+ * 사용자에게 보여줄 실패 문구.
+ *
+ * 🚫 provider 가 돌려준 오류 원문을 여기에 담지 않는다 — 이 메시지는
+ *    `session_page_images.error_message` 에 저장되어 `GET /sessions/:id/pages` 의
+ *    **성공 응답 본문**으로 사용자 브라우저까지 나간다. 전역 필터를 거치지 않으므로
+ *    필터 4단의 "내부 정보를 덮는" 방어가 닿지 않는다(`docs/lessons.md` 2026-09-04).
+ */
+const IMAGE_FAILURE_MESSAGE = '그림을 만들지 못했어요. 잠시 후 다시 시도해 주세요.';
+const IMAGE_TIMEOUT_MESSAGE = '그림 만들기가 오래 걸려 중단했어요. 다시 시도해 주세요.';
 
 interface OpenRouterImageResponse {
   data?: Array<{
@@ -30,7 +54,10 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
   private readonly apiKey: string | undefined;
   private readonly defaultModel: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Inject(NOTIFICATION_PORT) private readonly notifications: NotificationPort,
+  ) {
     this.apiKey = this.configService.get<string>('OPENROUTER_API_KEY');
     this.defaultModel =
       this.configService.get<string>('OPENROUTER_IMAGE_MODEL') ||
@@ -224,22 +251,37 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
       `[OpenRouter 요청] ${params.actionName} | 모델: ${this.defaultModel} | 레퍼런스 이미지: ${params.inputReferences.length}장 | 프롬프트 ${params.prompt.length}자`,
     );
 
-    const response = await fetch('https://openrouter.ai/api/v1/images', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://nerd-fairytale.local',
-        'X-Title': 'My Story Fairy Tale',
-      },
-      body: JSON.stringify({
-        model: this.defaultModel,
-        prompt: params.prompt,
-        input_references: params.inputReferences,
-        aspect_ratio: params.aspectRatio,
-        output_format: 'png',
-      }),
-    });
+    // ⚠️ `signal` 이 없으면 업스트림이 매달릴 때 이 await 가 풀리지 않는다. 호출측은
+    //    `await Promise.all(chunk)` 이라 **한 장 때문에 남은 청크와 완료 판정이 통째로 멈춘다.**
+    let response: Response;
+    try {
+      response = await fetch('https://openrouter.ai/api/v1/images', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://nerd-fairytale.local',
+          'X-Title': 'My Story Fairy Tale',
+        },
+        body: JSON.stringify({
+          model: this.defaultModel,
+          prompt: params.prompt,
+          input_references: params.inputReferences,
+          aspect_ratio: params.aspectRatio,
+          output_format: 'png',
+        }),
+        signal: AbortSignal.timeout(IMAGE_GENERATION_TIMEOUT_MS),
+      });
+    } catch (error: unknown) {
+      // `AbortSignal.timeout` 은 `TimeoutError`(DOMException) 를, 연결 실패는 `TypeError` 를 던진다.
+      const isTimeout = error instanceof Error && error.name === 'TimeoutError';
+      this.logger.error(
+        `[OpenRouter 요청 실패] ${params.actionName} | ${
+          isTimeout ? `타임아웃 ${IMAGE_GENERATION_TIMEOUT_MS}ms` : '연결 실패'
+        }`,
+      );
+      throw new Error(isTimeout ? IMAGE_TIMEOUT_MESSAGE : IMAGE_FAILURE_MESSAGE);
+    }
 
     const json = (await response.json().catch(() => null)) as OpenRouterImageResponse | null;
 
@@ -248,25 +290,42 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
     );
 
     if (!response.ok) {
+      // 운영자용 원인은 **로그에만** 남긴다. 상태코드는 남기되 응답 본문은 남기지 않는다
+      // (루트 `CLAUDE.md` 「외부 API 요청·응답 본문을 로그에 남기기」 금지).
       if (response.status === 402) {
-        this.logger.error('OpenRouter 크레딧 부족 (402)');
-        throw new Error(
-          'OpenRouter 크레딧이 부족합니다 (402). https://openrouter.ai/settings/credits 에서 크레딧을 충전해 주세요.',
-        );
-      }
-      if (response.status === 429) {
+        this.logger.error('OpenRouter 크레딧 부족 (402) — 크레딧 충전이 필요하다');
+        // ⭐ 이 프로젝트에서 **사람이 결제하지 않으면 영구히 복구되지 않는 유일한 실패**다.
+        //    로그에만 두면 아무도 모르는 채로 동화가 한 장도 안 만들어진다.
+        this.notifications.notify({
+          severity: 'critical',
+          title: 'OpenRouter 크레딧 부족',
+          summary:
+            '이미지 생성이 전면 중단됩니다. 크레딧을 충전해야 복구됩니다 — 자동 복구되지 않습니다.',
+          context: { 상태코드: response.status, 작업: params.actionName },
+          dedupeKey: 'openrouter:credit-exhausted',
+          // 1시간. 충전 전까지 계속 실패하므로 짧게 두면 채널이 같은 알림으로 덮인다.
+          dedupeTtlSeconds: 3600,
+        });
+      } else if (response.status === 429) {
         this.logger.error('OpenRouter 요청 속도 한도 초과 (429)');
-        throw new Error('OpenRouter 요청 한도 초과 (429). 잠시 후 다시 시도해 주세요.');
+        this.notifications.notify({
+          severity: 'warning',
+          title: 'OpenRouter 요청 한도 초과',
+          summary: '이미지 생성이 지연되거나 실패합니다. 반복되면 플랜·동시성 조정이 필요합니다.',
+          context: { 상태코드: response.status, 작업: params.actionName },
+          dedupeKey: 'openrouter:rate-limited',
+        });
+      } else {
+        this.logger.error(`OpenRouter 호출 실패 (${response.status})`);
       }
-      const errorMsg = json?.error?.message || response.statusText;
-      this.logger.error(`OpenRouter 호출 실패 (${response.status}): ${errorMsg}`);
-      throw new Error(`OpenRouter 이미지 생성 실패 (${response.status}): ${errorMsg}`);
+      // 사용자에게는 상태코드·provider 사정을 노출하지 않는다 — 위 상수 주석 참조.
+      throw new Error(IMAGE_FAILURE_MESSAGE);
     }
 
     const b64Json = json?.data?.[0]?.b64_json;
     if (!b64Json) {
-      this.logger.error('OpenRouter 응답 본문에 이미지(b64_json) 데이터가 누락되었습니다.');
-      throw new Error('OpenRouter 응답에서 이미지 데이터를 추출하지 못했습니다.');
+      this.logger.error('OpenRouter 응답에 이미지(b64_json) 데이터가 누락되었다');
+      throw new Error(IMAGE_FAILURE_MESSAGE);
     }
 
     const cost = json?.usage?.cost;
