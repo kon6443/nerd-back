@@ -29,6 +29,11 @@ import { useCharacterChat } from "./useCharacterChat";
 import { createChatDraftStore } from "./chat-drafts";
 import { SESSION_CHANGED_EVENT, UNAUTHORIZED_EVENT } from "@/lib/api/client";
 import {
+  errorMessage,
+  errorRecovery,
+  type ErrorRecovery,
+} from "@/lib/api/errorPresentation";
+import {
   ApiError,
   fetchAfterStory,
   fetchStoryDetail,
@@ -84,7 +89,22 @@ function StoryReadContent({ params }: PageProps) {
   }, [chatDrafts]);
 
   const [viewState, setViewState] = useState<ViewState>("loading");
+  /**
+   * 사용자가 **직접** 제작 현황을 열었는가.
+   *
+   * 폴링은 본편이 준비되면 독서 화면으로 전환하는데(`isReaderReady`), 리더에 이미 들어와 있다는
+   * 것 자체가 그 조건이 참이라는 뜻이다. 그래서 이 플래그가 없으면 「제작 현황 보기」를 눌러도
+   * **첫 폴링(3초) 만에 도로 튕겨 나온다.** 자동 전환은 처음 진입할 때만 필요하다.
+   */
+  const [statusPinned, setStatusPinned] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  /**
+   * 이 실패에서 사용자가 할 수 있는 일. 에러 **코드**가 정한다.
+   *
+   * 🚫 화면에서 `status` 숫자로 다시 판단하지 않는다 — 같은 규칙이 화면마다 갈린다.
+   *    판단은 `lib/api/errorPresentation.ts` 한 곳에 있고 테스트로 고정돼 있다.
+   */
+  const [recovery, setRecovery] = useState<ErrorRecovery>("retry");
   const [story, setStory] = useState<StoryDetail | null>(null);
   const [storyPages, setStoryPages] = useState<StoryPageView[]>([]);
   const [sessionPages, setSessionPages] = useState<SessionPagesResponse | null>(null);
@@ -258,6 +278,8 @@ function StoryReadContent({ params }: PageProps) {
 
   const noSessionError = !sessionId ? "세션 정보가 없습니다. 얼굴 사진을 먼저 등록해 주세요." : "";
   const activeError = errorMsg || noSessionError;
+  // 세션 정보 자체가 없으면 재시도할 요청이 없다 — 얼굴 등록이 유일한 길이다.
+  const errorRecoveryAction: ErrorRecovery = errorMsg ? recovery : "register-face";
 
   // 초기 데이터 로드 및 파이프라인 기동
   useEffect(() => {
@@ -278,22 +300,28 @@ function StoryReadContent({ params }: PageProps) {
         //    ⭐ 이후 쪽을 오가도 추가 요청이 없다 — 넘김 뒷면에 도착 쪽 본문이 항상 준비돼 있다.
         //    🚫 쪽마다 부르지 않는다. 그러면 어느 쪽을 먼저 받을지 정하는 로직이 화면에 생기고,
         //       동시 호출을 피하려는 순차 루프까지 따라온다 — 둘 다 API 모양 때문에 생긴 코드였다.
-        try {
-          const pages = await fetchStoryPages(slug);
-          if (active) setStoryPages(pages);
-        } catch (err) {
-          console.warn("본문 사전 로드 지연:", err);
-        }
+        // 🚫 실패를 삼키지 않는다. `storyPages` 에는 본문·캐릭터·낭독 URL 이 모두 실려 있어
+        //    (`bodyTextAt` · `charactersAt` · `narrationAudioUrl`) 이게 비면 화면은 영영
+        //    "본문을 불러오는 중입니다..." 로 남고 대화도 낭독도 죽는다. 재시도 경로를 준다.
+        const pages = await fetchStoryPages(slug);
+        if (!active) return;
+        setStoryPages(pages);
 
         // 3. autoStart 플래그가 있으면 개인화 생성 시작 호출 (API 10, 멱등성 보장)
         if (autoStart) {
           try {
             await personalizeSession(sessionId!);
           } catch (err: unknown) {
-            // 이미 생성 중이거나 완료된 경우 계속 진행
-            if (err instanceof ApiError && err.status !== 409 && err.status !== 202) {
-              console.warn("personalizeSession note:", err.message);
-            }
+            // 🚫 삼키지 않는다. 예전에는 `console.warn` 만 해서, 얼굴 미등록(`FACE_NOT_READY`)으로
+            //    시작이 거절돼도 화면은 진행률 0% 인 "만들고 있어요" 를 **영원히** 돌렸다.
+            //    백엔드가 여기서 던지는 경우는 「세션 없음」과 「얼굴 미등록」 둘뿐이다 —
+            //    진행 중·완료는 멱등하게 성공을 돌려주므로(`story-session.service.ts:504`)
+            //    이 catch 에 오는 것은 전부 사용자가 알아야 할 실패다.
+            //    아래 에러 화면의 「얼굴 다시 등록하기」가 그대로 복구 경로가 된다.
+            if (!active) return;
+            setErrorMsg(errorMessage(err, "동화 만들기를 시작하지 못했어요."));
+            setRecovery(errorRecovery(err));
+            return;
           }
         }
 
@@ -315,15 +343,12 @@ function StoryReadContent({ params }: PageProps) {
         }
       } catch (err: unknown) {
         if (!active) return;
-        if (err instanceof ApiError) {
-          if (err.isUnauthorized) {
-            router.push(`/login?redirect=/stories/${slug}/read?sessionId=${sessionId}`);
-            return;
-          }
-          setErrorMsg(err.message);
-        } else {
-          setErrorMsg("동화 정보를 불러오는 중 오류가 발생했습니다.");
+        if (err instanceof ApiError && err.isUnauthorized) {
+          router.push(`/login?redirect=/stories/${slug}/read?sessionId=${sessionId}`);
+          return;
         }
+        setErrorMsg(errorMessage(err, "동화 정보를 불러오는 중 오류가 발생했습니다."));
+        setRecovery(errorRecovery(err));
       }
     }
 
@@ -343,7 +368,8 @@ function StoryReadContent({ params }: PageProps) {
     fetcher: () => fetchSessionPages(sessionId!),
     onData: (data) => {
       setSessionPages(data);
-      if (isReaderReady(data)) {
+      // 사용자가 직접 연 현황 화면은 자동으로 닫지 않는다 — 위 `statusPinned` 주석 참조.
+      if (!statusPinned && isReaderReady(data)) {
         void preloadImages([getFirstPageImageUrl(data)]).then(() => {
           // 폴링으로 본편 완료를 처음 받는 경로도 초기 조회와 똑같이 독서 화면으로 전환한다.
           // 이 전환이 없으면 5/7 상태에서 폴링만 멈춰 생성 화면이 그대로 남는다.
@@ -488,7 +514,10 @@ function StoryReadContent({ params }: PageProps) {
           <h1 className="text-xl font-bold text-ink">문제가 발생했어요</h1>
           <p className="text-sm text-neutral-600">{activeError}</p>
           <div className="flex flex-wrap justify-center gap-3 pt-2">
-            {errorMsg && (
+            {/* 🚫 실패 종류와 상관없이 「다시 시도하기」를 띄우지 않는다 — 다시 보내도 같은 답이
+                오는 실패(없는 세션·이미 완료 등)에서는 눌러 보고 또 실패하는 경험만 준다.
+                무엇을 띄울지는 에러 **코드**가 정한다(`lib/api/errorPresentation.ts`). */}
+            {errorRecoveryAction === "retry" && (
               <button
                 type="button"
                 onClick={() => {
@@ -502,11 +531,16 @@ function StoryReadContent({ params }: PageProps) {
             )}
             <Link
               href={`/stories/${slug}/capture`}
-              className={actionClass(errorMsg ? "secondary" : "primary")}
+              className={actionClass(
+                errorRecoveryAction === "register-face" ? "primary" : "secondary",
+              )}
             >
-              얼굴 다시 등록하기
+              {errorRecoveryAction === "register-face" ? "얼굴 등록하러 가기" : "얼굴 다시 등록하기"}
             </Link>
-            <Link href={`/library/${slug}`} className={actionClass("secondary")}>
+            <Link
+              href={`/library/${slug}`}
+              className={actionClass(errorRecoveryAction === "none" ? "primary" : "secondary")}
+            >
               동화 소개로
             </Link>
           </div>
@@ -534,6 +568,12 @@ function StoryReadContent({ params }: PageProps) {
         isSelectingBranch={isSelectingBranch}
         handleRetry={handleRetry}
         handleAfterStoryRetry={handleAfterStoryRetry}
+        // 자동 복귀를 막은 대신 **직접 돌아갈 길**을 준다. 본편이 준비됐을 때만 뜬다.
+        canOpenReader={sessionPages !== null && isReaderReady(sessionPages)}
+        onOpenReader={() => {
+          setStatusPinned(false);
+          setViewState("reader");
+        }}
       />
     );
   }
@@ -629,7 +669,11 @@ function StoryReadContent({ params }: PageProps) {
         <header className={READER_BAR}>
           {!sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
             <button
-              onClick={() => setViewState("generating")}
+              onClick={() => {
+                // 자동 복귀를 막는다 — 안 그러면 3초 뒤 폴링이 도로 리더로 돌려보낸다.
+                setStatusPinned(true);
+                setViewState("generating");
+              }}
               className={actionClass("secondary", "text-sm")}
             >
               ← 제작 현황 보기

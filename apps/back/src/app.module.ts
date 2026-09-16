@@ -9,6 +9,7 @@ import { DatabaseModule } from '@common/database/database.module';
 import { HttpExceptionFilter } from '@common/filters/http-exception.filter';
 import { CustomThrottlerGuard } from '@common/guards/custom-throttler.guard';
 import { LoggerModule } from '@common/logger/logger.module';
+import { NotificationModule } from '@common/notification/notification.module';
 import { createGlobalValidationPipe } from '@common/pipes/global-validation-pipe';
 import { REDIS_CLIENT, RedisModule } from '@common/redis/redis.module';
 import { validateEnv } from '@config/env.validation';
@@ -26,6 +27,8 @@ import { StorySessionModule } from '@modules/story-session/story-session.module'
     }),
     LoggerModule,
     RedisModule,
+    // 기동·프로세스 오류 알림이 여기서 산다. 🚫 도메인 모듈에만 두면 부팅 훅이 돌지 않는다.
+    NotificationModule,
     // DB 는 핵심 의존 — 연결 실패 시 부팅이 실패한다 (DatabaseModule 주석 · D8).
     DatabaseModule,
 

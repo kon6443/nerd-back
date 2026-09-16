@@ -28,6 +28,9 @@ services:
     environment:
       # 여러 레플리카 중 하나만 실행해야 하는 작업의 가드로 쓴다.
       TASK_SLOT: '{{.Task.Slot}}'
+      # 기동 알림에 "어떤 버전이 떴는가" 를 싣기 위해 이미지 태그(커밋 SHA)를 넘긴다.
+      # 위 `image:` 가 쓰는 값과 같은 변수라 두 곳이 어긋날 수 없다.
+      IMAGE_TAG: ${IMAGE_TAG}
 
     # SIGTERM 후 진행 중인 요청이 끝날 시간을 준다. Swarm 기본은 10s 라
     # `enableShutdownHooks()` 가 마무리하기 전에 강제 종료될 수 있다.

@@ -28,14 +28,18 @@ interface CapturedResponse {
   json: jest.Mock;
 }
 
-function createHost(): CapturedResponse {
+function createHost(routePath?: string): CapturedResponse {
   const json = jest.fn();
   const status = jest.fn().mockReturnValue({ json });
 
   const host = {
     switchToHttp: () => ({
       getResponse: () => ({ status }),
-      getRequest: () => ({ method: 'GET', originalUrl: '/api/v2/sample' }),
+      getRequest: () => ({
+        method: 'GET',
+        originalUrl: '/api/v2/sample',
+        ...(routePath ? { route: { path: routePath } } : {}),
+      }),
     }),
   } as unknown as ArgumentsHost;
 
@@ -50,6 +54,75 @@ describe('HttpExceptionFilter', () => {
     // 테스트 출력이 로그로 더러워지지 않게 막는다. jest restoreMocks 가 자동 복원한다.
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+  });
+
+  // ⭐ 알림은 이 필터의 **부수 기능**이다. 두 가지를 고정한다 —
+  //    5xx 에서만 집계되는가, 그리고 알림이 응답 정규화를 건드리지 않는가.
+  describe('5xx 급증 집계 연결', () => {
+    let monitor: { record: jest.Mock };
+    let filterWithMonitor: HttpExceptionFilter;
+
+    beforeEach(() => {
+      monitor = { record: jest.fn().mockResolvedValue(undefined) };
+      filterWithMonitor = new HttpExceptionFilter(
+        monitor as unknown as ConstructorParameters<typeof HttpExceptionFilter>[0],
+      );
+    });
+
+    it('5xx 면 라우트 패턴과 함께 집계한다', () => {
+      const { host } = createHost('/sessions/:id/pages');
+
+      filterWithMonitor.catch(new Error('boom'), host);
+
+      expect(monitor.record).toHaveBeenCalledWith('GET /sessions/:id/pages');
+    });
+
+    // ⭐ 4xx 는 사용자 실수다. 여기까지 알리면 채널이 덮여 진짜 장애를 놓친다.
+    it('4xx 는 집계하지 않는다 ⭐', () => {
+      const { host } = createHost('/sessions/:id');
+
+      filterWithMonitor.catch(new SampleNotFoundErrorResponseDto(), host);
+
+      expect(monitor.record).not.toHaveBeenCalled();
+    });
+
+    // ⭐ readiness 실패(503)는 헬스체크 진단 결과라 passthrough 로 빠진다.
+    //    이것까지 세면 의존 장애 때마다 "서버 오류 급증" 이 울린다.
+    it('헬스체크 passthrough 는 집계하지 않는다 ⭐', () => {
+      const { host } = createHost('/health/ready');
+
+      filterWithMonitor.catch(
+        new ServiceUnavailableException({
+          status: 'error',
+          details: { redis: { status: 'down' } },
+        }),
+        host,
+      );
+
+      expect(monitor.record).not.toHaveBeenCalled();
+    });
+
+    it('라우트 패턴을 모르면 undefined 로 넘긴다', () => {
+      const { host } = createHost();
+
+      filterWithMonitor.catch(new Error('boom'), host);
+
+      expect(monitor.record).toHaveBeenCalledWith(undefined);
+    });
+
+    // ⭐ 모니터가 없어도(E2E·단위 spec) 응답은 정확히 같아야 한다.
+    it('모니터가 없어도 응답 정규화는 같다 ⭐', () => {
+      const withMonitor = createHost('/x');
+      const withoutMonitor = createHost('/x');
+
+      filterWithMonitor.catch(new Error('boom'), withMonitor.host);
+      filter.catch(new Error('boom'), withoutMonitor.host);
+
+      expect(withMonitor.status.mock.calls).toEqual(withoutMonitor.status.mock.calls);
+      expect(withMonitor.json.mock.calls[0][0]).toMatchObject(
+        withoutMonitor.json.mock.calls[0][0] as Record<string, unknown>,
+      );
+    });
   });
 
   describe('1단 — 도메인 에러', () => {

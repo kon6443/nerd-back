@@ -16,6 +16,7 @@ import { IMAGE_GENERATION_PORT } from '../../common/port/image-generation.port';
 import { MockImageAdapter } from '../../common/adapters/mock-image.adapter';
 import { OpenRouterImageAdapter } from '../../common/adapters/openrouter-image.adapter';
 import { StorageModule } from '../../common/storage/storageModule';
+import { NotificationModule } from '../../common/notification/notification.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { StorageModule } from '../../common/storage/storageModule';
     ]),
     ConfigModule,
     StorageModule,
+    NotificationModule,
     AuthModule,
   ],
   controllers: [StorySessionController],

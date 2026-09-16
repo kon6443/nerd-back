@@ -49,10 +49,16 @@ export function CharacterHotspots({
     }
 
     // 가장 가까운 부모 중 img를 포함한 요소를 안전하게 상향 탐색 (Loose Coupling)
+    //
+    // 🚫 **첫 `<img>` 를 그냥 집지 않는다.** 넘김 잔상을 없애려고 `BookPager` 가 직전 쪽 삽화를
+    //    밑장(`data-art-hold`)으로 깔아 두는데, 그것이 문서 순서상 `.art` 안 첫 번째다. 집으면
+    //    **직전 쪽의 원본 해상도**로 좌표를 계산해 말풍선이 통째로 어긋나고, 새 삽화가 아직
+    //    로드 중이면 `load` 리스너까지 엉뚱한 요소에 붙어 영영 다시 재지 않는다.
     let current = layer.parentElement;
     let image: HTMLImageElement | null = null;
     while (current) {
-      image = current.querySelector<HTMLImageElement>("img");
+      const candidates = Array.from(current.querySelectorAll<HTMLImageElement>("img"));
+      image = candidates.find((candidate) => !candidate.closest("[data-art-hold]")) ?? null;
       if (image) break;
       current = current.parentElement;
     }
