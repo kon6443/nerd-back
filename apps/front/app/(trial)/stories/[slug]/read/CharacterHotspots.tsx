@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { StoryPageCharacter } from "@nerd/contracts";
-import styles from "@/components/story/BookFrame.module.css";
+import styles from "./CharacterHotspots.module.css";
 import {
   ensureMinimumTarget,
   projectCoverHitbox,
@@ -48,17 +48,15 @@ export function CharacterHotspots({
       return;
     }
 
-    // BookPager 구조: .art > .artControls > .hotspotLayer
-    // layer의 부모인 .artControls에는 img가 없으므로 상위 .art 컨테이너에서 img를 찾는다.
-    const art =
-      layer.closest<HTMLDivElement>(`.${styles.art}`) ??
-      layer.parentElement?.parentElement;
-    if (!art) {
-      setLayout(null);
-      return;
+    // 가장 가까운 부모 중 img를 포함한 요소를 안전하게 상향 탐색 (Loose Coupling)
+    let current = layer.parentElement;
+    let image: HTMLImageElement | null = null;
+    while (current) {
+      image = current.querySelector<HTMLImageElement>("img");
+      if (image) break;
+      current = current.parentElement;
     }
 
-    const image = art.querySelector<HTMLImageElement>("img");
     if (!image) {
       setLayout(null);
       return;
@@ -103,37 +101,60 @@ export function CharacterHotspots({
 
   return (
     <div ref={layerRef} className={styles.hotspotLayer}>
-      {hotspots.map(({ character, rect }) => {
-        const selected = selectedRole === character.role;
-        return (
-          <button
-            key={character.role}
-            type="button"
-            aria-label={`${character.displayName}와 대화하기`}
-            aria-pressed={selected}
-            aria-expanded={selected && chatOpen}
-            className={styles.hotspot}
-            style={
-              {
-                insetInlineStart: rect.left,
-                insetBlockStart: rect.top,
-                inlineSize: rect.width,
-                blockSize: rect.height,
-              } as CSSProperties
-            }
-            onClick={(event) => onSelect(character.role, event.currentTarget)}
-          >
-            <span aria-hidden="true" className={styles.hotspotHint}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.25">
-                <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H8l-4 3v-5a7.5 7.5 0 0 1 7.5-13h1A7.5 7.5 0 0 1 20 11.5Z" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <span aria-hidden="true" className={styles.hotspotName}>
-              {character.displayName}
-            </span>
-          </button>
-        );
-      })}
+      {hotspots.map(({ character, rect }) => (
+        <HotspotPin
+          key={character.role}
+          character={character}
+          rect={rect}
+          isSelected={selectedRole === character.role}
+          isChatOpen={chatOpen}
+          onSelect={onSelect}
+        />
+      ))}
     </div>
+  );
+}
+
+function HotspotPin({
+  character,
+  rect,
+  isSelected,
+  isChatOpen,
+  onSelect,
+}: {
+  character: StoryPageCharacter;
+  rect: { left: number; top: number; width: number; height: number };
+  isSelected: boolean;
+  isChatOpen: boolean;
+  onSelect: (role: string, trigger: HTMLButtonElement) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`${character.displayName}와 대화하기`}
+      aria-pressed={isSelected}
+      aria-expanded={isSelected && isChatOpen}
+      className={styles.hotspot}
+      style={
+        {
+          insetInlineStart: rect.left,
+          insetBlockStart: rect.top,
+          inlineSize: rect.width,
+          blockSize: rect.height,
+        } as CSSProperties
+      }
+      onClick={(event) => onSelect(character.role, event.currentTarget)}
+    >
+      <span aria-hidden="true" className={styles.hotspotBubble}>
+        <span className={styles.hotspotIcon}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.25">
+            <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H8l-4 3v-5a7.5 7.5 0 0 1 7.5-13h1A7.5 7.5 0 0 1 20 11.5Z" strokeLinejoin="round" />
+          </svg>
+        </span>
+        <span className={styles.hotspotNameWrapper}>
+          <span className={styles.hotspotName}>{character.displayName}</span>
+        </span>
+      </span>
+    </button>
   );
 }
