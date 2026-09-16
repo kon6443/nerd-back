@@ -415,10 +415,48 @@ describe('StorySessionService', () => {
         id: 'session-1',
         userId: 1,
       } as unknown as StorySession);
+      pageImageRepo.find.mockResolvedValue([]);
 
       await service.deleteSession(1, 'session-1');
 
       expect(pageImageRepo.delete).toHaveBeenCalledWith({ sessionId: 'session-1' });
+      expect(sessionRepo.delete).toHaveBeenCalledWith({ id: 'session-1' });
+    });
+
+    // ⭐ DB 행만 지우면 레퍼런스·삽화 객체가 스토리지에 영원히 남는다. 사용자가 "다른 얼굴로
+    //    다시 만들기" 를 눌러도 **이전 얼굴에서 파생된 이미지가 계속 보관된다.**
+    it('레퍼런스와 삽화 객체를 스토리지에서도 지운다 ⭐', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: 'session-1',
+        userId: 1,
+        referenceImageKey: 'references/session-1/ref.png',
+      } as unknown as StorySession);
+      pageImageRepo.find.mockResolvedValue([
+        { imageKey: 'personalizations/session-1/common/page-1.webp' },
+        { imageKey: null },
+      ] as unknown as SessionPageImage[]);
+
+      await service.deleteSession(1, 'session-1');
+
+      expect(mockStoragePort.delete).toHaveBeenCalledWith('references/session-1/ref.png');
+      expect(mockStoragePort.delete).toHaveBeenCalledWith(
+        'personalizations/session-1/common/page-1.webp',
+      );
+      // 키가 없는 행까지 부르지 않는다.
+      expect(mockStoragePort.delete).toHaveBeenCalledTimes(2);
+    });
+
+    it('스토리지 삭제가 실패해도 DB 삭제를 되돌리지 않는다', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: 'session-1',
+        userId: 1,
+        referenceImageKey: 'references/session-1/ref.png',
+      } as unknown as StorySession);
+      pageImageRepo.find.mockResolvedValue([]);
+      mockStoragePort.delete.mockRejectedValue(new Error('스토리지 다운'));
+
+      // 스토리지는 롤백되지 않는다 — 지워진 것을 되살리는 쪽이 더 나쁘다.
+      await expect(service.deleteSession(1, 'session-1')).resolves.toBeUndefined();
       expect(sessionRepo.delete).toHaveBeenCalledWith({ id: 'session-1' });
     });
   });
@@ -726,6 +764,33 @@ describe('StorySessionService', () => {
         errorMessage: null,
       } as SessionPageImage);
       pageImageRepo.save.mockImplementation((entity: unknown) => Promise.resolve(entity));
+    });
+
+    // ⭐ 선행 단계(레퍼런스 다운로드 등)가 실패하면 예전에는 로그만 남고 끝났다. 그러면
+    //    세션은 `generating`, 페이지는 전부 `pending` 으로 굳어 폴링이 영원히 끝나지 않고,
+    //    `retryStoryPage` 는 `pending` 을 거절해(`status !== 'failed' && !== 'running'`)
+    //    **복구 경로가 통째로 막힌다.** 실패를 상태로 남기는 것이 이 테스트의 불변 조건이다.
+    it('선행 단계가 실패하면 세션과 대기 페이지를 failed 로 남겨 재시도 경로를 연다 ⭐', async () => {
+      mockStoragePort.download.mockRejectedValue(new Error('스토리지에 닿지 못했다'));
+
+      await service.executePersonalizationPipeline('session-1');
+
+      // `running` 은 건드리지 않는다 — 다른 레플리카가 집고 있을 수 있어 회수에 맡긴다.
+      expect(pageImageRepo.update).toHaveBeenCalledWith(
+        { sessionId: 'session-1', status: 'pending' },
+        expect.objectContaining({ status: 'failed' }),
+      );
+      expect(sessionRepo.update).toHaveBeenCalledWith({ id: 'session-1' }, { status: 'failed' });
+    });
+
+    it('실패 사유에 내부 예외 메시지를 담지 않는다', async () => {
+      mockStoragePort.download.mockRejectedValue(new Error('ECONNREFUSED 10.0.0.5:9000'));
+
+      await service.executePersonalizationPipeline('session-1');
+
+      const [, patch] = pageImageRepo.update.mock.calls[0] as [unknown, { errorMessage: string }];
+      // 이 값은 `GET /sessions/:id/pages` 응답으로 사용자 브라우저까지 나간다.
+      expect(patch.errorMessage).not.toContain('ECONNREFUSED');
     });
 
     it('다른 레플리카가 이미 집어간 페이지는 이미지를 생성하지 않는다 ⭐', async () => {

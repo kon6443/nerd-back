@@ -23,6 +23,7 @@ import {
 } from '@common/decorators/api-error-response.decorator';
 import { CurrentUser } from '@common/decorators/current-user.decorator';
 import { AuthGuard } from '@common/guards/auth.guard';
+import { MAX_IMAGE_SIZE_BYTES } from '@common/utils/image-validator';
 import { User } from '@entities/user.entity';
 import { StorySessionService } from './story-session.service';
 import {
@@ -96,12 +97,25 @@ export class StorySessionController {
   @Post(':id/face')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard)
+  // ⚠️ `limits` 가 없으면 multer 가 **파일 전체를 메모리에 다 올린 뒤에야** 서비스로 넘긴다.
+  //    `validateImageBuffer` 의 5MB 검사는 그 다음이라, 수백 MB 를 보내면 400 을 돌려주기도 전에
+  //    레플리카가 메모리를 먹는다. 여기서 끊어야 버퍼링 자체가 멈춘다.
+  //
+  // ⭐ **한도를 `MAX_IMAGE_SIZE_BYTES` 와 같게 두지 않는다.** multer 가 한도를 넘기면
+  //    `MulterError` 를 던지는데, 그것은 `HttpException` 이 아니라 전역 필터 4단으로 떨어져
+  //    **500 + 고정 메시지**가 된다(`http-exception.filter.ts`). 그러면 "5MB 이하여야 한다" 는
+  //    친절한 400(`IMAGE_TOO_LARGE`)이 사라진다. 그래서 **판정은 서비스가, 방어는 여기가** 맡는다:
+  //    정상 범위를 조금 넘는 파일은 서비스가 400 으로 정확히 답하고, 그보다 큰 것만 여기서 끊는다.
+  //    (프론트는 1024px JPEG q0.85 로 재인코딩해 보내므로 정상 경로는 수백 KB 다.)
   @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'front', maxCount: 1 },
-      { name: 'left', maxCount: 1 },
-      { name: 'right', maxCount: 1 },
-    ]),
+    FileFieldsInterceptor(
+      [
+        { name: 'front', maxCount: 1 },
+        { name: 'left', maxCount: 1 },
+        { name: 'right', maxCount: 1 },
+      ],
+      { limits: { fileSize: MAX_IMAGE_SIZE_BYTES * 2, files: 3 } },
+    ),
   )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
