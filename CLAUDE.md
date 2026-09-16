@@ -26,6 +26,7 @@
 | `apps/<앱>/CLAUDE.md` | **그 앱의** 규약·금지·함정 |
 | [`.claude/rules/`](.claude/rules/) | 코드 규약 상세 + 실측 카운트 (앱별 path-scoped) |
 | [`docs/deploy.md`](docs/deploy.md) | 배포 구성·흐름·롤백·리버스 프록시·상태 확인 |
+| [`docs/alerts.md`](docs/alerts.md) | **운영 알림** — 무엇을 Discord 로 보내는가·설정·추가하는 법 |
 | [`docs/lessons.md`](docs/lessons.md) | 작업 방식의 누적 교훈 |
 | [`docs/tasks/*.md`](docs/tasks/) | 진행 상황·결정 근거 (완료분은 `archive/`) |
 | `docs/handoff/*.md` | 세션 스냅샷 (PreCompact 훅 자동 생성, git 미추적) |
