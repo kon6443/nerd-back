@@ -6,25 +6,38 @@ export interface OwnedThumbnailUrls {
 }
 
 let globalThumbnailCache: OwnedThumbnailUrls | null = null;
+const preloadedThumbnailUrls = new Set<string>();
 
-/** 브라우저 이미지 프리로드 (디코딩까지 선행하여 페인트 지연 0ms 달성) */
+/** 브라우저 이미지 프리로드와 디코딩. 같은 URL은 한 번만 요청한다. */
 export function preloadThumbnailImage(url: string | null | undefined): void {
   if (!url || typeof window === "undefined") return;
+  if (preloadedThumbnailUrls.has(url)) return;
+  preloadedThumbnailUrls.add(url);
   const img = new window.Image();
   img.src = url;
   if (typeof img.decode === "function") {
-    img.decode().catch(() => {});
+    img.decode().catch(() => {
+      preloadedThumbnailUrls.delete(url);
+    });
   }
 }
 
-/** 캐시된 전역 썸네일 정보 조회 */
-export function getCachedThumbnailUrl(storySlug: string, loginId?: string | null): string | undefined {
-  if (!globalThumbnailCache) return undefined;
-  if (loginId && globalThumbnailCache.ownerLoginId !== loginId) return undefined;
+/** 같은 로그인 사용자가 서재 상세으로 이동할 때 재요청 전 썸네일을 재사용한다. */
+export function getCachedThumbnailUrl(
+  storySlug: string,
+  loginId: string,
+): string | undefined {
+  if (!globalThumbnailCache || globalThumbnailCache.ownerLoginId !== loginId) return undefined;
   return globalThumbnailCache.urls.get(storySlug);
 }
 
-/** 전역 캐시 갱신 */
+/** 같은 로그인 사용자의 서재 목록을 첫 렌더에 재사용한다. */
+export function getCachedThumbnailUrls(loginId: string): OwnedThumbnailUrls | null {
+  if (!globalThumbnailCache || globalThumbnailCache.ownerLoginId !== loginId) return null;
+  return globalThumbnailCache;
+}
+
+/** 로그인 사용자별 서재 썸네일 캐시를 갱신한다. */
 export function setCachedThumbnailUrls(cache: OwnedThumbnailUrls): void {
   globalThumbnailCache = cache;
 }
@@ -36,7 +49,7 @@ export function getCompletedThumbnailUrls(
   const thumbnails = new Map<string, string>();
 
   for (const session of sessions) {
-    if (!session.thumbnailImageUrl) continue;
+    if (session.status !== "completed" || !session.thumbnailImageUrl) continue;
     // sessions는 최신순이므로 먼저 나온 최신 세션을 우선 보존한다
     if (!thumbnails.has(session.templateSlug)) {
       thumbnails.set(session.templateSlug, session.thumbnailImageUrl);

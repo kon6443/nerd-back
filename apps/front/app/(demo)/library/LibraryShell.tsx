@@ -31,28 +31,30 @@ export const STORY_GRID = "grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3"
  * `StoryCard` 와 같은 구조다 — 4:3 썸네일, 제목, 설명 두 줄, 하단 버튼.
  * 🚫 문구 한 줄로 대신하지 않는다. 목록이 채워지는 순간 아래가 통째로 밀린다.
  *
- * ⚠️ **한 장만 그린다 — 개수를 약속하지 않는다.** 세 장을 그려 두면 동화가 그보다 적을 때 화면이
- * 줄어드는데, 줄어듦은 늘어남보다 크게 튄다. 넓은 화면은 3열이라 한 장이든 세 장이든 **한 줄**로
- * 높이가 같고(실측 405px 대 384px), 좁은 화면에서만 늘어난다.
+ * `count`를 넘기면 실제 목록과 같은 수의 자리를 먼저 확보할 수 있다. 서버 로딩 화면은 아직 목록
+ * 개수를 모르므로 기본값 한 장을 사용하고, 클라이언트의 개인화 썸네일 대기 화면은 실제 동화 수를
+ * 넘겨 카드가 채워질 때 레이아웃이 흔들리지 않게 한다.
  */
-export function StoryListSkeleton() {
+export function StoryListSkeleton({ count = 1 }: { count?: number } = {}) {
   return (
     <ul className={STORY_GRID} aria-hidden="true">
-      <li className="min-w-0">
-        <Card className="h-full w-full animate-pulse motion-reduce:animate-none">
-          <div className="flex h-full flex-col gap-4">
-            <div className="aspect-4/3 w-full rounded-xl bg-line" />
-            <div className="flex flex-col gap-2">
-              <div className="h-7 w-2/3 rounded bg-line" />
-              <div className="h-4 w-full rounded bg-line" />
-              <div className="h-4 w-4/5 rounded bg-line" />
+      {Array.from({ length: count }, (_, index) => (
+        <li className="min-w-0" key={index}>
+          <Card className="h-full w-full animate-pulse motion-reduce:animate-none">
+            <div className="flex h-full flex-col gap-4">
+              <div className="aspect-4/3 w-full rounded-xl bg-line" />
+              <div className="flex flex-col gap-2">
+                <div className="h-7 w-2/3 rounded bg-line" />
+                <div className="h-4 w-full rounded bg-line" />
+                <div className="h-4 w-4/5 rounded bg-line" />
+              </div>
+              <div className="mt-auto pt-1">
+                <div className="min-h-touch w-full rounded-btn bg-line" />
+              </div>
             </div>
-            <div className="mt-auto pt-1">
-              <div className="min-h-touch w-full rounded-btn bg-line" />
-            </div>
-          </div>
-        </Card>
-      </li>
+          </Card>
+        </li>
+      ))}
     </ul>
   );
 }
