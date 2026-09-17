@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { bookCamera } from "@/app/book-camera";
+import { createBookAtmosphere } from "@/app/book-atmosphere";
 import { createBookModel, type BookPalette } from "@/app/book-model";
 
 export type BookWorldFrame = {
@@ -44,6 +45,8 @@ function initializeBookWorld(canvas: HTMLCanvasElement, renderer: THREE.WebGLRen
   scene.fog = new THREE.Fog(palette.paper, 22, 65);
   const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
   const book = createBookModel(palette);
+  const atmosphere = createBookAtmosphere(palette);
+  book.add(atmosphere.group);
   scene.add(book);
   // Three r186의 공용 DFG LUT는 renderer.dispose()만으로 dispose 리스너가 제거되지 않는다.
   // 공개 shader callback에서 uniform을 받아, renderer가 살아 있을 때 Texture.dispose()한다.
@@ -107,6 +110,7 @@ function initializeBookWorld(canvas: HTMLCanvasElement, renderer: THREE.WebGLRen
         offsetX = Number.NaN;
       }
       const pose = bookCamera(frame.entry, width / height);
+      atmosphere.update(frame.entry);
       const pointerWeight = 1 - frame.entry;
       if (offsetX !== pose.offset.x || offsetY !== pose.offset.y) {
         offsetX = pose.offset.x;

@@ -21,17 +21,26 @@ export function createBookModel(palette: BookPalette) {
   const edge = material(color(palette.edge, palette.paper, 0.45));
   const cover = material(palette.cover);
   const coverDark = material(palette.coverDark);
-  const foliage = material(color(palette.leaf, palette.cover, 0.5));
-  const foliageLight = material(color(palette.leaf, palette.paper, 0.5));
+  const foliage = material(color(palette.leaf, palette.cover, 0.38));
+  const foliageLight = material(color(palette.leaf, palette.paper, 0.3));
   const bark = material(color(palette.edge, palette.coverDark, 0.36));
-  const roof = material(color(palette.rose, palette.edge, 0.35));
-  const gold = material(palette.gold);
-  const water = material(color(palette.sky, palette.paper, 0.65));
+  const roof = material(color(palette.sky, palette.cover, 0.75).lerp(new THREE.Color(palette.paper), 0.12));
+  const gold = material(color(palette.gold, palette.edge, 0.65));
+  gold.roughness = 0.75;
+  const water = material(color(palette.sky, palette.paper, 0.38));
+  const meadow = material(color(palette.leaf, palette.paper, 0.5));
+  const rose = material(color(palette.rose, palette.cover, 0.18));
+  const windowLight = material(color(palette.gold, palette.paper, 0.7));
+  windowLight.emissive.set(palette.gold);
+  windowLight.emissiveIntensity = 0.16;
   const pathMaterial = material(color(palette.edge, palette.gold, 0.12));
   const sphere = new THREE.SphereGeometry(1, 16, 12);
+  const detailSphere = new THREE.SphereGeometry(1, 8, 6);
   const trunk = new THREE.CylinderGeometry(0.04, 0.065, 0.6, 8);
+  const cylinder = new THREE.CylinderGeometry(1, 1, 1, 16);
   // 이 모델 안에서만 공유한다. 이탈 시 book-world의 geometry Set이 한 번씩 해제한다.
   const roundedBoxes = new Map<string, RoundedBoxGeometry>();
+  const arches = new Map<string, THREE.ExtrudeGeometry>();
 
   function mesh(parent: THREE.Group, geometry: THREE.BufferGeometry, surface: THREE.Material, x: number, y: number, z: number) {
     const object = new THREE.Mesh(geometry, surface);
@@ -53,8 +62,15 @@ export function createBookModel(palette: BookPalette) {
   }
 
   function ball(parent: THREE.Group, surface: THREE.Material, x: number, y: number, z: number, sx: number, sy = sx, sz = sx) {
-    const object = mesh(parent, sphere, surface, x, y, z);
+    const geometry = Math.max(sx, sy, sz) <= 0.065 ? detailSphere : sphere;
+    const object = mesh(parent, geometry, surface, x, y, z);
     object.scale.set(sx, sy, sz);
+    return object;
+  }
+
+  function column(parent: THREE.Group, surface: THREE.Material, x: number, y: number, z: number, radius: number, height: number) {
+    const object = mesh(parent, cylinder, surface, x, y, z);
+    object.scale.set(radius, height, radius);
     return object;
   }
 
@@ -94,6 +110,16 @@ export function createBookModel(palette: BookPalette) {
   const foilGeometry = new THREE.BufferGeometry();
   foilGeometry.setAttribute("position", new THREE.Float32BufferAttribute(coverFoil, 3));
   book.add(new THREE.LineSegments(foilGeometry, new THREE.LineBasicMaterial({ color: palette.edge })));
+
+  // 하드커버 밖으로 살짝 내려오는 천 책갈피.
+  const bookmark = new THREE.BufferGeometry();
+  bookmark.setAttribute("position", new THREE.Float32BufferAttribute([
+    0.5, 0.19, 1.85, 0.78, 0.19, 1.85, 0.78, 0.18, 2.25,
+    0.5, 0.18, 2.25, 0.78, 0.02, 2.65, 0.64, 0.08, 2.55, 0.5, 0.02, 2.65,
+  ], 3));
+  bookmark.setIndex([0, 3, 1, 1, 3, 2, 3, 5, 2, 2, 5, 4, 3, 6, 5]);
+  bookmark.computeVertexNormals();
+  mesh(book, bookmark, rose, 0, 0, 0);
 
   const paperLines: number[] = [];
   for (const side of [-1, 1]) {
@@ -140,7 +166,29 @@ export function createBookModel(palette: BookPalette) {
     mesh(book, geometry, surfaceMaterial, 0, 0, 0);
   }
 
-  ribbon([new THREE.Vector3(-0.65, 0, 2), new THREE.Vector3(0.15, 0, 1.05), new THREE.Vector3(-0.25, 0, 0), new THREE.Vector3(0.35, 0, -1.9)], 0.3, water);
+  // 땅도 종이의 곡률을 따라가므로 책 위에 떠 있거나 중앙 접힘을 덮지 않는다.
+  for (const [cx, cz, rx, rz] of [
+    [-2.48, -1.02, 0.48, 0.75], [-2.2, 1.25, 0.48, 0.38],
+    [2.63, -0.65, 0.32, 0.9], [2.15, 1.3, 0.48, 0.4],
+  ]) {
+    const positions = [cx, pageHeight(cx) + 0.013, cz];
+    const indices: number[] = [];
+    for (let i = 0; i <= 32; i++) {
+      const angle = i / 32 * Math.PI * 2;
+      const ripple = 1 + Math.sin(angle * 5) * 0.07;
+      const x = cx + Math.cos(angle) * rx * ripple;
+      positions.push(x, pageHeight(x) + 0.013, cz + Math.sin(angle) * rz * ripple);
+      if (i < 32) indices.push(0, i + 2, i + 1);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    const patch = mesh(book, geometry, meadow, 0, 0, 0);
+    patch.castShadow = false;
+  }
+
+  ribbon([new THREE.Vector3(-0.65, 0, 2), new THREE.Vector3(0.15, 0, 1.05), new THREE.Vector3(-0.25, 0, 0), new THREE.Vector3(0.35, 0, -1.9)], 0.35, water);
   ribbon([new THREE.Vector3(-2.75, 0, 1.6), new THREE.Vector3(-1.5, 0, 0.9), new THREE.Vector3(-1.7, 0, -0.55)], 0.23, pathMaterial);
   ribbon([new THREE.Vector3(0.65, 0, 1.75), new THREE.Vector3(1.5, 0, 0.75), new THREE.Vector3(1.1, 0, 0), new THREE.Vector3(1.4, 0, -0.65)], 0.23, pathMaterial);
 
@@ -157,89 +205,197 @@ export function createBookModel(palette: BookPalette) {
     ball(group, leaves, 0.15, 0.67, 0.05, 0.2, 0.29, 0.22);
   }
   const trees = [
-    [-2.7, -1.55, 1], [-2.65, 0.05, 0.82], [-2.1, 0.5, 0.72], [-2.8, 1.2, 0.6],
-    [-0.75, -1.6, 0.85], [-1.0, -0.75, 0.66], [-0.85, 0.65, 0.7],
-    [2.7, -1.55, 1.1], [2.65, -0.35, 0.85], [2.7, 0.8, 1], [2.15, 1.5, 0.65], [0.65, -1.75, 0.65],
+    [-2.65, -1.5, 0.82], [-2.65, 0.05, 0.7], [-2.8, 1.2, 0.48],
+    [-0.78, -1.55, 0.6], [2.7, -1.5, 0.8], [2.7, 0.65, 0.7], [2.15, 1.5, 0.48],
   ];
   trees.forEach(([x, z, scale], index) => tree(x, z, scale, index % 3 === 0));
 
   function archedDoor(parent: THREE.Group, x: number, y: number, z: number, width: number, height: number, surface: THREE.Material) {
-    const shape = new THREE.Shape();
-    shape.moveTo(-width / 2, 0);
-    shape.lineTo(width / 2, 0);
-    shape.lineTo(width / 2, height - width / 2);
-    shape.absarc(0, height - width / 2, width / 2, 0, Math.PI, false);
-    shape.closePath();
-    mesh(parent, new THREE.ExtrudeGeometry(shape, { depth: 0.025, bevelEnabled: false, curveSegments: 12 }), surface, x, y, z);
+    const key = `${width},${height}`;
+    let geometry = arches.get(key);
+    if (!geometry) {
+      const shape = new THREE.Shape();
+      shape.moveTo(-width / 2, 0);
+      shape.lineTo(width / 2, 0);
+      shape.lineTo(width / 2, height - width / 2);
+      shape.absarc(0, height - width / 2, width / 2, 0, Math.PI, false);
+      shape.closePath();
+      geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.025, bevelEnabled: false, curveSegments: 8 });
+      arches.set(key, geometry);
+    }
+    return mesh(parent, geometry, surface, x, y, z);
   }
 
   const cottage = new THREE.Group();
-  cottage.position.set(-1.7, pageHeight(-1.7), -0.95);
+  cottage.position.set(-1.7, pageHeight(-1.7), -1.05);
   cottage.rotation.y = 0.18;
+  cottage.scale.setScalar(0.8);
   book.add(cottage);
-  box(cottage, 0.92, 0.64, 0.78, edge, 0, 0.32, 0, 0.08);
-  const cottageRoof = mesh(cottage, new THREE.ConeGeometry(0.82, 0.5, 4), cover, 0, 0.86, 0);
-  cottageRoof.rotation.y = Math.PI / 4;
-  cottageRoof.scale.z = 0.86;
-  archedDoor(cottage, 0, 0.01, 0.394, 0.24, 0.4, coverDark);
+  const cottageRoofMaterial = material(color(palette.cover, palette.leaf, 0.2));
+  const plaster = material(color(palette.paper, palette.rose, 0.16));
+  const timber = material(color(palette.edge, palette.coverDark, 0.44));
+
+  function gableRoof(parent: THREE.Group, width: number, height: number, depth: number, x: number, y: number, z: number) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-width / 2, 0);
+    shape.lineTo(width / 2, 0);
+    shape.lineTo(0, height);
+    shape.closePath();
+    const roof = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false }),
+      [plaster, cottageRoofMaterial],
+    );
+    roof.position.set(x, y, z - depth / 2);
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    parent.add(roof);
+    // 박공 테두리만 남겨 작은 화면에서도 지붕의 실루엣이 읽히게 한다.
+    for (const side of [-1, 1]) {
+      const beam = box(parent, Math.hypot(width / 2, height), 0.045, 0.045, timber, x + side * width / 4, y + height / 2, z + depth / 2 + 0.014, 0.008);
+      beam.rotation.z = -side * Math.atan2(height, width / 2);
+    }
+  }
+
+  box(cottage, 1.32, 0.1, 1.23, edge, 0, 0.035, 0.07, 0.055);
+  box(cottage, 1.18, 0.98, 1.05, plaster, 0, 0.56, -0.05, 0.035);
+  gableRoof(cottage, 1.55, 0.87, 1.27, 0, 1.055, -0.05);
+  for (const y of [0.13, 1.02]) box(cottage, 1.25, 0.045, 1.1, timber, 0, y, -0.05, 0.01);
+  for (const x of [-0.555, 0.555]) box(cottage, 0.045, 0.94, 0.05, timber, x, 0.57, 0.48, 0.008);
+
+  function cottageWindow(parent: THREE.Group, x: number, y: number, z: number, rotation = 0, scale = 1) {
+    const window = new THREE.Group();
+    window.position.set(x, y, z);
+    window.rotation.y = rotation;
+    window.scale.setScalar(scale);
+    parent.add(window);
+    box(window, 0.25, 0.31, 0.04, timber, 0, 0, 0, 0.015);
+    box(window, 0.195, 0.25, 0.025, windowLight, 0, 0, 0.032, 0.008);
+    box(window, 0.017, 0.26, 0.02, paper, 0, 0, 0.053, 0.004);
+    box(window, 0.2, 0.017, 0.02, paper, 0, 0, 0.053, 0.004);
+    for (const side of [-1, 1]) box(window, 0.065, 0.3, 0.035, cottageRoofMaterial, side * 0.164, 0, 0.008, 0.012);
+    box(window, 0.33, 0.07, 0.15, timber, 0, -0.2, 0.055, 0.015);
+    for (const dx of [-0.09, 0, 0.09]) {
+      ball(window, foliage, dx, -0.16, 0.075, 0.065, 0.035, 0.055);
+      ball(window, dx === 0 ? gold : rose, dx, -0.12, 0.085, 0.036);
+    }
+  }
+  cottageWindow(cottage, -0.38, 0.64, 0.49, 0, 0.8);
+  cottageWindow(cottage, 0.38, 0.64, 0.49, 0, 0.8);
+  cottageWindow(cottage, 0.61, 0.6, -0.15, Math.PI / 2);
+
+  // 둥근 다락창은 숲속 집의 작은 표정으로 남긴다.
+  const roundFrame = column(cottage, timber, 0, 1.46, 0.595, 0.16, 0.035);
+  roundFrame.rotation.x = Math.PI / 2;
+  const roundWindow = column(cottage, windowLight, 0, 1.46, 0.621, 0.122, 0.02);
+  roundWindow.rotation.x = Math.PI / 2;
+  box(cottage, 0.016, 0.245, 0.02, paper, 0, 1.46, 0.635, 0.004);
+  box(cottage, 0.245, 0.016, 0.02, paper, 0, 1.46, 0.635, 0.004);
+
+  archedDoor(cottage, 0, 0.095, 0.49, 0.33, 0.61, timber);
+  archedDoor(cottage, 0, 0.11, 0.52, 0.245, 0.51, coverDark);
+  ball(cottage, gold, 0.072, 0.33, 0.56, 0.02);
+  gableRoof(cottage, 0.72, 0.28, 0.59, 0, 0.78, 0.6);
   for (const x of [-0.3, 0.3]) {
-    box(cottage, 0.18, 0.2, 0.035, paper, x, 0.35, 0.405, 0.02);
-    box(cottage, 0.125, 0.14, 0.015, cover, x, 0.35, 0.427, 0.012);
-    box(cottage, 0.016, 0.15, 0.02, paper, x, 0.35, 0.438, 0.004);
-    box(cottage, 0.14, 0.016, 0.02, paper, x, 0.35, 0.438, 0.004);
-    box(cottage, 0.21, 0.045, 0.08, edge, x, 0.23, 0.43, 0.01);
+    column(cottage, timber, x, 0.43, 0.83, 0.025, 0.7);
+    column(cottage, edge, x, 0.11, 0.83, 0.04, 0.08);
   }
-  ball(cottage, gold, 0.065, 0.19, 0.435, 0.019);
-  const roofSeams: number[] = [];
-  for (let i = 1; i < 5; i++) {
-    const t = i / 5;
-    const y = 1.11 - 0.5 * t;
-    const half = 0.58 * t;
-    roofSeams.push(-half, y + 0.006, half * 0.86 + 0.004, half, y + 0.006, half * 0.86 + 0.004);
-  }
-  const roofLines = new THREE.BufferGeometry();
-  roofLines.setAttribute("position", new THREE.Float32BufferAttribute(roofSeams, 3));
-  cottage.add(new THREE.LineSegments(roofLines, new THREE.LineBasicMaterial({ color: palette.coverDark, transparent: true, opacity: 0.35 })));
-  box(cottage, 0.12, 0.29, 0.12, edge, 0.22, 1, -0.12, 0.02);
+  for (let i = 0; i < 3; i++) box(cottage, 0.66 + i * 0.07, 0.05, 0.17, edge, 0, 0.13 - i * 0.035, 0.78 + i * 0.12, 0.012);
+  box(cottage, 0.025, 0.14, 0.1, gold, -0.21, 0.69, 0.6, 0.006);
+  ball(cottage, windowLight, -0.21, 0.61, 0.64, 0.047, 0.063, 0.047);
+
+  box(cottage, 0.17, 0.58, 0.19, edge, -0.37, 1.79, -0.31, 0.018);
+  box(cottage, 0.23, 0.065, 0.25, timber, -0.37, 2.08, -0.31, 0.015);
+  ball(cottage, paper, -0.36, 2.25, -0.32, 0.075, 0.1, 0.075);
 
   const castle = new THREE.Group();
   castle.position.set(1.4, 0.73, -0.95);
   book.add(castle);
-  box(castle, 1.3, 0.12, 1.02, edge, 0, 0.03, 0, 0.06);
-  box(castle, 0.93, 0.73, 0.7, paper, 0, 0.42, 0, 0.05);
-  archedDoor(castle, 0, 0.07, 0.36, 0.37, 0.5, edge);
-  archedDoor(castle, 0, 0.085, 0.392, 0.27, 0.41, coverDark);
-  for (const x of [-0.09, -0.03, 0.03, 0.09]) box(castle, 0.008, 0.25, 0.012, cover, x, 0.22, 0.42, 0.002);
-  ball(castle, gold, 0.075, 0.26, 0.43, 0.018);
-  for (const y of [0.15, 0.72]) box(castle, 1.01, 0.07, 0.76, edge, 0, y, 0, 0.025);
-  for (const x of [-0.35, -0.175, 0, 0.175, 0.35]) {
-    box(castle, 0.12, 0.12, 0.15, paper, x, 0.82, 0.27, 0.02);
+  // 성문 위치는 진입 카메라와 공유하므로 유지하고, 뒤쪽으로 높이를 쌓는다.
+  box(castle, 1.85, 0.12, 1.35, edge, 0, 0.03, -0.08, 0.06);
+  box(castle, 1.28, 0.83, 0.72, paper, 0, 0.46, 0, 0.035);
+  box(castle, 0.72, 1.48, 0.63, paper, 0.04, 0.8, -0.19, 0.025);
+  for (const y of [0.16, 0.85]) box(castle, 1.34, 0.065, 0.78, edge, 0, y, 0, 0.015);
+  box(castle, 0.8, 0.065, 0.71, gold, 0.04, 1.51, -0.19, 0.012);
+  const keepRoof = mesh(castle, new THREE.ConeGeometry(0.61, 0.68, 4), roof, 0.04, 1.88, -0.19);
+  keepRoof.rotation.y = Math.PI / 4;
+  keepRoof.scale.z = 0.92;
+
+  archedDoor(castle, 0, 0.065, 0.365, 0.52, 0.65, edge);
+  archedDoor(castle, 0, 0.08, 0.395, 0.38, 0.55, coverDark);
+  for (const x of [-0.135, -0.09, -0.045, 0, 0.045, 0.09, 0.135]) {
+    box(castle, 0.008, 0.36, 0.012, cover, x, 0.28, 0.424, 0.002);
+  }
+  for (const x of [-0.055, 0.055]) ball(castle, gold, x, 0.29, 0.438, 0.017);
+  for (let i = 0; i < 3; i++) {
+    box(castle, 0.66 + i * 0.16, 0.045, 0.13, edge, 0, 0.06 - i * 0.03, 0.49 + i * 0.12, 0.008);
+  }
+  for (const x of [-0.54, -0.36, 0.36, 0.54]) {
+    box(castle, 0.11, 0.16, 0.15, paper, x, 0.96, 0.28, 0.012);
+    box(castle, 0.13, 0.025, 0.17, gold, x, 1.045, 0.28, 0.004);
   }
 
+  const spire = new THREE.LatheGeometry([
+    new THREE.Vector2(0, 0), new THREE.Vector2(1.32, 0),
+    new THREE.Vector2(1.32, 0.035), new THREE.Vector2(1.03, 0.1),
+    new THREE.Vector2(0.7, 0.32), new THREE.Vector2(0.32, 0.65),
+    new THREE.Vector2(0.1, 0.92), new THREE.Vector2(0, 1),
+  ], 20);
+  const roofRing = new THREE.TorusGeometry(1, 0.018, 4, 20);
   function tower(x: number, z: number, height: number, radius: number) {
-    mesh(castle, new THREE.CylinderGeometry(radius, radius * 1.08, height, 20), paper, x, height / 2 + 0.08, z);
-    mesh(castle, new THREE.CylinderGeometry(radius * 1.16, radius * 1.16, 0.075, 20), edge, x, height + 0.05, z);
-    const roofProfile = [
-      new THREE.Vector2(0, radius * 2.4), new THREE.Vector2(radius * 0.13, radius * 1.95),
-      new THREE.Vector2(radius * 0.52, radius * 1.12), new THREE.Vector2(radius * 1.1, radius * 0.27),
-      new THREE.Vector2(radius * 1.5, 0.04), new THREE.Vector2(radius * 1.5, 0),
-      new THREE.Vector2(0, 0),
-    ];
-    mesh(castle, new THREE.LatheGeometry(roofProfile.reverse(), 24), roof, x, height + 0.09, z);
-    mesh(castle, new THREE.CylinderGeometry(radius * 1.07, radius * 1.07, 0.05, 20), edge, x, height * 0.4, z);
-    ball(castle, gold, x, height + radius * 2.4 + 0.1, z, 0.035);
-    archedDoor(castle, x, height * 0.61, z + radius + 0.002, radius * 0.72, radius * 1.14, edge);
-    archedDoor(castle, x, height * 0.63, z + radius + 0.03, radius * 0.48, radius * 0.9, cover);
+    column(castle, paper, x, height / 2 + 0.08, z, radius, height);
+    for (const y of [0.14, height + 0.04]) {
+      column(castle, edge, x, y, z, radius * 1.12, 0.055);
+    }
+    column(castle, gold, x, height + 0.095, z, radius * 1.18, 0.022);
+    const top = mesh(castle, spire, roof, x, height + 0.11, z);
+    const roofHeight = radius * 3.4;
+    top.scale.set(radius, roofHeight, radius);
+    const ring = mesh(castle, roofRing, edge, x, height + 0.11 + roofHeight * 0.1, z);
+    ring.rotation.x = Math.PI / 2;
+    ring.scale.setScalar(radius * 1.03);
+    ring.castShadow = false;
+    const tip = height + roofHeight + 0.11;
+    column(castle, gold, x, tip + 0.045, z, 0.012, 0.12);
+    ball(castle, gold, x, tip + 0.1, z, 0.025);
+    for (const side of [0, Math.PI / 2]) {
+      const window = new THREE.Group();
+      window.position.set(x, height * 0.65, z);
+      window.rotation.y = side;
+      castle.add(window);
+      archedDoor(window, 0, 0, radius, 0.13, 0.26, edge);
+      archedDoor(window, 0, 0.025, radius + 0.025, 0.086, 0.205, coverDark);
+      archedDoor(window, 0, 0.04, radius + 0.051, 0.055, 0.165, windowLight);
+    }
+    return tip;
   }
-  tower(-0.5, 0.25, 0.94, 0.17);
-  tower(0.5, 0.25, 1.08, 0.17);
-  tower(-0.4, -0.27, 1.25, 0.19);
-  tower(0.32, -0.27, 1.65, 0.23);
-  const flagPole = mesh(castle, new THREE.CylinderGeometry(0.012, 0.012, 0.45, 6), gold, 0.32, 2.47, -0.27);
-  flagPole.castShadow = false;
+  tower(-0.68, 0.28, 1.14, 0.19);
+  tower(0.68, 0.28, 1.3, 0.19);
+  const highestTip = tower(0.08, -0.4, 1.82, 0.2);
+
+  // 문 위 시계와 양옆의 길쭉한 창: 작은 화면에서도 궁전의 정면이 읽힌다.
+  const clockFrame = column(castle, gold, 0.04, 1.26, 0.14, 0.145, 0.035);
+  clockFrame.rotation.x = Math.PI / 2;
+  const clockFace = column(castle, paper, 0.04, 1.26, 0.165, 0.116, 0.02);
+  clockFace.rotation.x = Math.PI / 2;
+  box(castle, 0.014, 0.09, 0.014, coverDark, 0.04, 1.29, 0.181, 0.003);
+  box(castle, 0.07, 0.014, 0.014, coverDark, 0.068, 1.26, 0.181, 0.003);
+  for (const x of [-0.22, 0.3]) {
+    archedDoor(castle, x, 1.02, 0.145, 0.1, 0.27, cover);
+    archedDoor(castle, x, 1.04, 0.173, 0.055, 0.21, windowLight);
+  }
+
   const flagShape = new THREE.Shape();
-  flagShape.moveTo(0, 0); flagShape.lineTo(0.29, -0.025); flagShape.lineTo(0.23, -0.16); flagShape.lineTo(0, -0.13); flagShape.closePath();
-  const flag = mesh(castle, new THREE.ExtrudeGeometry(flagShape, { depth: 0.018, bevelEnabled: false }), gold, 0.33, 2.65, -0.27);
+  flagShape.moveTo(0, 0);
+  flagShape.bezierCurveTo(0.1, 0.05, 0.22, -0.08, 0.33, -0.01);
+  flagShape.lineTo(0.27, -0.095);
+  flagShape.lineTo(0.33, -0.18);
+  flagShape.bezierCurveTo(0.21, -0.24, 0.1, -0.11, 0, -0.15);
+  flagShape.closePath();
+  const flagGeometry = new THREE.ExtrudeGeometry(flagShape, { depth: 0.012, bevelEnabled: false, curveSegments: 6 });
+  const pole = column(castle, gold, 0.08, highestTip + 0.15, -0.4, 0.012, 0.3);
+  pole.castShadow = false;
+  const flag = mesh(castle, flagGeometry, gold, 0.092, highestTip + 0.29, -0.4);
+  flag.scale.setScalar(0.7);
   flag.rotation.y = -0.2;
 
   const bridge = new THREE.Group();
@@ -257,10 +413,11 @@ export function createBookModel(palette: BookPalette) {
   }
 
   // 반복 꽃잎은 한 번에 그려 가까운 시점의 디테일을 늘려도 draw call을 제한한다.
-  const petals = new THREE.InstancedMesh(sphere, paper, 60);
-  const centers = new THREE.InstancedMesh(sphere, gold, 12);
+  const flowerCount = 12;
+  const petals = new THREE.InstancedMesh(detailSphere, paper, flowerCount * 5);
+  const centers = new THREE.InstancedMesh(detailSphere, gold, flowerCount);
   const instance = new THREE.Object3D();
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < flowerCount; i++) {
     const side = i % 2 === 0 ? 1 : -1;
     const x = side * (0.8 + (i * 0.37 % 2.1));
     const z = 1.4 - (i * 0.43 % 3.1);
@@ -281,6 +438,19 @@ export function createBookModel(palette: BookPalette) {
   centers.receiveShadow = true;
   book.add(petals, centers);
 
+  for (const [x, z, size] of [[-2.75, 0.6, 0.8], [2.65, 1.18, 0.65]]) {
+    const y = pageHeight(x);
+    column(book, paper, x, y + 0.075 * size, z, 0.035 * size, 0.15 * size);
+    ball(book, rose, x, y + 0.16 * size, z, 0.12 * size, 0.06 * size, 0.12 * size);
+    for (const dx of [-0.045, 0.035]) ball(book, paper, x + dx * size, y + 0.215 * size, z, 0.018 * size, 0.008 * size, 0.018 * size);
+  }
+  for (const [x, z] of [[-2.05, -1.63], [2.85, 0.28]]) {
+    const y = pageHeight(x);
+    ball(book, foliage, x, y + 0.09, z, 0.24, 0.16, 0.19);
+    ball(book, foliageLight, x + 0.15, y + 0.07, z + 0.05, 0.17, 0.12, 0.16);
+    ball(book, rose, x - 0.08, y + 0.22, z, 0.035);
+  }
+
   function cloud(x: number, y: number, z: number, scale: number) {
     const group = new THREE.Group();
     group.position.set(x, y, z);
@@ -290,27 +460,29 @@ export function createBookModel(palette: BookPalette) {
     ball(group, paper, -0.17, 0.1, 0, 0.19, 0.22, 0.17);
     ball(group, paper, 0.1, 0.17, 0, 0.23, 0.27, 0.18);
   }
-  cloud(-2.9, 2.1, -1.8, 0.9);
-  cloud(2.6, 2.75, -1.75, 0.8);
-  cloud(0.2, 2.9, -2.15, 0.65);
+  cloud(-2.6, 2.05, -1.85, 0.6);
+  cloud(2.65, 2.45, -1.85, 0.5);
 
-  // 같은 구체를 쓰는 나무·구름·장식을 재질별로 묶고 원래 월드 변환을 보존한다.
+  // 구체뿐 아니라 반복 성벽·첨탑·창문도 묶는다. 정적 모델의 변환과 shadow 속성을 보존한다.
   book.updateMatrixWorld(true);
-  const sphereGroups = new Map<THREE.Material, THREE.Mesh[]>();
+  const batches = new Map<string, THREE.Mesh<THREE.BufferGeometry, THREE.Material>[]>();
   book.traverse((object) => {
-    if (!(object instanceof THREE.Mesh) || object instanceof THREE.InstancedMesh || object.geometry !== sphere || Array.isArray(object.material)) return;
-    const objects = sphereGroups.get(object.material) ?? [];
+    if (!(object instanceof THREE.Mesh) || object instanceof THREE.InstancedMesh || Array.isArray(object.material)) return;
+    const key = `${object.geometry.uuid}:${object.material.uuid}:${object.castShadow}:${object.receiveShadow}`;
+    const objects = batches.get(key) ?? [];
     objects.push(object);
-    sphereGroups.set(object.material, objects);
+    batches.set(key, objects);
   });
-  sphereGroups.forEach((objects, surface) => {
-    const instances = new THREE.InstancedMesh(sphere, surface, objects.length);
+  batches.forEach((objects) => {
+    if (objects.length < 2) return;
+    const first = objects[0];
+    const instances = new THREE.InstancedMesh(first.geometry, first.material, objects.length);
     objects.forEach((object, index) => {
       instances.setMatrixAt(index, object.matrixWorld);
       object.removeFromParent();
     });
-    instances.castShadow = true;
-    instances.receiveShadow = true;
+    instances.castShadow = first.castShadow;
+    instances.receiveShadow = first.receiveShadow;
     book.add(instances);
   });
   return book;
