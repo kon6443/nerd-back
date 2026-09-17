@@ -340,6 +340,13 @@ export function BookPager({
             </div>
         ) : null}
       </div>
+      {renderTextControls ? (
+        // ⭐ **1단(모바일)은 낭독 조작을 책 프레임 아래 밖에 둔다**(2026-09-18). 1단의 본문 칸은 높이가 고정된
+        // 스크롤이라, 본문 끝에 붙은 조작은 스크롤해야만 보였다. 펼침면은 위의 본문 쪽 안 것을 쓴다.
+        // ⚠️ 두 자리를 **CSS 가 하나만** 보인다(`display: none` — 숨은 쪽은 포커스·보조기술에서 빠진다).
+        //    JS 로 화면 폭을 읽어 한 곳만 그리면 서버 HTML 과 달라져 첫 화면에서 조작이 한 번 튄다.
+        <div className={styles.outsideControls}>{renderTextControls(baseText)}</div>
+      ) : null}
     </BookVolume>
   );
 }

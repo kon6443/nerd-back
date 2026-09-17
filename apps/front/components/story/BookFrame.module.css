@@ -140,6 +140,36 @@
   order: 1;
 }
 
+/*
+ * 1단(모바일)의 낭독 조작 자리 — **책 프레임 아래 밖**(2026-09-18 요청).
+ * 1단의 본문 칸(`.page`)은 높이 15rem 고정 스크롤이라, 본문 끝의 조작은 스크롤해야만 보였다.
+ * `BookPager` 가 두 자리에 그리고 **여기서 하나만** 보인다. `display: none` 이라 숨은 쪽은 포커스·보조기술에서 빠진다.
+ * ⚠️ `relative` — 책(`.book`)이 positioned 라 static 이면 넘어가는 종이 밑에 깔린다(`READER_BAR` 와 같은 이유).
+ */
+.outsideControls {
+  position: relative;
+}
+
+/* 본문 쪽 안에서는 구분선이 본문과 조작을 가르지만, 책 밖에서는 책 테두리가 이미 그 선이다. */
+.outsideControls > :first-child {
+  border-top-width: 0;
+  padding-top: 0;
+}
+
+.page > .pageControls {
+  display: none;
+}
+
+@media (min-width: 48rem) {
+  .page > .pageControls {
+    display: block;
+  }
+
+  .outsideControls {
+    display: none;
+  }
+}
+
 @media (min-width: 48rem) {
   .spread {
     grid-template-columns: repeat(2, minmax(0, 1fr));
