@@ -1,6 +1,9 @@
 "use client";
 
+import { StoryRoom } from "@/components/layout/StoryRoom";
+import room from "@/components/layout/StoryRoom.module.css";
 import Link from "next/link";
+import { StoryBookScene } from "@/components/story/StoryBookScene";
 import type { SessionPagesResponse, StoryBranchKey } from "@nerd/contracts";
 import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
 
@@ -43,17 +46,8 @@ export function GeneratingView({
   const failedCount = generationPages.filter((item) => item.status === "failed").length;
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-6 px-4 py-8 text-center">
-      {/* 마법 오라 애니메이션 */}
-      <div className="relative flex h-40 w-40 items-center justify-center">
-        <div className="absolute inset-0 animate-ping rounded-full bg-magic opacity-20" />
-        <div className="absolute -inset-2 animate-pulse rounded-full bg-primary-soft opacity-60" />
-        <div className="relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-surface shadow-xl">
-          <span className="animate-bounce text-5xl">🎨</span>
-        </div>
-        <span className="absolute -top-1 -right-1 text-2xl animate-spin">✨</span>
-        <span className="absolute -bottom-1 -left-1 text-2xl">📖</span>
-      </div>
+    <StoryRoom className={room.readingState} storySlug={slug}>
+      <StoryBookScene open={!hasFailed} progress={progressPercent} />
 
       <div>
         <h1 className="text-2xl font-bold text-ink md:text-3xl">
@@ -69,7 +63,7 @@ export function GeneratingView({
       {/* 세션 전체 실패는 진행률만으로는 드러나지 않는다 — 명시적으로 말한다. */}
       {hasFailed && (
         <p
-          className="max-w-md rounded-card border-2 border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+          className="max-w-md rounded-card border-2 border-danger bg-danger-soft px-4 py-3 text-sm font-medium text-danger-strong"
           role="alert"
         >
           {failedCount > 0
@@ -80,27 +74,27 @@ export function GeneratingView({
 
       {/* 폴링이 연속 실패할 때만 뜬다 — "멈춘 것"과 "느린 것"을 사용자가 구분할 수 있어야 한다. */}
       {pagesPollDegraded && (
-        <p className="max-w-md text-sm font-medium text-amber-700" role="status">
+        <p className="max-w-md text-sm font-medium text-gold-strong" role="status">
           연결이 불안정해요. 진행 상황을 계속 다시 확인하고 있어요.
         </p>
       )}
 
       {/* 진행률 프로그레스 바 */}
       <div className="w-full max-w-md">
-        <div className="mb-2 flex items-center justify-between text-xs font-bold text-ink-muted">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-ink-muted">
           <span>제작 진행률 ({completed}/{total}장)</span>
           <span>{progressPercent}%</span>
         </div>
-        <div className="h-4 w-full overflow-hidden rounded-pill border-2 border-line bg-white shadow-inner">
+        <div role="progressbar" aria-label="동화 제작 진행률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent} className="h-3 w-full overflow-hidden rounded-pill bg-line shadow-inner">
           <div
-            className="h-full bg-gradient-to-r from-accent-a via-primary to-magic transition-all duration-500 ease-out"
-            style={{ width: `${progressPercent}%` }}
+            className="h-full origin-left rounded-pill bg-primary transition-transform duration-300 ease-out motion-reduce:transition-none"
+            style={{ transform: `scaleX(${progressPercent / 100})` }}
           />
         </div>
       </div>
 
       {/* 페이지별 진행 단계 카드 리스트 */}
-      <div className="w-full max-w-md rounded-card border-2 border-line bg-white p-4 shadow-sm">
+      <div className="w-full max-w-md rounded-card border-2 border-line bg-surface-raised p-4 shadow-sm">
         <h2 className="mb-3 text-left text-xs font-bold text-ink-muted uppercase tracking-wider">
           페이지별 제작 현황
         </h2>
@@ -117,30 +111,30 @@ export function GeneratingView({
                 key={`${item.branchKey}-${item.pageNo}`}
                 className="rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm"
               >
-                <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="font-bold text-ink">
                     {pageLabel}
                   </span>
                   {item?.imageUrl && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                    <span className="rounded-full bg-primary-tint px-2 py-0.5 text-xs font-semibold text-primary-strong">
                       삽화 준비 완료
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {status === "succeeded" && (
-                    <span className="font-bold text-emerald-600">✓ 완성</span>
+                    <span className="font-bold text-primary-strong">✓ 완성</span>
                   )}
                   {status === "running" && (
-                    <span className="flex items-center gap-1 font-bold text-primary animate-pulse">
+                    <span className="flex items-center gap-1 font-bold text-primary-strong">
                       <span className="inline-block h-2 w-2 rounded-full bg-primary" />
                       그리는 중...
                     </span>
                   )}
                   {status === "pending" && (
-                    <span className="text-xs text-neutral-400">대기 중</span>
+                    <span className="text-xs text-ink-muted">대기 중</span>
                   )}
                   {status === "failed" && (
                     <button
@@ -150,9 +144,7 @@ export function GeneratingView({
                           : handleRetry(item.pageNo))
                       }
                       disabled={retryingPageNo === item.pageNo || isSelectingBranch !== null}
-                      // 색은 디자이너 영역이라 그대로 두고 **누를 수 있는 크기와 포커스 표시**만 보강했다.
-                      // ⚠️ 여기도 56px 규약에는 미달한다 — 페이지 목록 한 줄 안에 들어가야 한다.
-                      className={`min-h-[40px] rounded-btn bg-red-100 px-3 text-sm font-bold text-red-600 hover:bg-red-200 disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`}
+                      className={`min-h-touch rounded-btn bg-danger-soft px-3 text-sm font-bold text-danger-strong hover:bg-danger-soft disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`}
                     >
                       {retryingPageNo === item.pageNo || isSelectingBranch === item.branchKey
                         ? "재시도 중..."
@@ -166,7 +158,7 @@ export function GeneratingView({
                     ⚠️ 이 값은 사용자용 문구다 — 내부 예외 원문이 들어오지 않도록
                     백엔드에서 고정 문구로 걸러진다(`openrouter-image.adapter.ts`). */}
                 {status === "failed" && item.errorMessage && (
-                  <p className="mt-1 text-left text-xs text-red-600">{item.errorMessage}</p>
+                  <p className="mt-1 text-left text-xs text-danger-strong">{item.errorMessage}</p>
                 )}
               </div>
             );
@@ -194,6 +186,6 @@ export function GeneratingView({
           동화 소개로 돌아가기
         </Link>
       </div>
-    </main>
+    </StoryRoom>
   );
 }

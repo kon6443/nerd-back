@@ -107,9 +107,9 @@ export function LibraryStoryList({ stories, isCreateMode }: LibraryStoryListProp
                   href={getLibraryStoryHref(story.slug, isCreateMode)}
                   variant="primary"
                   size="compact"
-                  className={`w-full ${room.primary}`}
+                  className="w-full"
                 >
-                  동화 펼쳐 보기
+                  {isCreateMode ? "이 동화로 만들기" : "동화 펼쳐 보기"}
                 </ActionLink>
               }
             />

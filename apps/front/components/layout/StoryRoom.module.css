@@ -9,7 +9,6 @@
   --color-ink-muted: #626650;
   --color-accent-a-soft: #e4e9d5;
   --color-magic-strong: #4c6035;
-  --story-action: #435b32;
   --story-display: #eef0e2;
 }
 
@@ -26,7 +25,6 @@
   --color-ink-muted: #716053;
   --color-accent-a-soft: #f3e4d6;
   --color-magic-strong: #9b3a2c;
-  --story-action: #9b3a2c;
   --story-display: #f6eade;
 }
 
@@ -118,10 +116,6 @@
   box-shadow: 0 12px 30px color-mix(in srgb, var(--color-book-cover) 6%, transparent);
 }
 .message p + p { color: var(--room-muted); }
-.primary {
-  background: var(--story-action, color-mix(in srgb, var(--color-accent-a) 55%, var(--color-night)));
-  --btn-lip: var(--color-book-cover-strong);
-}
 .room :focus-visible { outline-color: var(--color-book-cover); }
 .room ::selection { background: var(--color-paper-edge); color: var(--color-book-cover-strong); }
 
@@ -130,7 +124,6 @@
   width: 280px;
   height: 225px;
   perspective: 900px;
-  pointer-events: none;
 }
 .bottomBook,
 .middleBook {
@@ -163,6 +156,7 @@
   height: 163px;
   transform: rotate(-10deg) rotateY(-18deg);
   transform-style: preserve-3d;
+  transition: transform 300ms cubic-bezier(.16,1,.3,1);
 }
 .standingBook::after {
   position: absolute;
@@ -193,7 +187,7 @@
 .bookRule { width: 44px; margin-top: 7px; border-top: 1px solid currentColor; }
 
 .login .content {
-  min-height: calc(100dvh - 77px);
+  min-height: calc(100dvh - var(--app-header-height));
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
   align-items: center;
@@ -222,7 +216,7 @@
 .form > button[type="button"] { color: var(--room-muted); }
 .input { border-color: color-mix(in srgb, var(--color-book-cover) 65%, var(--color-paper-edge)); background: var(--color-paper); caret-color: var(--color-book-cover); }
 .input:focus { border-color: var(--color-book-cover); outline: 2px solid var(--color-book-cover); outline-offset: 2px; }
-.input[aria-invalid="true"] { border-color: var(--color-accent-b-strong); }
+.input[aria-invalid="true"] { border-color: var(--color-danger-strong); }
 .guestLink { display: flex; justify-content: center; margin-top: 2rem; }
 
 @media (max-width: 900px) {
@@ -244,4 +238,38 @@
   .welcome { display: none; }
   .form { padding: 1.5rem; }
   .formHeading h1 { font-size: 1.875rem; }
+}
+
+.account .content { max-width: 1040px; }
+.accountHeader { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-bottom: 2rem; }
+.accountHeader h1 { font-size: clamp(2rem, 4vw, 3rem); color: var(--color-book-cover-strong); font-weight: 800; letter-spacing: -.04em; }
+.accountHeader p { margin-top: .75rem; color: var(--room-muted); line-height: 1.7; }
+.accountBody { display: flex; flex-direction: column; gap: 2rem; }
+.sessionCard { border-radius: 10px 22px 22px 10px; border-left: 5px solid var(--color-book-cover); box-shadow: 3px 4px 0 var(--color-paper), 4px 5px 0 var(--color-paper-edge), 6px 12px 20px color-mix(in srgb, var(--color-book-cover) 7%, transparent); }
+.sessionCover { transform: perspective(500px) rotateY(-10deg); transform-origin: left; box-shadow: 3px 3px 0 var(--color-paper-edge); transition: transform 220ms ease-out; }
+.sessionCard:focus-within .sessionCover { transform: perspective(500px) rotateY(0deg); }
+.readingState .content { display: flex; min-height: calc(100dvh - var(--app-header-height)); max-width: 720px; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem; text-align: center; }
+.readingState .window { opacity: .45; }
+.readingState h1 { color: var(--color-book-cover-strong); letter-spacing: -.03em; text-wrap: balance; word-break: keep-all; }
+.completionCover { position: relative; width: min(256px, 100%); aspect-ratio: 1; border: 5px solid var(--color-book-cover); border-left-width: 12px; border-radius: 5px 14px 14px 5px; transform: perspective(800px) rotateY(-10deg); box-shadow: 5px 4px 0 var(--color-paper-edge), 7px 7px 0 var(--color-paper), 8px 8px 0 var(--color-book-cover), 12px 20px 28px color-mix(in srgb, var(--color-book-cover) 18%, transparent); overflow: hidden; }
+.login:has(input:focus) .standingBook { transform: rotate(-4deg) rotateY(-6deg) translateY(-6px); }
+@media (hover: hover) and (pointer: fine) { .sessionCard:hover .sessionCover { transform: perspective(500px) rotateY(0deg); } }
+@media (max-width: 639px) {
+  .accountHeader { gap: .75rem; align-items: flex-start; }
+  .accountHeader h1 { font-size: 2rem; }
+
+  .readingState .content { padding-inline: 1.25rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .standingBook, .sessionCover { transition: none; }
+  .login:has(input:focus) .standingBook { transform: rotate(-10deg) rotateY(-18deg); }
+  .sessionCard:hover .sessionCover, .sessionCard:focus-within .sessionCover { transform: perspective(500px) rotateY(-10deg); }
+}
+
+.books .standingBook { animation: bookSettle 850ms cubic-bezier(.16,1,.3,1); }
+@keyframes bookSettle { from { transform: rotate(-16deg) rotateY(-28deg) translateY(-9px); } to { transform: rotate(-10deg) rotateY(-18deg); } }
+@media (hover: hover) and (pointer: fine) { .books:hover .standingBook { transform: rotate(-4deg) rotateY(-6deg) translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) {
+  .books .standingBook { animation: none; }
+  .books:hover .standingBook { transform: rotate(-10deg) rotateY(-18deg); }
 }

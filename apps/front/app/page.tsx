@@ -1,16 +1,16 @@
-import { AuthCta } from "@/components/layout/AuthCta";
-import { HOME_AUTHENTICATED_CTA } from "@/components/layout/authLinks";
+import { HOME_CREATE_CTA } from "@/components/layout/authLinks";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { HomeWorld } from "@/app/HomeWorld";
-import styles from "@/app/HomeWorld.module.css";
 
 export default function Home() {
   return (
     <HomeWorld>
-      <ActionLink href="/library" prefetch variant="primary" className={`sm:w-48 ${styles.primaryAction}`}>
+      <ActionLink href="/library" prefetch variant="primary" className="sm:w-48">
         동화 체험하기
       </ActionLink>
-      <AuthCta className="sm:w-48" authenticated={HOME_AUTHENTICATED_CTA} prefetch />
+      <ActionLink href={HOME_CREATE_CTA.href} variant="secondary" className="sm:w-48" prefetch>
+        {HOME_CREATE_CTA.cta}
+      </ActionLink>
     </HomeWorld>
   );
 }

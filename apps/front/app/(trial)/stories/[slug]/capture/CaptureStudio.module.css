@@ -1,10 +1,4 @@
-.page {
-  width: 100%;
-  max-width: 1064px;
-  margin-inline: auto;
-  padding: 14px 28px 40px;
-  flex: 1;
-}
+.page > div:last-child { width: min(100%, 1140px); padding: 1.25rem clamp(1.25rem, 4vw, 3rem) 3.5rem; }
 
 .pageHeader {
   display: flex;
@@ -27,33 +21,34 @@
   display: grid;
   grid-template-columns: minmax(0, .9fr) minmax(0, 1fr);
   align-items: center;
-  gap: 32px;
+  gap: 40px;
   padding: 28px;
   border: 1px solid var(--color-paper-edge);
-  border-radius: 32px;
+  border-radius: 12px 28px 28px 12px;
   background: var(--color-surface-raised);
-  box-shadow: 0 12px 36px rgb(47 91 105 / 12%);
+  box-shadow: 4px 5px 0 var(--color-paper), 5px 6px 0 var(--color-paper-edge), 12px 22px 36px color-mix(in srgb, var(--color-book-cover) 9%, transparent);
 }
 
 .welcome { min-width: 0; padding: 4px 8px; }
-.title { color: var(--color-ink); font-size: clamp(32px, 3.4vw, 44px); font-weight: 850; line-height: 1.22; letter-spacing: -.025em; }
-.title em { color: var(--color-accent-a-strong); font-style: normal; }
+.title { color: var(--color-ink); font-size: clamp(32px, 3.4vw, 44px); font-weight: 850; word-break: keep-all; line-height: 1.22; letter-spacing: -.025em; }
+.title em { color: var(--color-book-cover); font-style: normal; }
 .description { max-width: 310px; margin-top: 16px; color: var(--color-ink); font-size: 16px; line-height: 1.7; word-break: keep-all; }
 
-.companion { margin: 20px 0 4px; }
-.buddy { display: block; width: 202px; max-width: 100%; height: auto; flex-shrink: 0; animation: bookHello 4s ease-in-out; }
+.companion { margin: 8px 0 4px; }
+
 
 .privacy { display: flex; align-items: flex-start; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-paper-line); color: var(--color-ink); font-size: 12px; line-height: 1.75; word-break: keep-all; }
 .privacy > .icon { margin-top: 2px; color: var(--color-book-cover); }
 .privacyTitle { margin-bottom: 4px; font-weight: 750; }
 
-.capturePanel { min-width: 0; padding: 18px; border-radius: 24px; background: var(--color-accent-a-soft); }
+.capturePanel { min-width: 0; padding: 20px; border: 1px solid var(--color-paper-edge); border-radius: 20px; background: color-mix(in srgb, var(--color-accent-a-soft) 65%, var(--color-paper)); perspective: 900px; }
 .panelHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; color: var(--color-book-cover); }
 .panelHeader h2 { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 800; }
 .panelHeader h2 > .icon { width: 19px; height: 19px; }
 .photoCount { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; background: var(--color-surface-raised); color: var(--color-book-cover); font-size: 11px; font-weight: 750; }
 
-.photoMat { max-width: 284px; margin-inline: auto; padding: 10px 10px 0; border-radius: 22px; background: var(--color-surface-raised); box-shadow: 0 5px 16px rgb(47 91 105 / 8%); }
+.photoMat { max-width: 284px; margin-inline: auto; padding: 10px 10px 0; border-radius: 22px; background: var(--color-surface-raised); box-shadow: 2px 3px 0 var(--color-paper-edge), 8px 15px 24px color-mix(in srgb, var(--color-book-cover) 14%, transparent); transform: rotate(-3deg) rotateY(-6deg); transition: transform 300ms ease-out; }
+.capturePanel[data-state="camera"] .photoMat, .capturePanel[data-state="ready"] .photoMat { transform: none; }
 .viewfinder { position: relative; aspect-ratio: 1; width: 100%; overflow: hidden; border-radius: 15px; background: var(--color-accent-a-soft); }
 .photo, .video { width: 100%; height: 100%; object-fit: cover; }
 .video { transform: scaleX(-1); }
@@ -74,35 +69,25 @@
 .alternatives { display: flex; gap: 10px; }
 .choosePhoto { flex: 1; gap: 8px; }
 .error { margin-bottom: 12px; padding: 12px; border-radius: 12px; color: var(--color-danger-strong); background: var(--color-danger-soft); font-size: 13px; line-height: 1.65; word-break: keep-all; }
-.busySpark { animation: makingMagic 1.5s ease-in-out infinite; }
+.busySpark { color: var(--color-gold); }
 
-.resultCard { width: 100%; max-width: 640px; margin-inline: auto; padding: 28px; border-color: var(--color-paper-edge); border-radius: 32px; box-shadow: 0 12px 36px rgb(47 91 105 / 12%); }
-.resultBuddy { width: 146px; }
+.resultCard { width: 100%; max-width: 640px; margin-inline: auto; padding: 28px; border-color: var(--color-paper-edge); border-radius: 12px 28px 28px 12px; box-shadow: 8px 16px 32px color-mix(in srgb, var(--color-book-cover) 10%, transparent); }
+.resultBuddy { display: grid; place-items: center; zoom: .75; }
 .resultError { max-width: 640px; margin: 16px auto 0; }
-
-@keyframes bookHello {
-  0%, 100% { transform: translateY(0) rotate(-2deg); }
-  50% { transform: translateY(-6px) rotate(1deg); }
-}
-
-@keyframes makingMagic {
-  0%, 100% { transform: scale(.9); }
-  50% { transform: scale(1.15); }
-}
 
 @media (min-width: 1200px) {
   .studio { gap: 48px; padding: 32px 40px; }
 }
 
 @media (max-width: 767px) {
-  .page { padding: 8px 16px 28px; }
+  .page > div:last-child { padding: 8px 16px 32px; }
   .pageLabel { font-size: 11px; }
   .studio { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px 16px 16px; border-radius: 26px; }
   .welcome { position: relative; padding: 0 4px; }
-  .title { padding-right: 70px; font-size: 28px; }
+  .title { padding-right: 112px; font-size: 28px; }
   .description { margin-top: 8px; font-size: 14px; line-height: 1.5; }
-  .companion { position: absolute; top: 0; right: -7px; margin: 0; }
-  .companion .buddy { width: 92px; }
+  .companion { position: absolute; top: -14px; right: -9px; margin: 0; }
+  .companion > div { zoom: .5; }
   .privacy { gap: 8px; margin-top: 12px; padding-top: 10px; font-size: 11px; }
   .privacy > .icon { width: 19px; height: 19px; }
   .capturePanel { padding: 14px; border-radius: 20px; }
@@ -116,5 +101,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .buddy, .busySpark { animation: none; }
+  .photoMat { transition: none; transform: none; }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .capturePanel[data-state="idle"]:hover .photoMat { transform: rotate(-1deg) rotateY(-2deg) translateY(-3px); }
+}
+
+@media (max-width: 359px) {
+  .title { padding-right: 84px; font-size: 26px; }
+  .companion { top: 0; }
+  .companion > div { zoom: .36; }
 }

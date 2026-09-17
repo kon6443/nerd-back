@@ -11,9 +11,7 @@ type Tone = "neutral" | "accentA" | "accentB";
 /**
  * 카드의 R·padding 조합. **안에 둥근 요소(버튼·썸네일)가 모서리 가까이 붙는 카드는 `snug`** 를 쓴다.
  *
- * ⭐ 중첩 R 규칙: **안쪽 R = 바깥 R − padding.** `default`(R 16 · padding 20)는 안쪽이 음수라 동심원이
- * 성립하지 않는다 — 그런 카드에 둥근 버튼을 넣으면 카드와 버튼 R 이 같아 보여 어색했다(2026-09-14 지적).
- * `snug`(R 24 · padding 16)는 안쪽 8px 로 딱 떨어진다.
+ * 안쪽 모서리는 바깥 R에서 padding을 뺀다. `snug`는 R 24 · padding 16으로 안쪽 8px를 만든다.
  * 🚫 padding 을 `className` 으로 덧대지 않는다 — 규칙이 깨진다. 모양은 `inset` 으로 고른다.
  */
 type Inset = "default" | "snug";
@@ -25,7 +23,7 @@ const insetStyles: Record<Inset, string> = {
 
 /**
  * 카드 **안쪽** 둥근 요소(썸네일 등)의 R.
- * ⚠️ `snug` 카드 안에서만 쓴다 — `default` 에서는 계산값이 음수라 0 으로 떨어진다.
+ * 카드의 실제 토큰과 padding을 따라 함께 줄어든다.
  */
 export const CARD_NESTED_RADIUS = "rounded-[calc(var(--card-radius)-var(--card-padding))]";
 
@@ -51,7 +49,7 @@ export interface CardProps {
 export function Card({ tone = "neutral", inset = "default", className = "", children }: CardProps) {
   return (
     <div
-      className={`rounded-(--card-radius) border-2 p-(--card-padding) shadow-sm ${insetStyles[inset]} ${toneStyles[tone]} ${className}`}
+      className={`rounded-(--card-radius) border p-(--card-padding) shadow-sm ${insetStyles[inset]} ${toneStyles[tone]} ${className}`}
     >
       {children}
     </div>
