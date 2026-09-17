@@ -23,16 +23,17 @@
 **Acceptance criteria:** 공용 기능이 특정 라우트 파일에 의존하지 않으며 기존 캐시/소유권/서명/취소 테스트가 유지된다. 3D 리뷰에서 확인한 자원 공유·해제 경로 보존.
 **Verification:** 이동한 기존 preload 6개 테스트와 공개 목록/소유권·API signal·S3 서명/서비스 테스트. frontend/backend ci:all 및 foreground lint·git diff --check.
 
-### Task 2: main 통합·PR 게시 (진행 중)
+### Task 2: main 통합·PR 게시
 
 **Files:** 검증된 현재 변경 및 tasks/todo.md. Git feature branch와 원격 main.
 **Interfaces:** origin/main fetch/merge 후 feature push, PR base=main. 본문은 최종 3D·표지 로딩 동작과 리팩토링·검증·제한을 기술한다.
-- [ ] 최신 main과 통합하고 검증된 변경을 commit/push하여 PR과 원격 상태를 확인한다.
+- [x] 최신 main과 통합하고 검증된 변경을 commit/push하여 PR과 원격 상태를 확인했다.
 **Acceptance criteria:** 승인된 변경만 포함·secrets 미포함, main 충돌 없음, PR head SHA와 로컬/원격 일치. 실제 브라우저 preload 및 진입 회귀 유지, 개발 서버 유지.
 **Verification:** main ancestor/diff·staged paths/content 확인, 필요한 통합 검사 및 실제 브라우저 회귀, gh pr view/checks. PR URL과 CI 상태 보고.
 
 ## Refactor and PR verification — 2026-09-17
 
+- PR #61: https://github.com/kon6443/nerd-back/pull/61 (base=main). 소스 커밋 9292604·5dce477 게시 후 로컬·원격·PR head SHA 일치와 MERGEABLE을 확인했다. 게시 시 GitHub frontend/backend CI는 진행 중이며 최종 상태는 PR에서 확인한다.
 - preload의 기존 구현이 이동 후에도 원문과 동일함을 비교했고, 홈/목록/상세 3개 호출자를 공용 lib로 연결했다. 사용자별 썸네일 상태는 서재에 남겼다. 3D geometry/material 공유와 InstancedMesh·context dispose, 새 빛가루의 취소 원복 및 중복 progress 갱신 방지 경로를 검토했다.
 - 최신 origin/main fetch 결과 15ef3d3으로 기준과 같아 통합 충돌이 없다. feat/storybook-home-and-cover-loading에서 전체 변경을 게시한다.
 - 최종 리팩토링 후 frontend ci:all exit 0: 20 files/126 tests·lint/types/stubs/health-path·build. backend ci:all exit 0: 33 suites/315 unit tests·9 suites/66 E2E·lint/types/stubs·build. 양쪽 foreground npm run lint와 git diff --check exit 0. 원격 CI와 별개인 로컬 결과다.
