@@ -29,6 +29,9 @@ export function createBookModel(palette: BookPalette) {
   const water = material(color(palette.sky, palette.paper, 0.65));
   const pathMaterial = material(color(palette.edge, palette.gold, 0.12));
   const sphere = new THREE.SphereGeometry(1, 16, 12);
+  const trunk = new THREE.CylinderGeometry(0.04, 0.065, 0.6, 8);
+  // 이 모델 안에서만 공유한다. 이탈 시 book-world의 geometry Set이 한 번씩 해제한다.
+  const roundedBoxes = new Map<string, RoundedBoxGeometry>();
 
   function mesh(parent: THREE.Group, geometry: THREE.BufferGeometry, surface: THREE.Material, x: number, y: number, z: number) {
     const object = new THREE.Mesh(geometry, surface);
@@ -40,7 +43,13 @@ export function createBookModel(palette: BookPalette) {
   }
 
   function box(parent: THREE.Group, width: number, height: number, depth: number, surface: THREE.Material, x: number, y: number, z: number, radius = 0.05) {
-    return mesh(parent, new RoundedBoxGeometry(width, height, depth, 2, radius), surface, x, y, z);
+    const key = `${width},${height},${depth},${radius}`;
+    let geometry = roundedBoxes.get(key);
+    if (!geometry) {
+      geometry = new RoundedBoxGeometry(width, height, depth, 2, radius);
+      roundedBoxes.set(key, geometry);
+    }
+    return mesh(parent, geometry, surface, x, y, z);
   }
 
   function ball(parent: THREE.Group, surface: THREE.Material, x: number, y: number, z: number, sx: number, sy = sx, sz = sx) {
@@ -141,7 +150,7 @@ export function createBookModel(palette: BookPalette) {
     group.scale.setScalar(size);
     book.add(group);
     ball(group, foliage, 0, 0.005, 0, 0.18, 0.025, 0.16);
-    mesh(group, new THREE.CylinderGeometry(0.04, 0.065, 0.6, 8), bark, 0, 0.3, 0);
+    mesh(group, trunk, bark, 0, 0.3, 0);
     const leaves = light ? foliageLight : foliage;
     ball(group, leaves, 0, 0.76, 0, 0.28, 0.42, 0.28);
     ball(group, leaves, -0.17, 0.62, 0.02, 0.22, 0.27, 0.21);

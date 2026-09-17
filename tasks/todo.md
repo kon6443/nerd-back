@@ -1,3 +1,69 @@
+# PR #58 초기 3D 비용·썸네일 캐시 개선 Implementation Plan — 2026-09-17
+
+> **For implementers:** 승인된 두 성능 개선을 구현하고 회귀 검증을 완료한다.
+
+**Goal:** 기존 3D 화면과 진입 연출을 유지하면서 초기 준비 비용을 줄이고 썸네일 프리로드 기록의 무제한 누적을 막는다.
+**Architecture:** 모델 생성 한 번 안에서 동일 규격의 RoundedBoxGeometry와 나무 기둥 geometry를 공유한다. production에서 Three의 동기 shader 진단 조회를 비활성화하고 개발 중 검사는 유지한다. 기존 renderer의 소유권과 dispose를 유지한다. 프리로드 기록은 최근 사용 순서의 최대 128개 Map으로 제한하고 요청별 token으로 이전 실패와 새 요청을 구별한다.
+**Tech Stack:** Next.js 16.3.3, React 19.2.8, Three 0.186.0, Vitest, pnpm 10.26.2. 새 의존성 없음.
+**Spec:** 사용자 요청 — PR 메모리·성능 검토에서 확인한 초기 3D 준비 비용과 기존 썸네일 URL 캐시 누적을 개선한다.
+
+## Global Constraints
+
+- 홈의 즉시 3D 로딩·스크롤 없는 버튼 진입·책 디테일·그림자·WebGL fallback·reduced motion·이탈 cleanup을 보존한다.
+- 캐시 상한은 URL 재요청 방지 기록에만 적용한다. 로그인 소유자 검사와 실제 썸네일 URL 선택을 변경하지 않는다.
+- 변경 범위: 아래 frontend 파일, 해당 회귀 테스트, 기존 tasks/todo.md. API·DB·인증·패키지 변경 없음.
+- 기존 개발 서버 5502/5501 유지. 측정용 production 서버와 브라우저만 별도로 실행·종료한다.
+
+### Task 1: 초기 3D 준비 비용 감소
+
+**Files:** Modify apps/front/app/book-model.ts, apps/front/app/book-world.ts. Test: 기존 book-camera.test.ts와 실제 production 브라우저.
+**Interfaces:** createBookModel(palette)는 기존 THREE.Group과 같은 메시·재질·변환을 제공한다. createBookWorld의 render/dispose 계약과 HomeWorld의 lifecycle은 유지한다. 비동기 준비 상태나 추가 timer를 도입하지 않는다.
+- [x] 동일 RoundedBox 규격·나무 기둥을 모델 내부에서 공유하고 production의 동기 shader 진단 조회를 줄였다.
+**Acceptance criteria:** 동일 화면의 도형·재질·카메라 및 기존 버튼 이동을 보존한다. 같은 CPU 4배 감속 조건에서 초기 긴 작업/준비 시간 또는 GPU 업로드의 실측 개선이 있고 새 반복 작업·자원 누적이 없다.
+**Verification:** 수정 전후 동일 production Chrome에서 반복 측정; 초기 화면 캡처, 진입/취소/reduced motion/context 복구, 20회 이상 왕복 후 canvas·context·RAF·observer와 heap 확인.
+
+### Task 2: 썸네일 프리로드 기록 상한
+
+**Files:** Modify apps/front/app/(demo)/library/libraryStories.ts, apps/front/app/(demo)/library/libraryStories.test.ts.
+**Interfaces:** preloadThumbnailImage(url: string | null | undefined): void 유지. 최대 128개 최근 URL 기록과 요청별 token. getCachedThumbnailUrls/getOwnedThumbnailUrl/setCachedThumbnailUrls 계약 유지.
+- [x] 중복 요청·최근 사용 유지·상한 초과 축출·decode 실패 후 재시도·오래된 실패의 재요청 보호를 테스트로 확인하고 구현했다.
+**Acceptance criteria:** 빈 URL·서버 실행은 프리로드하지 않으며 같은 URL 중복을 막는다. 129번째 URL부터 오래된 기록을 제거한다. 실패한 현재 요청은 재시도할 수 있고 축출 전 요청의 늦은 실패는 새 요청에 영향이 없다.
+**Verification:** 새 Vitest 테스트가 기존 구현에서 상한/경합 조건에 실패한 뒤 수정 후 통과. 기존 소유자·썸네일 선택 테스트 유지.
+
+### Task 3: 통합 검증 및 기존 PR 상태 확인
+
+**Files:** 위 frontend 파일 및 tasks/todo.md.
+**Interfaces:** npx --yes pnpm@10.26.2 front ci:all, git diff --check, production QA, 기존 feature branch와 PR #58.
+- [x] frontend ci:all·브라우저 회귀 검사·diff review를 완료하고 검증 결과를 기록했다.
+- [x] PR #58이 이미 MERGED임을 확인했다. 최신 origin/main cc74b53에서 feat/front-startup-cache-optimization 브랜치를 만들고 로컬 후속 수정으로 보존했다.
+**Acceptance criteria:** lint·types·tests·stubs·health-path·build 통과. 초기 비용 감소/캐시 상한/이탈 해제 각각의 근거 제공. secrets·임시 QA 파일은 포함하지 않는다. PR이 이미 병합됐다면 이를 보고하고 기존 PR에 후속 변경을 push하지 않는다.
+**Verification:** foreground ci:all exit 0, git diff --check, 직접 화면 확인, 변경 파일 목록 및 gh pr view의 MERGED 상태 확인.
+
+
+### Task 4: 새 PR 게시 — 2026-09-17
+
+**Files:** 위 4개 frontend 파일과 tasks/todo.md.
+**Interfaces:** feat/front-startup-cache-optimization → main, GitHub CLI PR 생성·조회, 기존 CLI credential helper를 통한 HTTPS push.
+- [x] 변경 파일 5개와 최신 main 일치(HEAD...origin/main 0/0), 중복 PR 없음, foreground ci:all exit 0을 확인했다.
+- [x] frontend 변경 4개를 40f3662로 커밋하고 후속 원격 브랜치에 push했다.
+- [x] 새 PR #59를 main 대상으로 생성했다. head 40f3662와 변경 파일 4개를 확인했고 MERGEABLE이다. 생성 시점 CI(front)는 실행 중이며 로컬 검증 통과와 구분한다.
+**Acceptance criteria:** 사용자 요청에 따라 PR URL을 제공하며 실제 변경 범위와 검증 근거를 본문에 기록한다. main에 직접 push하거나 PR을 병합하지 않는다.
+**Verification:** git diff --cached --check/stat, 원격 head 일치, gh pr view의 base/head/files/mergeable/statusCheckRollup. 기존 통과한 frontend ci:all과 브라우저 검증은 소스가 변경되지 않은 범위에서 재사용한다.
+
+## Verification Story — 초기 준비·캐시
+
+- 원인 확인: CPU 4배 감속 production 프로파일에서 RoundedBox 생성과 UV 계산의 반복, 첫 shader 사용의 getProgramInfoLog 동기 대기가 기여했다. 같은 규격 geometry를 매번 만들고 production에서도 개발 진단을 수행하던 경로를 변경했다. shader 컴파일 자체를 제거한 것은 아니며 초기 긴 작업은 일부 남는다.
+- 모델 표현 보존: 객체 121개·렌더링 정점 52,925개 유지. 정점/normal/UV/index·재질·instance 변환·객체 변환 digest가 전후 동일(bcdc54ed...). 실제 1440×900, 390×844(DPR 3) 캡처도 전후 SHA256이 동일하다.
+- 자원/성능: 고유 geometry 96→58, 고유 정점 51,316→26,444. 실제 bufferData 325→200회(약 38% 감소). 같은 Chrome/M2 Pro에서 CPU 4배 감속·5회 측정의 ready 시간 중앙값 240.6→208.4ms(약 13% 감소). 첫 측정의 변동이 있으며 실제 저사양 기기 측정은 아니다.
+- 캐시: 추가한 6개 사례 중 기존 구현의 상한·최근 접근·축출 후 재요청 3개가 실패함을 확인한 뒤 수정했다. 11개 libraryStories 테스트 모두 통과. 브라우저에서 실제 Image.decode를 사용한 129개 URL→중복 접근→축출 URL 재접근 검사도 생성/디코딩 130개로 통과했다.
+- 메모리: production 20회 홈↔서재 왕복 후 매번 canvas/활성 WebGL context/예약 RAF/ResizeObserver 0개. DOM listener 319개 일정. 이탈 후 heap snapshot에 WebGLRenderer·Scene·카메라 누적 없음; Three 공용 Mesh/BufferGeometry와 브라우저 WebGL prototype은 각각 1개로 기존과 같다. 유휴 draw 0회.
+- 기능: WebGL 손실/복구 3회, Escape 취소, reduced motion 이동, 데스크톱과 CPU 감속 모바일 크기의 버튼 진입 모두 통과. runtime exception 0. 진입 중 long task 0, frame interval P95 약 16.7~16.8ms.
+- 프로젝트 검증: npx --yes pnpm@10.26.2 front ci:all exit 0 — contracts lint/build, frontend lint·types·stubs·health-path·18 files/121 tests·production build. git diff --check 통과.
+- PR: https://github.com/kon6443/nerd-back/pull/59 — 후속 성능·캐시 개선. 게시 전 최신 origin/main과 일치(0/0)했으며, 코드·테스트 4개 파일과 이 검증 기록만 포함한다. 로컬 branch는 origin/feat/front-startup-cache-optimization을 추적한다.
+- 근거: /tmp/nerd-pr58-bench-{before,after}.json, /tmp/nerd-book-model-{before,after}.json, /tmp/nerd-pr58-memory-after.json, /tmp/nerd-pr58-heap-after-20.heapsnapshot, /tmp/nerd-pr58-performance-after.json. QA 자료·env는 저장소 변경에 포함하지 않는다.
+
+---
+
 # 3D 동화 화면 최신 main 통합 및 PR Implementation Plan — 2026-09-17
 
 > **For implementers:** 사용자 요청에 따라 충돌을 해결하고 검증 후 커밋·푸시·PR 생성을 완료한다.
