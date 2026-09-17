@@ -1,3 +1,416 @@
+# 3D 동화 화면 최신 main 통합 및 PR Implementation Plan — 2026-09-17
+
+> **For implementers:** 사용자 요청에 따라 충돌을 해결하고 검증 후 커밋·푸시·PR 생성을 완료한다.
+
+**Goal:** 현재 홈·서재·로그인·동화 소개 개선을 최신 origin/main과 통합하여 검토 가능한 PR을 만든다.
+**Architecture:** 현재 변경을 별도 feature branch에 보존한 뒤 origin/main을 merge한다. 겹치는 프론트 파일은 main의 썸네일/캐시/오류 처리/로그인 이동 기능과 이번 입체 표현을 모두 유지한다.
+**Tech Stack:** Git·GitHub CLI·기존 pnpm frontend ci:all.
+**Spec:** 사용자 요청 — main과 충돌 있으면 해결하고 PR 생성.
+
+## Global Constraints
+
+- 기존 작업을 누락하거나 main의 최근 기능을 되돌리지 않는다. 강제 push·main push·PR merge·배포 없음.
+- 기존 3D 홈과 메모리 정리·시각 검증 결과를 보존한다. secrets·env·임시 QA 자료는 staging하지 않는다.
+- 실제 계정 생성·동화 제작·DB 변경 없이 통합 결과를 검증한다.
+
+### Task 1: 최신 main 통합
+
+**Files:** 현재 변경된 apps/front 파일과 tasks/todo.md, origin/main과 겹치는 UI 파일.
+**Interfaces:** feature branch feat/front-immersive-story-world, origin/main merge. StoryCard/StoryDetailArtwork/LibraryStoryList의 최신 interfaces 확인 후 표현 계층 연결.
+- [x] 현재 작업을 feature branch에 보존하고 충돌 7개를 기능 단위로 해결했다.
+**Acceptance criteria:** origin/main이 PR 브랜치의 조상이며 충돌 마커가 없다. 최신 썸네일·캐시·로그인/오류 처리와 3D 표현을 함께 보존한다.
+**Verification:** merge 결과·변경 파일 diff·호출자 추적·frontend ci:all·실제 홈/서재/소개/로그인 흐름 확인.
+
+### Task 2: 검증 및 PR 생성
+
+**Files:** 위 통합 파일 및 tasks/todo.md.
+**Interfaces:** frontend ci:all, git diff --check, GitHub PR base main.
+- [x] 로컬 검증 후 feature branch를 push하고 PR #58 생성·main MERGEABLE·원격 CI 실행 상태를 확인했다.
+**Acceptance criteria:** 로컬 프로젝트 검사 통과, PR URL 제공, main과 병합 가능 여부와 CI 상태를 사실대로 보고한다.
+**Verification:** staged paths·diff check·커밋, origin/main 최신 여부 재확인, gh pr view/checks 및 remote branch SHA 확인.
+
+## Integration verification — 최신 main
+
+- PR: https://github.com/kon6443/nerd-back/pull/58 (base main, head feat/front-immersive-story-world). 게시 직전 main 재조회 후 ancestor 검사를 통과했고 GitHub는 MERGEABLE로 판정했다. 게시 시점 CI (front/back)는 실행 중이며 로컬 ci:all 통과와 구분한다.
+- 기본 SSH 인증의 계정과 CLI 계정이 달라 첫 push는 권한 거부됐다. CLI 계정의 저장소 push 권한을 확인한 뒤, 전역 설정을 바꾸지 않고 기존 CLI credential helper와 명시적 HTTPS 주소로 push했다.
+
+- origin/main 4f53e84의 추가 11개 커밋을 통합했다. LibraryShell/count skeleton, LibraryStoryList/사용자 캐시, mode=create 링크·단일 CTA, StoryDetailArtwork/소유자 검사·우선 로딩, 로그인 안전한 redirect·오류 details를 유지했다.
+- 가입 오류 details의 ul을 포함하는 컨테이너를 p에서 div로 변경해 HTML 구조를 바로잡았다. StoryDetailShell은 완료 후 모드를 보존한 복귀 링크를 제공하고, 모드를 아직 모르는 loading은 같은 높이의 비활성 자리만 둔다.
+- frozen-lockfile 설치와 contracts prepare 빌드 후 frontend ci:all exit 0: 18 test files / 115 tests, lint·types·stubs·health-path·build. 최종 foreground npm run lint exit 0.
+- Chromium 1440×900/390×844에서 실제 동화 데이터를 사용하는 서재·일반 소개·제작 소개·로그인 8개 조합의 크림 배경·canvas 0·overflow 0 및 모드별 CTA/복귀 경로를 확인했다. 홈 두 CTA의 진입 후 이동도 확인했다.
+- 브라우저 fetch fixture로 가입 오류 details 1회 표시, 제작 모드의 개인화 썸네일과 완성 세션 링크, 계정 전환 후 이전 썸네일 제거를 확인했다. 실제 auth/세션 쓰기는 차단했다. StoryDetailArtwork의 추가 세션 요청은 0회였다.
+- QA helper는 최초 오류 envelope를 계약과 다르게 만들어 details 검증에 실패했다. 계약의 code/message/timestamp/details 형태로 고친 뒤 통과했다. 이후 요청 수를 production 기준으로 가정한 assertion이 실패하여 호출 스택을 확인했다: LibraryStoryList와 StorySessionActions 각각 개발 Strict Mode의 effect 재실행으로 2회였고 StoryDetailArtwork 요청은 0회. 제품 코드를 우회하거나 재시도 설정을 바꾸지 않았다.
+- 자료: /tmp/nerd-pr-integration-report.json, /tmp/nerd-pr-{library,detail}-{1440,390}.png, /tmp/nerd-pr-personalized-1440.png. 인증·이미지는 격리된 fixture이며 실제 모바일/Safari 실기 검증은 미수행.
+- main 통합 직후 로컬 backend가 이전 contracts/dist 타입을 참조해 TS 오류를 냈으나 frozen install의 prepare 빌드 후 0 errors로 시작했다. 검증용 backend는 프로세스 환경에서 Discord webhook을 비워 외부 알림을 전송하지 않도록 실행했다. .env는 변경하지 않았다.
+
+---
+
+# 동화 소개 화면의 입체 서재 연결 Implementation Plan — 2026-09-17
+
+> **For implementers:** 기존 실행 정책에 따라 아래 체크리스트를 완료한다.
+
+**Goal:** /library/jack-and-beanstalk를 포함한 /library/[slug] 소개 화면을 홈·서재의 크림 배경과 입체 책 재질에 맞춘다.
+**Architecture:** 기존 StoryRoom을 재사용하는 StoryDetailShell로 상세와 로딩의 배경·패널을 공유한다. 기존 library 카드 표지를 StoryCover로 추출하여 상세에도 적용한다. 버튼은 선택적 primaryClassName으로 기존 StoryRoom의 파란 CTA를 재사용한다.
+**Tech Stack:** 기존 Next.js·React·CSS Modules·디자인 토큰. 새 의존성 없음.
+**Spec:** 사용자 요청 — /library/jack-and-beanstalk 페이지에 이전 배경이 남아 있으므로 앞서 승인한 홈과 같은 톤을 이어간다.
+
+## Global Constraints
+
+- 대상은 동화 소개·로딩과 이를 위한 기존 표지/버튼의 표현 계층. 실제 리더·촬영·API·인증·세션 처리 로직은 변경하지 않는다.
+- 제목·요약·장수·등장인물·CTA 목적지와 56px 터치 타깃을 보존한다. 소개와 등장인물은 하나의 밝은 패널 안에 둔다.
+- 추가 canvas·RAF·listener 없음. 기존 main 미커밋 작업을 보존한다. 공유 DB 쓰기·동화 생성·커밋·배포 없음.
+- main 개발 서버 5502/5501 유지. 재시작 후 실제 /api/v2/stories는 HTTP 200으로 복구됨.
+
+### Task 1: 소개·로딩 화면의 재질 연결
+
+**Files:** Create apps/front/app/(demo)/library/[slug]/StoryDetailShell.tsx, StoryDetail.module.css; Modify 같은 디렉터리 page.tsx:1, loading.tsx:1; apps/front/components/story/StoryCard.tsx:50, StoryCard.module.css:8, StorySessionActions.tsx:12.
+**Interfaces:** StoryDetailShell({children})은 StoryRoom·서재 복귀 링크·하나의 종이 패널을 제공한다. StoryCover({title,imageUrl?,className?})는 기존 카드의 장식 표지를 공유한다. StorySessionActions({slug,primaryClassName?})은 동작을 유지하며 주 버튼 클래스만 받는다.
+- [x] 소개와 로딩에 같은 배경·패널·입체 책 표지와 파란 CTA를 적용했다.
+**Acceptance criteria:** 초록 언덕 대신 홈과 같은 크림 배경이 표시되고 실제 제목/내용·버튼 경로·등장인물을 유지한다. 로딩도 같은 틀을 사용한다. 서재 카드 표현은 유지한다.
+**Verification:** 실제 API의 두 동화 상세 및 서재를 브라우저로 확인한다. 1440×900·1024×768·390×844에서 overflow 0, CTA 최소 56px, 텍스트 대비·키보드 focus·reduced motion을 검사한다.
+
+### Task 2: 회귀 검증
+
+**Files:** 위 파일과 tasks/todo.md.
+**Interfaces:** frontend ci:all, foreground npm run lint, git diff --check 및 실제 로컬 브라우저.
+- [x] 화면·경로·로딩 검증과 프로젝트 검사를 완료하고 근거를 기록했다.
+**Acceptance criteria:** 기존 테스트·lint·types·build 통과, 해당 소개 화면의 canvas 0, 새 client lifecycle 작업 없음. 서버가 실행 중이며 확인 가능한 주소를 제공한다.
+**Verification:** 묶음 시각 검증 1회와 필요 시 보정 확인 1회, ci:all exit 0, foreground lint exit 0, diff check 및 서버 응답 확인.
+
+## Verification Story — 동화 소개
+
+| 수용 기준 | 검증 결과 |
+|---|---|
+| 배경·소개·표지 | 실제 5502 API 데이터로 잭과 콩나무/빨간 모자 확인. 두 소개 main의 배경 rgb(251,247,236), 기존 제목·요약·장수·등장인물·CTA 경로 유지. 책 표지는 서재와 공유하며 상세에만 세로 비율 적용 |
+| 로딩 연결 | 실제 페이지 스트리밍 중 MutationObserver로 로딩 상태 포착. 로딩/완료의 StoryRoom main과 StoryDetail panel 클래스 동일, 로딩 중 서재 복귀 링크 존재 |
+| 반응형·가독성 | 두 동화 각각 1440×900·1024×768·390×844 가로 overflow 0, 모든 CTA 높이 56px. 요약 대비 5.20:1, 주 버튼 5.05:1. /tmp/nerd-detail-{1440,1024,390}.png를 묶어서 직접 확인. 키보드 Tab의 주 버튼 focus-visible true, reduced motion transition 0.00001s |
+| 실제 이동 | 서재 복귀 → 실제 두 권 목록, 상세 재진입 → /library/jack-and-beanstalk/1, 내 얼굴로 만들기 → /stories/jack-and-beanstalk/capture와 파일 입력 표시 확인. API 쓰기·촬영·생성·세션 삭제 없음 |
+| 성능·검사 | 소개 canvas 0, 추가 hook/RAF/listener 없음. frontend ci:all exit 0 (83 tests·lint·types·stubs·health-path·build), 최종 foreground npm run lint exit 0. 실행 중 브라우저 uncaught exception 0 |
+
+QA 자료: /tmp/nerd-detail-report.json과 /tmp/nerd-detail-check.mjs. 첫 helper의 촬영 목적지 기대값은 로그인으로 잘못 가정하여 실패했다. 실제 capture 소스를 확인해 기대값을 수정했고, 만료된 CDP endpoint도 현재 QA 세션에서 조회하도록 고쳐 미완료 기능 검사만 실행해 exit 0을 확인했다. 제품 동작은 이를 이유로 바꾸지 않았다. 시각 검증은 한 번의 묶음 검사로 완료했고, 실제 모바일 기기/Safari·로그인 사용자 세션 분기는 이번에 실기 테스트하지 않았다. main 개발 서버를 유지하고 전용 QA 브라우저만 종료한다.
+
+---
+
+# 홈에서 이어지는 입체 서재·로그인 Implementation Plan — 2026-09-17
+
+> **For implementers:** 기존 실행 정책을 따르며 아래 항목을 완료한다.
+
+**Goal:** 홈 CTA의 목적지인 서재·로그인에 홈과 같은 종이·청록 표지·금색 포인트와 입체 책 표현을 적용한다.
+**Architecture:** 두 페이지에만 공통 StoryRoom 배경·장식과 CSS Module을 적용한다. 서재는 기존 StoryCard의 library variant를 입체 책 표지로 다듬고 로딩/오류/빈 화면에도 같은 shell을 유지한다. 로그인은 기존 인증 동작을 유지하며 표면·배치만 바꾼다. 입체감은 CSS perspective와 종이 단면으로 표현해 WebGL context·RAF·listener를 추가하지 않는다.
+**Tech Stack:** 기존 Next.js/React/CSS Modules·디자인 토큰. 새 의존성·이미지 다운로드 없음.
+**Spec:** 사용자 요청 — 버튼으로 들어간 페이지도 홈과 비슷한 3D 배경이나 톤앤매너로 맞춘다. 최근 메모리 누수 방지 요구도 유지한다.
+
+## Global Constraints
+
+- 적용 경로는 /library 목록·로딩·오류·빈 화면과 /login 로그인·가입 UI. 리더·촬영·마이페이지·전역 헤더·인증 로직·백엔드는 수정하지 않는다.
+- 실제 제목/요약과 기존 CTA 목적지·로그인/가입 검증·aria·focus·56px 타깃을 보존한다.
+- 전역 초록 배경을 대상 페이지의 불투명 cream 배경으로 덮는다. 새로운 전역 theme나 WebGL canvas를 추가하지 않는다.
+- main의 기존 미커밋 작업 보존. DB 쓰기·실제 가입·동화 생성·커밋·푸시·배포 없음.
+- 현재 /api/v2/stories HTTP 500. 실제 오류 UI를 확인하고 정상/빈/로딩 목록은 격리된 로컬 QA fixture로 명시적으로 검증한다.
+- impeccable context helper는 설치 파일 scripts/lib/target-args.mjs 누락으로 실패했다. 스킬 설치를 변경하지 않고 기존 토큰·코드·실제 화면을 직접 읽어 같은 디자인을 이어간다.
+
+### Task 1: 대상 화면의 공통 입체 재질
+
+**Files:** Create apps/front/components/layout/StoryRoom.tsx, StoryRoom.module.css; Modify apps/front/app/(demo)/library/LibraryShell.tsx, apps/front/app/(trial)/login/page.tsx.
+**Interfaces:** StoryRoom({children, className?})은 불투명 배경의 main과 콘텐츠 틀을 렌더한다. BookStack({className?})은 aria-hidden인 CSS 3D 책 장식이다. 기존 LibraryShell(children)은 성공·로딩·오류가 함께 사용한다.
+- [x] 홈 팔레트·입체 책 장식·로그인 종이 패널을 구현하고 3개 뷰포트에서 확인했다.
+**Acceptance criteria:** 홈 → 서재/로그인에서 색감이 연결되고 폼/목록이 배경에 가려지지 않는다. 모바일에서 장식보다 행동이 먼저 보이고 가로 overflow가 없다.
+**Verification:** 기존 화면과 새 desktop/tablet/mobile 캡처 비교, 실제 홈 CTA 이동, 로그인/가입 전환·빈 입력 검증·키보드 focus. 신규 canvas 0·RAF/JS listener 추가 없음.
+
+### Task 2: 서재의 책 카드와 전체 상태
+
+**Files:** Modify apps/front/components/story/StoryCard.tsx, apps/front/app/(demo)/library/LibraryShell.tsx, page.tsx, error.tsx; Create apps/front/components/story/StoryCard.module.css.
+**Interfaces:** StoryCard의 기존 props와 variant를 보존하고 library에만 입체 cover를 적용한다. STORY_GRID를 실제/로딩이 공유하고 skeleton은 같은 표지 비율·간격을 사용한다.
+- [x] 책 표지·종이 단면·hover/focus 표현과 로딩/빈/오류 상태의 재질을 맞췄다.
+**Acceptance criteria:** 제목/설명/CTA 가독성과 경로 유지, 긴 제목/설명 대응, reduced-motion에서 장식 모션 없음. 목록 수가 달라도 grid 정상.
+**Verification:** 로컬 read-only QA fixture로 정상 3권·긴 제목·빈 목록·지연·500 상태 확인. 390×844·1024×768·1440×900 레이아웃, 색 대비와 focus 확인.
+
+### Task 3: 통합 검증
+
+**Files:** 위 파일과 tasks/todo.md.
+**Interfaces:** frontend ci:all, foreground npm run lint, git diff --check; 개발 서버 5502/5501 유지.
+- [x] 묶음 시각 검증·대비 보정 확인과 프로젝트 검사·활성 자원 회귀 검증을 완료했다.
+**Acceptance criteria:** UI 검사·83개 기존 테스트·lint·types·build 통과. 홈 메모리 cleanup 회귀 없음. fixture QA와 실제 backend의 미검증 상태를 구분해 기록한다.
+**Verification:** desktop/mobile 스크린샷과 실제 폼 상호작용, 홈/서재 왕복 canvas/context 정리, ci:all exit 0·foreground lint exit 0·health 200.
+
+
+## Verification Story — 홈에서 이어지는 입체 서재·로그인
+
+| 수용 기준 | 검증 결과 |
+|---|---|
+| 홈과 이어지는 재질 | 대상 두 페이지의 main 배경이 홈과 같은 rgb(251,247,236). 청록 표지·종이 단면·입체 책 장식·동일한 파란 CTA 적용. 홈 버튼 → 서재에서 책 카드 3개, canvas 0 확인. 실제 5502 서재의 오류 화면에도 같은 cream 배경 적용 확인 |
+| 반응형·긴 내용 | Chromium 1440×900·1024×768·390×844에서 서재와 로그인 모두 가로 overflow 0, 입력/CTA 최소 56px. QA의 긴 제목 표지가 내용 높이만큼 늘어나며 내부 면과 표지 높이가 일치, 설명/버튼 겹침 없음. /tmp/nerd-world-library-{1440,1024,390}.png와 final-login-{1440,390}.png를 열어 확인 |
+| 로그인·가입 | 빈 제출 시 loginId에 focus, 두 필드 aria-invalid와 오류 설명 연결 유지. 가입 전환 시 new-password autocomplete·이전 오류 초기화 확인. 실제 개발 서버에서도 같은 동작과 오류 border rgb(144,105,205) 확인. 실제 계정 생성/로그인 요청은 실행하지 않음 |
+| 전체 목록 상태 | 읽기 전용 로컬 fixture에서 정상 3권·긴 제목·빈 목록·2초 지연·500 상태 확인. 오류의 다시 시도로 정상 목록 복구. 모바일 로딩 전후 titleY 165·listY 315로 동일. 실제 backend 데이터 조회 성공을 의미하지 않음 |
+| 가독성과 동작 | 입력 경계/안쪽 배경 대비 3.56:1, CTA 5.05:1, 폼 안내 5.27:1. focus 표시·aria 오류 유지. reduced-motion에서 표지 transition 0.00001s(기존 전역 접근성 규칙). 브라우저 uncaught exception 0 |
+| 메모리·성능 | 신규 배경은 서버 렌더 가능한 CSS/SVG만 사용, canvas·RAF·JS listener 추가 없음. 기존 홈에서 서재로 3회 왕복 후 canvas·활성 context·ResizeObserver·예약 RAF 0, 전역/미디어/홈 리스너 149로 일정, 매회 GPU 자원 532개 해제. 기존 홈의 정지 500ms draw 0. /tmp/nerd-world-memory.json |
+| 프로젝트 검사 | frontend ci:all exit 0: 83 tests·lint·types·stubs·health-path·build. 이후 CSS 대비 보정은 최종 npm run build와 foreground npm run lint exit 0 및 최종 브라우저 검사로 확인. git diff --check 통과 |
+| 실제 서버 상태 | main의 5502 홈·health 및 5501 health HTTP 200. `/api/v2/stories`는 직접 GET에서도 HTTP 500이 지속되어 실제 서재 목록 표시 성공은 미검증. 원인은 이번 UI 작업에서 변경/확정하지 않음 |
+
+검증은 두 번의 시각 확인(초기 묶음, 대비 보정 확인)으로 마쳤다. 테스트 fixture(5601), 임시 production frontend(5602), API proxy(5603)는 /tmp에서만 실행했고 공유 DB를 읽거나 쓰지 않는다. 임시 프로세스/QA 브라우저를 종료하고 main 개발 서버는 유지한다. 리더·촬영·마이페이지·전역 헤더·인증 로직·백엔드 변경 없음. 실제 모바일 기기/Safari는 미검증이다.
+
+재현 자료: /tmp/nerd-world-final-check.mjs 및 nerd-world-final-report.json, nerd-world-main-report.json. 전체 검사 로그 /tmp/nerd-world-ci.log, 최종 빌드 /tmp/nerd-world-final-build.log. QA helper의 DOM 객체 직렬화·CSS Module 이름 추측 오류는 boolean 조건과 의미 속성으로 바꿔 해결했고, 개발 서버 폼 검사는 SSR DOM 출현 대신 실제 모드 전환 완료를 확인한 뒤 수행했다. 실패한 helper 실행은 성공 증거에 포함하지 않았다. 커밋·푸시·배포하지 않았다.
+
+---
+
+# 스크롤 없는 3D 홈과 진입 최적화 Implementation Plan — 2026-09-16
+
+> **For implementers:** 기존 실행 정책과 아래 체크리스트를 따른다.
+
+**Goal:** 홈에서 이미지가 먼저 보이는 현상과 스크롤 여행을 제거하고 버튼 클릭으로만 책 속으로 진입해 다음 페이지까지 자연스럽게 연결한다.
+**Architecture:** 홈을 단일 화면으로 단순화한다. Three.js를 홈 client bundle에서 미리 가져와 layout effect에서 첫 화면을 그린다. 카메라는 고정 시작점에서 버튼 진입 경로만 계산하고, 가능한 브라우저에서는 View Transition으로 목적지 화면을 연결한다.
+**Tech Stack:** 기존 React/Next.js/Three.js/CSS Module, 지원 여부를 확인하는 native View Transition. 새 의존성 없음.
+**Spec:** 사용자 최신 요청 — 새로고침 이미지 선노출 제거, 스크롤 제거, 버튼 진입 체감, 최적화.
+
+## Global Constraints
+
+- 홈 코드와 사용하지 않는 홈 전용 자산/계산 코드만 정리한다. 공통 헤더·서재·인증·백엔드는 변경하지 않는다.
+- 일반 desktop/tablet/mobile에서 화면 한 장으로 보이며 가로/세로 여행 스크롤이 없다. 확대/작은 가로 화면에서는 접근성을 위해 콘텐츠 넘침을 허용한다.
+- 초기 이미지 3장·스크롤 listeners·장면 상태/DOM 갱신을 제거한다. 3D 준비 중 다른 책 이미지를 표시하지 않는다. WebGL 실패 시에만 대체 이미지 1장을 요청한다.
+- reduced-motion에서도 정지된 실제 3D를 보여 주되 클릭 연출은 생략한다. 새 탭·기존 목적지·Escape 취소·뒤로 가기를 유지한다.
+- 초기 HTML만으로 WebGL을 그릴 수는 없으므로 지연/실패 상태에서 안내와 CTA가 항상 접근 가능해야 한다. 즉시 표시를 보장한다고 주장하지 않는다.
+
+### Task 1: 한 화면과 초기 3D
+
+**Files:** apps/front/app/HomeWorld.tsx:1, HomeWorld.module.css:1, world-progress.ts와 test 삭제; public/images/home-world 중 village/library 삭제.
+**Interfaces:** HomeWorld는 기존 children CTA를 받는다. loading/ready/fallback 상태만 관리하며 첫 성공 렌더 후 canvas를 표시한다.
+- [x] 단일 화면과 초기 렌더 순서를 구현하고 스크롤/이미지 여행 코드를 제거한다.
+**Acceptance criteria:** 새로고침 중 이미지 선노출 없음, 정상 실행에서 홈 이미지 요청 0건, 일반 3뷰포트에서 세로 여행/장면 메뉴 없음.
+**Verification:** cold/warm reload의 DOM/네트워크/첫 WebGL 시점, 1440×900·1024×768·390×844 화면 및 overflow 확인.
+
+### Task 2: 진입 경로와 GPU 최적화
+
+**Files:** apps/front/app/book-camera.ts:1, book-camera.test.ts:1, book-world.ts:1, book-model.ts:1, HomeWorld.tsx:1, HomeWorld.module.css:1.
+**Interfaces:** bookCamera(entry, aspect)는 책 전체에서 성문 앞 시점으로 이동한다. render는 화면 크기·entry·pointer만 받는다. 반복 sphere는 같은 material끼리 InstancedMesh로 묶는다. navigation 완료는 홈 cleanup과 연결해 native View Transition이 새 화면을 캡처하게 한다.
+- [x] 클릭 진입 카메라/전환과 반복 메시·렌더 작업을 개선했다. 최종 브라우저 검증은 아래 품질 항목에서 수행한다.
+**Acceptance criteria:** 책 안으로 가까워진 후 화면 전환, 두 CTA 경로 유지·중복 이동 없음. 정지 상태 지속 렌더 0, 반복 메시 draw call 감소, 클릭 프레임의 레이아웃 읽기/쓰기 감소.
+**Verification:** camera endpoints/continuity tests, model draw/triangle 수 전후 비교, live frame/idle instrumentation, 실제 진입·뒤로 가기·모션 설정·WebGL 및 View Transition 미지원 테스트.
+
+### Task 4: 사용자 추가 요청 — 메모리 누수 방지
+
+**Files:** apps/front/app/HomeWorld.tsx:20, book-world.ts:12.
+**Interfaces:** 각 effect가 전용 canvas를 생성·제거한다. dispose는 geometry/material/instance/shadow/renderer/context를 해제하고 scene·호출자 참조를 비운다. 실패 초기화와 늦은 View Transition callback도 같은 소유권 규칙을 따른다.
+- [x] 초기화/해제·Strict Mode·반복 왕복의 자원 정리를 보강하고 실제 누적 여부를 측정했다.
+**Acceptance criteria:** 홈은 canvas/context 1개, 이탈하면 이전 context 해제·canvas 0·홈 RAF 0. 반복 왕복 후 리스너/observer/GPU 및 회수 후 heap이 계속 늘지 않는다.
+**Verification:** Chromium CDP의 반복 SPA 이동·GPU context/삭제 계측·이벤트/RAF 계측·명시적 GC 후 heap 비교. 관측한 반복 횟수와 하드웨어 한계를 보고한다.
+
+**추가 진단:** 배포 빌드에서 16회 왕복 후에도 회수된 heap이 증가했다. Heap snapshot의 강한 참조를 추적해 Three r186의 모듈 공용 `DFG_LUT` DataTexture → dispose listener → renderer 체인이 매 방문마다 남는 것을 확인했다. 공개 onBeforeCompile callback에서 실제 LUT uniform을 받아 renderer 해제 전에 texture.dispose()를 호출하고 동일한 왕복·heap snapshot으로 재검증한다. 라이브러리 내부 필드나 node_modules는 수정하지 않는다.
+
+### Task 3: 최종 품질 검증
+
+**Files:** 위 파일과 tasks/todo.md.
+**Interfaces:** frontend ci:all, foreground lint, diff, 로컬 서버 health 및 브라우저 검증.
+- [x] 최종 화면·초기 로딩·전환·접근성·성능을 검증하고 수치와 제한을 기록했다.
+**Acceptance criteria:** 변경 범위가 홈에 한정되고 모든 기능/검사가 통과한다. 실제 모바일 하드웨어 검증 여부를 명시하고 main 서버를 유지한다.
+**Verification:** frontend ci:all·npm run lint·git diff --check exit 0, frontend/backend health 200, 변경 전후 이미지 요청/코드량/draw call 증거.
+
+
+## Verification Story — 한 화면·버튼 진입·메모리
+
+| 수용 기준 | 최종 증거 |
+|---|---|
+| 첫 이미지 노출 제거 | 배포 빌드의 cache-disabled reload에서 loading → ready 동안 img 0, 홈 이미지 요청 0. 새 탭에서 ready 약 1.11초(현재 로컬 환경); WebGL/JS가 준비되기 전 즉시 3D 표시를 보장하지 않음 |
+| 한 화면 레이아웃 | 1440×900·1024×768·390×844에서 scrollWidth/Height가 viewport와 일치. 두 CTA 모두 높이 56px, 화면 안에 표시. 실제 캡처 시각 확인: /tmp/nerd-home-final-{1440,1024,390}.png |
+| 버튼 진입·목적지 | 클릭 400ms 뒤 홈 entering=true·wash=0인 상태에서 카메라가 책 안으로 접근하는 화면 확인. 이후 /library 이동, canvas 0·transition class 제거. 로그인 표시만 일시 전환해 ‘내 얼굴로 만들기’의 기존 /library 경로와 진입 확인. 실제 인증·서버 데이터는 변경하지 않음 |
+| 취소·대체 동작 | Escape 뒤 1600ms 경과해도 홈 유지, entering=false·wash=0. Ctrl/Meta/Shift/Alt 클릭 미가로채기. reduced-motion은 정지 3D 유지·진입 연출 생략. View Transition API가 없어도 이동. 실제 context loss에서 fallback 이미지 1장과 정상 링크 이동. 최종 reload에서 ready·canvas 1·img 0·브라우저 uncaught exception 0 |
+| 렌더 성능 | 63개 sphere 메시를 material별 4개 InstancedMesh로 묶어 draw call 163 → 104(-36.2%), triangle 65,700 유지, 63개 변환 행렬 오차 1e-5 이내. 정지 500ms 동안 draw 0·예약 RAF 0. 그림자는 필요할 때만 갱신, DPR 상한 1.5 |
+| 자원 해제 | 배포 빌드 16회 왕복 모두 이탈 뒤 canvas·활성 context·ResizeObserver·예약 RAF 0, 전역/미디어/홈 리스너 149로 일정. 매회 GPU 자원 532개 삭제. Strict Mode마다 전용 canvas를 소유해 잃어버린 context 재사용을 방지 |
+| 실제 heap 누수 수정 | 수정 전 6회 왕복으로 WebGLRenderer 17 → 23·PerspectiveCamera 51 → 69. DFG_LUT의 dispose listener가 renderer를 붙잡는 강한 참조 확인. Texture.dispose 추가 후 16회 + 6회 왕복에서는 renderer 수 증가 0, GC heap 15,703,376 → 15,691,360 bytes |
+| 깨끗한 탭 재검증 | 새 배포 빌드 탭에서 8회 준비 + 추가 6회 왕복. 이탈 후 WebGLRenderer·PerspectiveCamera 모두 0개, 모듈 상수 Mesh/BufferGeometry 각 1개로 일정. 추가 6회 전후 GC heap 8,754,512 → 7,915,476 bytes, backing storage 증가 없음. /tmp/nerd-home-memory-clean.json·nerd-heap-clean-scan.log·nerd-heap-before/after.heapsnapshot |
+| 프로젝트 검사 | 마지막 소스 수정 후 frontend ci:all exit 0: 83 tests·lint·types·stubs·health-path·production build. 별도 foreground npm run lint exit 0. git diff --check 통과. main의 5502 홈/health·5501 health 모두 HTTP 200 |
+
+재현 스크립트는 /tmp/nerd-home-qa.mjs(반복 이동/GPU/RAF/listener 계측), /tmp/nerd-heap-scan.mjs(GC와 heap snapshot), /tmp/nerd-home-functional.mjs(뷰포트·CTA·대체 동작)이며 CDP 연결 주소와 localhost origin을 인자로 받는다. 검증 보고서는 /tmp/nerd-home-functional-report.json, 전체 검사 로그는 /tmp/nerd-home-memory-fix-ci.log에 있다. Heap snapshot은 브라우저 내부 데이터를 포함하므로 repo에 넣지 않았다.
+
+**검증 제한:** Chromium 뷰포트 검증이며 실제 모바일 기기/Safari 장시간 사용은 미검증. 백엔드 `/api/v2/stories`는 별도 직접 GET에서도 HTTP 500을 반환했다. 이번 홈 수정으로 인한 것으로 단정하지 않으며, 서재의 정상 데이터 표시는 검증하지 못했다. 경로 이동·에러 화면 도달과 자원 해제는 확인했다. DB/백엔드 수정 없이 main 개발 서버를 유지했다. 임시 배포 QA 서버/브라우저만 종료하고 커밋·푸시·배포하지 않았다.
+
+---
+
+# 버튼으로 동화 속 진입 Implementation Plan — 2026-09-16
+
+> **For implementers:** 기존 실행 정책을 따르고 아래 체크리스트로 진행한다.
+
+**Goal:** 홈 CTA를 누르면 현재 카메라 위치에서 책 속 성문으로 들어간 뒤 기존 목적지로 자연스럽게 전환한다.
+**Architecture:** HomeWorld의 기존 rAF와 Three.js camera를 재사용한다. 홈 CTA 영역의 일반 내부 링크 클릭만 지연하고 밝은 종이색 전환 후 Next router로 이동한다. 공유 AuthCta·ActionLink와 대상 페이지는 수정하지 않는다.
+**Tech Stack:** 기존 Next.js 16.3.3·React 19·Three.js·CSS Module. 새 의존성 없음.
+**Spec:** 사용자 요청 — 동화 체험하기/내 얼굴로 만들기를 누르면 책 안으로 들어간 뒤 페이지 전환.
+
+## Global Constraints
+
+- 홈 전용 파일과 tasks/todo.md만 수정한다. 기존 로그인별 목적지·스크롤 감상·새 탭 열기를 보존한다.
+- 모션 줄이기·낮은 화면·WebGL 미지원에서는 원래 링크로 즉시 이동한다.
+- 중복 클릭으로 중복 이동하지 않는다. Escape로 진입 연출을 취소할 수 있고 화면 이탈 시 rAF/자원을 정리한다.
+- 실제 AI 생성·인증 계약·운영 DB·커밋·푸시·배포는 범위 밖이다.
+
+### Task 1: 진입 카메라
+
+**Files:** apps/front/app/book-camera.ts:9, book-camera.test.ts:4, book-world.ts:5.
+**Interfaces:** bookCamera(progress, aspect, entry = 0)는 기존 위치를 유지하다 entry 0..1에 따라 성문 앞 시점으로 이동한다. BookWorldFrame.entry는 선택적 숫자다.
+- [x] 현재 스크롤 위치를 시작점으로 삼는 진입 카메라와 렌더 입력을 구현한다.
+**Acceptance criteria:** entry 0에서 순간 이동 없음. 모든 스크롤 위치와 화면 비율에서 entry 1은 성문 앞의 동일한 위치·중앙 시야로 수렴한다.
+**Verification:** 시작점 동일성·종점 수렴·경계/비정상 입력·연속 이동 단위 테스트.
+
+### Task 2: CTA 진입과 페이지 전환
+
+**Files:** apps/front/app/HomeWorld.tsx:35, HomeWorld.module.css:1.
+**Interfaces:** CTA capture handler는 같은 origin의 일반 왼쪽 클릭에만 진입을 시작한다. effect의 기존 rAF가 약 1.2초 동안 camera entry·문구 fade·종이색 mask를 갱신한 후 router.push(href)를 한 번 호출한다.
+- [x] 클릭 진입·화면 fade·기존 라우팅·중복 클릭 방지·Escape 취소·접근성 대안을 연결한다.
+**Acceptance criteria:** 체험/로그인 상태별 생성 링크의 목적지 유지. Ctrl/Meta/Shift 클릭과 target/download는 원래 동작. reduced-motion·WebGL 실패에서는 지연 없이 이동.
+**Verification:** 실제 브라우저 시작/중간/끝 위치의 CTA 진입, 모바일, 키보드, 중복 클릭, 취소, 모션 줄이기 및 GPU 미지원 대안 검증.
+
+### Task 3: 최종 검증과 기록
+
+**Files:** 위 파일과 tasks/todo.md.
+**Interfaces:** 기존 프로젝트 frontend 검증 명령·로컬 브라우저/health를 사용한다.
+- [x] 시각 흐름을 확인하고 frontend ci:all·foreground lint·git diff --check·서버 health 결과를 기록한다.
+**Acceptance criteria:** 책 속 진입이 먼저 보이고 목적지 이동이 뒤따른다. 화면 이탈 후 남은 overlay/canvas 없음, 기존 3D 품질 유지.
+**Verification:** 단위/브라우저 증거와 CI exit 0, localhost 5502/5501 health 200. 실제 모바일 하드웨어 미검증 범위를 명시한다.
+
+
+## Verification Story — CTA로 동화 속 진입
+
+| 수용 기준 | 검증 근거 |
+|---|---|
+| 현재 시점에서 성문으로 접근 | book-camera 6 tests 통과. 스크롤 0/0.5/1 및 모바일/데스크톱에서 entry 0은 기존 위치와 동일하고 entry 1은 성문 앞 시점으로 수렴. 연속성·범위 밖 입력 검증 |
+| 연출 뒤 기존 페이지 이동 | 실제 체험 버튼 클릭: 200ms/650ms에는 홈 WebGL 유지, 1050ms 전환 마스크 약 0.84, 약 1256ms에 /library push 1회. 1500ms에 목적지 도착 및 홈 canvas/overlay 0개 |
+| 생성 CTA·중복 방지 | 브라우저의 표시용 data-session을 authenticated로 설정해 내 얼굴로 만들기의 기존 /library href 확인. 두 번 연속 클릭 후 약 1250ms에 push 1회. 실제 인증/서버 데이터는 변경하지 않았고 검사 뒤 새로고침해 표시 상태 복원 |
+| 모바일과 가까운 시점 진입 | 390×844·마지막 스크롤 시점에서 성문으로 접근 후 /library 이동. 가로 넘침 없음. `/tmp/nerd-entry-mobile-flight.png`, 최종 시작 화면 `/tmp/nerd-entry-final-mobile-home.png`. 데스크톱 초기 진입 `/tmp/nerd-entry-motion.png` |
+| 취소·키보드·새 탭 동작 | 키보드 Enter로 시작하고 Escape 취소 후 1300ms 이상 경과해도 홈 유지·push 0·mask 0·원래 CTA focus 유지. Ctrl/Meta/Shift/Alt 클릭 모두 홈 handler가 preventDefault 하지 않는 것을 확인 |
+| 정적 대안·GPU 오류 | reduced-motion=true에서는 image 모드이며 클릭 후 약 31ms에 /library 이동. 실제 WEBGL_lose_context 후 image 모드에서도 약 31ms에 이동. 1.2초 연출 대기 없음 |
+| 복귀·정리 | 실제 뒤로 가기 후 WebGL canvas 1개·entering=false·mask 0. 화면 이탈 후 홈 canvas/overlay 0개. 최종 새로고침 뒤 브라우저 page errors 0 |
+| 프로젝트 검사 | frontend ci:all exit 0: 96 tests·lint·types·stubs·health-path·build. 이후 안내 문구 1문장 수정은 최종 모바일 화면과 foreground npm run lint exit 0으로 확인. git diff --check 통과. 5502 홈/health 및 5501 health 모두 200 |
+
+모바일 검증은 Chromium의 뷰포트 변경이며 실제 기기/Safari 검증은 아니다. QA 스크립트의 최상위 변수 재선언 오류는 IIFE로 범위를 분리해 해결했고, 실패한 캡처는 증거에서 제외했다. 기존 스크롤 감상·로그인 경로를 유지했고 공유 컴포넌트/대상 페이지/백엔드를 변경하지 않았다. main 서버를 계속 실행하며 커밋·푸시·배포하지 않았다.
+
+---
+
+# Three.js 팝업 동화책 Implementation Plan — 2026-09-16
+
+**Goal:** 홈을 실제 입체 책·마을·성으로 구성하고 스크롤 카메라가 그 안으로 들어가게 한다.
+**Architecture:** 홈의 HTML 문구·CTA·스크롤 제어를 재사용한다. 지연 로드한 Three.js 렌더러와 절차적으로 생성한 메시를 별도 모듈로 분리하고 기존 이미지 화면은 그래픽 초기화 실패·모션 줄이기의 대안으로 유지한다.
+**Tech Stack:** 기존 Next.js/React, 사용자가 요청한 three 0.186.0 및 동일 버전 @types/three. 유료 자산·영상과 추가 프레임워크는 사용하지 않는다.
+**Spec:** 사용자 요청 — Three.js로 진짜 3D 목업 느낌, 동화 속으로 들어가는 몰입감.
+
+## Global Constraints
+
+- 홈 및 해당 frontend dependency/lockfile만 변경한다. 전역 헤더·서재·촬영·리더·백엔드·인증 계약은 유지한다.
+- 파랑 CTA·56px 터치·키보드·reduced-motion을 보존한다. 실 GPU가 없는 환경에서도 동화 진입이 가능해야 한다.
+- 카메라/렌더는 기존 rAF 흐름에서 필요할 때만 실행한다. 화면 이탈·늦은 import·context loss에서 GPU 자원을 정리한다.
+- 현재 main 변경을 보존하고 커밋·푸시·배포하지 않는다.
+
+### Task 1: 실제 입체 동화책 모델과 카메라
+
+**Files:** 새 apps/front/app/book-model.ts, book-camera.ts 및 book-camera.test.ts, apps/front/package.json과 pnpm-lock.yaml.
+**Interfaces:** createBookModel()은 Group을 반환한다. bookCamera(progress, aspect)는 카메라 위치·시선·화면 오프셋을 반환한다.
+- [x] 곡면 페이지·책 두께·종이 층·나무·집·다리·성을 실제 geometry와 material로 구성한다.
+**Acceptance criteria:** 카메라 각도가 달라져도 두께·겹침·그림자가 실제 공간을 따르고 책 전체 → 마을 → 성으로 연속 이동한다.
+**Verification:** 카메라 시작/중간/끝·역방향·모바일 프레이밍 tests와 실제 WebGL 화면 확인.
+
+### Task 2: 홈 연결과 자원 수명
+
+**Files:** 새 apps/front/app/book-world.ts, 기존 HomeWorld.tsx·HomeWorld.module.css.
+**Interfaces:** createBookWorld(canvas)의 render(frame)·dispose()를 HomeWorld의 rAF/cleanup에 연결한다. render 성공 시에만 이미지 대신 canvas를 표시한다.
+- [x] 지연 로드·반응형·HTML 안내/버튼·정적 대안·GPU context loss/recovery·해제를 연결한다.
+**Acceptance criteria:** 모바일·키보드 조작 가능, 재진입 중 중복 canvas/RAF 없음, 생성 실패·context loss에서 이미지와 CTA 유지.
+**Verification:** 브라우저 canvas/실제 geometry/스크롤·포인터·3뷰포트·context loss/recovery·화면 이탈 검사.
+
+### Task 4: 사용자 추가 승인 — 목업 디테일 보강
+
+**Files:** book-model.ts, book-world.ts 및 기존 camera/스타일 파일.
+**Interfaces:** 실제 geometry/material을 유지하며 그림자 바닥·책 표지 금박·지붕 곡선·성벽/창문 장식·꽃을 보강한다. 반복 꽃은 InstancedMesh로 묶는다.
+- [x] 가까운 장면에서 드러나는 디테일과 스튜디오 조명을 개선한다.
+**Acceptance criteria:** 책과 건물의 실루엣이 뚜렷하고 종이·표지·식물의 재질을 구분할 수 있다. CTA와 문구를 가리지 않으며 추가 디테일은 모바일 렌더 부담을 제한한다.
+**Verification:** 최종 desktop/tablet/mobile 장면 비교, geometry/draw 수 확인, pointer/scroll 프레임과 최종 frontend ci:all.
+
+### Task 3: 품질 검증과 기록
+
+**Files:** 위 홈 파일, tasks/todo.md.
+- [x] 시각 검토·frontend ci:all·foreground lint·서버 헬스를 확인했다. 추가 요청 구현 후 최종 diff 검사도 통과했다.
+**Acceptance criteria:** 입체 책이 주인공으로 보이며 가로 넘침·문구/버튼 겹침이 없다. 검사 통과, main 서버 계속 실행.
+**Verification:** npx --yes pnpm@10.26.2 front ci:all, frontend npm run lint, git diff --check, 5502/5501 health 200. 실제 모바일 하드웨어 검증 여부는 별도 명시한다.
+
+
+## Verification Story — 실제 3D와 디테일 보강
+
+- Three.js 0.186.0의 실제 geometry로 곡면 페이지·종이 층·표지·마을·성을 구성했다. 창문 프레임·성벽·문손잡이·곡선 지붕·금박 선·꽃을 보강했다.
+- Desktop 1440×900·tablet 1024×768·mobile 390×844에서 시각 확인. 최종 캡처: `/tmp/nerd-three-final-desktop.png`, `/tmp/nerd-three-final-close.png`, `/tmp/nerd-three-final-mobile.png`, `/tmp/nerd-three-roof-fixed.png`. 가로 넘침 없음, 모바일 CTA/장면 버튼 높이 56px 및 화면 내 노출 확인.
+- 실제 WebGL context loss 시 이미지로 전환, restore 시 WebGL·그림자 복구. 초기 WebGL 실패에서도 이미지·CTA 유지. SPA 이탈 후 canvas 0개·이전 context 해제 확인.
+- Tab/Enter로 두 번째·세 번째 장면 이동. 모션 줄이기에서는 canvas 숨김·정적 이미지·3개 제목 모두 접근 가능. 원래 설정으로 복원했고 브라우저 page errors 0건.
+- geometry 유효 좌표 확인, 지붕의 안쪽 법선 0개, 삼각형 65,700개·컬링 전 draw call 163개. 반복 꽃 72개는 2개 InstancedMesh로 처리했다.
+- 로컬 Chromium 1024×768의 90프레임 스크롤 측정: 중앙값 16.7ms·p95 16.8ms. 실제 모바일 기기 성능/Safari는 미검증.
+- frontend ci:all exit 0: 94 tests·lint·types·stubs·health-path·build 통과. 별도 foreground npm run lint exit 0. 5502 홈/health와 5501 health 모두 200. main 서버 유지, 커밋·푸시 없음.
+
+---
+
+# 동화 마을 스크롤 홈 Implementation Plan — 2026-09-15
+
+**Goal:** 홈에서 동화 마을·숲속 도서관·마법의 책을 여행한 뒤 기존 동화 읽기/개인화 흐름으로 들어간다.
+**Architecture:** 홈 전용 스크롤 스테이지와 CSS Module을 둔다. 기존 AuthCta·ActionLink·인증 라우팅을 재사용한다.
+**Tech Stack:** Next.js 16.3.3, React 19, 기존 Tailwind/CSS Module, native scroll와 requestAnimationFrame, 생성 이미지. 유료 영상 없이 승인된 이미지 기반으로 구현한다.
+**Spec:** 사용자 승인 — scroll-world 느낌의 둥근 클레이 동화 마을, 따뜻한 파스텔, 느린 이동, 홈 3~4개 장면과 항상 접근 가능한 동화 시작 버튼.
+
+## Global Constraints
+
+- 홈이 작업 범위다. 공통 헤더·서재·촬영·독서·백엔드를 별도로 재설계하지 않는다.
+- 최소 56px 터치 영역, 키보드 이동, 모바일 390×844·태블릿 1024×768·데스크톱 1440×900을 지원한다.
+- 자연스러운 브라우저 스크롤을 사용하고 모션 줄이기에는 정적 장면을 제공한다.
+- 기존 파랑 CTA·로그인별 AuthCta를 재사용한다. 매 스크롤마다 React state를 갱신하거나 새 runtime 의존성을 기본으로 추가하지 않는다.
+- 사용자가 이미지 기반 진행을 승인했다. 세 이미지의 확대·이동·크로스페이드로 깊이감을 표현하며 실제 3D 카메라 영상으로 소개하지 않는다.
+
+### Task 1: 동화 세계 자산과 화면 구성
+
+**Files:** `apps/front/public/images/home-world/`의 신규 생성 이미지, `tasks/todo.md`.
+**Interfaces:** 텍스트 없는 이미지와 HTML 문구를 분리한다. 마을 → 숲속 도서관 → 펼쳐진 마법의 책의 순서를 사용한다.
+- [x] 동화 마을·도서관·마법의 책 콘셉트 이미지를 기본 imagegen 도구로 생성하고 WebP 자산으로 준비한다.
+- [x] 사용자 승인에 따라 유료 영상 없이 이미지 기반 제작을 확정한다.
+**Acceptance criteria:** 둥근 클레이·따뜻한 파스텔·책이 중심인 세계가 일관되며 실제 사용 자산이 public에 있다.
+**Verification:** 생성 이미지 직접 확인, 파일 크기/형식 검사. 세 이미지 합계 약 430KB이며 로컬 URL에서 200 응답을 확인했다.
+
+**Asset evidence:** `public/images/home-world/village.webp`, `library.webp`, `magic-book.webp`. 세 원본 이미지를 직접 확인했고 원본은 기본 생성 이미지 경로에 보존한다. 프로덕션 자산은 설치된 sharp로 크기·WebP 압축만 적용했다. 공통 프롬프트 방향: text-free landscape, tactile matte clay, warm ivory/sage/pale-blue/apricot, quiet space for HTML headings. 첫 장면은 숲길과 파랑 지붕 도서관, 두 번째는 같은 도서관 내부의 큰 책, 세 번째는 같은 책에서 솟아난 팝업 동화 세계다. 실제 영상이나 카메라 이동 클립은 사용하지 않는다.
+
+### Task 2: 스크롤 홈 연결
+
+**Files:** `apps/front/app/page.tsx`, 새 `apps/front/app/HomeWorld.tsx`, 새 `apps/front/app/HomeWorld.module.css`; 스크롤 계산 분리가 필요하면 새 `apps/front/app/world-progress.ts` 및 `.test.ts`.
+**Interfaces:** HomeWorld는 children으로 기존 인증별 진입 버튼을 받는다. 진행 위치를 stage ref의 CSS 변수와 현재 장면 표시에 반영한다. 이미지에 깊이감·이동·크로스페이드를 적용한다. 기본 HTML과 모션 줄이기/낮은 화면에서는 장면을 세로로 모두 노출한다. 동화 진입 버튼은 계속 접근 가능하고, 향상된 모드에서는 장면 이동 버튼을 제공한다.
+- [x] 이미지 기반 스크롤 여행·장면 이동·항상 접근 가능한 기존 동화 진입을 구현한다.
+**Acceptance criteria:** 세 장면과 마지막 초대가 순서대로 보이고 위로 스크롤하면 되돌아간다. 새로고침·회전·모션 줄이기·키보드 접근에서 내용을 잃지 않는다.
+**Verification:** 진행 구간 경계·clamp 계산 테스트, 브라우저 실제 스크롤/링크/인증 표시 검증.
+
+### Task 3: 반응형·동작 검증
+
+**Files:** 위 홈 파일과 `tasks/todo.md`.
+- [x] 3개 화면 크기, 모션 줄이기, 키보드, 이미지 실패와 진입 링크를 확인하고 frontend ci:all·diff·서버 헬스를 검증한다. 추가 3D 보강 후 최종 검증을 다시 수행한다.
+**Acceptance criteria:** 가로 넘침·읽을 수 없는 겹침 없음, 끝까지 스크롤하지 않아도 동화 선택 가능, 검사 통과.
+**Verification:** `npx --yes pnpm@10.26.2 front ci:all`, frontend `npm run lint`, `git diff --check`, localhost 5502 및 5501 health 200. 첫 시각 검토 뒤 수정사항을 모아 최종 한 번 더 확인한다.
+
+### Task 4: 추가 피드백 — 원근감과 입체적인 움직임 보강
+
+**Files:** 기존 홈 전용 HomeWorld.tsx·HomeWorld.module.css·world-progress.ts 및 테스트, tasks/todo.md.
+**Interfaces:** 생성 이미지의 원본 비율을 유지해 원근 투영하고 가까운 빛 입자를 별도의 깊이에 배치한다. 데스크톱 포인터와 스크롤을 하나의 rAF에서 처리하고 텍스트/버튼은 고정한다. 새 runtime 의존성이나 유료 영상은 추가하지 않는다.
+- [x] 도서관 문 → 도서관 내부 → 펼쳐진 책 안으로 깊게 진입하는 스크롤 카메라와 빛 입자의 시차·문구 페이드를 구현한다.
+- [x] 스크롤·포인터 경계·복귀·터치 입력/모션 줄이기·레이어 가장자리를 확인하고 frontend ci:all·foreground lint·diff·헬스를 최종 검증한다.
+**Acceptance criteria:** 도서관 문과 책이 각각 진입 초점이며 확대/장면 전환 중 문구는 옅어진다. 앞쪽 빛 입자와 동화 배경이 다른 깊이에서 움직이며, 손을 떼면 안정적으로 돌아온다. 모바일은 스크롤로 입체감을 표현하고 조작·문구의 가독성을 유지한다.
+**Verification:** 카메라 좌표/범위 순수 함수 tests, 3개 뷰포트의 브라우저 변환 행렬·포인터/스크롤·정적 대안 및 최종 시각 확인.
+
+## Verification Story — 스크롤 홈, 2026-09-16
+
+| 수용 기준 | 근거 |
+|---|---|
+| 마을 → 도서관 → 책 속 세계 진입 | 브라우저에서 0 → 0.25 → 0.5 → 0.7 → 1 → 0 진행·역방향 재현. 최대 배율 2.8 / 2.6 / 1.8, 도서관 문·책·성 위치로 이동. 이동 구간 문구 opacity 0, 도착 후 1 확인 |
+| 3D 원근과 깊이 | CSS perspective 1100px, 포인터에 따른 matrix3d 변화, 빛 입자 translateZ 40~180px 확인. 포인터 이탈 후 기울기 0.01도 이내 복귀. 터치 PointerEvent는 기울기 0 유지 |
+| 반응형·가장자리 | 1440×900·1024×768·390×844에서 가로 넘침 없음. 모바일에서 확대 전 잘라 놓은 이미지 때문에 생긴 오른쪽 빈틈은 원본 비율의 전체 이미지 plane을 이동한 뒤 stage에서 잘라 해결. 최종 /tmp/nerd-home-world-door-mobile-fixed.png, /tmp/nerd-home-world-final-mobile-fixed.png, /tmp/nerd-home-world-final-desktop-fixed.png |
+| 계속 접근 가능한 진입 | 전체 스크롤 위치에서 56px 동화 CTA 노출. 동화/개인화 링크는 /library, 비로그인 링크는 /login 이동 확인. 인증 슬롯은 DOM의 data-session을 바꿔 표시만 확인했으며 실제 로그인이나 AI 생성은 하지 않음 |
+| 키보드·모션 줄이기 | Tab → 장면 버튼 → Enter로 두 번째 장면 이동 및 focus-visible 링 확인. reduced-motion에서 모든 장면 접근 가능, 카메라/이미지 transform none, 빛 입자 숨김. 낮은 844×390 화면은 정적 배치로 전환 |
+| 이미지 실패·가독성 | 잘못된 data 이미지로 3장 모두 naturalWidth 0을 확인해도 문구·/library CTA·종이 배경 유지. 홈 CTA의 파랑을 기존 토큰으로 진하게 보정해 작은 흰 글자 대비를 높임 |
+| 프로젝트 검증 | 최종 frontend ci:all exit 0: 90 tests·lint·types·stubs·health-path·build 통과. 별도 foreground npm run lint exit 0. 브라우저 page errors 0, diff check 통과, 5502·5501 health 200 |
+
+이미지 기반 카메라 연출이며 실제 3D 모델이나 연속 촬영 영상은 아니다. 과도한 확대 구간에서는 원본 이미지 해상도에 따른 부드러움이 남는다. 반응형 검증은 Chromium의 뷰포트 변경으로 수행했고 실제 모바일 Safari 하드웨어는 검증하지 않았다. 세 자산은 합계 429,664 bytes이며 새 의존성·유료 영상·백엔드 변경은 없다. main 개발 서버를 유지하고 커밋·푸시하지 않는다.
+
+## Risk & Rollback
+
+실제 영상 제작에는 외부 서비스 인증·비용이 필요하며 자동 설치·결제를 하지 않는다. 이미지 기반을 선택하면 실제 카메라 이동 영상으로 표현하지 않는다. main에서 검토 가능한 변경을 만들고 커밋·푸시·배포는 이번 요청에 포함하지 않는다. 기존 기록은 아래에 보존한다.
+
+---
+
 # 현재 작업: 제작형 서재와 삽화 속 캐릭터 대화
 
 > 상태: **구현 및 전체 검증 완료 (CI 통과)**

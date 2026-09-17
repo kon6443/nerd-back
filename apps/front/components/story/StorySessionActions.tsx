@@ -12,6 +12,7 @@ import { classifySessionStatus } from "./sessionStatus";
 interface StorySessionActionsProps {
   slug: string;
   isCreateMode?: boolean;
+  primaryClassName?: string;
 }
 
 /**
@@ -21,7 +22,7 @@ interface StorySessionActionsProps {
  * eslint 가 막는다(`setState synchronously within an effect`).
  */
 
-export function StorySessionActions({ slug, isCreateMode = false }: StorySessionActionsProps) {
+export function StorySessionActions({ slug, isCreateMode = false, primaryClassName = "" }: StorySessionActionsProps) {
   const router = useRouter();
   const authSession = useSession();
   const [mySession, setMySession] = useState<MyStorySessionItem | null>(null);
@@ -107,17 +108,17 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
         {resolving ? (
           /* 0. 확인 중 — 최종 버튼과 같은 높이·폭의 투명 자리표시 */
           isCreateMode ? (
-            <span aria-hidden="true" className={actionClass("primary", "invisible")}>
+            <span aria-hidden="true" className={actionClass("primary", `invisible ${primaryClassName}`)}>
               📷 내 얼굴로 만들기
             </span>
           ) : (
-            <span aria-hidden="true" className={actionClass("primary", "invisible")}>
+            <span aria-hidden="true" className={actionClass("primary", `invisible ${primaryClassName}`)}>
               시연 동화 읽기
             </span>
           )
         ) : !isCreateMode ? (
           /* 동화 체험하기 모드 — 내 얼굴 읽기를 노출하지 않고 시연 동화 읽기를 주 행동으로 제공 */
-          <ActionLink href={`/library/${slug}/1`} variant="primary" size="default">
+          <ActionLink href={`/library/${slug}/1`} variant="primary" size="default" className={primaryClassName}>
             시연 동화 읽기
           </ActionLink>
         ) : /* 이하 제작 모드 (isCreateMode === true) */
@@ -128,7 +129,7 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
               variant="primary"
               size="default"
-              className="font-bold shadow-md"
+              className={`font-bold shadow-md ${primaryClassName}`}
             >
               📖 내 얼굴 동화 읽기
             </ActionLink>
@@ -152,7 +153,7 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               href={`/stories/${slug}/read?sessionId=${currentSession.id}&autoStart=true`}
               variant="primary"
               size="default"
-              className="font-bold"
+              className={`font-bold ${primaryClassName}`}
             >
               ⏳ 제작 중인 동화 이어보기
             </ActionLink>
@@ -176,7 +177,7 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
               variant="primary"
               size="default"
-              className="font-bold"
+              className={`font-bold ${primaryClassName}`}
             >
               ⚠️ 제작 재시도하기
             </ActionLink>
@@ -195,7 +196,7 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
           </>
         ) : (
           /* 4. 아직 세션이 없거나(비로그인 포함) draft 상태인 경우 */
-          <ActionLink href={`/stories/${slug}/capture`} variant="primary">
+          <ActionLink href={`/stories/${slug}/capture`} variant="primary" className={primaryClassName}>
             📷 내 얼굴로 만들기
           </ActionLink>
         )}

@@ -5,6 +5,7 @@ import { ActionLink } from "@/components/ui/ActionLink";
 import { Card } from "@/components/ui/Card";
 import { actionClass } from "@/components/ui/actionStyles";
 import { LibraryShell } from "./LibraryShell";
+import room from "@/components/layout/StoryRoom.module.css";
 
 /**
  * ⚠️ **prop 이름은 `reset` 이다.** Next 의 에러 경계가 넘기는 이름이 그것이고
@@ -30,14 +31,14 @@ export default function LibraryError({ reset }: { reset: () => void }) {
 
   return (
     <LibraryShell>
-      <Card className="flex flex-col items-center gap-5 py-12 text-center">
+      <Card className={`flex flex-col items-center gap-5 text-center ${room.message}`}>
         {/* 오류는 색이 아니라 역할로 알린다 — 화면을 못 보는 사용자에게 즉시 읽힌다. */}
         <div role="alert">
           <p className="text-xl font-bold text-ink">동화를 불러오지 못했어요.</p>
           <p className="mt-2 text-ink-muted">연결 상태를 확인하고 다시 시도해 주세요.</p>
         </div>
         <div className="flex flex-wrap justify-center gap-3">
-          <button type="button" onClick={retry} className={actionClass("primary")}>
+          <button type="button" onClick={retry} className={`${actionClass("primary")} ${room.primary}`}>
             다시 시도
           </button>
           <ActionLink href="/" variant="secondary">

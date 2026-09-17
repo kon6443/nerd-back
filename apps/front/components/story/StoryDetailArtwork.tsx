@@ -1,27 +1,27 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import {
   getCachedThumbnailUrl,
   getCachedThumbnailUrls,
   preloadThumbnailImage,
 } from "@/app/(demo)/library/libraryStories";
-import { StoryArtwork } from "@/components/story/StoryArtwork";
+import { StoryCover } from "@/components/story/StoryCard";
 import { findMySessionBySlug } from "@/lib/api";
 import { useSession } from "@/lib/api/useSession";
 
 interface StoryDetailArtworkProps {
   slug: string;
+  title: string;
   isCreateMode: boolean;
 }
 
 /**
  * 동화 상세 표지 삽화.
  * 제작 모드(`mode=create`)에서 로그인 사용자의 완성된 개인화 동화가 있으면 1쪽 썸네일을 표시하고,
- * 그 외(일반 모드 또는 미완성 세션)에는 기본 삽화(StoryArtwork)를 렌더링한다.
+ * 그 외(일반 모드 또는 미완성 세션)에는 제목이 새겨진 기본 책 표지를 렌더링한다.
  */
-export function StoryDetailArtwork({ slug, isCreateMode }: StoryDetailArtworkProps) {
+export function StoryDetailArtwork({ slug, title, isCreateMode }: StoryDetailArtworkProps) {
   const authSession = useSession();
   const currentLoginId = authSession.status === "authenticated" ? authSession.me.loginId : null;
 
@@ -63,21 +63,5 @@ export function StoryDetailArtwork({ slug, isCreateMode }: StoryDetailArtworkPro
     };
   }, [isCreateMode, slug, currentLoginId, cachedThumbnails]);
 
-  if (isCreateMode && thumbnailUrl) {
-    return (
-      <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl border border-line bg-surface-raised shadow-sm">
-        <Image
-          src={thumbnailUrl}
-          alt=""
-          fill
-          priority
-          sizes="(max-width: 768px) 100vw, 50vw"
-          className="object-cover transition-opacity duration-300"
-          unoptimized
-        />
-      </div>
-    );
-  }
-
-  return <StoryArtwork className="aspect-4/3 rounded-xl" />;
+  return <StoryCover title={title} imageUrl={isCreateMode ? thumbnailUrl ?? undefined : undefined} priority />;
 }

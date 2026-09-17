@@ -3,6 +3,7 @@
 import type { StorySummary } from "@nerd/contracts";
 import { useEffect, useState } from "react";
 import { StoryCard } from "@/components/story/StoryCard";
+import room from "@/components/layout/StoryRoom.module.css";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { getMySessions } from "@/lib/api";
 import { useSession } from "@/lib/api/useSession";
@@ -117,7 +118,7 @@ export function LibraryStoryList({ stories, isCreateMode }: LibraryStoryListProp
                   href={getLibraryStoryHref(story.slug, isCreateMode)}
                   variant="primary"
                   size="compact"
-                  className="w-full"
+                  className={`w-full ${room.primary}`}
                 >
                   동화 펼쳐 보기
                 </ActionLink>

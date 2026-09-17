@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Card } from "@/components/ui/Card";
+import { BookStack, StoryRoom } from "@/components/layout/StoryRoom";
+import room from "@/components/layout/StoryRoom.module.css";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
 import { type FieldErrors, fetchMe, login, signup, validateLogin, validateSignup } from "@/lib/api/auth";
@@ -83,18 +84,22 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-4 px-5 py-8 md:py-10">
-      <Card className="px-6 py-8 md:px-10">
+    <StoryRoom className={room.login}>
+      <div className={room.welcome} aria-hidden="true">
+        <BookStack />
+        <p><span>한 권의 책에서,</span><span>커다란 모험으로.</span></p>
+      </div>
+      <div className={room.loginPanel}>
         <form
           method="post"
           onSubmit={handleSubmit}
-          className="flex flex-col gap-5"
+          className={room.form}
           noValidate
           aria-busy={pending}
         >
-          <div className="mb-1 text-center">
-            <h1 className="text-3xl font-bold text-ink">{label.title}</h1>
-            <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+          <div className={room.formHeading}>
+            <h1>{label.title}</h1>
+            <p>
               {mode === "signup"
                 ? "아이디와 비밀번호로 동화나라에 가입해요."
                 : "동화나라에 다시 오신 걸 환영해요."}
@@ -121,7 +126,7 @@ export default function LoginPage() {
 
           {formError ? (
             // role="alert" 이라 스크린리더가 즉시 읽는다. 실패를 조용히 두지 않는다.
-            <p
+            <div
               role="alert"
               className="rounded-xl bg-accent-b-soft px-4 py-3 text-sm leading-relaxed font-bold text-accent-b-strong"
             >
@@ -135,10 +140,10 @@ export default function LoginPage() {
                   ))}
                 </ul>
               )}
-            </p>
+            </div>
           ) : null}
 
-          <button type="submit" className={actionClass("primary")} disabled={pending}>
+          <button type="submit" className={`${actionClass("primary")} ${room.primary}`} disabled={pending}>
             {pending ? "잠시만요…" : label.submit}
           </button>
 
@@ -156,11 +161,13 @@ export default function LoginPage() {
             {label.switchTo}
           </button>
         </form>
-      </Card>
-      <ActionLink href="/library" variant="secondary" size="compact" className="self-center">
-        로그인 없이 동화 보기
-      </ActionLink>
-    </main>
+        <div className={room.guestLink}>
+          <ActionLink href="/library" variant="secondary" size="compact">
+            로그인 없이 동화 보기
+          </ActionLink>
+        </div>
+      </div>
+    </StoryRoom>
   );
 }
 
@@ -195,7 +202,7 @@ function Field({ id, label, value, onChange, error, type = "text", autoComplete 
         // 오류를 색으로만 알리지 않는다 — aria 로도 연결한다.
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className="min-h-touch w-full min-w-0 rounded-xl border-2 border-primary bg-surface-raised px-4 text-lg text-ink outline-none focus:border-primary-strong aria-invalid:border-accent-b-strong"
+        className={`min-h-touch w-full min-w-0 rounded-xl border-2 px-4 text-lg text-ink aria-invalid:border-accent-b-strong ${room.input}`}
       />
       {error ? (
         <p id={errorId} className="text-sm leading-relaxed text-accent-b-strong">
