@@ -7,10 +7,10 @@ import styles from "@/app/HomeWorld.module.css";
 export default function Home() {
   return (
     <HomeWorld>
-      <ActionLink href="/library" variant="primary" className={`sm:w-48 ${styles.primaryAction}`}>
+      <ActionLink href="/library" prefetch variant="primary" className={`sm:w-48 ${styles.primaryAction}`}>
         동화 체험하기
       </ActionLink>
-      <AuthCta className="sm:w-48" authenticated={HOME_AUTHENTICATED_CTA} />
+      <AuthCta className="sm:w-48" authenticated={HOME_AUTHENTICATED_CTA} prefetch />
     </HomeWorld>
   );
 }

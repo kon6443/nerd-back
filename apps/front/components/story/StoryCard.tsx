@@ -16,13 +16,6 @@ import styles from "./StoryCard.module.css";
  */
 type Variant = "album" | "library" | "choice";
 
-/** 비하인드 A/B 는 색으로 구분한다(시안). 나머지는 중립. */
-const variantTone = {
-  album: "neutral",
-  library: "neutral",
-  choice: "neutral",
-} as const;
-
 const variantLayout: Record<Variant, string> = {
   album: "w-44",
   library: "h-full w-full",
@@ -40,6 +33,8 @@ export interface StoryCardProps {
    * 키 → URL 변환은 호출하는 쪽의 책임이다.
    */
   imageUrl?: string;
+  /** 제목이 포함된 기본 표지는 contain으로 원본 전체를 표시한다. */
+  imageFit?: "cover" | "contain";
   /** LCP 썸네일 우선 로딩 여부. */
   priority?: boolean;
   /** `accentA`(비하인드 A) · `accentB`(비하인드 B). 지정하지 않으면 중립. */
@@ -47,12 +42,30 @@ export interface StoryCardProps {
   action?: ReactNode;
 }
 
+type StoryCoverProps = Pick<StoryCardProps, "title" | "imageUrl" | "imageFit" | "priority"> & {
+  className?: string;
+};
+
 /** 서재 목록과 동화 소개에서 함께 쓰는 장식용 책 표지. 실제 제목은 각 화면의 heading이 제공한다. */
-export function StoryCover({ title, imageUrl, priority, className = "" }: Pick<StoryCardProps, "title" | "imageUrl" | "priority"> & { className?: string }) {
+export function StoryCover({
+  title,
+  imageUrl,
+  imageFit = "cover",
+  priority,
+  className = "",
+}: StoryCoverProps) {
   return (
-    <div className={`${styles.cover} ${className}`} aria-hidden="true">
+    <div className={`${styles.cover} ${imageFit === "contain" ? styles.originalCover : ""} ${className}`} aria-hidden="true">
       {imageUrl ? (
-        <Image src={imageUrl} alt="" fill priority={priority} sizes="(max-width: 639px) 100vw, 360px" className={`${styles.coverImage} transition-opacity duration-300`} unoptimized />
+        <Image
+          src={imageUrl}
+          alt=""
+          fill
+          priority={priority}
+          sizes="(max-width: 639px) 100vw, 360px"
+          className={`${styles.coverImage} transition-opacity duration-300`}
+          unoptimized
+        />
       ) : (
         <div className={styles.coverFace}>
           <span className={styles.coverSeries}>동화나라</span>
@@ -71,16 +84,19 @@ export function StoryCard({
   subtitle,
   description,
   imageUrl,
+  imageFit,
   priority,
   tone,
   action,
 }: StoryCardProps) {
   return (
     // 썸네일·버튼이 카드 모서리에 붙어 있어 동심원 R 이 필요하다 — `snug`(안쪽 R 8px).
-    <Card tone={tone ?? variantTone[variant]} inset="snug" className={`${variantLayout[variant]} ${variant === "library" ? styles.card : ""}`}>
+    <Card tone={tone ?? "neutral"} inset="snug" className={`${variantLayout[variant]} ${variant === "library" ? styles.card : ""}`}>
       <div className="flex h-full flex-col gap-4">
         {variant === "library" ? (
-          <StoryCover title={title} imageUrl={imageUrl} priority={priority} />
+          <div className={styles.coverStage}>
+            <StoryCover title={title} imageUrl={imageUrl} imageFit={imageFit} priority={priority} />
+          </div>
         ) : imageUrl ? (
           <div className={`relative aspect-4/3 w-full overflow-hidden ${CARD_NESTED_RADIUS} bg-surface-raised`}>
             <Image

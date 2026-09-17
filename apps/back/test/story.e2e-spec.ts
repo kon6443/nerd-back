@@ -26,8 +26,14 @@ interface RepoStubs {
 
 function createRepoStubs(): RepoStubs {
   return {
-    templates: { find: jest.fn().mockResolvedValue([]), findOneBy: jest.fn().mockResolvedValue(null) },
-    pages: { findOneBy: jest.fn().mockResolvedValue(null), countBy: jest.fn().mockResolvedValue(0) },
+    templates: {
+      find: jest.fn().mockResolvedValue([]),
+      findOneBy: jest.fn().mockResolvedValue(null),
+    },
+    pages: {
+      findOneBy: jest.fn().mockResolvedValue(null),
+      countBy: jest.fn().mockResolvedValue(0),
+    },
     characters: { find: jest.fn().mockResolvedValue([]) },
     pageCharacters: { find: jest.fn().mockResolvedValue([]) },
   };
@@ -88,6 +94,7 @@ describe('동화 콘텐츠 조회 (E2E)', () => {
             title: '신데렐라',
             summary: '유리구두',
             coverImageKey: 'covers/cinderella.png',
+            coverImageUrl: 'https://storage.e2e.test/covers/cinderella.png',
           },
         ],
       });
@@ -135,6 +142,7 @@ describe('동화 콘텐츠 조회 (E2E)', () => {
         title: '백설공주',
         summary: null,
         coverImageKey: null,
+        coverImageUrl: null,
         pageCount: 6,
         characters: [{ role: 'queen', displayName: '왕비' }],
       });

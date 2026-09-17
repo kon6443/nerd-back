@@ -15,14 +15,8 @@ import room from "@/components/layout/StoryRoom.module.css";
 export const dynamic = "force-dynamic";
 
 /**
- * ⭐ **깜빡임은 `loading.tsx` 가 같은 틀을 그려서 해결한다.** 예전에는 로딩이 화면 한가운데 안내
- * 카드였고, 목록이 오면 제목까지 포함해 화면이 통째로 바뀌었다(2026-09-10 보고).
- *
- * 목록만 `Suspense` 로 감싸 껍데기를 먼저 흘리는 방식도 **된다.** 한때 이 자리에 "그렇게 하면
- * 에러 화면이 영영 안 뜬다" 고 적혀 있었으나, 재측정해 보니 **두 구조 모두 백엔드 500 에서
- * `error.tsx` 가 1초 안에 뜬다**(2026-09-10). 앞선 관측은 죽은 서버가 포트를 잡고 있어 옛 빌드를
- * 본 것이었다. 여기서 최상단 `await` 를 쓰는 이유는 에러 때문이 아니라 **`loading.tsx` 가 이미
- * 같은 틀을 그려서 구조가 더 단순하기 때문**이다.
+ * 실제 목록이 준비된 뒤 한 번에 표시한다. 한 권짜리 route skeleton과
+ * 로그인 확인용 skeleton을 거치지 않으며, 주요 진입 링크가 목록을 미리 요청한다.
  */
 export default async function LibraryPage({ searchParams }: PageProps<"/library">) {
   const isCreateMode = isLibraryCreateMode((await searchParams).mode);

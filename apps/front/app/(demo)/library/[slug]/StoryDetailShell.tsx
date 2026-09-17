@@ -5,9 +5,9 @@ import { actionClass } from "@/components/ui/actionStyles";
 import styles from "./StoryDetail.module.css";
 
 /** 로딩부터 소개까지 같은 배경·종이 패널을 유지한다. */
-export function StoryDetailShell({ children, backHref }: { children: ReactNode; backHref?: string }) {
+export function StoryDetailShell({ children, backHref, storySlug }: { children: ReactNode; backHref?: string; storySlug?: string }) {
   return (
-    <StoryRoom>
+    <StoryRoom storySlug={storySlug}>
       <div className={styles.back}>
         {backHref ? (
           <ActionLink href={backHref} variant="secondary" size="compact">

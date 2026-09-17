@@ -91,6 +91,7 @@ export function AppHeader() {
               <li key={link.href}>
                 <Link
                   href={link.href}
+                  prefetch={link.href === "/library" ? true : undefined}
                   // 현재 위치를 보조기술에도 알린다. 색만으로 표시하면 화면을 못 보는 사용자에게는 없는 정보다.
                   aria-current={active ? "page" : undefined}
                   className={navLinkClass(active)}

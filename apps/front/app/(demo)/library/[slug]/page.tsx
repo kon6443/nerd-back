@@ -26,11 +26,11 @@ export default async function StoryDetailPage({ params, searchParams }: PageProp
   const story = await orNotFound(fetchStoryDetail(parsed.data.slug));
 
   return (
-    <StoryDetailShell backHref={getLibraryHref(isCreateMode)}>
+    <StoryDetailShell backHref={getLibraryHref(isCreateMode)} storySlug={story.slug}>
       {/* 소개와 등장인물은 같은 밝은 패널 안에 둔다(2026-09-14 요청). */}
       <section className={styles.hero}>
         <div className={styles.book}>
-          <StoryDetailArtwork slug={story.slug} title={story.title} isCreateMode={isCreateMode} />
+          <StoryDetailArtwork slug={story.slug} title={story.title} coverImageUrl={story.coverImageUrl} isCreateMode={isCreateMode} />
         </div>
 
         <div className={styles.intro}>

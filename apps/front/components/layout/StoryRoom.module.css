@@ -1,3 +1,35 @@
+.library,
+.storyTheme[data-story="jack-and-beanstalk"] {
+  --color-book-cover: #4c6035;
+  --color-book-cover-strong: #304124;
+  --color-paper: #fbf8ed;
+  --color-paper-edge: #ddd5b7;
+  --color-paper-edge-strong: #a89b70;
+  --color-ink: #303b29;
+  --color-ink-muted: #626650;
+  --color-accent-a-soft: #e4e9d5;
+  --color-magic-strong: #4c6035;
+  --story-action: #435b32;
+  --story-display: #eef0e2;
+}
+
+/* 첨부 원본의 비율을 로드 전에도 확보한다: 잭 1024×1536, 빨간 모자 1254×1254. */
+.storyTheme[data-story="jack-and-beanstalk"] { --story-original-ratio: calc(2 / 3); }
+.storyTheme[data-story="red-riding-hood"] {
+  --story-original-ratio: 1;
+  --color-book-cover: #9b3a2c;
+  --color-book-cover-strong: #65312a;
+  --color-paper: #fff8ec;
+  --color-paper-edge: #e7cfb2;
+  --color-paper-edge-strong: #b69a71;
+  --color-ink: #492f28;
+  --color-ink-muted: #716053;
+  --color-accent-a-soft: #f3e4d6;
+  --color-magic-strong: #9b3a2c;
+  --story-action: #9b3a2c;
+  --story-display: #f6eade;
+}
+
 .room {
   position: relative;
   isolation: isolate;
@@ -77,7 +109,9 @@
 .libraryHeading h1 { font-size: clamp(2.5rem, 4vw, 3.75rem); }
 .libraryHeading p { margin-top: 1rem; max-width: 28rem; color: var(--room-muted); line-height: 1.8; word-break: keep-all; }
 .libraryBooks { flex: 0 0 280px; }
-.shelf { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem; }
+.library .libraryHeading { min-height: 175px; margin-bottom: 2rem; }
+.library .libraryBooks { zoom: 0.78; }
+.shelf { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 2rem; }
 .message {
   border-color: var(--color-paper-edge);
   background: color-mix(in srgb, var(--color-surface-raised) 70%, var(--color-paper));
@@ -85,7 +119,7 @@
 }
 .message p + p { color: var(--room-muted); }
 .primary {
-  background: color-mix(in srgb, var(--color-accent-a) 55%, var(--color-night));
+  background: var(--story-action, color-mix(in srgb, var(--color-accent-a) 55%, var(--color-night)));
   --btn-lip: var(--color-book-cover-strong);
 }
 .room :focus-visible { outline-color: var(--color-book-cover); }
@@ -199,6 +233,7 @@
 @media (max-width: 639px) {
   .content { padding-block: 2rem 3rem; }
   .libraryHeading { min-height: 0; margin-bottom: 2rem; gap: 0; }
+  .library .libraryHeading { min-height: 0; }
   .libraryHeading h1 { font-size: 2.5rem; }
   .libraryHeading p { font-size: 0.9375rem; max-width: 20rem; }
   .libraryBooks { display: none; }

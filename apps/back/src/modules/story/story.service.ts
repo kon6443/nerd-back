@@ -40,19 +40,20 @@ export class StoryService {
       order: { id: 'ASC' },
     });
 
-    return templates.map((template) => this.toSummary(template));
+    return Promise.all(templates.map((template) => this.toSummary(template)));
   }
 
   async getPublishedDetail(slug: string): Promise<StoryDetail> {
     const template = await this.findPublishedOrThrow(slug);
 
-    const [pageCount, characters] = await Promise.all([
+    const [summary, pageCount, characters] = await Promise.all([
+      this.toSummary(template),
       this.pages.countBy({ templateId: template.id, branchKey: 'common' }),
       this.characters.find({ where: { templateId: template.id }, order: { id: 'ASC' } }),
     ]);
 
     return {
-      ...this.toSummary(template),
+      ...summary,
       pageCount,
       // persona 는 엔티티에서 select: false 라 여기 담기지 않는다. 프롬프트 설계를 노출하지 않기 위한 것이다.
       characters: characters.map((character) => ({
@@ -134,7 +135,7 @@ export class StoryService {
       pageNo: page.pageNo,
       bodyText: page.bodyText,
       baseImageKey: page.baseImageKey,
-      narrationAudioUrl: await this.getNarrationAudioUrl(page.narrationAudioKey),
+      narrationAudioUrl: await this.getOptionalAssetUrl(page.narrationAudioKey),
       personaTargetRole: page.personaTargetRole,
       characters: appearances.map((appearance) => ({
         role: appearance.character.role,
@@ -144,8 +145,8 @@ export class StoryService {
     };
   }
 
-  private async getNarrationAudioUrl(key: string | null): Promise<string | null> {
-    if (key === null) return null;
+  private async getOptionalAssetUrl(key: string | null): Promise<string | null> {
+    if (!key) return null;
     try {
       return await this.storage.getPresignedUrl(key);
     } catch {
@@ -170,12 +171,13 @@ export class StoryService {
     return template;
   }
 
-  private toSummary(template: StoryTemplate): StorySummary {
+  private async toSummary(template: StoryTemplate): Promise<StorySummary> {
     return {
       slug: template.slug,
       title: template.title,
       summary: template.summary,
       coverImageKey: template.coverImageKey,
+      coverImageUrl: await this.getOptionalAssetUrl(template.coverImageKey),
     };
   }
 }
