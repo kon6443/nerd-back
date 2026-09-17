@@ -25,11 +25,14 @@
 
 **Files:** 위 통합 파일 및 tasks/todo.md.
 **Interfaces:** frontend ci:all, git diff --check, GitHub PR base main.
-- [ ] 로컬 통합 검증을 통과했으며, feature branch push·PR 생성·원격 상태 확인을 진행한다.
+- [x] 로컬 검증 후 feature branch를 push하고 PR #58 생성·main MERGEABLE·원격 CI 실행 상태를 확인했다.
 **Acceptance criteria:** 로컬 프로젝트 검사 통과, PR URL 제공, main과 병합 가능 여부와 CI 상태를 사실대로 보고한다.
 **Verification:** staged paths·diff check·커밋, origin/main 최신 여부 재확인, gh pr view/checks 및 remote branch SHA 확인.
 
 ## Integration verification — 최신 main
+
+- PR: https://github.com/kon6443/nerd-back/pull/58 (base main, head feat/front-immersive-story-world). 게시 직전 main 재조회 후 ancestor 검사를 통과했고 GitHub는 MERGEABLE로 판정했다. 게시 시점 CI (front/back)는 실행 중이며 로컬 ci:all 통과와 구분한다.
+- 기본 SSH 인증의 계정과 CLI 계정이 달라 첫 push는 권한 거부됐다. CLI 계정의 저장소 push 권한을 확인한 뒤, 전역 설정을 바꾸지 않고 기존 CLI credential helper와 명시적 HTTPS 주소로 push했다.
 
 - origin/main 4f53e84의 추가 11개 커밋을 통합했다. LibraryShell/count skeleton, LibraryStoryList/사용자 캐시, mode=create 링크·단일 CTA, StoryDetailArtwork/소유자 검사·우선 로딩, 로그인 안전한 redirect·오류 details를 유지했다.
 - 가입 오류 details의 ul을 포함하는 컨테이너를 p에서 div로 변경해 HTML 구조를 바로잡았다. StoryDetailShell은 완료 후 모드를 보존한 복귀 링크를 제공하고, 모드를 아직 모르는 loading은 같은 높이의 비활성 자리만 둔다.
