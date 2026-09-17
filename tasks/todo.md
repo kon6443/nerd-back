@@ -51,7 +51,7 @@
 
 **Files:** components/layout/AuthCta.tsx, authLinks.ts, StoryRoom.module.css; components/story/StorySessionActions.tsx, StoryBookScene.module.css; app/HomeWorld.module.css, page.tsx 및 해당 공통 primary 스타일 호출부. Git feature branch와 tasks/todo.md.
 **Interfaces:** 공통 actionClass가 버튼 색상을 단독 소유하도록 중복 override를 제거한다. 현재 유일한 헤더 호출자에 맞게 AuthCta props를 줄이되 두 session 슬롯과 aria-current를 보존한다. 진입·호버·모션 감소 동작은 유지한다.
-- [ ] 중복 스타일과 미사용 props를 정리하고 검증 후 commit/push/PR을 게시한다. (진행 중)
+- [x] 중복 스타일과 미사용 props를 정리하고 검증 후 commit/push/PR을 게시했다.
 **Acceptance criteria:** 외관·경로·인증·촬영·독서 동작 유지, frontend ci:all과 live smoke 통과, secrets/임시 파일 제외, 최신 main과 충돌 없음, 로컬·원격·PR head 일치.
 **Verification:** 전체 호출자 검색, frontend ci:all, 실제 생성 진입·GNB·hover/reduced motion 확인, git diff --check, main ancestor 및 PR/CI 상태 확인.
 
@@ -65,6 +65,7 @@
 - 리팩토링: 홈/서재/로그인/소개/오류의 중복 primary CSS와 StorySessionActions의 스타일 전달 prop, AuthCta의 미사용 목적지/prefetch 옵션을 제거했다. 전용 scene의 reduced motion 선택자가 모든 사용처에 적용되도록 맞췄다. 기존 요청·세션/사진·폴링 로직은 변경하지 않았다.
 - 리팩토링 후 frontend ci:all exit 0(20 files/126 tests·lint/types/stubs/health-path·production build), 마지막 주석/이름/정렬 정리 후 foreground lint 및 git diff --check exit 0. 생성 진입·로그인 검증/가입 전환·PC hover·터치 자동 재생·reduced motion을 재확인했고 runtime exception/API write 0, idle RAF/canvas 0이었다. 실제 공개 상세의 CTA/돌아가기 경로, primary 색 rgb(53,79,56), 높이 56px와 GNB 현재 위치도 확인했다.
 - 게시 전 origin/main=7c07864와 HEAD가 같아 통합 충돌 없음. 변경 파일은 frontend와 작업 기록뿐이며 dependency·migration·backend 변경과 secrets/임시 산출물은 없다.
+- PR #62: https://github.com/kon6443/nerd-back/pull/62 (base=main, head=feat/storybook-ui-consistency). 소스 커밋 fa5732a의 로컬·원격·PR SHA 일치 및 MERGEABLE 확인. 원격 frontend CI는 게시 시 진행 중이며 최종 결과는 PR에서 확인한다. 전용 QA 브라우저는 종료했고 개발 서버 5501/5502는 계속 실행 중이다.
 
 ---
 
