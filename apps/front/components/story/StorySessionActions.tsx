@@ -11,6 +11,7 @@ import { classifySessionStatus } from "./sessionStatus";
 
 interface StorySessionActionsProps {
   slug: string;
+  primaryClassName?: string;
 }
 
 /**
@@ -20,7 +21,7 @@ interface StorySessionActionsProps {
  * eslint 가 막는다(`setState synchronously within an effect`).
  */
 
-export function StorySessionActions({ slug }: StorySessionActionsProps) {
+export function StorySessionActions({ slug, primaryClassName = "" }: StorySessionActionsProps) {
   const router = useRouter();
   const authSession = useSession();
   const [mySession, setMySession] = useState<MyStorySessionItem | null>(null);
@@ -109,7 +110,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
             <span aria-hidden="true" className={actionClass("secondary", "invisible")}>
               시연 동화 읽기
             </span>
-            <span aria-hidden="true" className={actionClass("primary", "invisible")}>
+            <span aria-hidden="true" className={actionClass("primary", `invisible ${primaryClassName}`)}>
               📷 내 얼굴로 만들기
             </span>
           </>
@@ -120,7 +121,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
               href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
               variant="primary"
               size="default"
-              className="font-bold shadow-md"
+              className={`font-bold shadow-md ${primaryClassName}`}
             >
               📖 내 얼굴 동화 읽기
             </ActionLink>
@@ -147,7 +148,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
               href={`/stories/${slug}/read?sessionId=${currentSession.id}&autoStart=true`}
               variant="primary"
               size="default"
-              className="font-bold"
+              className={`font-bold ${primaryClassName}`}
             >
               ⏳ 제작 중인 동화 이어보기
             </ActionLink>
@@ -174,7 +175,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
               href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
               variant="primary"
               size="default"
-              className="font-bold"
+              className={`font-bold ${primaryClassName}`}
             >
               ⚠️ 제작 재시도하기
             </ActionLink>
@@ -198,7 +199,7 @@ export function StorySessionActions({ slug }: StorySessionActionsProps) {
           /* 4. 아직 세션이 없거나(비로그인 포함) draft 상태인 경우 */
           <>
             {/* 이 화면의 주 동작은 개인화다 — 시연 읽기는 한 단계 내린다. */}
-            <ActionLink href={`/stories/${slug}/capture`} variant="primary">
+            <ActionLink href={`/stories/${slug}/capture`} variant="primary" className={primaryClassName}>
               📷 내 얼굴로 만들기
             </ActionLink>
             <ActionLink href={`/library/${slug}/1`} variant="secondary">

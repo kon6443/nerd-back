@@ -1,4 +1,5 @@
-import { ActionLink } from "@/components/ui/ActionLink";
+import { StoryDetailShell } from "./StoryDetailShell";
+import styles from "./StoryDetail.module.css";
 
 /**
  * 동화 상세의 대기 화면.
@@ -12,33 +13,30 @@ import { ActionLink } from "@/components/ui/ActionLink";
  */
 export default function StoryDetailLoading() {
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-5 py-6 md:px-10 md:py-8">
-      <div>
-        <ActionLink href="/library" variant="secondary" size="compact">
-          서재로 돌아가기
-        </ActionLink>
-      </div>
+    <StoryDetailShell>
       <p role="status" className="sr-only">
         동화 정보를 불러오는 중입니다.
       </p>
       <section
         aria-hidden="true"
-        className="grid animate-pulse items-center gap-8 rounded-card border-2 border-line bg-surface-raised p-6 motion-reduce:animate-none md:grid-cols-2 md:p-8"
+        className={`${styles.hero} animate-pulse motion-reduce:animate-none`}
       >
-        <div className="aspect-4/3 w-full rounded-xl bg-line" />
-        <div className="flex min-w-0 flex-col gap-4">
-          <div className="h-10 w-3/4 rounded bg-line" />
+        <div className={styles.book}>
+          <div className={`${styles.skeleton} ${styles.blankBook}`} />
+        </div>
+        <div className={styles.intro}>
+          <div className={`h-12 w-3/4 ${styles.skeleton}`} />
           <div className="flex flex-col gap-2">
-            <div className="h-5 w-full rounded bg-line" />
-            <div className="h-5 w-5/6 rounded bg-line" />
+            <div className={`h-5 w-full ${styles.skeleton}`} />
+            <div className={`h-5 w-5/6 ${styles.skeleton}`} />
           </div>
-          <div className="h-9 w-24 rounded-pill bg-line" />
+          <div className={`h-9 w-24 ${styles.skeleton}`} />
           <div className="flex flex-wrap gap-3 pt-2">
-            <div className="min-h-touch w-40 rounded-btn bg-line" />
-            <div className="min-h-touch w-32 rounded-btn bg-line" />
+            <div className={`min-h-touch w-full md:w-48 ${styles.skeleton}`} />
+            <div className={`min-h-touch w-full md:w-40 ${styles.skeleton}`} />
           </div>
         </div>
       </section>
-    </main>
+    </StoryDetailShell>
   );
 }

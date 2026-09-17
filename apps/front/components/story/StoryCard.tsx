@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import { CARD_NESTED_BUTTON_RADIUS, CARD_NESTED_RADIUS, Card } from "@/components/ui/Card";
 import { StoryArtwork } from "@/components/story/StoryArtwork";
+import { BookEmblem } from "@/components/layout/StoryRoom";
+import styles from "./StoryCard.module.css";
 
 /**
  * 동화 카드.
@@ -43,6 +45,24 @@ export interface StoryCardProps {
   action?: ReactNode;
 }
 
+/** 서재 목록과 동화 소개에서 함께 쓰는 장식용 책 표지. 실제 제목은 각 화면의 heading이 제공한다. */
+export function StoryCover({ title, imageUrl, className = "" }: Pick<StoryCardProps, "title" | "imageUrl"> & { className?: string }) {
+  return (
+    <div className={`${styles.cover} ${className}`} aria-hidden="true">
+      {imageUrl ? (
+        <Image src={imageUrl} alt="" fill sizes="(max-width: 639px) 100vw, 360px" className={styles.coverImage} unoptimized />
+      ) : (
+        <div className={styles.coverFace}>
+          <span className={styles.coverSeries}>동화나라</span>
+          <BookEmblem />
+          <span className={styles.coverTitle}>{title}</span>
+          <span className={styles.coverRule} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function StoryCard({
   variant = "library",
   title,
@@ -54,9 +74,11 @@ export function StoryCard({
 }: StoryCardProps) {
   return (
     // 썸네일·버튼이 카드 모서리에 붙어 있어 동심원 R 이 필요하다 — `snug`(안쪽 R 8px).
-    <Card tone={tone ?? variantTone[variant]} inset="snug" className={variantLayout[variant]}>
+    <Card tone={tone ?? variantTone[variant]} inset="snug" className={`${variantLayout[variant]} ${variant === "library" ? styles.card : ""}`}>
       <div className="flex h-full flex-col gap-4">
-        {imageUrl ? (
+        {variant === "library" ? (
+          <StoryCover title={title} imageUrl={imageUrl} />
+        ) : imageUrl ? (
           <div className={`relative aspect-4/3 w-full overflow-hidden ${CARD_NESTED_RADIUS}`}>
             <Image
               src={imageUrl}
@@ -75,7 +97,7 @@ export function StoryCard({
           {subtitle ? <p className="text-sm font-bold text-ink-muted">{subtitle}</p> : null}
           <h2 className="break-keep text-xl font-bold text-balance wrap-anywhere text-ink">{title}</h2>
           {description ? (
-            <p className="break-keep text-sm leading-relaxed wrap-anywhere text-ink-muted">{description}</p>
+            <p className={`break-keep text-sm leading-relaxed wrap-anywhere text-ink-muted ${variant === "library" ? styles.description : ""}`}>{description}</p>
           ) : null}
         </div>
 
