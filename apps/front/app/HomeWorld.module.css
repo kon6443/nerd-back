@@ -1,6 +1,5 @@
 .world {
   --world-gutter: clamp(1.5rem, 6.5vw, 7.5rem);
-  --header-height: 77px;
   flex: 1;
   background: var(--color-paper);
   color: var(--color-ink);
@@ -11,7 +10,7 @@
   isolation: isolate;
   display: flex;
   align-items: center;
-  height: calc(100dvh - var(--header-height));
+  height: calc(100dvh - var(--app-header-height));
   min-height: 480px;
   padding: 2rem var(--world-gutter);
   overflow: clip;
@@ -93,10 +92,6 @@
 
 .actions { margin-top: 2rem; }
 .actionLinks { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.primaryAction {
-  background: color-mix(in srgb, var(--color-accent-a) 55%, var(--color-night));
-  --btn-lip: var(--color-book-cover-strong);
-}
 .note { margin-top: 1rem; font-size: 0.8125rem; line-height: 1.5; }
 
 .entryWash {
@@ -121,7 +116,7 @@
 }
 
 @media (max-width: 767px) {
-  .world { --world-gutter: 1.5rem; --header-height: 133px; }
+  .world { --world-gutter: 1.5rem; }
   .stage {
     flex-direction: column;
     align-items: stretch;

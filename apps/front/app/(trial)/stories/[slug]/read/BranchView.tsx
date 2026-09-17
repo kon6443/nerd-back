@@ -1,6 +1,9 @@
 "use client";
 
+import { StoryRoom } from "@/components/layout/StoryRoom";
+import room from "@/components/layout/StoryRoom.module.css";
 import type { AfterStoryResponse, StoryBranchKey } from "@nerd/contracts";
+import { StoryIcon } from "@/components/ui/StoryIcon";
 import { Badge } from "@/components/ui/Badge";
 import { CARD_NESTED_BUTTON_RADIUS, Card } from "@/components/ui/Card";
 import { actionClass } from "@/components/ui/actionStyles";
@@ -37,12 +40,8 @@ export function BranchView({
   const savedChoice = afterStory?.firstBranchChoice;
 
   return (
-    // ⭐ 세로 가운데가 아니라 **위에서부터** 쌓는다. 가운데 정렬이면 콘텐츠가 화면 아래(언덕 그림 위)로
-    //    쏠려 보였다(2026-09-14 지적). 완독 화면(`EndView`)과 같은 여백을 쓴다.
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center gap-6 px-4 pt-10 pb-8 text-center md:pt-14">
-      <div className="rounded-full bg-magic-strong/10 p-5 text-4xl shadow-inner">
-        🌙
-      </div>
+    <StoryRoom className={room.readingState}>
+      <span className="rounded-full border border-paper-edge bg-paper p-4 text-book-cover"><StoryIcon name="book" className="size-9" /></span>
 
       <div>
         {/* 톤을 적어 둔다 — 기본값에 기대면 `Badge` 기본이 바뀔 때 이 화면 색이 조용히 따라 바뀐다. */}
@@ -77,7 +76,7 @@ export function BranchView({
                 <p className="mt-2 text-sm leading-relaxed text-ink-muted">{choice.description}</p>
                 {choice.status === "failed" && (
                   <div className="mt-3 flex flex-col gap-2">
-                    <p className="text-sm font-medium text-red-600">
+                    <p className="text-sm font-medium text-danger-strong">
                       이 이야기를 아직 준비하지 못했어요. 다시 만들 수 있어요.
                     </p>
                     <button
@@ -106,19 +105,19 @@ export function BranchView({
           })}
         </div>
       ) : (
-        <Card className="w-full max-w-md border-red-200 text-red-700">
+        <Card className="w-full max-w-md border-danger text-danger-strong">
           비하인드 선택지를 준비하지 못했어요.
         </Card>
       )}
 
       {afterStoryPollDegraded && (
-        <p className="max-w-md text-sm font-medium text-amber-700" role="status">
+        <p className="max-w-md text-sm font-medium text-gold-strong" role="status">
           연결이 불안정해요. 생성 상태를 계속 다시 확인하고 있어요.
         </p>
       )}
 
       {afterStoryError && (
-        <p className="max-w-md text-sm font-medium text-red-600" role="alert">{afterStoryError}</p>
+        <p className="max-w-md text-sm font-medium text-danger-strong" role="alert">{afterStoryError}</p>
       )}
 
       {/* ⭐ 이 화면의 주인공은 선택 A·B 다. 아래 두 버튼은 그보다 낮고 **서로는 같은 위계**라
@@ -132,6 +131,6 @@ export function BranchView({
           건너뛰기
         </button>
       </div>
-    </main>
+    </StoryRoom>
   );
 }

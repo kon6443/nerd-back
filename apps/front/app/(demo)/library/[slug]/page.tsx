@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { StoryDetailArtwork } from "@/components/story/StoryDetailArtwork";
 import { getLibraryHref, isLibraryCreateMode } from "@/lib/libraryMode";
 import { StorySessionActions } from "@/components/story/StorySessionActions";
-import roomStyles from "@/components/layout/StoryRoom.module.css";
 import { fetchStoryDetail, orNotFound } from "@/lib/api";
 import { StoryDetailShell } from "./StoryDetailShell";
 import styles from "./StoryDetail.module.css";
@@ -46,7 +45,7 @@ export default async function StoryDetailPage({ params, searchParams }: PageProp
 
           {story.pageCount > 0 ? (
             // `key` 로 동화가 바뀌면 새로 마운트시킨다 — 이전 동화의 세션이 남지 않게.
-            <StorySessionActions key={story.slug} slug={story.slug} isCreateMode={isCreateMode} primaryClassName={roomStyles.primary} />
+            <StorySessionActions key={story.slug} slug={story.slug} isCreateMode={isCreateMode} />
           ) : (
             // 페이지가 아직 안 들어온 동화다. 링크를 걸면 첫 페이지에서 404 를 만난다.
             <p className={styles.summary}>아직 페이지가 준비되지 않았어요.</p>

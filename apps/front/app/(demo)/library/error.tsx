@@ -38,7 +38,7 @@ export default function LibraryError({ reset }: { reset: () => void }) {
           <p className="mt-2 text-ink-muted">연결 상태를 확인하고 다시 시도해 주세요.</p>
         </div>
         <div className="flex flex-wrap justify-center gap-3">
-          <button type="button" onClick={retry} className={`${actionClass("primary")} ${room.primary}`}>
+          <button type="button" onClick={retry} className={actionClass("primary")}>
             다시 시도
           </button>
           <ActionLink href="/" variant="secondary">

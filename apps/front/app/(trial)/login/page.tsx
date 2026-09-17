@@ -128,7 +128,7 @@ export default function LoginPage() {
             // role="alert" 이라 스크린리더가 즉시 읽는다. 실패를 조용히 두지 않는다.
             <div
               role="alert"
-              className="rounded-xl bg-accent-b-soft px-4 py-3 text-sm leading-relaxed font-bold text-accent-b-strong"
+              className="rounded-xl bg-danger-soft px-4 py-3 text-sm leading-relaxed font-bold text-danger-strong"
             >
               {formError}
               {/* 백엔드가 `details` 로 필드별 사유를 주는데 쓰는 곳이 없어, 가입 실패에도
@@ -143,7 +143,7 @@ export default function LoginPage() {
             </div>
           ) : null}
 
-          <button type="submit" className={`${actionClass("primary")} ${room.primary}`} disabled={pending}>
+          <button type="submit" className={actionClass("primary")} disabled={pending}>
             {pending ? "잠시만요…" : label.submit}
           </button>
 
@@ -202,10 +202,10 @@ function Field({ id, label, value, onChange, error, type = "text", autoComplete 
         // 오류를 색으로만 알리지 않는다 — aria 로도 연결한다.
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
-        className={`min-h-touch w-full min-w-0 rounded-xl border-2 px-4 text-lg text-ink aria-invalid:border-accent-b-strong ${room.input}`}
+        className={`min-h-touch w-full min-w-0 rounded-xl border-2 px-4 text-lg text-ink aria-invalid:border-danger-strong ${room.input}`}
       />
       {error ? (
-        <p id={errorId} className="text-sm leading-relaxed text-accent-b-strong">
+        <p id={errorId} className="text-sm leading-relaxed text-danger-strong">
           {error}
         </p>
       ) : null}

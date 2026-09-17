@@ -6,30 +6,15 @@ import type { ActionSize } from "@/components/ui/actionStyles";
 import { AUTH_LINK } from "./authLinks";
 
 /**
- * 로그인 상태를 따르는 주요 CTA — 헤더와 홈 화면이 **같은 것**을 쓴다.
- *
- * ⭐ **두 문구를 다 렌더하고 CSS 가 하나만 보인다** (`globals.css` 의 `.session-*`, `<html data-session>`).
- * 세션 값으로 분기해 한쪽만 그리면 JS 가 로드될 때까지 칸이 비고, 새로고침마다 깜빡인다
- * (2026-09-09 배포 환경 보고). 속성은 첫 페인트 전에 `layout.tsx` 의 스크립트가 올린다.
- *
- * `'use client'` 인 이유는 `aria-current` 계산(`usePathname`) 하나다. 호출부가 넘기게 두면 헤더만 넘기고
- * 홈은 빠지는 식으로 갈린다 — 실제로 그렇게 두 벌이 될 뻔했다.
+ * 헤더의 인증 CTA. 두 링크를 렌더하고 첫 페인트 전에 설정된 data-session으로
+ * 하나만 표시해 hydration 때의 빈칸과 깜빡임을 막는다. usePathname은 현재 위치만 표시한다.
  */
 export function AuthCta({
   className = "",
   size = "default",
-  authenticated = AUTH_LINK.authenticated,
-  prefetch,
 }: {
   className?: string;
   size?: ActionSize;
-  /** 홈의 동화 제작 진입처럼 목적지 데이터까지 미리 준비할 때 사용한다. */
-  prefetch?: boolean;
-  /**
-   * 로그인 후 보일 링크. 기본은 마이페이지. 홈 히어로만 `HOME_AUTHENTICATED_CTA` 를 넘긴다.
-   * ⚠️ 문자열을 호출부에서 적지 않는다 — `authLinks.ts` 의 상수를 넘긴다.
-   */
-  authenticated?: { href: string; cta: string };
 }) {
   const pathname = usePathname();
   return (
@@ -44,14 +29,13 @@ export function AuthCta({
         {AUTH_LINK.guest.cta}
       </ActionLink>
       <ActionLink
-        href={authenticated.href}
-        prefetch={prefetch}
+        href={AUTH_LINK.authenticated.href}
         variant="secondary"
         size={size}
         className={`session-authenticated ${className}`}
-        aria-current={pathname === authenticated.href ? "page" : undefined}
+        aria-current={pathname === AUTH_LINK.authenticated.href ? "page" : undefined}
       >
-        {authenticated.cta}
+        {AUTH_LINK.authenticated.cta}
       </ActionLink>
     </>
   );

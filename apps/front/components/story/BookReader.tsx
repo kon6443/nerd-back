@@ -93,7 +93,7 @@ function BookReaderContent({
           {/* 시연을 읽다가 바로 개인화로 넘어가는 입구. 비로그인이면 촬영 화면이 로그인으로 보낸다
               (`stories/[slug]/capture`) — 여기서 세션을 조회하지 않는다(공개 경로에서 인증 API 금지). */}
           <ActionLink href={`/stories/${slug}/capture`} variant="primary" size="compact">
-            내 얼굴로 체험하기
+            내 얼굴로 만들기
           </ActionLink>
         </div>
       </header>

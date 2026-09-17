@@ -38,8 +38,8 @@ function initializeBookWorld(canvas: HTMLCanvasElement, renderer: THREE.WebGLRen
   const token = (name: string) => tokens.getPropertyValue(`--color-${name}`).trim();
   const palette: BookPalette = {
     paper: token("paper"), edge: token("paper-edge-strong"), cover: token("book-cover"),
-    coverDark: token("book-cover-strong"), leaf: token("primary-tint"), gold: token("gold"),
-    sky: token("accent-a"), rose: token("danger-soft"),
+    coverDark: token("book-cover-strong"), leaf: token("scene-leaf"), gold: token("gold"),
+    sky: token("scene-sky"), rose: token("danger-soft"),
   };
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(palette.paper, 22, 65);

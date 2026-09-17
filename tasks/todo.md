@@ -1,3 +1,74 @@
+# 동화나라 전체 UI 일관성 Implementation Plan — 2026-09-17
+
+> **For implementers:** 홈의 종이·숲 재질을 전체 기존 경로에 확장하고, 기능·접근성·성능을 보존한다.
+
+**Goal:** 홈·서재·소개·촬영·로그인·마이페이지·독서 및 상태 화면에서 일관된 GNB/CTA/색상과 목적 있는 입체 인터랙션을 제공한다.
+**Architecture:** globals.css와 actionStyles의 의미 토큰을 공통 기준으로 만들고 StoryRoom으로 기존 평면 배경을 대체한다. 추가 입체 연출은 CSS perspective로 페이지 진입 시 한 번 펼쳐지는 작은 책, 호버, 실제 제작 진행 상태에 반응하게 구현한다. 새로운 WebGL renderer·타이머·패키지·API는 추가하지 않는다.
+**Tech Stack:** 현재 Next.js 16.3.3, React 19, CSS Modules/Tailwind, Three.js 홈 유지, Vitest, 실제 Chromium 검증.
+**Spec:** 사용자 첨부 촬영 화면과 전체 프론트 UI/UX 일관성·다른 페이지의 3D 재미 요소 요청. 홈의 크림색 종이·숲색을 시각 기준으로 삼는다.
+
+## Global Constraints
+
+- 변경 범위 apps/front UI 및 tasks/todo.md. backend·DB·인증/합성/폴링 계약 유지. 후속 요청에 따라 리팩토링 후 main 대상 PR을 게시하며 merge·배포는 하지 않는다.
+- GNB guest/authenticated의 첫 렌더 안정성·현재 위치·모바일 터치 타깃을 유지한다. 주요 행동은 숲색, 보조는 종이색, 오류는 의미색으로 통일한다.
+- 사진 안내의 사실 문구와 정면 한 장 흐름·카메라 정리·blob 해제 유지. 실제 얼굴/유료 생성/개인 데이터 쓰기는 QA에서 하지 않는다.
+- 홈 진입·그림자/GPU lifecycle·이미지 preload/cache 유지. 장식 버튼은 두지 않는다(사용자 추가 요청). CSS 입체 모션은 진입 시 한 번/호버/실제 진행 변화에 반응하며 reduced motion에서는 펼쳐진 정지 상태를 제공한다.
+- 디자인 검증은 desktop/mobile 묶음 1회, 발견된 결함을 모아 수정 후 확인 1회. 실제 상태 fixture는 브라우저 내부에서만 사용하고 운영 인증을 우회하지 않는다.
+
+### Task 1: 공통 시각 언어와 GNB
+
+**Files:** apps/front/app/globals.css, layout.tsx, HomeWorld.module.css, book-world.ts, page.tsx; components/layout/AppHeader.tsx, AuthCta.tsx, StoryBackground.tsx, StoryRoom.module.css; components/ui/actionStyles.ts, Card.tsx; app/(demo)/library/LibraryShell.tsx, LibraryStoryList.tsx, page.tsx.
+**Interfaces:** actionClass(variant, extra, size) 및 session 표시 계약 유지. 헤더 높이 토큰을 홈과 공유한다. StoryBackground는 공통 종이 바탕의 정적 장식으로 변경한다.
+- [x] 공통 팔레트·버튼·GNB·모바일 정렬을 일관되게 적용했다.
+**Acceptance criteria:** 동일 역할의 CTA가 같은 색/높이/눌림/포커스를 갖고, 촬영 경로도 서재 위치로 표시된다. 홈의 guest 사용자도 내 얼굴로 만들기 진입을 발견할 수 있다.
+**Verification:** 기존 테스트 및 frontend ci:all; 실제 guest/authenticated GNB, 320/390/768/1440 뷰포트·홈 진입 확인.
+
+### Task 2: 촬영·로그인·마이페이지의 동화 재질과 입체 피드백
+
+**Files:** components/layout/StoryRoom.tsx, StoryRoom.module.css; Create components/story/StoryBookScene.tsx, StoryBookScene.module.css; app/(trial)/stories/[slug]/capture/page.tsx, CaptureStudio.tsx, CaptureStudio.module.css; app/(trial)/login/page.tsx; app/(trial)/me/page.tsx; components/story/StoryCard.module.css; app/(demo)/library/[slug]/StoryDetail.module.css.
+**Interfaces:** StoryBookOrnament는 장식용 작은 책을 진입 시 자동으로 펼치며 hover에 반응한다. StoryRoom(storySlug?)와 기존 촬영 props/API는 유지한다. 공개 서재 표지/소개는 기존 비율과 캐시를 보존한다.
+- [x] 촬영·로그인·마이페이지를 공통 공간으로 맞추고 진입/호버와 실제 상태에 반응하는 깊이감을 줬다.
+**Acceptance criteria:** 초기/카메라 거부/선택/재촬영/완료 화면이 같은 재질을 사용하고 사진이 왜곡되지 않는다. 작은 책은 조작 버튼 없이 자연스럽게 재생되고, hover가 없는 모바일과 모션 감소 설정에서도 내용과 기능이 유지된다. 내 동화의 비어 있음/목록/실패를 구분한다.
+**Verification:** 브라우저 synthetic 사진과 차단된 API writes, 상태 fixture로 촬영·my page·로그인/가입 전환; 자동 재생/호버/reduced motion과 불필요한 Tab 정지점·overflow 없음 확인.
+
+### Task 3: 독서·제작·완독·안내의 일관성
+
+**Files:** app/(trial)/stories/[slug]/read/GeneratingView.tsx, EndView.tsx, BranchView.tsx, ChatSurface.tsx, page.tsx; components/ui/CenteredPage.tsx, PageMessage.tsx, StatusEmblem.tsx; 필요한 공통 아이콘은 Create components/ui/StoryIcon.tsx.
+**Interfaces:** 생성 progress와 기존 상태/action callbacks를 그대로 소비한다. reader의 modal/keyboard/책넘김/오디오·polling은 유지한다.
+- [x] 제작 상태와 독서·대화·완독·오류 화면을 같은 토큰/아이콘/여백으로 맞췄다.
+**Acceptance criteria:** 실패를 완료/진행으로 오인시키지 않고 재시도·뒤로가기·모달 Esc/포커스가 유지된다. 페이지별 무한 장식 루프가 추가되지 않는다.
+**Verification:** demo reader·분기·채팅 열기/닫기, synthetic 생성/실패/완료 상태와 production build. 필요한 상태 테스트만 추가하며 CSS 구현을 복제한 테스트는 만들지 않는다.
+
+### Task 4: 전체 흐름과 성능 확인
+
+**Files:** tasks/todo.md, 기존 frontend 검사, 임시 QA 파일은 /tmp/nerd-ui-consistency-*.
+**Interfaces:** 실제 공개 API read 및 브라우저 격리 fixture; frontend ci:all과 최종 foreground lint.
+- [x] 전체 경로의 desktop/mobile 검증 및 자동 재생·호버 최종 확인을 완료했다.
+**Acceptance criteria:** 각 페이지 시각 확인, 수평 overflow/console exception 없음, focus 및 56px 주 행동 유지, 사진/인증/독서 흐름 회귀 없음, 추가 idle RAF/timer/WebGL 없음. 개발 서버 유지.
+**Verification:** before/after screenshots, DOM·motion·network 관찰 결과와 테스트/lint/type/build exit 0 기록. 미검증 실제 유료 합성과 계정 쓰기는 명시한다.
+
+### Task 5: 공통 스타일 정리 및 PR 게시
+
+**Files:** components/layout/AuthCta.tsx, authLinks.ts, StoryRoom.module.css; components/story/StorySessionActions.tsx, StoryBookScene.module.css; app/HomeWorld.module.css, page.tsx 및 해당 공통 primary 스타일 호출부. Git feature branch와 tasks/todo.md.
+**Interfaces:** 공통 actionClass가 버튼 색상을 단독 소유하도록 중복 override를 제거한다. 현재 유일한 헤더 호출자에 맞게 AuthCta props를 줄이되 두 session 슬롯과 aria-current를 보존한다. 진입·호버·모션 감소 동작은 유지한다.
+- [x] 중복 스타일과 미사용 props를 정리하고 검증 후 commit/push/PR을 게시했다.
+**Acceptance criteria:** 외관·경로·인증·촬영·독서 동작 유지, frontend ci:all과 live smoke 통과, secrets/임시 파일 제외, 최신 main과 충돌 없음, 로컬·원격·PR head 일치.
+**Verification:** 전체 호출자 검색, frontend ci:all, 실제 생성 진입·GNB·hover/reduced motion 확인, git diff --check, main ancestor 및 PR/CI 상태 확인.
+
+## UI verification — 2026-09-17
+
+- 7개 주요 화면의 desktop/mobile 14개 관찰과 상태 fixture 23개 관찰에서 가로 넘침·runtime exception 0. 촬영 거부/선택·완료, 내 동화 목록, 제작/실패, 독서·대화 Esc·분기·완독을 확인했다. 실제 사진·계정 쓰기·유료 AI 합성은 수행하지 않았다.
+- 작은 책은 900ms 진입 1회 후 정지, PC hover 반응, 터치 환경 자동 재생, reduced motion 정지 상태를 확인했다. 장식 버튼 0, 촬영 페이지 idle RAF 0, 추가 canvas 0. 주요 CTA 56px, 320px 촬영 제목 겹침 없음.
+- frontend ci:all(20 files/126 tests·lint/types/stubs/health-path·build), 마지막 CSS 수정 후 foreground lint/build exit 0. 최종 build는 sandbox 실행이 compile 단계에서 진행되지 않아 중단하고 허용된 실행 환경에서 같은 명령으로 성공했다. 내부 원인은 단정하지 않는다.
+- 공통 UI 토큰 변경이 홈 3D의 강/나뭇잎 색에 전파되어 scene 전용 토큰으로 분리했다. JS에서만 사용하는 토큰은 Tailwind가 생략하므로 :root에 선언하고 production CSS·실제 색을 확인했다.
+- 근거: /tmp/nerd-ui-consistency-final.json, /tmp/nerd-ui-consistency-states.json, /tmp/nerd-ui-consistency-motion.json 및 최종 home/capture-320 캡처. 리팩토링 후 검사는 별도로 기록한다.
+- 리팩토링: 홈/서재/로그인/소개/오류의 중복 primary CSS와 StorySessionActions의 스타일 전달 prop, AuthCta의 미사용 목적지/prefetch 옵션을 제거했다. 전용 scene의 reduced motion 선택자가 모든 사용처에 적용되도록 맞췄다. 기존 요청·세션/사진·폴링 로직은 변경하지 않았다.
+- 리팩토링 후 frontend ci:all exit 0(20 files/126 tests·lint/types/stubs/health-path·production build), 마지막 주석/이름/정렬 정리 후 foreground lint 및 git diff --check exit 0. 생성 진입·로그인 검증/가입 전환·PC hover·터치 자동 재생·reduced motion을 재확인했고 runtime exception/API write 0, idle RAF/canvas 0이었다. 실제 공개 상세의 CTA/돌아가기 경로, primary 색 rgb(53,79,56), 높이 56px와 GNB 현재 위치도 확인했다.
+- 게시 전 origin/main=7c07864와 HEAD가 같아 통합 충돌 없음. 변경 파일은 frontend와 작업 기록뿐이며 dependency·migration·backend 변경과 secrets/임시 산출물은 없다.
+- PR #62: https://github.com/kon6443/nerd-back/pull/62 (base=main, head=feat/storybook-ui-consistency). 소스 커밋 fa5732a의 로컬·원격·PR SHA 일치 및 MERGEABLE 확인. 원격 frontend CI는 게시 시 진행 중이며 최종 결과는 PR에서 확인한다. 전용 QA 브라우저는 종료했고 개발 서버 5501/5502는 계속 실행 중이다.
+
+---
+
 # 홈 동화책·표지 로딩 리팩토링 및 PR Implementation Plan — 2026-09-17
 
 > **For implementers:** 현재 작업을 검토하고 필요한 책임 분리만 수행한 뒤 검증된 feature branch를 main 대상 PR로 게시한다.
