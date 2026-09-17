@@ -8,14 +8,15 @@ interface StoryArtworkProps {
  */
 export function StoryArtwork({ className = "" }: StoryArtworkProps) {
   return (
-    <div className={`relative isolate overflow-hidden bg-primary-soft ${className}`}>
+    <div className={`relative isolate overflow-hidden bg-hill-1 ${className}`}>
       <svg
         viewBox="0 0 512 620"
         preserveAspectRatio="xMidYMid slice"
         className="absolute inset-0 h-full w-full"
         aria-hidden="true"
       >
-        <rect width="512" height="620" fill="var(--color-primary-tint)" />
+        {/* 장식이라 주 색이 아니라 풍경 세이지(`hill-*`)를 쓴다 — 주 색은 누를 수 있는 것의 신호다. */}
+        <rect width="512" height="620" fill="var(--color-surface-raised)" opacity=".55" />
         <g fill="var(--color-surface-raised)" opacity=".85">
           <ellipse cx="108" cy="156" rx="66" ry="26" />
           <ellipse cx="148" cy="143" rx="43" ry="23" />
@@ -24,12 +25,12 @@ export function StoryArtwork({ className = "" }: StoryArtworkProps) {
         </g>
         <path
           d="M0 496 Q128 452 256 484 T512 472 L512 620 L0 620Z"
-          fill="var(--color-accent-a)"
+          fill="var(--color-hill-2)"
           opacity=".25"
         />
         <path
           d="M0 542 Q150 506 300 536 T512 528 L512 620 L0 620Z"
-          fill="var(--color-accent-a)"
+          fill="var(--color-hill-2)"
           opacity=".35"
         />
       </svg>
@@ -37,7 +38,7 @@ export function StoryArtwork({ className = "" }: StoryArtworkProps) {
         <svg
           viewBox="0 0 120 100"
           fill="none"
-          className="h-24 w-28 text-primary-strong"
+          className="h-24 w-28 text-book-cover-strong"
           aria-hidden="true"
         >
           <path
