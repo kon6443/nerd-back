@@ -22,6 +22,8 @@ export function createBookWorld(canvas: HTMLCanvasElement) {
 }
 
 function initializeBookWorld(canvas: HTMLCanvasElement, renderer: THREE.WebGLRenderer) {
+  // 동기 GPU 진단 조회는 개발 중에만 수행한다. production의 첫 프레임 대기를 줄인다.
+  renderer.debug.checkShaderErrors = process.env.NODE_ENV !== "production";
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
