@@ -22,11 +22,11 @@
 **Acceptance criteria:** 기존 테스트·시각적 결과·개인화 우선순위 동일, 불필요한 클래스/분기 제거, source 변경 범위와 PR 설명 일치.
 **Verification:** frontend/backend ci:all, 실제 표지/첫 진입의 기존 QA 근거와 리팩토링 이후 확인, foreground lint와 git diff --check.
 
-### Task 2: main 통합 및 PR 게시 (진행 중)
+### Task 2: main 통합 및 PR 게시
 
 **Files:** 승인된 변경 파일·tasks/todo.md. Git branch feat/story-cover-images.
 **Interfaces:** origin/main fetch/merge, feature push, GitHub PR base=main. PR 제목·본문은 최종 구현과 검증을 설명한다.
-- [ ] 최신 main과 통합하고 검증된 변경을 push하여 새 PR URL과 병합/CI 상태를 확인한다.
+- [x] 최신 main과 통합하고 검증된 변경을 push하여 새 PR URL과 병합/CI 상태를 확인했다.
 **Acceptance criteria:** PR에서 이번 표지·서재 작업만 검토 가능, secrets 미포함, GitHub head SHA 일치 및 main 충돌 여부 확인.
 **Verification:** staged paths/diff 확인, main ancestor 및 diff, push 후 gh pr view/checks, 원격 CI 상태 확인. 임시 5602 서버/QA 브라우저는 종료하고 개발 서버는 유지한다.
 
@@ -37,6 +37,8 @@
 - 전체 backend 검사 중 발견한 기존 응답 비교 테스트의 1ms timestamp 차이는 해당 테스트의 toISOString 반환값을 고정해 제거했다. 운영 예외 처리 로직은 변경하지 않았다.
 - 리팩토링 후 auth 응답을 보류한 실제 브라우저에서 제목/이미지 2개, skeleton 0개, SSR h2 2개를 확인했다. 원본 fit은 모두 contain이고 비율은 잭 2:3·빨간 모자 1:1과 일치했다. 이전 운영 빌드 진입·개인화·접근성 검증 결과도 유지한다.
 - origin/main fba9d81을 fast-forward 반영했다. 이전 HEAD와 source tree가 같아 재검증이 필요한 통합 변경은 없었다. 검증용 5602 서버와 이번 QA 브라우저를 종료했으며 기존 개발 서버는 유지했다.
+- PR: https://github.com/kon6443/nerd-back/pull/60 — main 대상 OPEN, 게시 시 MERGEABLE. 구현 commit 1017ea7의 로컬·원격·PR head SHA 일치를 확인했다. 변경 파일 23개와 staged diff를 검토했으며 env·이미지·서명 URL은 포함하지 않았다.
+- GitHub의 frontend/backend CI 실행을 확인했다. 게시 시점에는 진행 중이며 최종 결과는 PR의 Checks에서 확인할 수 있다. DB migration 불필요·공용 표지 데이터 적용 상태·별도 DB의 반영 방법을 PR 본문에 명시했다.
 
 ---
 
