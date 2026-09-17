@@ -16,8 +16,8 @@ function storyPath(slug: string, suffix = ""): string {
   return `/stories/${encodeURIComponent(slug)}${suffix}`;
 }
 
-export function fetchStories(): Promise<StorySummary[]> {
-  return apiFetch<StorySummary[]>("/stories");
+export function fetchStories(signal?: AbortSignal): Promise<StorySummary[]> {
+  return apiFetch<StorySummary[]>("/stories", { signal });
 }
 
 export function fetchStoryDetail(slug: string): Promise<StoryDetail> {

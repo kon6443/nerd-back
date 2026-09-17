@@ -2,8 +2,10 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createBookWorld, type BookWorld } from "@/app/book-world";
+import { preloadThumbnailImage } from "@/lib/preloadThumbnailImage";
+import { fetchStories } from "@/lib/api/story";
 import styles from "@/app/HomeWorld.module.css";
 
 type Presentation = { renderer: "loading" | "ready" | "fallback"; entering: boolean };
@@ -16,6 +18,18 @@ export function HomeWorld({ children }: { children: ReactNode }) {
   const startEntryRef = useRef<((href: string) => boolean) | null>(null);
   const presentationRef = useRef<Presentation>({ renderer: "loading", entering: false });
   const [presentation, setPresentation] = useState<Presentation>({ renderer: "loading", entering: false });
+
+  useEffect(() => {
+    // route prefetch는 이미지까지 받지 않는다. 첫 두 공개 표지는 홈/진입 연출 중 미리 준비한다.
+    const controller = new AbortController();
+    void fetchStories(controller.signal).then((stories) => {
+      if (controller.signal.aborted) return;
+      for (const story of stories.slice(0, 2)) preloadThumbnailImage(story.coverImageUrl);
+    }).catch(() => {
+      // 미리 받기는 선택적이다. 취소/네트워크 실패 시 서재의 정상 이미지 요청에 맡긴다.
+    });
+    return () => controller.abort();
+  }, []);
 
   useLayoutEffect(() => {
     const root = rootRef.current;

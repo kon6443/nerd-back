@@ -38,6 +38,20 @@ describe("동화 조회 경로", () => {
     expect(calledUrl(spy)).toBe("http://backend:5501/api/v2/stories/dev-cloud-village");
   });
 
+  it("홈을 떠날 때 공개 목록의 미리 받기를 취소할 수 있다", async () => {
+    const controller = new AbortController();
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation((_input, options) =>
+      new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => reject(options.signal?.reason), { once: true });
+      }),
+    );
+    const request = fetchStories(controller.signal);
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetch.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+  });
+
   it("페이지는 slug 와 pageNo 를 경로에 넣는다", async () => {
     const spy = mockOk({ pageNo: 3 });
 

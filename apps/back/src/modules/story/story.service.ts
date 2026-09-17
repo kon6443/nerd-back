@@ -7,7 +7,13 @@ import { StoryPage } from '@entities/story-page.entity';
 import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { STORY_TEMPLATE_STATUS, StoryTemplate } from '@entities/story-template.entity';
 import { STORAGE_PORT, type StoragePort } from '@common/port/storage.port';
-import { StoryNotFoundErrorResponseDto, StoryPageNotFoundErrorResponseDto } from './dto/story.error.dto';
+import {
+  StoryNotFoundErrorResponseDto,
+  StoryPageNotFoundErrorResponseDto,
+} from './dto/story.error.dto';
+
+const PUBLIC_COVER_SIGNING_WINDOW_MS = 5 * 60 * 1000;
+const PUBLIC_COVER_URL_TTL_SECONDS = 60 * 60;
 
 /**
  * 사전 제작 동화 콘텐츠 조회 (SPEC-001 Library · SPEC-004 Story Reader).
@@ -100,9 +106,7 @@ export class StoryService {
       }
     }
 
-    return Promise.all(
-      pages.map((page) => this.toPageView(page, byPage.get(page.id) ?? [])),
-    );
+    return Promise.all(pages.map((page) => this.toPageView(page, byPage.get(page.id) ?? [])));
   }
 
   async getPublishedPage(slug: string, pageNo: number): Promise<StoryPageView> {
@@ -145,9 +149,15 @@ export class StoryService {
     };
   }
 
-  private async getOptionalAssetUrl(key: string | null): Promise<string | null> {
+  private async getOptionalAssetUrl(
+    key: string | null,
+    signingDate?: Date,
+  ): Promise<string | null> {
     if (!key) return null;
     try {
+      if (signingDate) {
+        return await this.storage.getPresignedUrl(key, PUBLIC_COVER_URL_TTL_SECONDS, signingDate);
+      }
       return await this.storage.getPresignedUrl(key);
     } catch {
       return null;
@@ -172,12 +182,17 @@ export class StoryService {
   }
 
   private async toSummary(template: StoryTemplate): Promise<StorySummary> {
+    // 공개 표지만 5분 동안 같은 URL을 사용해 홈 preload와 서재의 브라우저 캐시를 공유한다.
+    // 1시간 서명의 남은 수명은 55~60분이며 개인화/얼굴 사진의 서명에는 적용하지 않는다.
+    const signingDate = new Date(
+      Math.floor(Date.now() / PUBLIC_COVER_SIGNING_WINDOW_MS) * PUBLIC_COVER_SIGNING_WINDOW_MS,
+    );
     return {
       slug: template.slug,
       title: template.title,
       summary: template.summary,
       coverImageKey: template.coverImageKey,
-      coverImageUrl: await this.getOptionalAssetUrl(template.coverImageKey),
+      coverImageUrl: await this.getOptionalAssetUrl(template.coverImageKey, signingDate),
     };
   }
 }

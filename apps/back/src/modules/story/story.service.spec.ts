@@ -32,6 +32,10 @@ describe('StoryService', () => {
   let storage: jest.Mocked<StoragePort>;
   let service: StoryService;
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     templates = createMockRepository<StoryTemplate>();
     pages = createMockRepository<StoryPage>();
@@ -82,7 +86,37 @@ describe('StoryService', () => {
           coverImageUrl: 'https://storage.local/covers/lrrh.png',
         },
       ]);
-      expect(storage.getPresignedUrl).toHaveBeenCalledWith('covers/lrrh.png');
+      expect(storage.getPresignedUrl).toHaveBeenCalledWith(
+        'covers/lrrh.png',
+        3600,
+        expect.any(Date),
+      );
+    });
+
+    it('공개 표지는 5분 경계에서만 서명 시각이 바뀌고 표지 교체는 즉시 반영한다', async () => {
+      jest.useFakeTimers({ now: new Date('2026-09-17T13:00:01Z') });
+      templates.find.mockResolvedValue([PUBLISHED_TEMPLATE]);
+      await service.listPublished();
+      jest.setSystemTime(new Date('2026-09-17T13:04:59Z'));
+      await service.listPublished();
+      expect(storage.getPresignedUrl.mock.calls[1]).toEqual(storage.getPresignedUrl.mock.calls[0]);
+      expect(storage.getPresignedUrl.mock.calls[0][2]).toEqual(new Date('2026-09-17T13:00:00Z'));
+
+      templates.find.mockResolvedValue([createStoryTemplate({ coverImageKey: 'covers/new.webp' })]);
+      await service.listPublished();
+      expect(storage.getPresignedUrl).toHaveBeenLastCalledWith(
+        'covers/new.webp',
+        3600,
+        new Date('2026-09-17T13:00:00Z'),
+      );
+
+      jest.setSystemTime(new Date('2026-09-17T13:05:00Z'));
+      await service.listPublished();
+      expect(storage.getPresignedUrl).toHaveBeenLastCalledWith(
+        'covers/new.webp',
+        3600,
+        new Date('2026-09-17T13:05:00Z'),
+      );
     });
 
     it('표지 키가 없으면 URL은 null이고 스토리지를 호출하지 않는다', async () => {
