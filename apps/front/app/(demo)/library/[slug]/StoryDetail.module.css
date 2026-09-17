@@ -16,8 +16,13 @@
   gap: clamp(2rem, 4vw, 3.5rem);
 }
 .book {
-  --story-cover-ratio: 3 / 4;
-  width: min(100%, 270px);
+  --story-book-height: 380px;
+  --story-cover-ratio: 0.75;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 404px;
   margin-inline: auto;
   padding-block: 0.5rem 1rem;
 }
@@ -42,7 +47,7 @@
 .blankBook { aspect-ratio: 3 / 4; width: calc(100% - 12px); margin: 2px 8px 4px 4px; }
 @media (max-width: 767px) {
   .hero { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
-  .book { width: 180px; }
+  .book { --story-book-height: 280px; min-height: 304px; }
   .intro { gap: 1rem; }
   .intro a,
   .intro button { width: 100%; padding-inline: 1rem; }

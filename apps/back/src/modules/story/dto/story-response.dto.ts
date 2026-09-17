@@ -31,6 +31,12 @@ export class StorySummaryDto implements StorySummary {
     description: '대표 이미지의 오브젝트 키. URL 이 아니다 — 변환은 클라이언트에 노출되는 시점에 한다.',
   })
   coverImageKey: string | null;
+
+  @ApiProperty({
+    nullable: true,
+    description: '대표 이미지의 표시용 서명 URL. 키가 없거나 발급 실패 시 null.',
+  })
+  coverImageUrl: string | null;
 }
 
 export class StoryCharacterSummaryDto implements StoryCharacterSummary {

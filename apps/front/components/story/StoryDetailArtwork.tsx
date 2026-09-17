@@ -13,15 +13,16 @@ import { useSession } from "@/lib/api/useSession";
 interface StoryDetailArtworkProps {
   slug: string;
   title: string;
+  coverImageUrl?: string | null;
   isCreateMode: boolean;
 }
 
 /**
  * 동화 상세 표지 삽화.
  * 제작 모드(`mode=create`)에서 로그인 사용자의 완성된 개인화 동화가 있으면 1쪽 썸네일을 표시하고,
- * 그 외(일반 모드 또는 미완성 세션)에는 제목이 새겨진 기본 책 표지를 렌더링한다.
+ * 그 외에는 DB에 연결된 기본 표지를 표시하며, 표지가 없으면 제목이 새겨진 책을 렌더링한다.
  */
-export function StoryDetailArtwork({ slug, title, isCreateMode }: StoryDetailArtworkProps) {
+export function StoryDetailArtwork({ slug, title, coverImageUrl, isCreateMode }: StoryDetailArtworkProps) {
   const authSession = useSession();
   const currentLoginId = authSession.status === "authenticated" ? authSession.me.loginId : null;
 
@@ -63,5 +64,13 @@ export function StoryDetailArtwork({ slug, title, isCreateMode }: StoryDetailArt
     };
   }, [isCreateMode, slug, currentLoginId, cachedThumbnails]);
 
-  return <StoryCover title={title} imageUrl={isCreateMode ? thumbnailUrl ?? undefined : undefined} priority />;
+  const personalizedUrl = isCreateMode ? thumbnailUrl : null;
+  return (
+    <StoryCover
+      title={title}
+      imageUrl={personalizedUrl ?? coverImageUrl ?? undefined}
+      imageFit={personalizedUrl ? "cover" : "contain"}
+      priority
+    />
+  );
 }

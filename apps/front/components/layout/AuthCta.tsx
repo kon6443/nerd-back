@@ -19,9 +19,12 @@ export function AuthCta({
   className = "",
   size = "default",
   authenticated = AUTH_LINK.authenticated,
+  prefetch,
 }: {
   className?: string;
   size?: ActionSize;
+  /** 홈의 동화 제작 진입처럼 목적지 데이터까지 미리 준비할 때 사용한다. */
+  prefetch?: boolean;
   /**
    * 로그인 후 보일 링크. 기본은 마이페이지. 홈 히어로만 `HOME_AUTHENTICATED_CTA` 를 넘긴다.
    * ⚠️ 문자열을 호출부에서 적지 않는다 — `authLinks.ts` 의 상수를 넘긴다.
@@ -42,6 +45,7 @@ export function AuthCta({
       </ActionLink>
       <ActionLink
         href={authenticated.href}
+        prefetch={prefetch}
         variant="secondary"
         size={size}
         className={`session-authenticated ${className}`}

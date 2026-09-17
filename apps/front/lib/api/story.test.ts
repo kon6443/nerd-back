@@ -56,10 +56,10 @@ describe("동화 조회 경로", () => {
   });
 
   it("봉투를 벗겨 data 만 돌려준다", async () => {
-    mockOk([{ slug: "dev-cloud-village", title: "구름 마을", summary: null, coverImageKey: null }]);
+    mockOk([{ slug: "dev-cloud-village", title: "구름 마을", summary: null, coverImageKey: null, coverImageUrl: null }]);
 
     await expect(fetchStories()).resolves.toEqual([
-      { slug: "dev-cloud-village", title: "구름 마을", summary: null, coverImageKey: null },
+      { slug: "dev-cloud-village", title: "구름 마을", summary: null, coverImageKey: null, coverImageUrl: null },
     ]);
   });
 });

@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import styles from "./StoryRoom.module.css";
 
 /** 홈의 종이·표지 재질을 잇는 페이지 배경. 별도 canvas나 animation loop가 없다. */
-export function StoryRoom({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function StoryRoom({ children, className = "", storySlug }: { children: ReactNode; className?: string; storySlug?: string }) {
   return (
-    <main className={`${styles.room} ${className}`}>
+    <main className={`${styles.room} ${styles.storyTheme} ${className}`} data-story={storySlug}>
       <div className={styles.window} aria-hidden="true"><span /><span /></div>
       <div className={styles.content}>{children}</div>
     </main>

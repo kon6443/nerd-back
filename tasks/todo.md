@@ -1,3 +1,210 @@
+# 표지·서재 개선 리팩토링 및 PR Implementation Plan — 2026-09-17
+
+> **For implementers:** 현재 변경 범위의 불필요한 코드를 정리하고 최신 main과 통합 후 PR을 게시한다.
+
+**Goal:** 표지 API·WebP 연결·동화별 책/UI·서재 첫 진입 개선을 읽기 쉬운 변경으로 정리하고 검증 가능한 PR을 만든다.
+**Architecture:** 현재 변경의 호출자와 상태 흐름을 직접 검토한 뒤, 사용되지 않는 skeleton CSS와 중복 표지 fit 조건을 정리한다. 검증된 변경을 commit하고 최신 origin/main을 merge한 뒤 feature branch를 push하여 PR을 생성한다.
+**Tech Stack:** 기존 React·Next.js·NestJS·contracts·Git/GitHub CLI 및 pnpm 검사.
+**Spec:** 사용자 요청 — 리팩토링 후 PR. 현재 작업 전체를 대상으로 하며 별도 migration은 필요 없다는 질문에 답변 완료.
+
+## Global Constraints
+
+- 기능·색상·책 비율·WebP 키·개인화 소유자 검사를 유지한다. 관련 없는 모듈/패키지를 리팩토링하지 않는다.
+- 기존 PR #59는 merged다. 새 PR은 main 대상이며 강제 push/main push/PR merge/배포는 수행하지 않는다.
+- shared DB/S3 데이터 반영은 이미 완료했다. env·원본 이미지·임시 실행 helper·서명 URL은 staging하지 않는다.
+- public API는 기존 DB 필드 재사용이며 schema migration이 없다. PR에 기존 함수 재사용·데이터 적용 상태·검증 결과를 명시한다.
+
+### Task 1: 리뷰 기반 리팩토링
+
+**Files:** 현재 diff의 backend story service/DTO/spec/contracts, frontend LibraryStoryList·StoryCover·StoryRoom·상세 shell·prefetch 호출자. Write는 apps/front/components/story/StoryCard.tsx, StoryCard.module.css, StoryDetailArtwork.tsx; 필요한 변경부 JSX 가독성 및 tasks/todo.md에 한정.
+**Interfaces:** 공개 컴포넌트 props와 API 계약 유지. originalCover class 하나로 원본 이미지의 CSS fit을 제어하고 없어진 skeleton 전용 CSS는 제거한다.
+- [x] source와 전이적 호출자를 검토해 동작 보존 리팩토링을 수행하고 프로젝트 검사로 확인했다.
+**Acceptance criteria:** 기존 테스트·시각적 결과·개인화 우선순위 동일, 불필요한 클래스/분기 제거, source 변경 범위와 PR 설명 일치.
+**Verification:** frontend/backend ci:all, 실제 표지/첫 진입의 기존 QA 근거와 리팩토링 이후 확인, foreground lint와 git diff --check.
+
+### Task 2: main 통합 및 PR 게시
+
+**Files:** 승인된 변경 파일·tasks/todo.md. Git branch feat/story-cover-images.
+**Interfaces:** origin/main fetch/merge, feature push, GitHub PR base=main. PR 제목·본문은 최종 구현과 검증을 설명한다.
+- [x] 최신 main과 통합하고 검증된 변경을 push하여 새 PR URL과 병합/CI 상태를 확인했다.
+**Acceptance criteria:** PR에서 이번 표지·서재 작업만 검토 가능, secrets 미포함, GitHub head SHA 일치 및 main 충돌 여부 확인.
+**Verification:** staged paths/diff 확인, main ancestor 및 diff, push 후 gh pr view/checks, 원격 CI 상태 확인. 임시 5602 서버/QA 브라우저는 종료하고 개발 서버는 유지한다.
+
+## Refactor verification — 2026-09-17
+
+- StoryCover props를 명명하고 원본 이미지 fit을 부모 class 한 곳에서 처리했다. 모든 값이 neutral이던 variantTone map과 사용처가 없어진 blankCover CSS를 제거했다. 공개 계약·개인화 우선순위·기존 소유자 검사는 유지한다.
+- 최종 frontend ci:all exit 0: lint·types·stubs·health-path·18 files/121 tests·production build. 최종 backend ci:all exit 0: lint·types·stubs·33 suites/313 unit tests·9 suites/66 E2E tests·build. 마지막 source 수정 이후 양쪽 npm run lint도 foreground에서 exit 0이다.
+- 전체 backend 검사 중 발견한 기존 응답 비교 테스트의 1ms timestamp 차이는 해당 테스트의 toISOString 반환값을 고정해 제거했다. 운영 예외 처리 로직은 변경하지 않았다.
+- 리팩토링 후 auth 응답을 보류한 실제 브라우저에서 제목/이미지 2개, skeleton 0개, SSR h2 2개를 확인했다. 원본 fit은 모두 contain이고 비율은 잭 2:3·빨간 모자 1:1과 일치했다. 이전 운영 빌드 진입·개인화·접근성 검증 결과도 유지한다.
+- origin/main fba9d81을 fast-forward 반영했다. 이전 HEAD와 source tree가 같아 재검증이 필요한 통합 변경은 없었다. 검증용 5602 서버와 이번 QA 브라우저를 종료했으며 기존 개발 서버는 유지했다.
+- PR: https://github.com/kon6443/nerd-back/pull/60 — main 대상 OPEN, 게시 시 MERGEABLE. 구현 commit 1017ea7의 로컬·원격·PR head SHA 일치를 확인했다. 변경 파일 23개와 staged diff를 검토했으며 env·이미지·서명 URL은 포함하지 않았다.
+- GitHub의 frontend/backend CI 실행을 확인했다. 게시 시점에는 진행 중이며 최종 결과는 PR의 Checks에서 확인할 수 있다. DB migration 불필요·공용 표지 데이터 적용 상태·별도 DB의 반영 방법을 PR 본문에 명시했다.
+
+---
+
+# 서재 첫 진입 실제 동화 표시 Implementation Plan — 2026-09-17
+
+> **For implementers:** 한 권 스켈레톤에서 두 권으로 바뀌는 단계와 공개 목록의 인증 대기를 제거한다.
+
+**Goal:** 서재가 표시되는 첫 렌더부터 서버가 조회한 실제 두 동화·기본 WebP 표지를 보여주고, 개인화는 같은 카드 안에서 적용한다.
+**Architecture:** /library/loading.tsx의 route fallback을 제거하여 데이터 준비 전에는 기존 화면을 유지한다. LibraryStoryList는 auth/세션 대기와 무관하게 전달받은 공개 stories를 렌더한다. 홈의 서재 CTA와 상단 서재 링크만 full-route prefetch하여 실제 이동 전 목록을 준비한다.
+**Tech Stack:** 기존 Next.js 16.3.3 App Router·React 19.2.8·pnpm 10.26.2. 추가 캐시·타이머·의존성 없음.
+**Spec:** 사용자 2026-09-17 21:07:42 스크린샷 — 서재 진입 시 한 권 스켈레톤 후 두 동화 표시 대신 바로 실제 두 동화를 표시해 달라는 요청.
+
+## Global Constraints
+
+- 기존 미커밋 표지·색상·WebP 작업을 유지한다. DB/S3/API/인증 판정은 변경하지 않는다.
+- 공개 목록의 서버 조회는 유지한다. 동화 두 개를 하드코딩하거나 개인화 정보를 공용 캐시에 넣지 않는다.
+- 현재 사용자 소유 썸네일만 사용하는 검사와 이탈 시 async 결과 무시를 보존한다. 인증/개인화 실패 시에도 기본 표지는 보여야 한다.
+- 서재 상세와 리더 loading은 유지한다. 홈페이지 진입 연출·취소·reduced motion을 보존한다.
+- 새로고침·느린 네트워크에서 서버 데이터 수신 시간은 필요하다. prefetch는 production에서만 작동하므로 운영 빌드로 검증하고 즉시 표시를 네트워크 무관한 보장으로 표현하지 않는다.
+
+### Task 1: 공개 목록의 중간 skeleton 제거
+
+**Files:** Modify apps/front/app/(demo)/library/LibraryStoryList.tsx, LibraryShell.tsx, page.tsx; Delete apps/front/app/(demo)/library/loading.tsx. 사용처가 없어지는 StoryListSkeleton과 그 전용 import/state 제거.
+**Interfaces:** LibraryStoryList(stories, isCreateMode)는 unknown/guest/authenticated 어떤 상태에서도 같은 공개 카드 목록을 반환한다. 개인화 조회 결과만 기존 소유자 검사 후 교체한다.
+- [x] route fallback과 auth/개인화 대기로 목록을 가리는 분기를 제거하여 처음부터 실제 공개 동화를 렌더한다.
+**Acceptance criteria:** 인증 조회를 지연해도 두 동화 제목·표지·링크가 표시되고 skeleton이 없다. 로그인 세션 조회 지연/실패 시 기본 표지가 유지되고, 다른 계정/로그아웃에서는 이전 사용자 표지가 제거된다.
+**Verification:** 수정 전 auth 응답 보류 브라우저에서 제목 0개/스켈레톤 2개 재현. 수정 후 같은 보류 조건에서 제목/기본 표지 2개, SSR HTML 실제 h2/이미지 존재, 개인화 교체·계정 변경 fixture.
+
+### Task 2: 진입 경로 미리 준비·검증
+
+**Files:** Modify apps/front/app/page.tsx, apps/front/components/layout/AuthCta.tsx, AppHeader.tsx; tasks/todo.md.
+**Interfaces:** 기존 Next Link의 prefetch=true를 홈의 /library 및 /library?mode=create CTA, 상단 서재 링크에만 전달한다. AuthCta에 optional prefetch prop으로 홈 호출 의도를 전달한다.
+- [x] 주요 서재 링크의 full-route prefetch를 적용하고 build·실제 진입/새로고침을 검증했다.
+**Acceptance criteria:** production에서 클릭 전 RSC prefetch 확인, 홈 진입 후 실제 두 카드 표시까지 한 권 skeleton 0회, 모바일 가로 넘침 없음, 버튼 목적지/기존 진입 연출·취소 유지.
+**Verification:** frontend ci:all 및 foreground npm run lint, git diff --check. 기존 서버는 유지하고 별도 임시 production 서버와 QA 브라우저만 종료한다. desktop/mobile navigation·slow auth·personalization fixture·새로고침 검사.
+
+## First-entry verification — 2026-09-17
+
+- 원인: route loading은 한 권 기본 skeleton, LibraryStoryList는 SSR의 unknown auth 및 개인화 응답 대기에서 다시 skeleton을 반환했다. 실제 stories를 이미 받아도 공개 제목/이미지를 표시하지 않았다.
+- 수정 전후: 동일한 auth 응답 보류 조건에서 제목 0/이미지 0/skeleton 목록 1 → 제목 2/이미지 2/skeleton 0. 서버 HTML의 실제 h2도 0 → 2다.
+- 운영 빌드: 별도 5602 서버에서 /library와 /library?mode=create의 클릭 전 RSC prefetch HTTP 200을 확인했다. 1440/390 화면의 홈 진입·직접 새로고침 모두 첫 서재 DOM부터 실제 제목 2개/skeleton 0개이며, 관찰 중 한 권 단계는 없었다. 가로 넘침 0, 홈 이탈 canvas 0, runtime exception 0.
+- 기능: Escape 진입 취소·reduced motion 이동 유지. 개인화 응답 보류 중 기본 WebP 유지, 완료 후 같은 카드 DOM에서 썸네일 교체, 다른 계정의 세션 조회 500과 로그아웃 후 기본 표지 유지. 실제 auth/세션 쓰기 0회.
+- 검증: frontend ci:all exit 0 — 18 files/121 tests·lint·types·stubs·health-path·production build. foreground npm run lint exit 0. 로컬 Next 16.3.3의 navigation guide와 Link prefetch 문서를 적용했으며, 네트워크 수신 자체가 생략되는 것은 아니다.
+- 자료: /tmp/nerd-library-first-{before,after}.json, /tmp/nerd-library-entry-report.json, /tmp/nerd-library-entry-{1440,390}.png. 운영 테스트 fixture는 별도 브라우저에서만 적용했다.
+
+---
+
+# 표지 비율·동화별 책과 UI 색상 Implementation Plan — 2026-09-17
+
+> **For implementers:** 사용자 스크린샷의 빈 표지 여백을 제거하고 기존 서재·소개 UI 안에서 두 그림의 비율과 팔레트를 적용한다.
+
+**Goal:** 잭과 콩나무는 2:3 세로형, 빨간 모자는 1:1 정사각형 책으로 표시하고 책등·페이지 가장자리·카드·버튼·소개 화면을 표지와 어울리게 만든다. 추가 요청에 따라 기존 WebP 변환 함수를 재사용해 표지 전송량도 줄인다.
+**Architecture:** StoryCover의 기존 imageFit 구분으로 원본 표지에만 해당 동화의 CSS 비율을 사용한다. StoryRoom.module.css의 동화별 scoped 변수는 목록 li와 상세 main에서 공유한다. 목록의 고정 높이 표지 전시 영역을 skeleton도 사용해 로딩 시 텍스트·버튼 위치를 보존한다.
+**Tech Stack:** 기존 Next.js 16.3.3·React·CSS Modules·pnpm 10.26.2. 새 라이브러리·상태·effect·canvas 없음.
+**Spec:** 사용자 2026-09-17 20:52:48 스크린샷 — 책 표지에 맞는 책 사이즈와 표지 색상에 어울리는 책/UI 요청.
+
+## Global Constraints
+
+- 기존 S3/DB 표지 연결과 모든 미커밋 작업을 유지한다. 추가 최적화 요청에 한해 두 표지의 WebP 복사본과 DB 표지 키를 갱신한다. 기존 PNG는 보존하며 API·다른 DB 필드는 추가 변경하지 않는다.
+- 서재 목록·동화 소개에 범위를 한정한다. 홈·촬영·로그인·리더 및 공통 GNB의 색상은 유지한다.
+- 두 첨부 표지의 비율은 1024:1536, 1254:1254로 이미 확인했다. 원본 전체를 표시하고 이미지 로드 전부터 같은 공간을 확보한다.
+- 개인화 썸네일의 우선순위·소유자 검사·기존 cover 맞춤(목록 4:3, 상세 3:4)과 링크를 보존한다. 모바일 가로 넘침 0, 주요 터치 타깃 56px, 본문·버튼 대비 4.5:1, 키보드 focus와 reduced motion을 검증한다.
+- 기존 파란 CTA 기본 규칙은 다른 화면에 유지한다. 요청에 따라 해당 두 동화 표면 안에서만 진한 숲 초록·붉은 갈색을 적용한다.
+- Impeccable context.mjs는 설치된 scripts/lib/target-args.mjs 누락으로 실행 실패했다. skill 설치 복구는 범위 밖이며 사용자 스크린샷·현행 CSS/컴포넌트를 시각 기준으로 삼는다.
+
+### Task 1: 원본 비율 책과 목록 배치
+
+**Files:** Modify apps/front/components/story/StoryCard.tsx, StoryCard.module.css; apps/front/app/(demo)/library/LibraryShell.tsx, LibraryStoryList.tsx; apps/front/components/layout/StoryRoom.module.css.
+**Interfaces:** StoryCover의 imageFit='contain'은 --story-original-ratio를 사용한다. 목록 coverStage는 실제·skeleton 공용; theme은 li의 data-story slug로 결정한다. 기존 개인화 imageFit='cover'는 4:3 유지.
+- [x] 책 면을 원본 비율로 맞추고 여백 없는 표지·어울리는 책등·종이 두께와 정렬된 카드/버튼을 표시했다.
+**Acceptance criteria:** 두 책의 렌더링 width/height와 원본 비율 일치, 제목/그림 자름·늘림 없음, 개인화/표지 없음 fallback 유지, 카드별 CTA 하단 정렬 및 skeleton 전시 높이 일치.
+**Verification:** 1440·768·390·320 viewport의 DOM 비율/overflow/버튼 높이 검사, PC·모바일 캡처 확인, 개인화 fixture와 로그아웃 회귀.
+
+### Task 2: 동화별 소개 팔레트·최종 검증
+
+**Files:** Modify apps/front/components/layout/StoryRoom.tsx, StoryRoom.module.css; apps/front/app/(demo)/library/[slug]/StoryDetailShell.tsx, StoryDetail.module.css, page.tsx; tasks/todo.md.
+**Interfaces:** StoryRoom.storySlug?: string, StoryDetailShell.storySlug?: string로 scoped 색/비율 변수를 전달한다. 서재는 공통 크림·숲 색상, 두 상세는 각 동화의 팔레트 사용.
+- [x] 상세 책 비율과 표지별 UI 색상을 연결하고 프로젝트 검사 및 실제 UI 검증을 완료했다.
+**Acceptance criteria:** 동화별 책·제목·CTA·보조 텍스트·focus 색 조화, 글자/버튼 대비 통과, 모바일/키보드/기존 이동 유지, 화면 밖 글로벌 UI 변화 없음.
+**Verification:** frontend ci:all, foreground npm run lint, git diff --check. 실제 두 상세·목록을 한 번에 검사하고 발견된 결함이 있으면 한 묶음 수정 후 확인 1회. CSS 중심 변경에 별도 구현 복제 단위 테스트를 만들지 않는다.
+
+### Task 3: 기존 변환 함수로 표지 WebP 적용
+
+**Files:** Read apps/back/src/modules/story-session/convertImageToWebp.ts 및 해당 spec. 임시 /tmp/nerd-cover-webp-{prepare,apply,verify}.mjs와 검증 manifest; 소스 로직·의존성 추가 없음.
+**Interfaces:** 기존 convertImageToWebp(Buffer): Promise<Buffer>, sharp quality 85. 변환한 bytes의 hash를 포함하는 prod/templates/{slug}/cover-{hash}.webp 키를 S3에 추가하고 두 DB 행의 기존 PNG 키를 비교 갱신한다.
+- [x] 기존 함수를 재사용해 원본 크기·비율을 보존한 WebP를 만들고, 용량·시각 품질·S3 다운로드·실제 API를 검증한 후 표시했다.
+**Acceptance criteria:** 원본 두 PNG 및 기존 S3 오브젝트 보존, 새 파일 MIME image/webp, 해상도/비율 동일, 전송 bytes 감소, DB는 해당 두 cover_image_key만 변경, 개인화 변환 로직과 다른 콘텐츠 불변.
+**Verification:** 기존 convertImageToWebp.spec.ts 실행, sharp metadata·bytes/hash 확인, 새 WebP 이미지 시각 확인, DB transaction 전후 콘텐츠 counts 및 새 키 재조회, 실제 API 이미지 HTTP 200·MIME/bytes/hash 일치와 최종 브라우저 회귀 검사.
+
+## Shape, palette & WebP verification — 2026-09-17
+
+- 비율/팔레트: 두 원본에 맞는 잭 2:3, 빨간 모자 1:1 CSS 비율을 이미지 로딩 전부터 확보한다. 책 면의 빈 띠가 제거되었고, 동화별 책등·가장자리·제목·카드·CTA·focus 색을 scoped 변수로 공유한다. 개인화 이미지는 목록 4:3/상세 3:4와 기존 cover 맞춤을 유지했다. 추가 state/effect/observer/canvas는 없다.
+- UI 근거: Chromium 1440·768·390·320 너비에서 목록·두 상세 12개 조합의 원본/렌더 비율 일치(오차 0.001 미만), 가로 넘침 0, CTA 높이 최소 56px 및 데스크톱 하단 정렬을 확인했다. PC·모바일 실제 viewport 캡처에서 제목·그림·종이 두께를 확인했다. 텍스트/버튼의 최소 실측 대비는 6.28:1. 키보드 focus-visible 3px 테마색 outline과 reduced-motion을 확인했다.
+- QA 보정: 자동 검사의 reduced-motion 기대값이 0s로 잘못 고정되어 실패했다. globals.css가 0.01ms !important 정책을 적용하며 실제 값은 1e-05s임을 확인했다. 제품 코드는 그대로 두고 검증을 해당 정책과 일치시킨 뒤 남은 기능만 검사했다. 레이아웃 검사를 반복하지 않았다.
+- 로딩/개인화: 목록 skeleton과 실제 coverStage 높이 모두 356px. fixture에서 개인화 썸네일 우선 표시, 목록 4:3/상세 3:4, 로그아웃 후 원본 2:3 복귀 통과. runtime exception 0, 실제 auth/세션 쓰기 0회.
+- 최적화 원인/수정: 기존 표지는 원본 PNG를 unoptimized로 직접 표시해 합계 6,502,867 bytes가 필요했다. 기존 convertImageToWebp 함수(sharp quality 85)를 재사용했다. 원본 해상도를 유지하며 잭 3,171,373→392,856 bytes(87.61% 감소), 빨간 모자 3,331,494→517,610 bytes(84.46% 감소), 합계 약 86% 감소했다. 전송 시간 배수 향상을 단정하지 않는다.
+- S3/DB: 새 키는 prod/templates/jack-and-beanstalk/cover-b4748985efa68b01.webp 및 prod/templates/red-riding-hood/cover-45013953ab26bba6.webp. 기존 PNG 오브젝트를 보존하고 id=2/3 cover_image_key만 이전 키 비교 조건과 transaction으로 갱신했다. 각 동화의 전체 페이지 7·등장인물 4·세션 4개는 동일하다. 실제 목록·상세 API와 이미지 GET HTTP 200, image/webp, 최적화 파일 SHA256 일치를 확인했다.
+- 검사: 최종 frontend ci:all exit 0 — lint·types·stubs·health-path·18 files/121 tests·production build. 기존 WebP 변환 Jest 2 tests 통과. 최종 foreground npm run lint exit 0. 소스는 로컬 변경이며 새 PR/배포는 아직 수행하지 않았다.
+- 근거: /tmp/nerd-cover-theme-report.json, /tmp/nerd-cover-theme-*.png, /tmp/nerd-cover-webp-{before,applied,api-report}.json. 임시 helper·원본·변환 이미지·서명 URL은 저장소 변경에 포함하지 않는다.
+
+---
+
+# 빨간 모자·잭과 콩나무 표지 연결 Implementation Plan — 2026-09-17
+
+> **For implementers:** 첨부 원본 두 장을 기존 S3와 MySQL 표지 필드로 연결하고 실제 화면에서 확인한다.
+
+**Goal:** 빨간 모자는 첨부 00-little-red-riding-hood-cover.png, 잭과 콩나무는 jack-and-the-beanstalk-cover.png를 기본 책 표지로 표시한다.
+**Architecture:** 기존 story_templates.cover_image_key와 StoragePort를 재사용한다. 공개 동화 목록·상세 응답에 coverImageUrl을 추가해 조회 시 서명 URL을 만들고, frontend는 개인화 썸네일이 없을 때 이 URL을 사용한다. 원본 PNG는 콘텐츠 hash가 포함된 새 S3 키에 업로드하고 두 기존 DB 행의 표지 키만 트랜잭션으로 갱신한다.
+**Tech Stack:** 기존 NestJS·TypeORM/MySQL·S3·Next.js·React·contracts·Jest/Vitest·pnpm 10.26.2. 새 dependency나 DB schema 없음.
+**Spec:** 사용자 제공 이미지 2장을 DB에 저장하여 해당 동화의 책 표지로 사용한다는 요청.
+
+## Global Constraints
+
+- 현재 환경은 공용 MySQL 및 S3 prod/ prefix를 사용한다. DB에는 원본 binary/만료 URL 대신 반환된 오브젝트 키를 저장한다.
+- 대상 slug는 red-riding-hood, jack-and-beanstalk 두 개뿐이다. 기존 키와 페이지·등장인물·세션 개수를 읽어 기록한 후 표지 키만 비교 갱신한다.
+- 기존 원본 오브젝트를 덮어쓰거나 삭제하지 않는다. 전체 seed 스크립트는 하위 페이지·등장인물을 교체하므로 실행하지 않는다.
+- 사용자 원본 그림과 제목을 자르지 않는다. 기본 표지는 contain으로 표시하며 기존 개인화 썸네일 우선순위·소유자 검사·책 입체 틀을 유지한다.
+- 업로드·DB 변경은 검증된 소스와 구체적인 대상/이전 키/새 키가 준비된 뒤 실행한다. secrets·서명 URL·임시 데이터 작업 파일은 commit하지 않는다.
+
+### Task 1: 공개 표지 URL 계약·조회
+
+**Files:** Modify packages/contracts/src/story.ts; apps/back/src/modules/story/story.service.ts, dto/story-response.dto.ts, story.service.spec.ts; 필요한 API fixture apps/back/test/story.e2e-spec.ts 및 apps/front/lib/api/story.test.ts.
+**Interfaces:** StorySummary.coverImageUrl: string | null (StoryDetail 상속). StoryService.toSummary(): Promise<StorySummary>, 기존 StoragePort.getPresignedUrl(key) 사용.
+- [x] 목록·상세의 공개된 표지 키를 URL로 변환하고 빈 키/서명 실패는 null로 반환한다.
+**Acceptance criteria:** 공개 조건과 응답 필드 보존, private/draft 조회 방지, URL 실패가 동화 조회 실패로 번지지 않음. 목록의 URL 발급은 Promise.all로 병렬 처리.
+**Verification:** 계약/응답/조회 조건/키 없음/서명 실패에 대한 Jest 회귀 테스트, contracts와 backend lint·typecheck·tests·build.
+
+### Task 2: 목록·소개 표지 표시
+
+**Files:** Modify apps/front/app/(demo)/library/LibraryStoryList.tsx, [slug]/page.tsx; apps/front/components/story/StoryDetailArtwork.tsx, StoryCard.tsx, StoryCard.module.css.
+**Interfaces:** StoryDetailArtwork에 coverImageUrl 전달; StoryCard/StoryCover.imageFit?: 'cover' | 'contain'. 기본 표지 URL은 nullish fallback이며 개인화 URL은 기존 우선순위 유지.
+- [x] 새 기본 표지를 목록과 상세에 연결하고 두 비율의 원본을 잘리지 않게 표시한다.
+**Acceptance criteria:** 빨간 모자/잭과 콩나무의 해당 이미지 표시, 다른 동화의 기본 표지·개인화 썸네일 유지, 기존 링크/키보드/모바일 폭 유지.
+**Verification:** frontend ci:all; 실제 두 동화 목록·상세를 1440/390 너비에서 확인, 이미지 naturalWidth와 object-fit, 개인화/로그아웃 fixture 회귀 검사.
+
+### Task 3: S3·DB 표지 반영
+
+**Files:** 저장소 소스 외부 /tmp/nerd-cover-inspect.mjs, /tmp/nerd-cover-before.json, 업로드 실행 helper; 사용자 첨부 원본 두 파일.
+**Interfaces:** 환경의 기존 S3 설정 및 MySQL 앱 계정. 새로운 키는 prod/templates/{slug}/cover-{sha256 앞 16자리}.png. SQL의 이전 cover_image_key 비교 조건으로 동시 변경 보호.
+- [x] 원본 hash와 S3 업로드/다운로드 hash를 검증하고 두 표지 키를 한 트랜잭션으로 갱신한다.
+**Acceptance criteria:** 정확히 두 행 갱신, 이전 키 복구 가능, 첨부 원본 byte 동일, DB 외 컬럼과 기존 콘텐츠/세션 개수 보존.
+**Verification:** S3 GET sha256 일치, DB 재조회와 콘텐츠/세션 개수 비교, 실제 API 목록·상세에서 각 새 키와 유효한 이미지 URL 확인.
+
+### Task 4: 전체 검증·정리
+
+**Files:** 위 파일, tasks/todo.md, 검증 중 발견된 비결정적 timestamp 비교 테스트 apps/back/src/common/filters/http-exception.filter.spec.ts.
+**Interfaces:** npx --yes pnpm@10.26.2 back ci:all / front ci:all, foreground npm run lint, git diff --check, 실제 로컬 UI.
+- [x] 기존 오류 응답 비교 테스트의 실제 시각 1ms 차이를 고정 시각으로 바로잡고, 프로젝트 검사와 실화면 검증을 마쳤다.
+**Acceptance criteria:** source·DB·스토리지·화면이 서로 일치하고 실제 적용 여부와 배포 상태를 구분해 보고한다.
+**Verification:** frontend/backend 검사 exit 0, 실제 이미지 로드·에러 없음, diff check와 변경 파일 목록 확인. 현재 개발 서버 유지.
+
+## Cover verification — 2026-09-17
+
+- 계약/API: 구현 전 새 coverImageUrl 기대값 5개가 실패하고 기존 12개가 통과함을 확인했다. 구현 후 키 없음, URL 발급 실패의 개별 격리, 미공개/미존재 조회 제한과 HTTP 응답 회귀 검증이 통과했다.
+- 프로젝트 검사: frontend ci:all exit 0 — lint·types·stubs·health-path·18 files/121 tests·production build. backend ci:all exit 0 — lint·types·stubs·33 unit suites/313 tests·9 E2E suites/66 tests·build. contracts build도 통과했다.
+- 최종 foreground 검사: apps/front와 apps/back에서 각각 npm run lint exit 0, git diff --check 통과. 검증용 nerd-cover-qa 브라우저 세션은 종료했다.
+- 검사 중 기존 HttpExceptionFilter 테스트가 두 호출의 실제 시각 차이(.349Z/.350Z)를 같은 값으로 기대하여 실패했다. 해당 테스트의 toISOString 반환만 고정해 결정적으로 비교하도록 수정했다. 제품 오류 처리 로직은 변경하지 않았다.
+- 데이터: id=2 jack-and-beanstalk 및 id=3 red-riding-hood의 cover_image_key만 transaction으로 변경했다. 새 키는 각각 prod/templates/jack-and-beanstalk/cover-010e79e283f7b9f9.png, prod/templates/red-riding-hood/cover-6fbb8360fee1f378.png. 이전 templates/{slug}/page-1.png 오브젝트와 복구용 이전 키를 보존했다. 각 동화의 전체 페이지 7개·등장인물 4개·세션 4개는 동일하다.
+- 원본: S3 GET 및 실제 API에서 발급한 URL GET 모두 HTTP 200/image/png. 잭 3,171,373 bytes, 빨간 모자 3,331,494 bytes의 SHA256이 사용자 첨부와 각각 일치한다. 변환·자르기 없이 원본 그대로 저장했다. API 상세의 본편 pageCount는 각각 5다.
+- UI: Chromium 1440×900/390×844에서 서재·두 소개·제작 모드 소개 8개 조합을 확인했다. 해당 표지 키, naturalWidth 1024/1254, contain, 기존 링크와 가로 넘침 없음, runtime exception 0. 이미지 decode 완료 후 실제 viewport 캡처를 눈으로 확인했다. 모바일 소개의 전체 페이지 캡처에서만 표지가 가려지는 현상이 재현되어, 같은 화면의 viewport 캡처와 비교했다. 실제 viewport에서는 정상이며 이 캡처 현상을 제품 결함으로 처리하지 않았다.
+- 개인화: 브라우저 fetch fixture로 목록·제작 상세의 개인화 썸네일 우선순위와 cover fit 유지, 로그아웃 후 DB 기본 표지 복귀를 확인했다. 실제 인증/세션 쓰기 0회. 기존 소유자 검사와 캐시 로직은 보존했다.
+- 적용 범위: S3·공용 DB 반영 완료. API·frontend 소스는 feat/story-cover-images의 로컬 변경이며 배포/새 PR은 아직 수행하지 않았다. 개발 서버 5502/5501은 유지한다.
+- 근거: /tmp/nerd-cover-{before,applied,api-report,ui-report}.json 및 /tmp/nerd-cover-viewport-*.png. 서명 URL·env·원본 이미지·QA helper는 저장소 변경에 포함하지 않는다.
+
+---
+
 # PR #58 초기 3D 비용·썸네일 캐시 개선 Implementation Plan — 2026-09-17
 
 > **For implementers:** 승인된 두 성능 개선을 구현하고 회귀 검증을 완료한다.
