@@ -349,6 +349,7 @@ describe('StoryService', () => {
         pageNo: 3,
         bodyText: '늑대가 숲에서 빨간 모자를 만났습니다.',
         baseImageKey: 'pages/lrrh-3.png',
+        baseImageUrl: 'https://storage.local/pages/lrrh-3.png',
         narrationAudioUrl: null,
         personaTargetRole: 'protagonist',
         characters: [
@@ -362,10 +363,56 @@ describe('StoryService', () => {
       });
     });
 
+    it('기본 삽화는 5분 고정 윈도우 서명 URL로 발급하고 키가 없으면 null이다', async () => {
+      jest.useFakeTimers({ now: new Date('2026-09-17T13:00:01Z') });
+      templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ pageNo: 1, baseImageKey: 'pages/red-1.webp' }),
+      );
+      pageCharacters.find.mockResolvedValue([]);
+
+      const result = await service.getPublishedPage('little-red-riding-hood', 1);
+
+      expect(result.baseImageUrl).toBe('https://storage.local/pages/red-1.webp');
+      expect(storage.getPresignedUrl).toHaveBeenCalledWith(
+        'pages/red-1.webp',
+        3600,
+        new Date('2026-09-17T13:00:00Z'),
+      );
+
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ pageNo: 1, baseImageKey: null }),
+      );
+      const nullResult = await service.getPublishedPage('little-red-riding-hood', 1);
+      expect(nullResult.baseImageUrl).toBeNull();
+
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ pageNo: 1, baseImageKey: '   ' }),
+      );
+      const spaceResult = await service.getPublishedPage('little-red-riding-hood', 1);
+      expect(spaceResult.baseImageUrl).toBeNull();
+    });
+
+    it('기본 삽화 URL 발급 실패는 본문 조회를 실패시키지 않고 null로 내린다', async () => {
+      templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ baseImageKey: 'pages/fail.webp' }),
+      );
+      pageCharacters.find.mockResolvedValue([]);
+      storage.getPresignedUrl.mockRejectedValueOnce(new Error('storage unavailable'));
+
+      const result = await service.getPublishedPage('little-red-riding-hood', 1);
+      expect(result.baseImageUrl).toBeNull();
+      expect(result.bodyText).toBeDefined();
+    });
+
     it('낭독 키는 서명 URL로 바꾸고 오브젝트 키를 응답에 노출하지 않는다', async () => {
       templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
       pages.findOneBy.mockResolvedValue(
-        createStoryPage({ narrationAudioKey: 'prod/narration/red/page-3.mp3' }),
+        createStoryPage({
+          baseImageKey: null,
+          narrationAudioKey: 'prod/narration/red/page-3.mp3',
+        }),
       );
       pageCharacters.find.mockResolvedValue([]);
       storage.getPresignedUrl.mockResolvedValueOnce('https://storage.local/red-3.mp3?signed=1');
@@ -380,7 +427,10 @@ describe('StoryService', () => {
     it('낭독 URL 발급 실패는 본문 조회를 실패시키지 않고 null로 내린다', async () => {
       templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
       pages.findOneBy.mockResolvedValue(
-        createStoryPage({ narrationAudioKey: 'prod/narration/red/page-3.mp3' }),
+        createStoryPage({
+          baseImageKey: null,
+          narrationAudioKey: 'prod/narration/red/page-3.mp3',
+        }),
       );
       pageCharacters.find.mockResolvedValue([]);
       storage.getPresignedUrl.mockRejectedValueOnce(new Error('storage unavailable'));
@@ -389,6 +439,23 @@ describe('StoryService', () => {
         narrationAudioUrl: null,
         bodyText: expect.any(String),
       });
+    });
+
+    it('기본 삽화와 낭독 음성이 모두 존재하면 두 서명 URL을 함께 반환한다', async () => {
+      templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({
+          pageNo: 1,
+          baseImageKey: 'pages/red-1.webp',
+          narrationAudioKey: 'audio/red-1.mp3',
+        }),
+      );
+      pageCharacters.find.mockResolvedValue([]);
+
+      const result = await service.getPublishedPage('little-red-riding-hood', 1);
+
+      expect(result.baseImageUrl).toBe('https://storage.local/pages/red-1.webp');
+      expect(result.narrationAudioUrl).toBe('https://storage.local/audio/red-1.mp3');
     });
   });
 });
