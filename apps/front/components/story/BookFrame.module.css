@@ -140,6 +140,36 @@
   order: 1;
 }
 
+/*
+ * 1단(모바일)의 낭독 조작 자리 — **책 프레임 아래 밖**(2026-09-18 요청).
+ * 1단의 본문 칸(`.page`)은 높이 15rem 고정 스크롤이라, 본문 끝의 조작은 스크롤해야만 보였다.
+ * `BookPager` 가 두 자리에 그리고 **여기서 하나만** 보인다. `display: none` 이라 숨은 쪽은 포커스·보조기술에서 빠진다.
+ * ⚠️ `relative` — 책(`.book`)이 positioned 라 static 이면 넘어가는 종이 밑에 깔린다(`READER_BAR` 와 같은 이유).
+ */
+.outsideControls {
+  position: relative;
+}
+
+/* 본문 쪽 안에서는 구분선이 본문과 조작을 가르지만, 책 밖에서는 책 테두리가 이미 그 선이다. */
+.outsideControls > :first-child {
+  border-top-width: 0;
+  padding-top: 0;
+}
+
+.page > .pageControls {
+  display: none;
+}
+
+@media (min-width: 48rem) {
+  .page > .pageControls {
+    display: block;
+  }
+
+  .outsideControls {
+    display: none;
+  }
+}
+
 @media (min-width: 48rem) {
   .spread {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -580,14 +610,46 @@
   block-size: auto;
 }
 
-/* 1단 화면의 한 면 — 삽화와 본문을 세로로 쌓아 밑에 깔린 책과 같은 모양을 만든다. */
-.faceStack {
-  display: flex;
-  flex-direction: column;
+/*
+ * 1단 화면의 한 면 — 삽화와 본문을 세로로 쌓아 밑에 깔린 책과 **똑같은** 모양을 만든다.
+ * ⭐ 넘김이 시작되는 순간 종이가 밑면과 한 픽셀도 달라지면 안 된다. 예전에는 삽화가 비율을 잃고 줄어
+ *    (262 → 198px) 본문이 튀어 올랐고, 흰 테두리도 없어 **종이 복제본이 떼어지는** 모양이었다(2026-09-18 실측).
+ *    그래서 삽화는 비율을 지키고(`flex: none`), 테두리는 `.surface` 와 같은 3px 흰 선이다.
+ */
+.faceStack,
+.faceBlank {
+  border: 3px solid var(--color-surface-raised);
   background-color: var(--page-paper, var(--color-surface));
   background-image: var(--paper-grain);
   background-size: 160px 160px;
   background-blend-mode: multiply;
+}
+
+.faceStack {
+  display: flex;
+  flex-direction: column;
+}
+
+.sliceInner > .faceStack > .art {
+  flex: none;
+}
+
+.sliceInner > .faceBlank {
+  block-size: 100%;
+}
+
+/* 1단 종이는 **책등 쪽 모서리도** 둥글다 — 모바일 책은 네 모서리가 다 둥근 카드다. 뒷면은 좌우가 반대다. */
+.leaf[data-single] > .seg > .segFace .slice {
+  border-radius: var(--tip-top) 0 0 var(--tip-bottom);
+}
+
+.leaf[data-single] > .seg > .segBack .slice {
+  border-radius: 0 var(--tip-top) var(--tip-bottom) 0;
+}
+
+/* 1단은 비치지 않는다 — 넘어가는 종이 밑으로 도착 쪽 글자가 겹쳐 보여 두 장이 뒤엉켜 보였다. */
+.leaf[data-single] .slice {
+  opacity: 1;
 }
 
 /*
@@ -738,49 +800,64 @@
   }
 }
 
-/* 1단은 떠나는 쪽이 들려 사라지면 끝이다 — 뒷면이 필요 없어 90°까지만 돌린다. 앞지르는 구간이 없다. */
-@keyframes leaf-next-single {
+/*
+ * 1단(모바일) 넘김 — **책등(왼쪽)을 축으로 180° 넘어간다.** 두 방향 모두 왼쪽 축이다(`BookPager` 가 `data-turn="next"` 로 둔다).
+ *   - 다음 쪽(`out`): 떠나는 쪽이 들려 왼쪽으로 넘어간다. 밑면은 처음부터 도착 쪽이다.
+ *   - 이전 쪽(`in`): `out` 을 **시간만 거꾸로** — 앞 쪽이 왼쪽에서 넘어와 덮는다. 밑면은 덮일 때까지 떠나는 쪽이다.
+ * ⭐ 90° 를 **속도가 붙은 채로** 지난다. 예전에는 90° 에서 감속해 멈추며 끝났다 — 가장 느린 순간에 종이가
+ *    모서리째 사라져 "뜯겨 나가는" 것처럼 보였다(2026-09-18 지적).
+ * ⚠️ 휨 제약은 펼침면과 같다: 58 × curl < |각도| 이고, 90° 를 넘은 뒤에는 58 × curl < 180 − |각도|.
+ */
+@keyframes leaf-single-out {
   0% {
     --turn-angle: 0deg;
     --curl: 0;
   }
-  15% {
-    --turn-angle: -10deg;
-    --curl: 0.14;
+  12% {
+    --turn-angle: -8deg;
+    --curl: 0.12;
   }
-  40% {
-    --turn-angle: -45deg;
-    --curl: 0.6;
+  35% {
+    --turn-angle: -50deg;
+    --curl: 0.5;
   }
-  70% {
-    --turn-angle: -78deg;
-    --curl: 0.45;
+  55% {
+    --turn-angle: -98deg;
+    --curl: 0.55;
+  }
+  78% {
+    --turn-angle: -150deg;
+    --curl: 0.18;
   }
   100% {
-    --turn-angle: -90deg;
+    --turn-angle: -180deg;
     --curl: 0;
   }
 }
 
-@keyframes leaf-prev-single {
+@keyframes leaf-single-in {
   0% {
-    --turn-angle: 0deg;
+    --turn-angle: -180deg;
     --curl: 0;
   }
-  15% {
-    --turn-angle: 10deg;
-    --curl: 0.14;
+  22% {
+    --turn-angle: -150deg;
+    --curl: 0.18;
   }
-  40% {
-    --turn-angle: 45deg;
-    --curl: 0.6;
+  45% {
+    --turn-angle: -98deg;
+    --curl: 0.55;
   }
-  70% {
-    --turn-angle: 78deg;
-    --curl: 0.45;
+  65% {
+    --turn-angle: -50deg;
+    --curl: 0.5;
+  }
+  88% {
+    --turn-angle: -8deg;
+    --curl: 0.12;
   }
   100% {
-    --turn-angle: 90deg;
+    --turn-angle: 0deg;
     --curl: 0;
   }
 }
@@ -790,11 +867,16 @@
  * 하나로 합치면 어느 쪽이 남는지 알 수 없다. **이름을 따로 주고 여기서 갈아 끼운다.**
  */
 @media (max-width: 47.99rem) {
-  .leaf[data-turn="next"] {
-    animation-name: leaf-next-single;
+  .leaf[data-single] {
+    /* 반 바퀴를 온전히 도니 펼침면 반쪽보다 조금 길게 — 서두르면 다시 휙 날아가 보인다. */
+    animation-duration: 720ms;
   }
 
-  .leaf[data-turn="prev"] {
-    animation-name: leaf-prev-single;
+  .leaf[data-single="next"] {
+    animation-name: leaf-single-out;
+  }
+
+  .leaf[data-single="prev"] {
+    animation-name: leaf-single-in;
   }
 }

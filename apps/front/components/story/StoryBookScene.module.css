@@ -19,7 +19,7 @@
 .castle span:nth-child(2) { left: 22px; top: -36px; }
 .castle span:nth-child(3) { left: auto; right: -7px; }
 .tree { position: absolute; bottom: 0; left: 16px; width: 8px; height: 40px; border-radius: 3px; background: var(--color-paper-edge-strong); }
-.tree::before { position: absolute; content: ""; width: 41px; height: 54px; bottom: 17px; left: -17px; border-radius: 52% 48% 45% 44%; background: var(--color-primary-soft); box-shadow: inset -9px -4px 0 var(--color-hill-2); }
+.tree::before { position: absolute; content: ""; width: 41px; height: 54px; bottom: 17px; left: -17px; border-radius: 52% 48% 45% 44%; background: var(--color-hill-1); box-shadow: inset -9px -4px 0 var(--color-hill-2); }
 .smallTree { left: auto; right: 2px; transform: scale(.72); transform-origin: bottom; }
 .ribbon { position: absolute; width: 13px; height: 40px; left: 120px; bottom: -34px; background: var(--color-accent-b); clip-path: polygon(0 0,100% 0,100% 100%,50% 80%,0 100%); }
 .pageMarks { position: absolute; display: flex; gap: 6px; left: 50%; bottom: -7px; transform: translateX(-50%); }

@@ -68,7 +68,9 @@ export function NarrationPlayer({
       >
         처음부터
       </button>
-      <div className="min-w-28 flex-1" aria-hidden="true">
+      {/* 최소 폭을 좁게 둔다 — 모바일 책 아래(폭 ~360px)와 태블릿 오른쪽 쪽에서 시간 표시까지 **한 줄**에 들어가야 한다.
+          넓으면 시간이 다음 줄로 꺾여 모바일에서는 하단바 밑으로 숨었다(2026-09-18 390px 실측). */}
+      <div className="min-w-16 flex-1" aria-hidden="true">
         <div className="h-2 overflow-hidden rounded-pill bg-line">
           {/* 진행 표시는 버튼이 아니라 위치다 — 초록(GNB 전용)이 아니라 하단바 진행 점과 같은 파랑. */}
           <div
