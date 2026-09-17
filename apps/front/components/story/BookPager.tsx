@@ -109,8 +109,8 @@ function LeafSegments({
   depth: number;
   direction: TurnDirection;
   front: ReactNode;
-  /** 1단 화면에는 뒷면이 없다 — 떠나는 쪽이 들려 사라지면 끝이다. */
-  back: ReactNode | null;
+  /** 넘어간 뒤 보이는 면. 1단 화면은 빈 종이다(넘어간 종이가 내려앉을 왼쪽 쪽이 없다). */
+  back: ReactNode;
 }) {
   if (depth >= LEAF_SEGMENTS) return null;
   // 책 모서리를 물려받아야 하는 것은 **바깥 끝 마디**뿐이다.
@@ -126,11 +126,9 @@ function LeafSegments({
       <div className={styles.segFace}>
         <LeafSlice index={sliceIndex(depth, direction, "front")}>{front}</LeafSlice>
       </div>
-      {back ? (
-        <div className={`${styles.segFace} ${styles.segBack}`}>
-          <LeafSlice index={sliceIndex(depth, direction, "back")}>{back}</LeafSlice>
-        </div>
-      ) : null}
+      <div className={`${styles.segFace} ${styles.segBack}`}>
+        <LeafSlice index={sliceIndex(depth, direction, "back")}>{back}</LeafSlice>
+      </div>
       <LeafSegments depth={depth + 1} direction={direction} front={front} back={back} />
     </div>
   );
@@ -246,13 +244,15 @@ export function BookPager({
   }, [pageNo, pageCount, onRequestPage]);
 
   // 밑에 깔리는 펼침면. 넘기는 중에는 종이가 아직 덮지 않은 면에 떠나는 쪽이, 드러난 면에 도착 쪽이 있다.
+  // 1단 이전 쪽은 **앞 쪽이 왼쪽에서 넘어와 덮는다** — 덮일 때까지 밑면은 떠나는 쪽 그대로다.
   let baseArt = shownPageNo;
   let baseText = shownPageNo;
   if (turn) {
     const nextSpread = turn.layout === "spread" && turn.direction === "next";
     const prevSpread = turn.layout === "spread" && turn.direction === "prev";
-    baseArt = nextSpread ? turn.from : turn.to;
-    baseText = prevSpread ? turn.from : turn.to;
+    const prevSingle = turn.layout === "single" && turn.direction === "prev";
+    baseArt = nextSpread || prevSingle ? turn.from : turn.to;
+    baseText = prevSpread || prevSingle ? turn.from : turn.to;
   }
 
   // 밑면 삽화가 바뀌면 직전 것을 아래에 남긴다. 다음 교체 때 밀려난다 — 한 장만 더 들고 있는다.
@@ -302,7 +302,9 @@ export function BookPager({
               // 쪽 조합이 바뀌면 새 종이로 애니메이션을 처음부터 돌린다.
               key={`${turn.from}-${turn.to}`}
               aria-hidden="true"
-              data-turn={turn.direction}
+              // 1단은 책등이 늘 왼쪽이라 두 방향 모두 왼쪽 축으로 돈다. 방향은 `data-single` 이 키프레임을 고른다.
+              data-turn={turn.layout === "single" ? "next" : turn.direction}
+              data-single={turn.layout === "single" ? turn.direction : undefined}
               className={styles.leaf}
               style={{ "--seg-count": LEAF_SEGMENTS } as CSSProperties}
               onAnimationEnd={(event) => {
@@ -311,16 +313,19 @@ export function BookPager({
               }}
             >
               {turn.layout === "single" ? (
+                // ⭐ 1단은 **책등(왼쪽)을 축으로 180° 넘어간다.** 다음 쪽은 떠나는 쪽이 왼쪽으로 넘어가고,
+                // 이전 쪽은 앞 쪽이 왼쪽에서 넘어와 덮는다. 뒷면은 빈 종이다.
+                // 🚫 90° 에서 멈추지 않는다 — 가장 느린 순간에 모서리째 사라져 "뜯겨 나가는" 것처럼 보였다(2026-09-18).
                 <LeafSegments
                   depth={0}
-                  direction={turn.direction}
+                  direction="next"
                   front={
                     <div className={styles.faceStack}>
-                      <div className={styles.art}>{renderArt(turn.from)}</div>
-                      <div className={styles.page}>{renderText(turn.from)}</div>
+                      <div className={styles.art}>{renderArt(turn.direction === "next" ? turn.from : turn.to)}</div>
+                      <div className={styles.page}>{renderText(turn.direction === "next" ? turn.from : turn.to)}</div>
                     </div>
                   }
-                  back={null}
+                  back={<div className={styles.faceBlank} />}
                 />
               ) : turn.direction === "next" ? (
                 <LeafSegments
