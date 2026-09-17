@@ -49,7 +49,9 @@ function BookReaderContent({
 
   const requestPage = useCallback(
     (pageNo: number) => {
-      window.history.pushState(null, "", readerHref(slug, pageNo));
+      if (typeof window !== "undefined") {
+        window.history.pushState(null, "", readerHref(slug, pageNo));
+      }
     },
     [slug],
   );
@@ -63,15 +65,15 @@ function BookReaderContent({
 
   const isFirst = targetPageNo <= 1;
   const isLast = targetPageNo >= pageCount;
-  const characters = pages[targetPageNo - 1].characters;
   const activePage = pages[targetPageNo - 1];
+  const characters = activePage?.characters ?? [];
   const narrationPreloads = useMemo(
-    () => [activePage.narrationAudioUrl, pages[targetPageNo]?.narrationAudioUrl],
-    [activePage.narrationAudioUrl, pages, targetPageNo],
+    () => [activePage?.narrationAudioUrl, pages[targetPageNo]?.narrationAudioUrl],
+    [activePage?.narrationAudioUrl, pages, targetPageNo],
   );
   const narration = useNarration({
     pageKey: `demo:${slug}:${targetPageNo}`,
-    audioUrl: activePage.narrationAudioUrl,
+    audioUrl: activePage?.narrationAudioUrl ?? null,
     preloadUrls: narrationPreloads,
   });
 
@@ -102,13 +104,15 @@ function BookReaderContent({
         pageNo={targetPageNo}
         pageCount={pageCount}
         onRequestPage={requestPage}
-        renderArt={(pageNo) => <BookArtContent pageNo={pageNo} />}
+        renderArt={(pageNo) => (
+          <BookArtContent pageNo={pageNo} imageUrl={pages[pageNo - 1]?.baseImageUrl} />
+        )}
         renderText={(pageNo) => (
-          <BookTextContent pageNo={pageNo}>{pages[pageNo - 1].bodyText}</BookTextContent>
+          <BookTextContent pageNo={pageNo}>{pages[pageNo - 1]?.bodyText ?? ""}</BookTextContent>
         )}
         renderTextControls={() => (
           <NarrationPlayer
-            audioUrl={activePage.narrationAudioUrl}
+            audioUrl={activePage?.narrationAudioUrl ?? null}
             enabled={narration.enabled}
             onPlay={narration.play}
             onPause={narration.pause}
