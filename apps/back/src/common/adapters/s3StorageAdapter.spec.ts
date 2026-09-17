@@ -5,6 +5,31 @@ import { S3StorageAdapter } from './s3-storage.adapter';
 describe('S3StorageAdapter', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
+  it('공개 표지의 고정 서명 시각은 같은 URL을 만들고 기본 서명은 현재 시각을 쓴다', async () => {
+    jest.useFakeTimers({ now: new Date('2026-09-17T13:01:00Z') });
+    const values: Record<string, string> = {
+      S3_ENDPOINT: 'https://storage.test',
+      S3_REGION: 'us-east-1',
+      S3_BUCKET_NAME: 'test-bucket',
+      S3_ACCESS_KEY_ID: 'test-access-key',
+      S3_SECRET_ACCESS_KEY: 'test-secret-key',
+    };
+    const adapter = new S3StorageAdapter({ get: (key: string) => values[key] } as ConfigService);
+    const signingDate = new Date('2026-09-17T13:00:00Z');
+    const first = await adapter.getPresignedUrl('covers/book.webp', 3600, signingDate);
+    const privateFirst = await adapter.getPresignedUrl('personalizations/page.webp');
+    jest.setSystemTime(new Date('2026-09-17T13:04:59Z'));
+    const second = await adapter.getPresignedUrl('covers/book.webp', 3600, signingDate);
+    const privateSecond = await adapter.getPresignedUrl('personalizations/page.webp');
+
+    expect(second).toBe(first);
+    expect(new URL(first).searchParams.get('X-Amz-Date')).toBe('20260917T130000Z');
+    expect(new URL(first).searchParams.get('X-Amz-Expires')).toBe('3600');
+    expect(privateSecond).not.toBe(privateFirst);
+    expect(new URL(privateSecond).searchParams.get('X-Amz-Date')).toBe('20260917T130459Z');
   });
 
   it('업로드 객체에 private 캐시 정책과 콘텐츠 타입을 지정한다', async () => {
@@ -22,7 +47,11 @@ describe('S3StorageAdapter', () => {
     const adapter = new S3StorageAdapter(configService);
     const buffer = Buffer.from('webp-bytes');
 
-    const key = await adapter.upload('personalizations/session-1/page-1.webp', buffer, 'image/webp');
+    const key = await adapter.upload(
+      'personalizations/session-1/page-1.webp',
+      buffer,
+      'image/webp',
+    );
 
     expect(key).toBe('test/personalizations/session-1/page-1.webp');
     expect(send).toHaveBeenCalledTimes(1);

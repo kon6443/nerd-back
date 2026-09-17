@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import {
   getCachedThumbnailUrl,
   getCachedThumbnailUrls,
-  preloadThumbnailImage,
 } from "@/app/(demo)/library/libraryStories";
 import { StoryCover } from "@/components/story/StoryCard";
 import { findMySessionBySlug } from "@/lib/api";
 import { useSession } from "@/lib/api/useSession";
+import { preloadThumbnailImage } from "@/lib/preloadThumbnailImage";
 
 interface StoryDetailArtworkProps {
   slug: string;

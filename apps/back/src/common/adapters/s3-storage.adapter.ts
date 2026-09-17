@@ -29,10 +29,7 @@ export class S3StorageAdapter implements StoragePort {
       region,
       endpoint: endpoint || undefined,
       forcePathStyle: true, // MinIO 호환성 필수
-      credentials:
-        accessKeyId && secretAccessKey
-          ? { accessKeyId, secretAccessKey }
-          : undefined,
+      credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
     });
   }
 
@@ -53,7 +50,7 @@ export class S3StorageAdapter implements StoragePort {
     return fullKey;
   }
 
-  async getPresignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
+  async getPresignedUrl(key: string, expiresInSeconds = 3600, signingDate?: Date): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucketName,
       Key: key,
@@ -61,6 +58,7 @@ export class S3StorageAdapter implements StoragePort {
 
     const signedUrl = await getSignedUrl(this.s3Client, command, {
       expiresIn: expiresInSeconds,
+      ...(signingDate ? { signingDate } : {}),
     });
 
     // MinIO 서명 URL 함정 대응: S3_PUBLIC_URL 이 있으면 내부 DNS 호스트를 외부 호스트로 치환

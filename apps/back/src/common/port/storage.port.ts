@@ -6,8 +6,9 @@ export interface StoragePort {
 
   /**
    * 클라이언트가 스토리지에서 직접 이미지를 안전하게 내려받을 수 있는 만료 서명 URL을 발급한다.
+   * signingDate가 없으면 현재 시각을 쓴다. 지정 시 만료는 해당 시각부터 계산한다.
    */
-  getPresignedUrl(key: string, expiresInSeconds?: number): Promise<string>;
+  getPresignedUrl(key: string, expiresInSeconds?: number, signingDate?: Date): Promise<string>;
 
   /**
    * 객체를 다운로드하여 버퍼로 반환한다 (레퍼런스 이미지 참조용).

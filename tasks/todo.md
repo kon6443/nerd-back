@@ -1,3 +1,234 @@
+# 홈 동화책·표지 로딩 리팩토링 및 PR Implementation Plan — 2026-09-17
+
+> **For implementers:** 현재 작업을 검토하고 필요한 책임 분리만 수행한 뒤 검증된 feature branch를 main 대상 PR로 게시한다.
+
+**Goal:** 차분한 홈 3D 동화책과 서재 표지 preload/cache 개선을 검토하기 쉬운 변경으로 완성한다.
+**Architecture:** 서재의 소유자별 썸네일 상태에서 공용 이미지 preload 기능을 분리한다. 공개 표지 서명 구간/TTL은 명명하고 오류 fallback과 private 서명 경로를 보존한다. 기존 3D 모델/입자/lifecycle은 리뷰·검증 후 유지한다.
+**Tech Stack:** 기존 Three.js·React/Next·NestJS·AWS SDK·pnpm·Git/GitHub CLI. 추가 의존성·DB/스토리지 변경 없음.
+**Spec:** 사용자 최신 요청 — 리팩토링 후 PR. 현재 main의 홈 3D·표지 로딩 미커밋 변경 전체를 포함한다.
+
+## Global Constraints
+
+- 새 feature branch에서 commit/push/PR한다. main push·PR merge·배포는 하지 않는다. env·자격증명·서명 URL·QA 임시 파일은 staging하지 않는다.
+- 소스 리뷰: createBookModel→createBookWorld→HomeWorld, 입자 update/dispose, preload의 홈/목록/상세 3개 호출자, StoragePort의 S3/local 및 공개/개인화/음성 호출자를 확인한다.
+- preload의 최대 128 URL·decode 실패 재시도·늦은 실패 보호와 사용자별 썸네일 소유권 검사를 유지한다. 첫 두 공개 표지 준비, effect abort, navigation 실패 비차단 계약은 유지한다.
+- 5분 공개 표지 서명 구간과 1시간 TTL·키 교체/미공개 검사·private 서명의 현재시각 발급을 유지한다.
+- 3D 색·배치·진입 1450ms·Escape·reduced motion·기존 GPU 정리를 변경하지 않는다. 외관 변경이나 인접 API 리팩토링을 추가하지 않는다.
+
+### Task 1: 리뷰 기반 책임 분리
+
+**Files:** Create apps/front/lib/preloadThumbnailImage.ts, preloadThumbnailImage.test.ts. Modify app/(demo)/library/libraryStories.ts 및 test, LibraryStoryList.tsx, components/story/StoryDetailArtwork.tsx, app/HomeWorld.tsx의 imports; apps/back/src/modules/story/story.service.ts의 서명 상수/분기; tasks/todo.md.
+**Interfaces:** preloadThumbnailImage(url: string | null | undefined): void 및 getOptionalAssetUrl 반환/오류 계약 동일. API·컴포넌트 props는 유지한다.
+- [x] 전이적 호출자를 검토하고 공용 preload와 6개 테스트를 lib로 옮겼다. 공개 표지 서명 구간/TTL을 명명하고 직접 분기로 정리했다.
+**Acceptance criteria:** 공용 기능이 특정 라우트 파일에 의존하지 않으며 기존 캐시/소유권/서명/취소 테스트가 유지된다. 3D 리뷰에서 확인한 자원 공유·해제 경로 보존.
+**Verification:** 이동한 기존 preload 6개 테스트와 공개 목록/소유권·API signal·S3 서명/서비스 테스트. frontend/backend ci:all 및 foreground lint·git diff --check.
+
+### Task 2: main 통합·PR 게시
+
+**Files:** 검증된 현재 변경 및 tasks/todo.md. Git feature branch와 원격 main.
+**Interfaces:** origin/main fetch/merge 후 feature push, PR base=main. 본문은 최종 3D·표지 로딩 동작과 리팩토링·검증·제한을 기술한다.
+- [x] 최신 main과 통합하고 검증된 변경을 commit/push하여 PR과 원격 상태를 확인했다.
+**Acceptance criteria:** 승인된 변경만 포함·secrets 미포함, main 충돌 없음, PR head SHA와 로컬/원격 일치. 실제 브라우저 preload 및 진입 회귀 유지, 개발 서버 유지.
+**Verification:** main ancestor/diff·staged paths/content 확인, 필요한 통합 검사 및 실제 브라우저 회귀, gh pr view/checks. PR URL과 CI 상태 보고.
+
+## Refactor and PR verification — 2026-09-17
+
+- PR #61: https://github.com/kon6443/nerd-back/pull/61 (base=main). 소스 커밋 9292604·5dce477 게시 후 로컬·원격·PR head SHA 일치와 MERGEABLE을 확인했다. 게시 시 GitHub frontend/backend CI는 진행 중이며 최종 상태는 PR에서 확인한다.
+- preload의 기존 구현이 이동 후에도 원문과 동일함을 비교했고, 홈/목록/상세 3개 호출자를 공용 lib로 연결했다. 사용자별 썸네일 상태는 서재에 남겼다. 3D geometry/material 공유와 InstancedMesh·context dispose, 새 빛가루의 취소 원복 및 중복 progress 갱신 방지 경로를 검토했다.
+- 최신 origin/main fetch 결과 15ef3d3으로 기준과 같아 통합 충돌이 없다. feat/storybook-home-and-cover-loading에서 전체 변경을 게시한다.
+- 최종 리팩토링 후 frontend ci:all exit 0: 20 files/126 tests·lint/types/stubs/health-path·build. backend ci:all exit 0: 33 suites/315 unit tests·9 suites/66 E2E·lint/types/stubs·build. 양쪽 foreground npm run lint와 git diff --check exit 0. 원격 CI와 별개인 로컬 결과다.
+- 실제 브라우저의 캐시 없는 첫 run에서 표지가 클릭 약 0.89초 전에 요청됐고 route 후 34~35ms에 표시됐다. 재방문 표지 전송량 0, route 후 약 0.1ms. 이전 단계의 production·모바일·진입/취소·GPU 해제 검증 코드 및 lifecycle은 리팩토링에서 변하지 않았다. /tmp/nerd-image-loading-refactor.json.
+- 검증 환경 문제를 분리했다. 첫 ci 명령은 sandbox npm DNS 제한으로 테스트 시작 전 실패했고 동일 명령을 허용된 네트워크 환경에서 실행해 성공했다. /tmp/nerd-pr61-{front,back}-ci-sandbox-failure.log, /tmp/nerd-pr61-{front,back}-ci.log.
+- 초기 브라우저 재검사는 backend 5501 미실행으로 실패했다. 기존 Nest watch와 tsc build가 같은 dist를 공유하고, 일반 tsc가 require('@config/timezone')을 남겨 Nest watch 재실행 때 MODULE_NOT_FOUND가 났다. 실제 dist 및 Nest의 alias 변환 hook과 로그를 대조했다. 검증 빌드를 마친 후 이번 세션의 watch를 재시작해 require('./config/timezone') 변환·5501 listener·실제 API/표지 응답을 확인했다. 앞으로도 같은 dist에 두 빌드를 동시에 쓰면 재발할 수 있으며, 빌드 구성 변경은 이번 PR에 넣지 않았다. 기존의 별도 watch 프로세스는 수정하지 않았다.
+
+---
+
+# 서재 표지 로딩 지연 개선 Implementation Plan — 2026-09-17
+
+> **For implementers:** 측정된 이미지 요청 시작 지연과 매 조회마다 바뀌는 URL을 함께 수정한다.
+
+**Goal:** 홈에서 공개 표지를 미리 내려받고 서재에서 같은 URL의 브라우저 캐시를 재사용한다.
+**Architecture:** 공개 동화 표지만 서명 시각을 5분 경계로 맞춰 같은 키의 URL을 안정화한다. 기존 1시간 서명 유효기간 내에서 남은 수명은 55~60분이다. HomeWorld의 비차단 effect가 공개 목록의 첫 두 표지만 기존 bounded preload helper로 받으며 이탈 시 목록 요청을 취소한다.
+**Tech Stack:** 기존 AWS SDK v3·StoragePort·Next.js 16.3.3·React·Jest/Vitest. 새 endpoint/DB migration/asset 업로드/의존성 없음.
+**Spec:** 사용자 요청 — '동화 체험하기' 이후 늦는 이미지의 해결. 실제 재현에서 라우트 약 1.75초 이후 이미지가 추가 2.5초 뒤 표시되며 같은 표지의 반복 요청도 캐시를 재사용하지 못했다. 목록 API 약 77ms, WebP 두 개 합계 약 910KB, URL 재조회 시 달라짐을 확인했다.
+
+## Global Constraints
+
+- 기존 main의 3D 변경을 보존한다. 1450ms 진입/CTA/Escape/reduced motion은 유지하며 이미지 완료를 기다리는 새 navigation gate를 만들지 않는다.
+- 공개 목록/상세의 표지만 stable signingDate를 사용한다. 개인화 이미지·얼굴 사진·음성의 기존 서명 방식·만료·권한 검사와 private Cache-Control은 유지한다.
+- 시간 경계는 요청마다 계산하고 URL/개인정보를 서버 전역 Map에 저장하지 않는다. 같은 시각/키/설정의 replica에서 URL이 동일해야 한다. 키가 바뀌면 즉시 새 URL을 받는다.
+- 홈의 이미지 준비 실패는 정상 진입을 막지 않는다. 공개 첫 두 표지만 prefetch하고 effect cleanup은 fetch를 abort한다. 이미지 객체는 기존 128-entry URL 중복 방지 helper가 보관하지 않는다.
+- 실측은 URL query/서명 정보를 로그·문서에 남기지 않는다. 단순히 캐시를 비우거나 timeout을 늘려 해결했다고 주장하지 않는다.
+
+### Task 1: 공개 표지 URL과 미리 받기
+
+**Files:** Modify apps/back/src/common/port/storage.port.ts, common/adapters/s3-storage.adapter.ts, modules/story/story.service.ts 및 인접 specs; apps/front/lib/api/story.ts, story.test.ts, app/HomeWorld.tsx. Read app/(demo)/library/libraryStories.ts. Record tasks/todo.md.
+**Interfaces:** StoragePort.getPresignedUrl(key, expiresInSeconds?, signingDate?)는 기존 호출과 호환. fetchStories(signal?)는 선택적 취소 전달. 기존 목록 응답 계약은 유지한다.
+- [x] 공개 표지의 5분 서명 구간·키 변경·기존 private 서명과 홈의 미리 받기/취소를 구현하고 확인했다.
+**Acceptance criteria:** 5분 안의 같은 공개 표지 URL 동일, 다음 구간/키 변경은 새 URL, 실제 서명이 유효하고 private 흐름의 호출 인자는 동일. 홈 이탈 시 fetch 취소, 실패 시에도 서재 진입 가능.
+**Verification:** S3 adapter에서 테스트 자격증명으로 실제 SDK 서명을 비교(외부 요청 없음), StoryService의 공개 범위/키 갱신/경계 테스트, frontend signal 전달 테스트.
+
+### Task 2: 실측·프로젝트 검증
+
+**Files:** Existing frontend/backend suites, tasks/todo.md, /tmp/nerd-image-loading-* 산출물.
+**Interfaces:** 실제 공개 API/스토리지 GET만 사용하며 auth fixture가 필요하면 QA 브라우저 안에서만 적용한다.
+- [x] dev/production에서 첫 방문·재방문 요청 순서 및 실패/이탈·모바일·GPU 자원 해제와 프로젝트 검사를 완료했다.
+**Acceptance criteria:** 홈에서 표지 요청이 시작되고 다음 서재가 그 URL을 재사용. 전후 측정에 cold/warm 및 dev/production 조건 명시, preload 실패/이탈과 모바일 진입 유지. frontend/backend ci:all 및 foreground lint 통과.
+**Verification:** 동일 시나리오 CDP 네트워크·DOM 타임라인 비교, 실제 API URL 동일성·이미지 200 확인, production preview 및 기존 진입/cleanup QA. git diff --check. 임시 서버/QA 브라우저만 종료하고 기존 5501/5502 유지.
+
+## Library image loading verification — 2026-09-17
+
+- 원인: route prefetch만으로 표지 파일이 다운로드되지 않았고 서재 commit 후에야 두 이미지 요청이 시작됐다. 이미 WebP이고 Cache-Control이 private/max-age=86400이어도 API가 매번 새 서명 URL을 발급해 재방문이 다른 cache key가 됐다. 로컬 최초 측정에서 route 1.75초 후 이미지 완료가 추가 2.44~2.54초, 다음 방문도 0.37~0.42초 및 두 파일 약 910KB 재전송이었다. 외부 첫 응답까지 약 2.2초였으며 DNS/TLS/스토리지 각각의 지연으로 분해하지 않았으므로 특정 인프라 원인을 단정하지 않는다.
+- 수정: 공개 표지 서명 시각을 5분 단위로 안정화하고 홈의 useEffect에서 첫 두 표지를 기존 preloadThumbnailImage로 받는다. API 요청만 effect cleanup에서 취소하며 이미지 실패는 기존 서재 로딩으로 복구한다. 개인화/얼굴 사진/음성의 서명과 접근 검사는 유지한다. 서버 URL Map·추가 navigation gate·새 endpoint·DB/스토리지 쓰기 없음.
+- 수정 전후 모두 홈 renderer ready 후 1초 대기하고 실제 버튼을 눌렀다. 별도 브라우저의 캐시 없는 dev 첫 방문은 표지 요청이 클릭 약 0.91초 전에 시작되고, route 후 추가 0.38~0.68초에 완료했다. 클릭부터 두 표지 완료는 약 4.29→2.23초. 같은 URL의 재방문 표지는 약 0.1ms 후 표시되고 전송량 0이었다. 사전에 캐시된 별도 run은 0~4ms였으며 cold 결과와 구분한다.
+- production standalone + 실제 API reverse proxy에서도 확인했다. browser cache를 비운 첫 run은 이미지 두 개가 홈에서 HTTP 200으로 다운로드됐고 route와 약 0.1ms 차이로 표시됐다. 다음 run 전송량 0. 이 production run은 앞선 실측과 TCP/TLS 연결 조건이 같다고 보장하지 않으므로 보편적 첫 로드 보장은 아니다. 느린 연결/홈에서 즉시 클릭/5분 서명 경계에서는 추가 이미지 대기가 남을 수 있다.
+- failure/abort: 브라우저에서 홈 목록 preload 실패를 주입해도 정상 서재·두 표지 표시. 지연된 preload 중 이탈하면 signal abort 1회 및 정상 서재·표지 2개 확인. 실제 API 쓰기 0. 1440/768/390/320 overflow 0, 두 CTA 유지, 실제 두 버튼·Escape·reduced motion·6회 홈/서재 이동 통과. idle draw 0, context 7/7·Buffer 1,869/1,869·VertexArray 1,134/1,134 해제, runtime exception 0.
+- 최종 source 후 frontend ci:all exit 0: 19 files/126 tests·lint/types/stubs/health-path·build. backend ci:all exit 0: 33 suites/315 unit tests·9 suites/66 E2E·lint/types/stubs·build. 양쪽 foreground npm run lint 및 git diff --check exit 0. 실 SDK 고정 서명/기본 현재시각 서명, 공개 키 교체/시간 경계, AbortSignal 전달 테스트 포함.
+- 근거: /tmp/nerd-image-loading-before.json, /tmp/nerd-image-loading-after.json(warm), /tmp/nerd-image-loading-after-cold.json, /tmp/nerd-image-loading-production-cold.json, /tmp/nerd-image-loading-resilience.json, /tmp/nerd-image-regression-qa-report.json. 보고서는 URL query/서명 값을 기록하지 않는다. main의 미커밋 변경으로 유지한다.
+
+---
+
+# 차분한 동화책 구성 Implementation Plan — 2026-09-17
+
+> **For implementers:** 건물과 장식을 줄여 펼친 책과 작은 이야기 풍경의 위계를 회복한다.
+
+**Goal:** 성·집·장식의 경쟁을 낮추고 종이 여백과 따뜻한 숲속 동화 분위기가 읽히게 한다.
+**Architecture:** book-model.ts의 정적 건물 크기·첨탑·조경 수를 줄이고 book-atmosphere.ts는 소수의 진입 빛가루만 유지한다. 기존 카메라 성문 좌표와 라우팅·dispose 흐름을 유지한다.
+**Tech Stack:** 기존 Three.js·TypeScript·Vitest. 새 asset/package 없음.
+**Spec:** 사용자 요청 — 현재 책이 과하므로 객관적으로 판단하여 동화에 어울리도록 수정한다. 크기 경쟁과 중복 장식이 원인이며 작은 팝업 동화책 방향으로 절제한다.
+
+## Global Constraints
+
+- main의 현재 미커밋 작업에서 홈 3D만 다듬는다. 문구·CTA·책의 종이 두께·카메라·1450ms 진입·Escape·reduced motion·API·DB는 유지한다.
+- 성문 좌표는 유지하고 성의 첨탑을 7→3개로 줄인다. 집은 0.8배로 낮추고 별채·돌출창·복잡한 지붕선은 제거한다. 아치문·현관·꽃상자·둥근 다락창은 남긴다.
+- 책 밖 덩굴/꽃과 뒤쪽 구름 덩어리·중복 별은 제거한다. 책 위에는 작은 구름 2개, 나무 7그루, 꽃 12개, 소수 빛가루만 남긴다. idle 새 렌더/타이머/리스너 없음.
+- 시각 검사는 PC·모바일 한 묶음으로 시행하고, 결함이 있으면 일괄 수정 후 한 번만 추가 확인한다. 기존 Impeccable context 설치 누락은 재시도하지 않는다.
+
+### Task 1: 책 위 풍경과 주변 장식 절제
+
+**Files:** Modify apps/front/app/book-model.ts, apps/front/app/book-atmosphere.ts. Read apps/front/app/book-atmosphere.test.ts, book-world.ts. Record tasks/todo.md.
+**Interfaces:** createBookModel(BookPalette): THREE.Group 및 createBookAtmosphere(BookPalette): { group, update(entry) } 유지. 성문 위치 (1.4, 1.1, -0.53) 유지.
+- [x] 작은 집·세 첨탑 성·드문 조경으로 정리했다. PC/모바일 첫 검사 후 회색에 치우친 성 지붕색만 부드러운 파란색으로 보정했다.
+**Acceptance criteria:** PC/모바일에서 건물 위계와 책장이 읽히고 CTA를 가리지 않는다. 명시한 장식 수와 제거 항목 반영, 이전 모델보다 render/triangle 수 감소, 모든 geometry 좌표 유한.
+**Verification:** 실제 PC/모바일 캡처 일괄 확인, 이전 snapshot과 모델 통계 비교. 기존 분위기 테스트로 진입·취소·progress 중복 갱신 방지 확인.
+
+### Task 2: 최종 동작과 자원 검증
+
+**Files:** Existing frontend suite, tasks/todo.md, 임시 /tmp 검증 산출물.
+**Interfaces:** 기존 CTA 진입·Escape·reduced motion·BookWorld.dispose 및 개발 서버 5501/5502 유지.
+- [x] frontend ci:all·foreground lint·실제 버튼 전환과 GPU 자원 해제 검증을 완료했다.
+**Acceptance criteria:** lint/types/tests/build 성공, 가로 넘침·runtime exception 0, idle 추가 draw 0, 반복 이탈 때 context/buffer 해제, 실제 API 쓰기 0.
+**Verification:** npx --yes pnpm@10.26.2 front ci:all, npm run lint, git diff --check. 기존 QA helper로 레이아웃과 진입/취소·6회 이동 계측. 사용한 QA 브라우저만 종료하고 개발 서버는 유지한다.
+
+## Quieter storybook verification — 2026-09-17
+
+- 성 첨탑 7→3개, 깃발 2→1개, 집 크기 0.8배와 단순한 지붕으로 정리했다. 책 밖 덩굴·꽃·뒤쪽 구름 덩어리·중복 금빛 별·표지 금속 장식은 제거했다. 나무 12→7그루, 책 위 꽃 28→12개, 진입 별/빛가루 25→11개로 줄이고 부드러운 파란 지붕과 초록 집 지붕을 유지했다.
+- 책 종이·중앙 접힘·강/다리·두 갈래 길·문/현관/꽃상자는 유지했다. PC/모바일 캡처에서 책의 여백과 작은 집/성의 위계를 확인했다. 첫 검사에서 지붕이 회색에 치우친 점만 수정하고 마지막 확인을 마쳤다. /tmp/nerd-quieter-desktop.png, /tmp/nerd-quieter-mobile.png.
+- 모델 통계: render 대상 108→89, 삼각형 92,597→54,461(약 41% 감소), 유한하지 않은 geometry 좌표 0. /tmp/nerd-quieter-model-report.json. 로컬 생성 시간 표본은 더 빨라지지 않았으므로 FPS·로딩 속도 향상을 단정하지 않는다. 마지막 색상 변경은 geometry 통계에 영향이 없다.
+- 1440·768·390·320 너비에서 가로 넘침 0, canvas 1개, CTA 높이 56px 및 화면 내 노출 확인. 실제 진입·Escape 취소·reduced motion·홈/서재 6회 반복 통과. runtime exception/API 쓰기 0, idle 700ms draw 0. context 14/14 해제, Buffer 3,738/3,738·VertexArray 2,268/2,268 삭제. 색상 보정 전 검사이며 이후 lifecycle/geometry 변화는 없다. /tmp/nerd-quieter-qa-report.json.
+- 마지막 소스 수정 후 frontend ci:all exit 0: lint/types/stubs/health-path·19 files/125 tests·production build. foreground npm run lint와 git diff --check exit 0. 개발 서버 5501/5502는 유지하며 main의 미커밋 작업으로 남겼다.
+
+---
+
+# 책 주변 동화 풍경과 진입 빛가루 Implementation Plan — 2026-09-17
+
+> **For implementers:** 승인된 주변 장식을 추가하고 기존 진입 progress에 빛가루를 연결한다.
+
+**Goal:** 책 뒤 낮은 구름, 오른쪽/아래 덩굴과 꽃, 성 주변의 별·빛가루로 책 속 세계가 주변으로 이어지는 느낌을 만든다.
+**Architecture:** 정적 책 모델과 분리한 book-atmosphere.ts가 주변 geometry와 빛가루 update(entry)를 소유한다. book-world.ts가 group을 기존 scene에 연결하고 기존 render에서만 progress를 전달한다. 기존 scene dispose가 모든 geometry/material/InstancedMesh를 해제한다.
+**Tech Stack:** 기존 Three.js·TypeScript·Vitest. 외부 asset·새 package·추가 animation loop 없음.
+**Spec:** 사용자에게 제안한 네 항목(뒤쪽 구름, 오른쪽/아래 덩굴·꽃, 성 주변 별·빛가루, 버튼 진입 때 성문으로 모임)에 대한 '진행해줘' 승인.
+
+## Global Constraints
+
+- main의 미커밋 성/책 개선을 보존한다. 이번 추가 변경은 홈 3D 주변 장식에 한정한다. Git push/PR/배포·DB/API 수정 없음.
+- 왼쪽 문구/CTA의 여백을 유지하고 장식은 책 주변에 집중한다. 장식은 기존 aria-hidden canvas 안에만 추가한다.
+- 1450ms 진입과 카메라·라우팅·Escape·reduced motion을 유지한다. idle/hidden 상태에서 새 렌더·타이머·리스너가 생기지 않는다.
+- 반복 구름·잎·꽃·빛가루는 공유 geometry와 InstancedMesh를 사용한다. 움직이는 장식은 shadow를 만들지 않아 고정 shadow map을 다시 그리지 않는다.
+- focal moment는 책 주변 빛가루가 기존 카메라와 함께 성문으로 모이는 순간이다. entry=0은 정지, 취소는 원위치, 진입 후반에 작아지며 사라진다. 프레임별 heap 할당을 피한다.
+- 시각 검사는 PC/모바일을 묶어 한 차례, 결함 수정 후 최대 한 차례 확인한다. 기존 Impeccable context 설치 누락은 재시도/수리하지 않는다.
+
+### Task 1: 주변 장식 및 진입 연출
+
+**Files:** Create apps/front/app/book-atmosphere.ts, book-atmosphere.test.ts; Modify apps/front/app/book-world.ts. Read book-model.ts, book-camera.ts, HomeWorld.tsx. 기존 book-model.ts의 현재 작업은 유지한다.
+**Interfaces:** createBookAtmosphere(BookPalette): { group: THREE.Group; update(entry: number): void }. book-world는 book.add(group) 후 기존 material 등록/dispose를 재사용한다.
+- [x] 책을 둘러싼 낮은 구름·덩굴·꽃과 성문으로 수렴하는 별/빛가루를 구현했다.
+**Acceptance criteria:** 책과 성이 계속 주인공이고 좌측 UI를 가리지 않는다. entry 값에 따른 결정적 위치, 유한 좌표, 취소 원복, 같은 progress에서 불필요한 GPU buffer 갱신 없음.
+**Verification:** Vitest에서 진입 수렴·끝 상태·취소 동일성·입력 경계·동일 progress 갱신 방지를 확인. 실제 PC/모바일 시각 검사 및 모델 draw/triangle 통계.
+
+### Task 2: 왼쪽 주인공 집 보강
+
+**Files:** Modify apps/front/app/book-model.ts의 cottage 및 인접 나무 배치. 기존 성·책/주변 장식·API는 유지한다.
+**Interfaces:** createBookModel(BookPalette): THREE.Group 유지. 기존 box/column/archedDoor/material/instancing helper를 사용해 큰 박공 지붕과 낮은 별채·다락창·현관·꽃상자를 만든다.
+- [x] 큰 박공 지붕·별채·다락창·현관·꽃상자를 추가하고 PC/모바일에서 성과 균형을 확인했다.
+**Acceptance criteria:** 사용자의 22:01:30 스크린샷보다 존재감 있는 집, 여러 지붕/따뜻한 창/꽃상자/현관을 PC·모바일에서 확인. 성과 집의 역할 차이와 기존 책 위 길 유지, 인접 나무가 주된 정면을 가리지 않음.
+**Verification:** 변경 후 PC/모바일 일괄 시각 검사, 모델 finite 좌표·draw/triangle 수 및 frontend ci:all 재확인. 새 애니메이션/리스너/타이머는 추가하지 않는다.
+
+### Task 3: 회귀·자원 검증
+
+**Files:** tasks/todo.md 및 임시 /tmp/nerd-atmosphere-* QA 산출물. Existing frontend suite.
+**Interfaces:** 기존 버튼·Escape·reduced motion·BookWorld.dispose 유지. 테스트 브라우저의 합성 로그인 상태만 사용하고 실제 API 쓰기는 하지 않는다.
+- [x] frontend ci:all/foreground lint와 실제 진입·idle·반복 이탈 검증을 완료했다.
+**Acceptance criteria:** lint/types/tests/build 통과, PC/모바일 overflow 0·CTA 노출, idle draw 0, 이탈 시 canvas 및 WebGL context/buffer 해제, runtime exception 0.
+**Verification:** frontend ci:all, npm run lint, git diff --check. 기존 QA helper를 이번 task session에 맞춰 재사용해 실제 화면·진입 프레임·GPU 자원 계측. 개발 서버는 유지하고 이번 QA 브라우저만 종료한다.
+
+## Surroundings and cottage verification — 2026-09-17
+
+- 책 뒤 구름, 오른쪽/아래 덩굴·꽃, 별·빛가루를 추가했다. 빛가루는 기존 entry progress에만 반응하고 성문으로 모인 뒤 사라진다. 동일 progress에서 instance buffer 갱신을 생략하며 취소 시 원래 위치로 돌아온다. 추가 animation loop·timer·listener는 없다.
+- 사용자 후속 요청에 맞춰 왼쪽 집을 확대하고 별채·박공 지붕·둥근 다락창·돌출창·현관·꽃상자·굴뚝을 추가했다. 정면을 가리던 나무 한 그루의 배치를 조정했다. PC 1440×900·모바일 390×844 캡처에서 성과 집의 균형 및 문구/버튼 노출을 확인했다.
+- 집 보강 전후 모델만 비교하면 render 대상 75→108, 삼각형 73,933→92,597, 생성 중앙값 9.10→10.89ms다. 장식 증가에 따른 비용이 있으므로 성능 향상을 주장하지 않는다. 전체 모델 경계는 동일하며 NaN/Infinity 좌표 0이다. 근거: /tmp/nerd-cottage-model-report.json.
+- 주변 장식 반영 후 1440·768·390·320 너비에서 overflow 0·canvas 1·CTA 높이 56px 이상을 확인했다. 집 보강 후 실제 진입·Escape·reduced motion을 다시 확인하고 홈/서재 6회 반복에서 runtime exception 0, API 쓰기 0, idle 700ms 추가 draw 0을 확인했다. WebGL context 14/14 해제, Buffer 4,746/4,746·VertexArray 2,730/2,730 삭제. Three 내부 LUT 자원은 context loss로 반환되는 항목을 함께 확인했다.
+- 최종 source 변경 후 frontend ci:all exit 0: lint/types/stubs/health-path·19 files/125 tests·production build. foreground npm run lint 및 git diff --check exit 0. frontend 5502/backend 5501 listener를 확인했다. main의 미커밋 변경으로 유지하며 PR/push/DB 변경은 하지 않았다.
+- 근거: /tmp/nerd-atmosphere-before-cottage-qa-report.json(전체 viewport), /tmp/nerd-atmosphere-qa-report.json(최종 회귀), /tmp/nerd-cottage-{desktop,mobile}.png, /tmp/nerd-atmosphere-entry.png. 임시 helper·캡처는 저장소 밖에 있다.
+
+---
+
+# 홈 3D 동화 왕국 디테일 Implementation Plan — 2026-09-17
+
+> **For implementers:** main 최신화 후 기존 홈의 책·성 모델을 보강하고 실제 브라우저와 frontend 검사로 확인한다.
+
+**Goal:** 펼친 책 위에 높은 파란 첨탑·크림색 성벽·금빛 장식의 동화 왕국이 솟아난 느낌을 만든다.
+**Architecture:** 기존 createBookModel의 procedural geometry와 프로젝트 팔레트를 재사용한다. 성의 높이와 지붕 계층·창문·성문을 보강하고 책 위 꽃밭·소품·책갈피를 추가한다. 반복 geometry/material은 기존 sphere instancing을 확장해 묶고 기존 BookWorld dispose 경로를 유지한다.
+**Tech Stack:** Three.js 0.186.0·기존 Next/React·TypeScript. 신규 패키지·모델/텍스처 다운로드·외부 데이터 쓰기 없음.
+**Spec:** 사용자 요청 — main 이동/pull 후 홈의 3D 동화책을 더 꾸미고 디즈니 성과 비슷한 분위기를 적용한다. 공식 성의 파란 지붕·크림색 벽·금색 장식과 현재 화면을 시각 기준으로 삼는다.
+
+## Global Constraints
+
+- main에서 작업한다. main push·새 PR·배포는 이번 요청 범위에 없다. 현재 main은 15ef3d3이며 pull --ff-only 완료.
+- 홈의 문구·CTA·로그인/동화 경로·1450ms 진입·Escape·reduced motion·기존 카메라 성문 좌표를 보존한다. DB/서재/리더 수정 없음.
+- 신규 상시 animation loop·타이머·이벤트 리스너를 추가하지 않는다. 반복 장식은 공유 geometry/material과 InstancedMesh로 제한한다. 기존 dispose에서 모든 GPU 자원이 해제되어야 한다.
+- 현재 크림·청록 책의 정체성을 유지하고 장식은 책 위에 한정한다. 기존 3D fallback 유지. PC·모바일 CTA와 텍스트를 가리지 않는다.
+- Impeccable context 도구는 이번 세션에서 설치 파일 누락으로 실패한 사실이 있어 재실행하지 않는다. 현행 코드·실제 홈 화면을 기준으로 작업한다.
+
+### Task 1: 책 위 왕국 모델 보강
+
+**Files:** Modify apps/front/app/book-model.ts. Read book-world.ts, book-camera.ts, HomeWorld.tsx, HomeWorld.module.css, globals.css. 필요한 구도 수정만 기존 home CSS/camera에 한정하며 변경 시 해당 검증을 추가한다.
+**Interfaces:** createBookModel(BookPalette): THREE.Group 계약 유지. shared geometry의 월드 변환·재질·shadow 속성을 보존해 InstancedMesh로 묶는다.
+- [x] 여러 높이의 파란 첨탑, 황금 장식, 성문·창문·시계, 초록 꽃밭·작은 소품·책갈피를 완성했다.
+**Acceptance criteria:** 성이 여러 층의 뚜렷한 실루엣을 갖고 책/종이 두께가 유지된다. 데스크톱·모바일에서 왕국과 CTA가 읽히며 진입 시 성문 방향이 유지된다. 반복 메시로 인한 draw call 증가를 제한한다.
+**Verification:** 수정 전후 모델 geometry/object/triangle 통계와 생성 시간 비교, 실제 PC·모바일 스크린샷을 한 번에 검토. 필요한 결함을 한 번에 수정하고 추가 확인은 최대 한 차례.
+
+### Task 2: 회귀·성능 검증
+
+**Files:** tasks/todo.md 및 임시 /tmp/nerd-castle-* QA 산출물. Test existing frontend suite 및 브라우저.
+**Interfaces:** 기존 HomeWorld lifecycle·BookWorld.dispose 및 두 CTA 동작 보존. 모델 변경에는 구현을 복제하는 unit test를 추가하지 않는다.
+- [x] frontend ci:all과 최종 foreground lint를 통과하고 실제 진입·취소·reduced motion·반복 이탈 자원 정리를 확인했다.
+**Acceptance criteria:** lint/types/tests/build 통과, 런타임 오류·가로 넘침 없음, 장식 추가 후 idle 상태에서 렌더 반복 없음, 이탈 후 canvas 및 GPU 자원 해제. 사용자가 보던 개발 서버는 유지한다.
+**Verification:** frontend ci:all, npm run lint, git diff --check, 브라우저 화면·WebGL 생성/삭제/idle draw 계측·진입 회귀. 이번에 연 QA 브라우저/임시 서버만 정리한다.
+
+
+## Home castle verification — 2026-09-17
+
+- main 15ef3d3으로 이동/pull 완료. 소스 수정은 book-model.ts 한 파일이며 카메라·라우팅·effect·글로벌 토큰은 유지했다. 7개 파란 첨탑·성문/계단·시계·황금 깃발/별·꽃밭/버섯·책갈피·표지 금속 장식을 추가했다.
+- 최종 모델: render 대상 104→75(약 28% 감소), 삼각형 65,700→73,933. 반복 성벽/창문/첨탑을 geometry·재질·shadow 속성별로 묶고, 작은 꽃잎은 저해상도 공유 geometry를 사용했다. 모델 생성 중앙값은 로컬 반복 측정 7.35→7.60ms로 비슷한 범위이며 실제 기기의 FPS 향상을 단정하지 않는다. NaN/Infinity 좌표 0.
+- UI: 1440·768·390·320 너비에서 renderer ready, canvas 1개, 가로 넘침 0, 두 CTA 최소 높이 56px 및 화면 내 노출. PC/모바일 실제 캡처에서 새 성의 실루엣·책 종이 두께·텍스트/CTA 배치를 확인했다. 로그인 상태는 테스트 브라우저 fixture이며 실제 인증/세션 쓰기 0회.
+- 회귀/자원: 실제 서재 진입, Escape 취소, reduced motion 이동 통과. idle 700ms 동안 추가 draw 0. 최초 진입 후 홈/서재 6회 반복에서 runtime exception 0, 이탈 canvas 0, WebGL context 14개 모두 context loss로 해제, Buffer 3,206개·VertexArray 1,820개 모두 삭제. Three 내부 LUT의 일부 native 자원은 개별 delete 대신 context loss로 함께 반환되므로 context 종료도 별도로 계측했다.
+- 환경 문제: 최초 전환 검사에서 서재 데이터 조회가 실패했다. frontend health 200 및 5501 listener 부재·직접 연결 거부를 확인했고, 기존 backend 종료 로그가 없어 종료 원인은 확정하지 않았다. 프로젝트 back dev로 다시 실행 후 같은 실제 전환이 정상 동작했다. timeout 증가·제품 코드 우회·DB 변경은 하지 않았다. Redis 미실행 경고는 기존 backend가 축소 모드로 처리하며 이번 범위에서 설정은 바꾸지 않았다.
+- 검사: frontend ci:all exit 0 — lint/types/stubs/health-path, 18 files/121 tests, production build. 최종 source 변경 후 foreground npm run lint exit 0, git diff --check 통과. 원래 frontend 5502와 복구한 backend 5501은 유지한다.
+- 근거: /tmp/nerd-castle-model-report.json, /tmp/nerd-castle-qa-server-unavailable.json(최초 화면 검사 및 환경 실패 보존), /tmp/nerd-castle-qa-report.json(남은 회귀 검사), /tmp/nerd-castle-final-{1440,390}.png. 검증 helper·스크린샷은 저장소 밖에 있다.
+
+---
+
 # 표지·서재 개선 리팩토링 및 PR Implementation Plan — 2026-09-17
 
 > **For implementers:** 현재 변경 범위의 불필요한 코드를 정리하고 최신 main과 통합 후 PR을 게시한다.

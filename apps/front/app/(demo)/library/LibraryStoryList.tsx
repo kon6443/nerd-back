@@ -7,13 +7,13 @@ import room from "@/components/layout/StoryRoom.module.css";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { getMySessions } from "@/lib/api";
 import { useSession } from "@/lib/api/useSession";
+import { preloadThumbnailImage } from "@/lib/preloadThumbnailImage";
 import { getLibraryStoryHref } from "@/lib/libraryMode";
 import { STORY_GRID } from "./LibraryShell";
 import {
   getCompletedThumbnailUrls,
   getCachedThumbnailUrls,
   getOwnedThumbnailUrl,
-  preloadThumbnailImage,
   setCachedThumbnailUrls,
   type OwnedThumbnailUrls,
 } from "./libraryStories";
