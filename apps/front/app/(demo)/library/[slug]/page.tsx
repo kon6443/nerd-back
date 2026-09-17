@@ -1,6 +1,7 @@
 import { storySlugParamsSchema } from "@nerd/contracts";
 import { notFound } from "next/navigation";
-import { StoryCover } from "@/components/story/StoryCard";
+import { StoryDetailArtwork } from "@/components/story/StoryDetailArtwork";
+import { getLibraryHref, isLibraryCreateMode } from "@/lib/libraryMode";
 import { StorySessionActions } from "@/components/story/StorySessionActions";
 import roomStyles from "@/components/layout/StoryRoom.module.css";
 import { fetchStoryDetail, orNotFound } from "@/lib/api";
@@ -15,20 +16,21 @@ import styles from "./StoryDetail.module.css";
  */
 export const dynamic = "force-dynamic";
 
-export default async function StoryDetailPage({ params }: PageProps<"/library/[slug]">) {
+export default async function StoryDetailPage({ params, searchParams }: PageProps<"/library/[slug]">) {
   const parsed = storySlugParamsSchema.safeParse(await params);
   // 주소창에서 아무 값이나 넣을 수 있다. 형식이 아니면 백엔드를 부르지 않고 끝낸다 —
   // 검증 스키마는 백엔드와 **같은 것**이라 두 곳의 판정이 갈리지 않는다.
   if (!parsed.success) notFound();
 
+  const isCreateMode = isLibraryCreateMode((await searchParams).mode);
   const story = await orNotFound(fetchStoryDetail(parsed.data.slug));
 
   return (
-    <StoryDetailShell>
+    <StoryDetailShell backHref={getLibraryHref(isCreateMode)}>
       {/* 소개와 등장인물은 같은 밝은 패널 안에 둔다(2026-09-14 요청). */}
       <section className={styles.hero}>
         <div className={styles.book}>
-          <StoryCover title={story.title} />
+          <StoryDetailArtwork slug={story.slug} title={story.title} isCreateMode={isCreateMode} />
         </div>
 
         <div className={styles.intro}>
@@ -44,7 +46,7 @@ export default async function StoryDetailPage({ params }: PageProps<"/library/[s
 
           {story.pageCount > 0 ? (
             // `key` 로 동화가 바뀌면 새로 마운트시킨다 — 이전 동화의 세션이 남지 않게.
-            <StorySessionActions key={story.slug} slug={story.slug} primaryClassName={roomStyles.primary} />
+            <StorySessionActions key={story.slug} slug={story.slug} isCreateMode={isCreateMode} primaryClassName={roomStyles.primary} />
           ) : (
             // 페이지가 아직 안 들어온 동화다. 링크를 걸면 첫 페이지에서 404 를 만난다.
             <p className={styles.summary}>아직 페이지가 준비되지 않았어요.</p>

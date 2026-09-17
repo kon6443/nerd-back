@@ -35,26 +35,29 @@ export const STORY_GRID = room.shelf;
  * `StoryCard` 와 같은 구조다 — 4:3 썸네일, 제목, 설명 두 줄, 하단 버튼.
  * 🚫 문구 한 줄로 대신하지 않는다. 목록이 채워지는 순간 아래가 통째로 밀린다.
  *
- * 한 장만 그려 데이터 개수를 약속하지 않는다. 표지 비율·padding·격자는 실제 카드와 공유한다.
+ * count는 개인화 썸네일 대기 시 실제 동화 수를 받는다. 서버 로딩은 기본값 한 장을 쓴다.
+ * 표지 비율·padding·격자는 실제 카드와 공유한다.
  */
-export function StoryListSkeleton() {
+export function StoryListSkeleton({ count = 1 }: { count?: number } = {}) {
   return (
     <ul className={STORY_GRID} aria-hidden="true">
-      <li className="min-w-0">
-        <Card inset="snug" className={`h-full w-full animate-pulse motion-reduce:animate-none ${book.card}`}>
-          <div className="flex h-full flex-col gap-4">
-            <div className={book.cover}><div className={book.blankCover} /></div>
-            <div className="flex flex-col gap-2">
-              <div className="h-7 w-2/3 rounded bg-line" />
-              <div className="h-4 w-full rounded bg-line" />
-              <div className="h-4 w-4/5 rounded bg-line" />
+      {Array.from({ length: count }, (_, index) => (
+        <li className="min-w-0" key={index}>
+          <Card inset="snug" className={`h-full w-full animate-pulse motion-reduce:animate-none ${book.card}`}>
+            <div className="flex h-full flex-col gap-4">
+              <div className={book.cover}><div className={book.blankCover} /></div>
+              <div className="flex flex-col gap-2">
+                <div className="h-7 w-2/3 rounded bg-line" />
+                <div className="h-4 w-full rounded bg-line" />
+                <div className="h-4 w-4/5 rounded bg-line" />
+              </div>
+              <div className="mt-auto pt-1">
+                <div className="min-h-touch w-full rounded-btn bg-line" />
+              </div>
             </div>
-            <div className="mt-auto pt-1">
-              <div className="min-h-touch w-full rounded-btn bg-line" />
-            </div>
-          </div>
-        </Card>
-      </li>
+          </Card>
+        </li>
+      ))}
     </ul>
   );
 }

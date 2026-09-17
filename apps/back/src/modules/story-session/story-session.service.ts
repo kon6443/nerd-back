@@ -1,12 +1,13 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Transactional } from 'typeorm-transactional';
 import { randomUUID } from 'node:crypto';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
+import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
 import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
 import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
@@ -27,6 +28,9 @@ import {
 } from '../../common/port/image-generation.port';
 import { STORAGE_PORT, type StoragePort } from '../../common/port/storage.port';
 import { validateImageBuffer } from '../../common/utils/image-validator';
+import { isMysqlDuplicateKey } from '@common/utils/is-mysql-duplicate-key';
+import { createLogThrottle } from '@common/utils/log-throttle';
+import { NOTIFICATION_PORT, type NotificationPort } from '@common/port/notification.port';
 import type {
   PersonalizeSessionResponse,
   RetryPageResponse,
@@ -51,9 +55,19 @@ import type {
  */
 const STALE_RUNNING_MS = 10 * 60 * 1000;
 
+/**
+ * 파이프라인이 통째로 중단됐을 때 남는 페이지 실패 사유.
+ *
+ * 🚫 내부 예외 메시지를 담지 않는다 — 이 값은 `GET /sessions/:id/pages` 응답의
+ *    `errorMessage` 로 사용자 브라우저까지 나간다.
+ */
+const PIPELINE_ABORTED_MESSAGE = '만들기가 중단됐어요. 다시 시도해 주세요.';
+
 @Injectable()
 export class StorySessionService {
   private readonly logger = new Logger(StorySessionService.name);
+  /** 서명 URL 실패 로그 억제기 — 폴링 경로에서 불리므로 간격 제한이 필수다. */
+  private readonly presignFailLog = createLogThrottle(60_000);
 
   constructor(
     @InjectRepository(StorySession)
@@ -62,6 +76,8 @@ export class StorySessionService {
     private readonly templateRepo: Repository<StoryTemplate>,
     @InjectRepository(StoryPage)
     private readonly pageRepo: Repository<StoryPage>,
+    @InjectRepository(StoryPageCharacter)
+    private readonly pageCharacterRepo: Repository<StoryPageCharacter>,
     @InjectRepository(SessionPageImage)
     private readonly pageImageRepo: Repository<SessionPageImage>,
     @Inject(IMAGE_GENERATION_PORT)
@@ -76,6 +92,12 @@ export class StorySessionService {
     @Optional()
     @InjectRepository(SessionBranchChoice)
     private readonly branchChoiceRepo?: Repository<SessionBranchChoice>,
+    // ⚠️ `@Optional()` 은 **기존 spec 들이 이 클래스를 positional 로 직접 생성**하기 때문이다
+    //    (`new StorySessionService(repoA, repoB, ...)`). 필수로 두면 그 호출이 전부 깨진다.
+    //    운영에서는 `StorySessionModule` 이 `NotificationModule` 을 import 해 반드시 주입된다.
+    @Optional()
+    @Inject(NOTIFICATION_PORT)
+    private readonly notifications?: NotificationPort,
   ) {}
 
   /**
@@ -136,6 +158,27 @@ export class StorySessionService {
       branchRepo.findOne({ where: { sessionId } }),
     ]);
 
+    const afterStoryPages = pages.filter(
+      (page) => page.pageNo === 6 && (page.branchKey === 'a' || page.branchKey === 'b'),
+    );
+    const appearances: StoryPageCharacter[] =
+      afterStoryPages.length === 0
+        ? []
+        : ((await this.pageCharacterRepo.find({
+            where: { pageId: In(afterStoryPages.map((page) => page.id)) },
+            relations: { character: true },
+            order: { id: 'ASC' },
+          })) ?? []);
+    const charactersByPage = new Map<number, StoryPageCharacter[]>();
+    for (const appearance of appearances) {
+      const pageCharacters = charactersByPage.get(appearance.pageId);
+      if (pageCharacters) {
+        pageCharacters.push(appearance);
+      } else {
+        charactersByPage.set(appearance.pageId, [appearance]);
+      }
+    }
+
     const byBranch = new Map(choices.map((choice) => [choice.branchKey, choice]));
     const result = (['a', 'b'] as const).map(async (branchKey) => {
       const choice = byBranch.get(branchKey);
@@ -149,9 +192,17 @@ export class StorySessionService {
         pageNo: 6 as const,
         bodyText: page.bodyText,
         status: image?.status ?? 'pending',
-        imageUrl: image?.status === 'succeeded' && image.imageKey ? await this.storagePort.getPresignedUrl(image.imageKey) : null,
+        imageUrl:
+          image?.status === 'succeeded' && image.imageKey
+            ? await this.getOptionalPresignedUrl(image.imageKey)
+            : null,
         narrationAudioUrl: await this.getNarrationAudioUrl(page.narrationAudioKey),
         errorMessage: image?.errorMessage ?? null,
+        characters: (charactersByPage.get(page.id) ?? []).map((appearance) => ({
+          role: appearance.character.role,
+          displayName: appearance.character.displayName,
+          hitbox: appearance.hitbox,
+        })),
       };
     });
 
@@ -184,7 +235,17 @@ export class StorySessionService {
       return { sessionId, branchKey: existing.branchKey, isFirstChoice: false };
     }
     const created = branchRepo.create({ id: randomUUID(), sessionId, branchKey: input.branchKey });
-    await branchRepo.save(created);
+    try {
+      await branchRepo.save(created);
+    } catch (error: unknown) {
+      // 위 `findOne` 과 이 `save` 사이에 다른 기기가 먼저 골랐다. `uq_session_branch_choices_session`
+      // 위반은 곧 "이미 첫 선택이 있다" 이므로, 500 이 아니라 **위 분기와 같은 답**을 내야 한다.
+      if (!isMysqlDuplicateKey(error)) throw error;
+      const raced = await branchRepo.findOne({ where: { sessionId } });
+      if (!raced) throw error;
+      if (raced.branchKey !== input.branchKey) throw new FirstBranchAlreadyChosenErrorResponseDto();
+      return { sessionId, branchKey: raced.branchKey, isFirstChoice: false };
+    }
     return { sessionId, branchKey: input.branchKey, isFirstChoice: true };
   }
 
@@ -230,7 +291,7 @@ export class StorySessionService {
 
       let referenceImageUrl: string | null = null;
       if (existing.referenceImageKey) {
-        referenceImageUrl = await this.storagePort.getPresignedUrl(existing.referenceImageKey);
+        referenceImageUrl = await this.getOptionalPresignedUrl(existing.referenceImageKey);
       }
 
       return {
@@ -295,12 +356,34 @@ export class StorySessionService {
       order: { createdAt: 'DESC' },
     });
 
+    const sessionIds = sessions.map((session) => session.id);
+    const thumbnailImages: SessionPageImage[] =
+      sessionIds.length === 0
+        ? []
+        : ((await this.pageImageRepo.find({
+            where: {
+              sessionId: In(sessionIds),
+              pageNo: 1,
+              branchKey: 'common',
+              status: 'succeeded',
+            },
+          })) ?? []);
+    const thumbnailKeyBySession = new Map(
+      thumbnailImages
+        .filter((image): image is SessionPageImage & { imageKey: string } => Boolean(image.imageKey))
+        .map((image) => [image.sessionId, image.imageKey]),
+    );
+
     return Promise.all(
       sessions.map(async (s) => {
         let referenceImageUrl: string | null = null;
         if (s.referenceImageKey) {
-          referenceImageUrl = await this.storagePort.getPresignedUrl(s.referenceImageKey);
+          referenceImageUrl = await this.getOptionalPresignedUrl(s.referenceImageKey);
         }
+        const thumbnailImageKey = thumbnailKeyBySession.get(s.id);
+        const thumbnailImageUrl = thumbnailImageKey
+          ? await this.getOptionalPresignedUrl(thumbnailImageKey)
+          : null;
         return {
           id: s.id,
           templateId: s.templateId,
@@ -308,6 +391,7 @@ export class StorySessionService {
           templateTitle: s.template?.title ?? '',
           status: s.status,
           referenceImageUrl,
+          thumbnailImageUrl,
           createdAt: s.createdAt.toISOString(),
           updatedAt: s.updatedAt.toISOString(),
         };
@@ -316,16 +400,71 @@ export class StorySessionService {
   }
 
   /**
-   * 세션 삭제 (초기화 및 다른 얼굴로 새로 만들기용)
+   * 서명 실패를 `null` 로 격리한다 — **조회 경로의 기본값이다.**
+   *
+   * 삽화 URL 하나를 못 만드는 것과 목록·폴링 응답 전체가 500 이 되는 것은 사용자에게
+   * 전혀 다른 일이다. 앞은 그림 한 칸이 비는 것이고, 뒤는 화면이 통째로 죽는 것이다.
+   * 🚫 업로드 직후 URL 반환처럼 **그 URL 이 응답의 목적인 곳**에는 쓰지 않는다 —
+   *    거기서 조용히 `null` 을 주면 사용자는 성공했다고 오해한다.
    */
-  // 페이지 이미지 → 세션 두 테이블을 지운다. 중간에 끊기면 "지웠는데 목록에 남는" 상태가
-  // 되므로 한 트랜잭션으로 묶는다 (컨텍스트는 main.ts 의 initializeTransactionalContext).
-  @Transactional()
+  private async getOptionalPresignedUrl(key: string): Promise<string | null> {
+    try {
+      return await this.storagePort.getPresignedUrl(key);
+    } catch (error: unknown) {
+      // ⚠️ 이 경로는 **3초 폴링 안의 페이지 루프**에서 불린다(`getSessionPages`).
+      //    스토리지가 죽으면 폴링 1회당 페이지 수만큼 찍히고, 레플리카 3개가 함께 찍는다.
+      //    🚫 그대로 두면 lessons 2026-08-26 과 같은 로그 폭증이 된다 — 반드시 스로틀을 낀다.
+      const { log, suppressed } = this.presignFailLog.consume(Date.now());
+      if (log) {
+        const omitted = suppressed > 0 ? ` (직전 1분간 동일 실패 ${suppressed}건 생략)` : '';
+        this.logger.warn(`서명 URL 발급 실패(해당 항목만 비운다): ${key}${omitted} — ${error}`);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * 세션 삭제 (초기화 및 다른 얼굴로 새로 만들기용)
+   *
+   * ⚠️ **스토리지 삭제는 트랜잭션 밖이다.** 안에 두면 DB 커밋 **전에** 객체가 지워져,
+   * 커밋이 실패했을 때 세션 행은 살아 있는데 삽화만 사라진다 — 서재에 동화가 남고
+   * 그림이 전부 깨진 상태가 된다. 스토리지는 롤백되지 않으므로 **DB 가 확정된 뒤에만** 지운다.
+   */
   async deleteSession(userId: number, sessionId: string): Promise<void> {
+    const storageKeys = await this.deleteSessionRows(userId, sessionId);
+
+    // 여기부터는 DB 커밋이 끝났다. 이 정리가 실패해도 되돌릴 것이 없다 —
+    // 남는 객체는 고아일 뿐이고 **지워진 것을 되살리는 쪽이 더 나쁘다.**
+    await Promise.all(
+      storageKeys.map((key) =>
+        this.storagePort.delete(key).catch((error: unknown) => {
+          this.logger.warn(`스토리지 객체 삭제 실패(고아로 남는다): ${key} — ${error}`);
+        }),
+      ),
+    );
+  }
+
+  /**
+   * 세션의 DB 행만 지우고, 지워야 할 스토리지 키를 돌려준다.
+   *
+   * 페이지 이미지 → 세션 두 테이블을 지운다. 중간에 끊기면 "지웠는데 목록에 남는" 상태가
+   * 되므로 한 트랜잭션으로 묶는다 (컨텍스트는 main.ts 의 initializeTransactionalContext).
+   */
+  @Transactional()
+  private async deleteSessionRows(userId: number, sessionId: string): Promise<string[]> {
     const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
     if (!session || session.userId !== userId) {
       throw new SessionNotFoundErrorResponseDto();
     }
+
+    // 지울 스토리지 키를 **행을 지우기 전에** 모아 둔다. 지운 뒤에는 무엇을 지워야 할지
+    // 알 수 없어 객체가 고아로 남는다 — 사용자가 "다른 얼굴로 다시 만들기" 를 눌러도
+    // 이전 얼굴에서 파생된 이미지가 스토리지에 계속 보관된다.
+    const pageImages = await this.pageImageRepo.find({ where: { sessionId } });
+    const storageKeys = [
+      session.referenceImageKey,
+      ...pageImages.map((img) => img.imageKey),
+    ].filter((key): key is string => typeof key === 'string' && key.length > 0);
 
     // 1. 해당 세션의 페이지 이미지 레코드 삭제
     await this.pageImageRepo.delete({ sessionId });
@@ -334,6 +473,8 @@ export class StorySessionService {
     await this.sessionRepo.delete({ id: sessionId });
 
     this.logger.log(`동화 세션 삭제 완료: ${sessionId} (사용자 ${userId})`);
+
+    return storageKeys;
   }
 
   /**
@@ -478,7 +619,15 @@ export class StorySessionService {
         imageKey: null,
         errorMessage: null,
       });
-      await this.pageImageRepo.save(newPageImage);
+      try {
+        await this.pageImageRepo.save(newPageImage);
+      } catch (error: unknown) {
+        // 위 `find` 와 이 `save` 사이에 다른 요청(버튼 연타·다른 레플리카)이 같은 행을 넣으면
+        // `uq_session_page_images_session_page_branch` 를 위반한다. **그건 정상 경합이다** —
+        // 이 API 는 멱등하다고 선언했으므로(위 주석) 500 을 내지 않고 넘어간다.
+        // back-code-patterns §14 「조회해서 없으면 저장으로 막지 않는다」.
+        if (!isMysqlDuplicateKey(error)) throw error;
+      }
     }
 
     session.status = 'generating';
@@ -522,7 +671,7 @@ export class StorySessionService {
         );
         let imageUrl: string | null = null;
         if (pageImg?.imageKey && pageImg.status === 'succeeded') {
-          imageUrl = await this.storagePort.getPresignedUrl(pageImg.imageKey);
+          imageUrl = await this.getOptionalPresignedUrl(pageImg.imageKey);
         }
 
         return {
@@ -713,6 +862,42 @@ export class StorySessionService {
       await this.checkAndUpdateSessionCompletion(session.id);
     } catch (error: unknown) {
       this.logger.error(`개인화 파이프라인 전체 오류: ${error}`);
+      // 🚫 로그만 남기고 끝내지 않는다. 여기서 빠져나오면 세션이 `generating` 인 채로 굳어
+      //    폴링이 영원히 끝나지 않고, 페이지가 전부 `pending` 이라 `retryStoryPage` 도
+      //    거절해(`status !== 'failed' && status !== 'running'`) **복구 경로가 통째로 막힌다.**
+      await this.markPipelineFailed(sessionId);
+    }
+  }
+
+  /**
+   * 파이프라인이 중단됐음을 상태로 남긴다 — 사용자가 실패를 보고 재시도할 수 있게.
+   *
+   * `pending` 만 `failed` 로 옮긴다. `running` 은 다른 레플리카가 지금 집고 있을 수 있어
+   * 건드리지 않는다 — 그쪽은 `STALE_RUNNING_MS` 회수가 맡는다.
+   * 🚫 여기서 다시 던지지 않는다. 이 함수는 이미 실패한 경로의 뒤처리다.
+   */
+  private async markPipelineFailed(sessionId: string): Promise<void> {
+    try {
+      await this.pageImageRepo.update(
+        { sessionId, status: 'pending' },
+        { status: 'failed', errorMessage: PIPELINE_ABORTED_MESSAGE },
+      );
+      // 로드한 엔티티를 `save` 하지 않는다 — 동시에 도는 `uploadFace` 의 변경을 덮을 수 있다.
+      await this.sessionRepo.update({ id: sessionId }, { status: 'failed' });
+
+      // 사용자 한 명의 제작이 통째로 실패한 것이다. 반복되면 업스트림·스토리지 장애를 의심한다.
+      // 🚫 `userId`·세션 소유자를 넣지 않는다 — 외부 채널로 나가는 값이다(개인정보).
+      this.notifications?.notify({
+        severity: 'warning',
+        title: '동화 제작 파이프라인 중단',
+        summary:
+          '한 세션의 개인화가 중단되어 실패로 표시했습니다. 짧은 시간에 반복되면 외부 의존(이미지 API·스토리지)을 확인하세요.',
+        dedupeKey: 'story-session:pipeline-aborted',
+        // 5분. 여러 세션이 연달아 실패하는 상황을 한 건으로 묶어 본다.
+        dedupeTtlSeconds: 300,
+      });
+    } catch (error: unknown) {
+      this.logger.error(`파이프라인 실패 상태 기록에 실패했다: 세션 ${sessionId} — ${error}`);
     }
   }
 

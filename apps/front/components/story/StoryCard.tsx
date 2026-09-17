@@ -40,17 +40,19 @@ export interface StoryCardProps {
    * 키 → URL 변환은 호출하는 쪽의 책임이다.
    */
   imageUrl?: string;
+  /** LCP 썸네일 우선 로딩 여부. */
+  priority?: boolean;
   /** `accentA`(비하인드 A) · `accentB`(비하인드 B). 지정하지 않으면 중립. */
   tone?: "neutral" | "accentA" | "accentB";
   action?: ReactNode;
 }
 
 /** 서재 목록과 동화 소개에서 함께 쓰는 장식용 책 표지. 실제 제목은 각 화면의 heading이 제공한다. */
-export function StoryCover({ title, imageUrl, className = "" }: Pick<StoryCardProps, "title" | "imageUrl"> & { className?: string }) {
+export function StoryCover({ title, imageUrl, priority, className = "" }: Pick<StoryCardProps, "title" | "imageUrl" | "priority"> & { className?: string }) {
   return (
     <div className={`${styles.cover} ${className}`} aria-hidden="true">
       {imageUrl ? (
-        <Image src={imageUrl} alt="" fill sizes="(max-width: 639px) 100vw, 360px" className={styles.coverImage} unoptimized />
+        <Image src={imageUrl} alt="" fill priority={priority} sizes="(max-width: 639px) 100vw, 360px" className={`${styles.coverImage} transition-opacity duration-300`} unoptimized />
       ) : (
         <div className={styles.coverFace}>
           <span className={styles.coverSeries}>동화나라</span>
@@ -69,6 +71,7 @@ export function StoryCard({
   subtitle,
   description,
   imageUrl,
+  priority,
   tone,
   action,
 }: StoryCardProps) {
@@ -77,15 +80,16 @@ export function StoryCard({
     <Card tone={tone ?? variantTone[variant]} inset="snug" className={`${variantLayout[variant]} ${variant === "library" ? styles.card : ""}`}>
       <div className="flex h-full flex-col gap-4">
         {variant === "library" ? (
-          <StoryCover title={title} imageUrl={imageUrl} />
+          <StoryCover title={title} imageUrl={imageUrl} priority={priority} />
         ) : imageUrl ? (
-          <div className={`relative aspect-4/3 w-full overflow-hidden ${CARD_NESTED_RADIUS}`}>
+          <div className={`relative aspect-4/3 w-full overflow-hidden ${CARD_NESTED_RADIUS} bg-surface-raised`}>
             <Image
               src={imageUrl}
               alt=""
               fill
+              priority={priority}
               sizes="(max-width: 768px) 100vw, 320px"
-              className="object-cover"
+              className="object-cover transition-opacity duration-300"
               unoptimized
             />
           </div>

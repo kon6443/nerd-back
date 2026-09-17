@@ -28,7 +28,12 @@ export function ReaderAudioProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    return () => controller?.destroy();
+    if (!controller) return;
+    controller.attach();
+    return () => {
+      controller.detach();
+      controller.stop();
+    };
   }, [controller]);
 
   return <ReaderAudioContext value={controller}>{children}</ReaderAudioContext>;

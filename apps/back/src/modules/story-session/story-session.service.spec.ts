@@ -4,10 +4,15 @@ import {
   mockUpdateQueryBuilder,
   type MockRepository,
 } from '@common/__spec__/mock-repository';
-import { createStoryPage } from '@entities/__spec__/entity.factory';
+import {
+  createStoryCharacter,
+  createStoryPage,
+  createStoryPageCharacter,
+} from '@entities/__spec__/entity.factory';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
+import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
 import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
 import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
@@ -35,6 +40,7 @@ describe('StorySessionService', () => {
   let sessionRepo: MockRepository<StorySession>;
   let templateRepo: MockRepository<StoryTemplate>;
   let pageRepo: MockRepository<StoryPage>;
+  let pageCharacterRepo: MockRepository<StoryPageCharacter>;
   let pageImageRepo: MockRepository<SessionPageImage>;
   let afterStoryChoiceRepo: MockRepository<StoryAfterStoryChoice>;
   let branchChoiceRepo: MockRepository<SessionBranchChoice>;
@@ -67,9 +73,11 @@ describe('StorySessionService', () => {
     sessionRepo = createMockRepository<StorySession>();
     templateRepo = createMockRepository<StoryTemplate>();
     pageRepo = createMockRepository<StoryPage>();
+    pageCharacterRepo = createMockRepository<StoryPageCharacter>();
     pageImageRepo = createMockRepository<SessionPageImage>();
     afterStoryChoiceRepo = createMockRepository<StoryAfterStoryChoice>();
     branchChoiceRepo = createMockRepository<SessionBranchChoice>();
+    pageCharacterRepo.find.mockResolvedValue([]);
 
     mockImagePort = {
       generateReference: jest.fn().mockResolvedValue(Buffer.from('mock-reference-image-bytes')),
@@ -87,6 +95,7 @@ describe('StorySessionService', () => {
       asRepository(sessionRepo),
       asRepository(templateRepo),
       asRepository(pageRepo),
+      asRepository(pageCharacterRepo),
       asRepository(pageImageRepo),
       mockImagePort,
       mockStoragePort,
@@ -106,9 +115,27 @@ describe('StorySessionService', () => {
         { branchKey: 'b', title: 'B', description: 'B 설명' },
       ] as StoryAfterStoryChoice[]);
       pageRepo.find.mockResolvedValue([
-        { pageNo: 6, branchKey: 'a', bodyText: 'A 결과', narrationAudioKey: 'a.mp3' },
-        { pageNo: 6, branchKey: 'b', bodyText: 'B 결과', narrationAudioKey: 'b.mp3' },
+        { id: 61, pageNo: 6, branchKey: 'a', bodyText: 'A 결과', narrationAudioKey: 'a.mp3' },
+        { id: 62, pageNo: 6, branchKey: 'b', bodyText: 'B 결과', narrationAudioKey: 'b.mp3' },
       ] as StoryPage[]);
+      pageCharacterRepo.find.mockResolvedValue([
+        createStoryPageCharacter({
+          id: 1,
+          pageId: 61,
+          character: createStoryCharacter({ role: 'jack', displayName: '잭', persona: '비공개' }),
+          hitbox: { x: 0.2, y: 0.3, width: 0.3, height: 0.54 },
+        }),
+        createStoryPageCharacter({
+          id: 2,
+          pageId: 62,
+          character: createStoryCharacter({
+            role: 'goose',
+            displayName: '요술 거위',
+            ttsVoiceId: 'secret-voice',
+          }),
+          hitbox: { x: 0.05, y: 0.61, width: 0.29, height: 0.3 },
+        }),
+      ]);
       pageImageRepo.find.mockResolvedValue([
         { pageNo: 6, branchKey: 'a', status: 'succeeded', imageKey: 'a.png', errorMessage: null },
         { pageNo: 6, branchKey: 'b', status: 'failed', imageKey: null, errorMessage: '실패' },
@@ -120,6 +147,23 @@ describe('StorySessionService', () => {
       expect(result.firstBranchChoice).toBe('a');
       expect(result.choices[0]).toMatchObject({ branchKey: 'a', bodyText: 'A 결과', imageUrl: expect.any(String) });
       expect(result.choices[1]).toMatchObject({ branchKey: 'b', status: 'failed', errorMessage: '실패' });
+      expect(result.choices.map((choice) => choice.characters)).toEqual([
+        [
+          {
+            role: 'jack',
+            displayName: '잭',
+            hitbox: { x: 0.2, y: 0.3, width: 0.3, height: 0.54 },
+          },
+        ],
+        [
+          {
+            role: 'goose',
+            displayName: '요술 거위',
+            hitbox: { x: 0.05, y: 0.61, width: 0.29, height: 0.3 },
+          },
+        ],
+      ]);
+      expect(pageCharacterRepo.find).toHaveBeenCalledTimes(1);
       expect(result.choices.map((choice) => choice.narrationAudioUrl)).toEqual([
         'https://storage.local/references/session-1/ref.png',
         'https://storage.local/references/session-1/ref.png',
@@ -133,8 +177,8 @@ describe('StorySessionService', () => {
         { branchKey: 'b', title: 'B', description: 'B 설명' },
       ] as StoryAfterStoryChoice[]);
       pageRepo.find.mockResolvedValue([
-        { pageNo: 6, branchKey: 'a', bodyText: 'A 결과', narrationAudioKey: 'a.mp3' },
-        { pageNo: 6, branchKey: 'b', bodyText: 'B 결과', narrationAudioKey: 'b.mp3' },
+        { id: 61, pageNo: 6, branchKey: 'a', bodyText: 'A 결과', narrationAudioKey: 'a.mp3' },
+        { id: 62, pageNo: 6, branchKey: 'b', bodyText: 'B 결과', narrationAudioKey: 'b.mp3' },
       ] as StoryPage[]);
       pageImageRepo.find.mockResolvedValue([]);
       branchChoiceRepo.findOne.mockResolvedValue(null);
@@ -228,7 +272,7 @@ describe('StorySessionService', () => {
   });
 
   describe('getMySessions', () => {
-    it('사용자의 모든 세션을 조회하고 S3 서명 URL과 함께 반환한다', async () => {
+    it('완료 세션의 1쪽 공통 성공 이미지를 한 번에 조회해 썸네일 URL로 반환한다', async () => {
       sessionRepo.find.mockResolvedValue([
         {
           id: 'session-1',
@@ -241,6 +285,16 @@ describe('StorySessionService', () => {
           updatedAt: new Date('2026-09-08T01:00:00Z'),
         } as unknown as StorySession,
       ]);
+      pageImageRepo.find.mockResolvedValue([
+        {
+          sessionId: 'session-1',
+          pageNo: 1,
+          branchKey: 'common',
+          status: 'succeeded',
+          imageKey: 'sessions/session-1/page-1.png',
+        } as SessionPageImage,
+      ]);
+      mockStoragePort.getPresignedUrl.mockImplementation(async (key) => `https://storage.local/${key}`);
 
       const result = await service.getMySessions(1);
 
@@ -248,7 +302,102 @@ describe('StorySessionService', () => {
       expect(result[0].id).toBe('session-1');
       expect(result[0].templateSlug).toBe('red-riding-hood');
       expect(result[0].referenceImageUrl).toBe('https://storage.local/references/session-1/ref.png');
+      expect(result[0].thumbnailImageUrl).toBe(
+        'https://storage.local/sessions/session-1/page-1.png',
+      );
       expect(mockStoragePort.getPresignedUrl).toHaveBeenCalledWith('references/session-1/ref.png');
+      expect(pageImageRepo.find).toHaveBeenCalledTimes(1);
+      expect(pageImageRepo.find).toHaveBeenCalledWith({
+        where: {
+          sessionId: expect.anything(),
+          pageNo: 1,
+          branchKey: 'common',
+          status: 'succeeded',
+        },
+      });
+    });
+
+    it('미완료·키 누락·서명 실패 썸네일을 null로 격리해 목록 전체를 반환한다', async () => {
+      sessionRepo.find.mockResolvedValue([
+        {
+          id: 'session-good',
+          userId: 1,
+          templateId: 10,
+          status: 'completed',
+          referenceImageKey: null,
+          template: { slug: 'good', title: '성공' },
+          createdAt: new Date('2026-09-08T03:00:00Z'),
+          updatedAt: new Date('2026-09-08T03:00:00Z'),
+        },
+        {
+          id: 'session-no-key',
+          userId: 1,
+          templateId: 11,
+          status: 'completed',
+          referenceImageKey: null,
+          template: { slug: 'no-key', title: '키 없음' },
+          createdAt: new Date('2026-09-08T02:00:00Z'),
+          updatedAt: new Date('2026-09-08T02:00:00Z'),
+        },
+        {
+          id: 'session-sign-fail',
+          userId: 1,
+          templateId: 12,
+          status: 'completed',
+          referenceImageKey: null,
+          template: { slug: 'sign-fail', title: '서명 실패' },
+          createdAt: new Date('2026-09-08T01:00:00Z'),
+          updatedAt: new Date('2026-09-08T01:00:00Z'),
+        },
+        {
+          id: 'session-generating',
+          userId: 1,
+          templateId: 13,
+          status: 'generating',
+          referenceImageKey: null,
+          template: { slug: 'generating', title: '생성 중' },
+          createdAt: new Date('2026-09-08T00:00:00Z'),
+          updatedAt: new Date('2026-09-08T00:00:00Z'),
+        },
+      ] as StorySession[]);
+      pageImageRepo.find.mockResolvedValue([
+        {
+          sessionId: 'session-good',
+          imageKey: 'sessions/session-good/page-1.png',
+        },
+        {
+          sessionId: 'session-no-key',
+          imageKey: null,
+        },
+        {
+          sessionId: 'session-sign-fail',
+          imageKey: 'sessions/session-sign-fail/page-1.png',
+        },
+      ] as SessionPageImage[]);
+      mockStoragePort.getPresignedUrl.mockImplementation(async (key) => {
+        if (key.includes('sign-fail')) throw new Error('storage unavailable');
+        return `https://storage.local/${key}`;
+      });
+
+      await expect(service.getMySessions(1)).resolves.toEqual([
+        expect.objectContaining({
+          id: 'session-good',
+          thumbnailImageUrl: 'https://storage.local/sessions/session-good/page-1.png',
+        }),
+        expect.objectContaining({ id: 'session-no-key', thumbnailImageUrl: null }),
+        expect.objectContaining({ id: 'session-sign-fail', thumbnailImageUrl: null }),
+        expect.objectContaining({ id: 'session-generating', thumbnailImageUrl: null }),
+      ]);
+      expect(pageImageRepo.find).toHaveBeenCalledTimes(1);
+    });
+
+    it('세션이 없으면 썸네일 이미지를 조회하지 않는다', async () => {
+      sessionRepo.find.mockResolvedValue([]);
+
+      const result = await service.getMySessions(1);
+
+      expect(result).toEqual([]);
+      expect(pageImageRepo.find).not.toHaveBeenCalled();
     });
   });
 
@@ -266,10 +415,48 @@ describe('StorySessionService', () => {
         id: 'session-1',
         userId: 1,
       } as unknown as StorySession);
+      pageImageRepo.find.mockResolvedValue([]);
 
       await service.deleteSession(1, 'session-1');
 
       expect(pageImageRepo.delete).toHaveBeenCalledWith({ sessionId: 'session-1' });
+      expect(sessionRepo.delete).toHaveBeenCalledWith({ id: 'session-1' });
+    });
+
+    // ⭐ DB 행만 지우면 레퍼런스·삽화 객체가 스토리지에 영원히 남는다. 사용자가 "다른 얼굴로
+    //    다시 만들기" 를 눌러도 **이전 얼굴에서 파생된 이미지가 계속 보관된다.**
+    it('레퍼런스와 삽화 객체를 스토리지에서도 지운다 ⭐', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: 'session-1',
+        userId: 1,
+        referenceImageKey: 'references/session-1/ref.png',
+      } as unknown as StorySession);
+      pageImageRepo.find.mockResolvedValue([
+        { imageKey: 'personalizations/session-1/common/page-1.webp' },
+        { imageKey: null },
+      ] as unknown as SessionPageImage[]);
+
+      await service.deleteSession(1, 'session-1');
+
+      expect(mockStoragePort.delete).toHaveBeenCalledWith('references/session-1/ref.png');
+      expect(mockStoragePort.delete).toHaveBeenCalledWith(
+        'personalizations/session-1/common/page-1.webp',
+      );
+      // 키가 없는 행까지 부르지 않는다.
+      expect(mockStoragePort.delete).toHaveBeenCalledTimes(2);
+    });
+
+    it('스토리지 삭제가 실패해도 DB 삭제를 되돌리지 않는다', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: 'session-1',
+        userId: 1,
+        referenceImageKey: 'references/session-1/ref.png',
+      } as unknown as StorySession);
+      pageImageRepo.find.mockResolvedValue([]);
+      mockStoragePort.delete.mockRejectedValue(new Error('스토리지 다운'));
+
+      // 스토리지는 롤백되지 않는다 — 지워진 것을 되살리는 쪽이 더 나쁘다.
+      await expect(service.deleteSession(1, 'session-1')).resolves.toBeUndefined();
       expect(sessionRepo.delete).toHaveBeenCalledWith({ id: 'session-1' });
     });
   });
@@ -577,6 +764,33 @@ describe('StorySessionService', () => {
         errorMessage: null,
       } as SessionPageImage);
       pageImageRepo.save.mockImplementation((entity: unknown) => Promise.resolve(entity));
+    });
+
+    // ⭐ 선행 단계(레퍼런스 다운로드 등)가 실패하면 예전에는 로그만 남고 끝났다. 그러면
+    //    세션은 `generating`, 페이지는 전부 `pending` 으로 굳어 폴링이 영원히 끝나지 않고,
+    //    `retryStoryPage` 는 `pending` 을 거절해(`status !== 'failed' && !== 'running'`)
+    //    **복구 경로가 통째로 막힌다.** 실패를 상태로 남기는 것이 이 테스트의 불변 조건이다.
+    it('선행 단계가 실패하면 세션과 대기 페이지를 failed 로 남겨 재시도 경로를 연다 ⭐', async () => {
+      mockStoragePort.download.mockRejectedValue(new Error('스토리지에 닿지 못했다'));
+
+      await service.executePersonalizationPipeline('session-1');
+
+      // `running` 은 건드리지 않는다 — 다른 레플리카가 집고 있을 수 있어 회수에 맡긴다.
+      expect(pageImageRepo.update).toHaveBeenCalledWith(
+        { sessionId: 'session-1', status: 'pending' },
+        expect.objectContaining({ status: 'failed' }),
+      );
+      expect(sessionRepo.update).toHaveBeenCalledWith({ id: 'session-1' }, { status: 'failed' });
+    });
+
+    it('실패 사유에 내부 예외 메시지를 담지 않는다', async () => {
+      mockStoragePort.download.mockRejectedValue(new Error('ECONNREFUSED 10.0.0.5:9000'));
+
+      await service.executePersonalizationPipeline('session-1');
+
+      const [, patch] = pageImageRepo.update.mock.calls[0] as [unknown, { errorMessage: string }];
+      // 이 값은 `GET /sessions/:id/pages` 응답으로 사용자 브라우저까지 나간다.
+      expect(patch.errorMessage).not.toContain('ECONNREFUSED');
     });
 
     it('다른 레플리카가 이미 집어간 페이지는 이미지를 생성하지 않는다 ⭐', async () => {

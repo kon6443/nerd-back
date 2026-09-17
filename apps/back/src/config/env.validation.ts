@@ -136,6 +136,19 @@ export const envSchema = dbEnvSchema.extend({
   S3_ACCESS_KEY_ID: optionalText,
   S3_SECRET_ACCESS_KEY: optionalText,
   STORAGE_KEY_PREFIX: z.string().default('dev/'),
+  /**
+   * 운영 알림 Discord webhook URL.
+   *
+   * ⭐ **비어 있으면 알림이 통째로 꺼진다**(no-op 어댑터). 로컬·테스트의 기본값이고,
+   *    운영에서 알림을 끄는 롤백 경로이기도 하다 — 코드를 되돌릴 필요가 없다.
+   * 🚫 값은 그 자체가 시크릿이다. 저장소·로그·응답 어디에도 남기지 않는다.
+   */
+  DISCORD_WEBHOOK_URL: optionalText,
+  /**
+   * 배포된 이미지 태그(커밋 SHA). 스택 YAML 이 `image:` 와 **같은 변수**로 주입한다.
+   * 로컬에는 없다 — 기동 알림에서 "버전" 필드가 빠질 뿐이다.
+   */
+  IMAGE_TAG: optionalText,
 });
 
 export type DbEnvVariables = z.infer<typeof dbEnvSchema>;

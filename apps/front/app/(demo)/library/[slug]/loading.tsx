@@ -33,7 +33,6 @@ export default function StoryDetailLoading() {
           <div className={`h-9 w-24 ${styles.skeleton}`} />
           <div className="flex flex-wrap gap-3 pt-2">
             <div className={`min-h-touch w-full md:w-48 ${styles.skeleton}`} />
-            <div className={`min-h-touch w-full md:w-40 ${styles.skeleton}`} />
           </div>
         </div>
       </section>

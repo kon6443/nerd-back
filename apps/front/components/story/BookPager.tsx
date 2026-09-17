@@ -152,6 +152,8 @@ export interface BookPagerProps {
   pageCount: number;
   renderArt: (pageNo: number) => ReactNode;
   renderText: (pageNo: number) => ReactNode;
+  /** 정적인 삽화 면에만 그리는 조작 UI. 직전 삽화와 넘기는 종이에는 복제하지 않는다. */
+  renderArtControls?: (pageNo: number) => ReactNode;
   /** 정적인 본문 면에만 그리는 조작 UI. 넘기는 종이에는 복제하지 않는다. */
   renderTextControls?: (pageNo: number) => ReactNode;
   /**
@@ -173,6 +175,7 @@ export function BookPager({
   pageCount,
   renderArt,
   renderText,
+  renderArtControls,
   renderTextControls,
   onRequestPage,
   onTurningChange,
@@ -228,6 +231,10 @@ export function BookPager({
         event.target.closest("input, textarea, select, [contenteditable]")
       )
         return;
+      // 🚫 대화 같은 모달이 열려 있으면 넘기지 않는다. `<dialog showModal()>` 은 배경을
+      //    inert 로 만들지만 **`window` 레벨 리스너는 그대로 받는다** — 패널 안 버튼에
+      //    포커스를 둔 채 방향키를 누르면 뒤의 책이 넘어가고, 쪽이 바뀌면서 대화가 초기화된다.
+      if (document.querySelector("dialog[open]")) return;
       const next =
         event.key === "ArrowRight" ? pageNo + 1 : event.key === "ArrowLeft" ? pageNo - 1 : null;
       if (next === null || next < 1 || next > pageCount) return;
@@ -269,11 +276,17 @@ export function BookPager({
             <div className={styles.art}>
               {artPair.under !== artPair.over ? (
                 // 🚫 `key` 를 주지 않는다 — 같은 쪽으로 되돌아올 때 새로 마운트되어 다시 빈다.
-                <div className={styles.artHold} aria-hidden="true">
+                // `data-art-hold` 는 **바깥에서 이 장을 건너뛰기 위한 표시**다. 이 밑장은
+                // 문서 순서상 `.art` 안 첫 `<img>` 라, 크기를 재는 쪽이 무심코 집으면
+                // **직전 쪽 이미지**를 재게 된다 (`CharacterHotspots` 참조).
+                <div className={styles.artHold} aria-hidden="true" data-art-hold="true">
                   {renderArt(artPair.under)}
                 </div>
               ) : null}
               {renderArt(artPair.over)}
+              {!turn && renderArtControls ? (
+                <div className={styles.artControls}>{renderArtControls(artPair.over)}</div>
+              ) : null}
             </div>
             <div className={styles.page}>
               {renderText(baseText)}

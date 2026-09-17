@@ -45,6 +45,8 @@ export interface CharacterChatController {
   busy: boolean;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   submit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  /** 삽화 속 캐릭터를 대화 상대로 고른다. */
+  selectRole: (nextRole: string) => void;
   updateDraft: (nextRole: string, nextMessage: string) => void;
   /** 「이용 상태 다시 확인」. */
   recheck: () => void;
@@ -106,7 +108,7 @@ export function useCharacterChat({
           setRole((current) =>
             next.characters.some((character) => character.role === current)
               ? current
-              : (next.characters[0]?.role ?? ""),
+              : (next.exchange?.role ?? next.characters[0]?.role ?? ""),
           );
           if (
             next.status === "pending" ||
@@ -229,6 +231,12 @@ export function useCharacterChat({
     drafts.set(sessionId, pageNo, branchKey, { role: nextRole, message: nextMessage });
   }
 
+  function selectRole(nextRole: string) {
+    setRole(nextRole);
+    setError("");
+    if (sessionId) drafts.set(sessionId, pageNo, branchKey, { role: nextRole, message });
+  }
+
   function recheck() {
     setState("loading");
     void refresh();
@@ -267,6 +275,7 @@ export function useCharacterChat({
     busy: sending || status === "pending",
     inputRef,
     submit,
+    selectRole,
     updateDraft,
     recheck,
     retryAudio,

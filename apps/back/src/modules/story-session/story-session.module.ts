@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
+import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
 import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
 import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
@@ -15,6 +16,7 @@ import { IMAGE_GENERATION_PORT } from '../../common/port/image-generation.port';
 import { MockImageAdapter } from '../../common/adapters/mock-image.adapter';
 import { OpenRouterImageAdapter } from '../../common/adapters/openrouter-image.adapter';
 import { StorageModule } from '../../common/storage/storageModule';
+import { NotificationModule } from '../../common/notification/notification.module';
 
 @Module({
   imports: [
@@ -22,6 +24,7 @@ import { StorageModule } from '../../common/storage/storageModule';
       StorySession,
       StoryTemplate,
       StoryPage,
+      StoryPageCharacter,
       SessionPageImage,
       StoryAfterStoryChoice,
       SessionBranchChoice,
@@ -29,6 +32,7 @@ import { StorageModule } from '../../common/storage/storageModule';
     ]),
     ConfigModule,
     StorageModule,
+    NotificationModule,
     AuthModule,
   ],
   controllers: [StorySessionController],

@@ -17,7 +17,7 @@
 
 **Files:** 현재 변경된 apps/front 파일과 tasks/todo.md, origin/main과 겹치는 UI 파일.
 **Interfaces:** feature branch feat/front-immersive-story-world, origin/main merge. StoryCard/StoryDetailArtwork/LibraryStoryList의 최신 interfaces 확인 후 표현 계층 연결.
-- [ ] 현재 작업을 브랜치에 보존하고 충돌을 기능 단위로 해결한다. (진행 중)
+- [x] 현재 작업을 feature branch에 보존하고 충돌 7개를 기능 단위로 해결했다.
 **Acceptance criteria:** origin/main이 PR 브랜치의 조상이며 충돌 마커가 없다. 최신 썸네일·캐시·로그인/오류 처리와 3D 표현을 함께 보존한다.
 **Verification:** merge 결과·변경 파일 diff·호출자 추적·frontend ci:all·실제 홈/서재/소개/로그인 흐름 확인.
 
@@ -25,9 +25,20 @@
 
 **Files:** 위 통합 파일 및 tasks/todo.md.
 **Interfaces:** frontend ci:all, git diff --check, GitHub PR base main.
-- [ ] 검증 후 feature branch를 push하고 PR 내용·충돌 상태·CI 결과를 확인한다.
+- [ ] 로컬 통합 검증을 통과했으며, feature branch push·PR 생성·원격 상태 확인을 진행한다.
 **Acceptance criteria:** 로컬 프로젝트 검사 통과, PR URL 제공, main과 병합 가능 여부와 CI 상태를 사실대로 보고한다.
 **Verification:** staged paths·diff check·커밋, origin/main 최신 여부 재확인, gh pr view/checks 및 remote branch SHA 확인.
+
+## Integration verification — 최신 main
+
+- origin/main 4f53e84의 추가 11개 커밋을 통합했다. LibraryShell/count skeleton, LibraryStoryList/사용자 캐시, mode=create 링크·단일 CTA, StoryDetailArtwork/소유자 검사·우선 로딩, 로그인 안전한 redirect·오류 details를 유지했다.
+- 가입 오류 details의 ul을 포함하는 컨테이너를 p에서 div로 변경해 HTML 구조를 바로잡았다. StoryDetailShell은 완료 후 모드를 보존한 복귀 링크를 제공하고, 모드를 아직 모르는 loading은 같은 높이의 비활성 자리만 둔다.
+- frozen-lockfile 설치와 contracts prepare 빌드 후 frontend ci:all exit 0: 18 test files / 115 tests, lint·types·stubs·health-path·build. 최종 foreground npm run lint exit 0.
+- Chromium 1440×900/390×844에서 실제 동화 데이터를 사용하는 서재·일반 소개·제작 소개·로그인 8개 조합의 크림 배경·canvas 0·overflow 0 및 모드별 CTA/복귀 경로를 확인했다. 홈 두 CTA의 진입 후 이동도 확인했다.
+- 브라우저 fetch fixture로 가입 오류 details 1회 표시, 제작 모드의 개인화 썸네일과 완성 세션 링크, 계정 전환 후 이전 썸네일 제거를 확인했다. 실제 auth/세션 쓰기는 차단했다. StoryDetailArtwork의 추가 세션 요청은 0회였다.
+- QA helper는 최초 오류 envelope를 계약과 다르게 만들어 details 검증에 실패했다. 계약의 code/message/timestamp/details 형태로 고친 뒤 통과했다. 이후 요청 수를 production 기준으로 가정한 assertion이 실패하여 호출 스택을 확인했다: LibraryStoryList와 StorySessionActions 각각 개발 Strict Mode의 effect 재실행으로 2회였고 StoryDetailArtwork 요청은 0회. 제품 코드를 우회하거나 재시도 설정을 바꾸지 않았다.
+- 자료: /tmp/nerd-pr-integration-report.json, /tmp/nerd-pr-{library,detail}-{1440,390}.png, /tmp/nerd-pr-personalized-1440.png. 인증·이미지는 격리된 fixture이며 실제 모바일/Safari 실기 검증은 미수행.
+- main 통합 직후 로컬 backend가 이전 contracts/dist 타입을 참조해 TS 오류를 냈으나 frozen install의 prepare 빌드 후 0 errors로 시작했다. 검증용 backend는 프로세스 환경에서 Discord webhook을 비워 외부 알림을 전송하지 않도록 실행했다. .env는 변경하지 않았다.
 
 ---
 
@@ -397,7 +408,86 @@ QA 자료: /tmp/nerd-detail-report.json과 /tmp/nerd-detail-check.mjs. 첫 helpe
 
 ---
 
-# 얼굴 등록 화면 UI/UX 개선 — 2026-09-15
+# 현재 작업: 제작형 서재와 삽화 속 캐릭터 대화
+
+> 상태: **구현 및 전체 검증 완료 (CI 통과)**
+> Spec: [`docs/tasks/slice-8-library-character-interaction-spec.md`](../docs/tasks/slice-8-library-character-interaction-spec.md)
+> Plan: [`tasks/plan.md`](plan.md)
+
+- [x] Task 1 — 계약과 세션 API 확장
+  - Acceptance: 완성 세션의 1쪽 썸네일 URL과 6A/6B 등장인물 히트박스가 공개 계약에 포함되며, 누락·서명 실패가 응답 전체를 막지 않는다.
+  - Verify: contracts build, story-session service tests, backend build.
+  - Files: session contract, story-session service/test.
+- [x] Task 2 — 서재 카드의 개인화 썸네일
+  - Acceptance: 로그인 사용자의 완성 동화만 개인화 1쪽을 표시하고 공개·미완성·오류 상태는 기존 삽화로 폴백한다.
+  - Verify: 매칭 Vitest, frontend typecheck/build, 공개·로그인 서재 수동 확인.
+  - Files: LibraryStoryList, matching helper/test, library page, session API test.
+- [x] Task 3 — 제작 모드 URL과 상세 CTA
+  - Acceptance: 홈의 `내 얼굴로 만들기` 흐름만 `mode=create`를 상세까지 보존하고 일반 체험 흐름과 갈린다.
+  - Verify: URL helper Vitest, 일반/제작 브라우저 흐름.
+  - Files: libraryMode/test, authLinks, library list/detail.
+- [x] Task 4 — 제작 모드의 시연 CTA 제거
+  - Acceptance: 제작 모드 상세의 모든 세션 상태와 로딩 자리표시에서 시연 CTA가 없고 개인화 동작은 유지된다.
+  - Verify: frontend typecheck/build와 세션 상태별 수동 확인.
+  - Files: StorySessionActions, detail loading.
+- [x] Task 5 — 정적 삽화 hotspot 기반
+  - Acceptance: `object-cover` 크롭을 반영한 히트박스가 정적 삽화 면에 한 번만 존재하고 쪽 넘김에는 복제되지 않는다.
+  - Verify: 좌표 변환 Vitest, BookPager 회귀 및 두 해상도 수동 확인.
+  - Files: geometry/test, BookPager, BookFrame CSS.
+- [x] Task 6 — 캐릭터 선택과 기존 채팅 연결
+  - Acceptance: hover·focus·touch로 본편과 6A/6B 캐릭터를 선택해 대화를 열며 하단 런처 없이 모든 채팅 상태에 재진입한다.
+  - Verify: frontend tests/build, 키보드·터치·음성 배타·포커스 복귀 수동 QA.
+  - Files: CharacterHotspots, reader page/useCharacterChat, ChatLauncher 제거.
+- [x] Task 7 — 전체 검증
+  - Acceptance: `pnpm ci:all`, `git diff --check`, 1024×768/390×844의 두 공식 동화 전체 흐름이 통과한다.
+  - Verify: CI와 Verification Story.
+  - Files: 작업 문서.
+
+## 다음 작업 상태
+
+- [ ] **D10 사용자 데이터 삭제 구현**
+  - 책 삭제 시 DB의 세션·분기·대화와 스토리지의 레퍼런스 이미지·개인화 삽화·캐릭터 답변 MP3를 함께 제거한다.
+  - 계정 탈퇴 시 사용자의 모든 책에 같은 삭제를 적용한 후 계정을 제거한다. 현재는 탈퇴 API가 없고 책 삭제도 DB만 지우므로 구현·보상 삭제·재시도 테스트가 필요하다.
+- [ ] **리더 평가용 `보기 설정` 정리**
+  - `chat`/`immersive` 쿼리와 설정 UI를 정식 기능으로 채택하거나, 현재 기본값으로 고정하고 제거한다.
+- [x] **완성 동화 리더 헤더 네비게이션 문제 종료 (2026-09-16)**
+  - 완성 세션에서 `← 제작 현황 보기`가 노출되던 문제는 `isAllCompleted`와 `status === 'completed'` 가드로 이미 해결됐다.
+  - 별도의 “상태 머신 전역 리팩토링”은 재현 가능한 문제와 수용 기준이 없어 작업으로 유지하지 않는다. 새 상태 전환 결함이 발견되면 그 시나리오를 기준으로 다시 연다.
+
+## 2026-09-16 작업 완료 내역
+
+- [x] **캐릭터 말풍선 핀(Speech Bubble Pin) 인터랙션 구현 (피드백 5 고도화 완료)**
+  - **결정 배경**: 단일 통 이미지 특성상 캐릭터 실루엣 외곽선 발광의 한계를 극복하기 위해, 사용자와의 Grilling 세션을 통해 직관적이고 친근한 **"부유형 마법 말풍선 핀"** 방식으로 전면 개편.
+  - [x] **어색한 타원 테두리 제거**: 기존 `.hotspot::before`의 달걀형 타원 테두리 선 및 `hotspotPulse` 애니메이션 완전 제거.
+  - [x] **부유형 말풍선 핀 (`[ 💬 ]`)**: 캐릭터 우측 상단(어깨/머리 대각선 위)에 작고 귀여운 말풍선 핀을 상시 부유 배치 (`@keyframes bubbleFloat` 2.5s ease-in-out infinite alternate).
+  - [x] **호버/포커스/활성화 확장**: 마우스 호버 또는 키보드 포커스 시 `grid-template-columns: 0fr -> 1fr` 트릭을 활용해 캐릭터 이름 캡슐(`[ 💬 {이름} ]`)로 부드럽게 확장.
+  - [x] **스타일링**: 크림색 종이 배경(`var(--color-paper)`), 따뜻한 마법 금빛 테두리(`var(--color-gold)` / `var(--color-gold-strong)`), 소프트 드롭 섀도우.
+  - [x] **상호작용 영역**: 말풍선 핀뿐만 아니라 기존 캐릭터 히트박스(몸체) 전체를 투명 클릭/터치 가능 영역으로 유지하여 아동 및 모바일 터치 편의성 확보.
+  - [x] **모듈화 및 결합도 완화**: `CharacterHotspots.module.css`를 신설하여 핫스팟 전용 스타일을 캡슐화하고 `BookFrame.module.css`와의 결합도를 제거함.
+  - [x] **접근성 & 모션 감축**: `aria-label`, `aria-pressed`, `aria-expanded`, `:focus-visible`, `prefers-reduced-motion` 완벽 지원.
+  - [x] **위치 미세 조정 (얼굴 가림 방지)**: 말풍선 핀 기본 위치를 우측으로 20px 추가 이동(`inset-inline-end: -2rem`), 상단으로 살짝 이동(`inset-block-start: -1rem`)하여 잭과 콩나무 4쪽 등 캐릭터의 얼굴과 겹치지 않고 우측 어깨 바깥 여백에 자연스럽게 뜨도록 보정.
+  - [x] **검증**: `pnpm ci:all` 전체 통과, 프론트엔드 Vitest 91개 테스트, ESLint, Next.js 빌드 및 독립 reviewer / qa-engineer 전원 PASS.
+
+## 2026-09-15 사용자 피드백 반영 및 해결 내역
+
+- [x] **피드백 1**: `/library/{동화}?mode=create` 상세 페이지 표지 삽화에 1쪽 개인화 썸네일 노출 ([`StoryDetailArtwork.tsx`](../apps/front/components/story/StoryDetailArtwork.tsx))
+- [x] **피드백 2**: 썸네일 프리로드 체감 속도 극대화
+  - 마운트 즉시 `getMySessions()` 병렬 요청으로 `useSession` 대기 병목 완전 제거
+  - 전역 인메모리 썸네일 캐시 구축으로 서재 목록 → 상세 페이지 진입 시 **0ms 즉시 렌더링**
+  - 브라우저 백그라운드 이미지 디코딩(`img.decode()`) 프리로드 및 카드 호버/터치 사전 워밍업
+  - 카드 및 상세 이미지 컨테이너에 `bg-surface-raised` 플레이스홀더 및 부드러운 페이드인(`transition-opacity duration-300`) 적용
+- [x] **피드백 3 & 후속 과제 (문서화)**: 이미 다 만들어진 동화(`status === 'completed'`, `isAllCompleted === true`)를 읽을 때 리더 헤더의 `← 제작 현황 보기` 버튼 숨김 가드 적용 및 스펙/할일 문서에 기록 완료
+- [x] **피드백 4**: 낭독 플레이어 로딩바 및 시간초 멈춤 버그 해결
+  - 원인: React 18/19 StrictMode의 마운트 시뮬레이션 시 `useEffect` 언마운트 클린업(`destroy()`)이 실행되어 `Audio` 객체의 이벤트 리스너가 제거된 채 유지됨
+  - 해결: `ReaderAudioController`에 `attach()` / `detach()` 수명 주기 및 `play()` 시 자동 리스너 복원(Self-healing) 구조 도입
+  - 누락되었던 `durationchange`, `canplay`, `playing`, `seeking`, `seeked` 이벤트 리스너 보강
+  - `NarrationPlayer`: 오디오 준비 중일 때 `"불러오는 중..."` 버튼 상태 제공 및 프로그레스 바 부드러운 전환(`transition-[width] duration-200 ease-linear`) 적용
+- [x] **피드백 5**: 캐릭터 챗 클릭 불가 수정 (`.art` 컨테이너 내 `img` 탐색) 및 평상시에도 캐릭터 테두리가 은은하게 숨쉬듯 빛나는 타원형 광원 애니메이션 추가 ([`CharacterHotspots.tsx`](../apps/front/app/(trial)/stories/[slug]/read/CharacterHotspots.tsx), [`BookFrame.module.css`](../apps/front/components/story/BookFrame.module.css))
+- [x] **피드백 6**: 일반 동화 체험하기(`!isCreateMode`)에서는 `내 얼굴 읽기`를 노출하지 않고 `시연 동화 읽기`를 주 행동(primary)으로 제공 ([`StorySessionActions.tsx`](../apps/front/components/story/StorySessionActions.tsx))
+
+---
+
+# 이전 완료 기록: 얼굴 등록 화면 UI/UX 개선 — 2026-09-15
 
 **Goal:** 정면 사진 한 장으로 시작하는 흐름을 아이가 이해하기 쉬운 동화 속 촬영 공간으로 다듬는다.
 **Architecture:** 기존 하늘·풀밭 배경과 파랑 CTA를 유지한다. 촬영 표현은 라우트 전용 `CaptureStudio`와 CSS Module로 분리하고, 사진·세션·카메라 상태는 기존 페이지가 소유한다.
@@ -534,7 +624,7 @@ QA 자료: /tmp/nerd-detail-report.json과 /tmp/nerd-detail-check.mjs. 첫 helpe
 
 # 이전 작업: 동화 낭독·캐릭터 답변 TTS
 
-> 상태: **구현 완료, 운영 DB 적용·수동 QA 대기**
+> 상태: **구현·운영 DB 적용·정적 낭독·캐릭터 답변 TTS 확인 완료 (2026-09-16)**
 > Spec: [`docs/tasks/slice-7-tts-spec.md`](../docs/tasks/slice-7-tts-spec.md)
 > Plan: [`tasks/plan.md`](plan.md)
 
@@ -562,9 +652,9 @@ QA 자료: /tmp/nerd-detail-report.json과 /tmp/nerd-detail-check.mjs. 첫 helpe
   - Acceptance: 새 답변만 자동재생하고 저장 답변은 수동재생하며 채팅 조작 시 내레이션이 정지한다.
   - Verify: 준비·완료·실패·재방문·배타 재생 Vitest 및 수동 QA.
   - Files: story-chat API, useCharacterChat, CharacterChat, audio integration/tests
-- [ ] Task 7 — 전체 검증과 운영 게이트
-  - Acceptance: `pnpm ci:all` 통과, 캐릭터 Gemini voice 설정과 `OPENROUTER_API_KEY`·`OPENROUTER_TTS_MODEL`이 배포 전 게이트로 정리된다.
-  - Verify: CI, diff/check, 시연·체험 A/B와 채팅 수동 QA.
+- [x] Task 7 — 전체 검증과 운영 게이트
+  - 완료: backend·frontend CI, diff/check, PR #50 병합·배포, 공유 DB 마이그레이션, 실제 OpenRouter TTS 동작.
+  - 2026-09-16 사용자가 정적 낭독과 캐릭터 답변 TTS의 실제 동작을 확인했다. 기존 공식 동화·A/B·채팅 흐름을 포함한 TTS 작업을 종료한다.
   - Files: 계획 Verification Story와 필요한 운영 문서
 
 ---

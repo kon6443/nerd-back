@@ -11,6 +11,7 @@ import { classifySessionStatus } from "./sessionStatus";
 
 interface StorySessionActionsProps {
   slug: string;
+  isCreateMode?: boolean;
   primaryClassName?: string;
 }
 
@@ -21,7 +22,7 @@ interface StorySessionActionsProps {
  * eslint 가 막는다(`setState synchronously within an effect`).
  */
 
-export function StorySessionActions({ slug, primaryClassName = "" }: StorySessionActionsProps) {
+export function StorySessionActions({ slug, isCreateMode = false, primaryClassName = "" }: StorySessionActionsProps) {
   const router = useRouter();
   const authSession = useSession();
   const [mySession, setMySession] = useState<MyStorySessionItem | null>(null);
@@ -105,17 +106,24 @@ export function StorySessionActions({ slug, primaryClassName = "" }: StorySessio
 
       <div className="flex flex-wrap items-center gap-3">
         {resolving ? (
-          /* 0. 확인 중 — 기본 세트와 같은 높이의 투명 자리표시. 눌리지 않고 보조기술에도 안 읽힌다. */
-          <>
-            <span aria-hidden="true" className={actionClass("secondary", "invisible")}>
-              시연 동화 읽기
-            </span>
+          /* 0. 확인 중 — 최종 버튼과 같은 높이·폭의 투명 자리표시 */
+          isCreateMode ? (
             <span aria-hidden="true" className={actionClass("primary", `invisible ${primaryClassName}`)}>
               📷 내 얼굴로 만들기
             </span>
-          </>
-        ) : /* 1. 이미 완성된 동화가 있는 경우 */
+          ) : (
+            <span aria-hidden="true" className={actionClass("primary", `invisible ${primaryClassName}`)}>
+              시연 동화 읽기
+            </span>
+          )
+        ) : !isCreateMode ? (
+          /* 동화 체험하기 모드 — 내 얼굴 읽기를 노출하지 않고 시연 동화 읽기를 주 행동으로 제공 */
+          <ActionLink href={`/library/${slug}/1`} variant="primary" size="default" className={primaryClassName}>
+            시연 동화 읽기
+          </ActionLink>
+        ) : /* 이하 제작 모드 (isCreateMode === true) */
         currentSession && stage === "completed" ? (
+          /* 1. 이미 완성된 동화가 있는 경우 */
           <>
             <ActionLink
               href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
@@ -124,9 +132,6 @@ export function StorySessionActions({ slug, primaryClassName = "" }: StorySessio
               className={`font-bold shadow-md ${primaryClassName}`}
             >
               📖 내 얼굴 동화 읽기
-            </ActionLink>
-            <ActionLink href={`/library/${slug}/1`} variant="secondary" size="default">
-              시연 동화 읽기
             </ActionLink>
             <button
               type="button"
@@ -152,9 +157,6 @@ export function StorySessionActions({ slug, primaryClassName = "" }: StorySessio
             >
               ⏳ 제작 중인 동화 이어보기
             </ActionLink>
-            <ActionLink href={`/library/${slug}/1`} variant="secondary" size="default">
-              시연 동화 읽기
-            </ActionLink>
             <button
               type="button"
               onClick={handleResetAndRecreate}
@@ -179,9 +181,6 @@ export function StorySessionActions({ slug, primaryClassName = "" }: StorySessio
             >
               ⚠️ 제작 재시도하기
             </ActionLink>
-            <ActionLink href={`/library/${slug}/1`} variant="secondary" size="default">
-              시연 동화 읽기
-            </ActionLink>
             <button
               type="button"
               onClick={handleResetAndRecreate}
@@ -197,15 +196,9 @@ export function StorySessionActions({ slug, primaryClassName = "" }: StorySessio
           </>
         ) : (
           /* 4. 아직 세션이 없거나(비로그인 포함) draft 상태인 경우 */
-          <>
-            {/* 이 화면의 주 동작은 개인화다 — 시연 읽기는 한 단계 내린다. */}
-            <ActionLink href={`/stories/${slug}/capture`} variant="primary" className={primaryClassName}>
-              📷 내 얼굴로 만들기
-            </ActionLink>
-            <ActionLink href={`/library/${slug}/1`} variant="secondary">
-              시연 동화 읽기
-            </ActionLink>
-          </>
+          <ActionLink href={`/stories/${slug}/capture`} variant="primary" className={primaryClassName}>
+            📷 내 얼굴로 만들기
+          </ActionLink>
         )}
       </div>
     </div>
