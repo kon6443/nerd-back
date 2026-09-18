@@ -30,7 +30,7 @@ export function LibraryStoryList({ stories, isCreateMode }: LibraryStoryListProp
             description={story.summary ?? undefined}
             imageUrl={story.coverImageUrl ?? undefined}
             imageFit="contain"
-            priority={index < 2}
+            priority
             action={
               <ActionLink
                 href={getLibraryStoryHref(story.slug, isCreateMode)}

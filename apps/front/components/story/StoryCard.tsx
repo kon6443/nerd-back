@@ -63,7 +63,7 @@ export function StoryCover({
           fill
           priority={priority}
           sizes="(max-width: 639px) 100vw, 360px"
-          className={`${styles.coverImage} transition-opacity duration-300`}
+          className={styles.coverImage}
           unoptimized
         />
       ) : (
@@ -105,7 +105,7 @@ export function StoryCard({
               fill
               priority={priority}
               sizes="(max-width: 768px) 100vw, 320px"
-              className="object-cover transition-opacity duration-300"
+              className="object-cover"
               unoptimized
             />
           </div>
