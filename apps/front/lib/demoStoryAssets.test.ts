@@ -14,10 +14,10 @@ describe("getDemoStoryImageUrl", () => {
   it("잭과 콩나무 1~5쪽은 남/녀 프리셋에 맞는 정적 합성 이미지 경로를 반환한다", () => {
     for (let page = 1; page <= 5; page++) {
       expect(getDemoStoryImageUrl("jack-and-beanstalk", "male", page, "https://orig.png")).toBe(
-        `/demo/stories/jack-and-beanstalk/male/page-${page}.jpg`,
+        `/demo/stories/jack-and-beanstalk/male/page-${page}.webp`,
       );
       expect(getDemoStoryImageUrl("jack-and-beanstalk", "female", page, "https://orig.png")).toBe(
-        `/demo/stories/jack-and-beanstalk/female/page-${page}.jpg`,
+        `/demo/stories/jack-and-beanstalk/female/page-${page}.webp`,
       );
     }
   });
@@ -25,10 +25,10 @@ describe("getDemoStoryImageUrl", () => {
   it("빨간 모자 1~5쪽은 남/녀 프리셋에 맞는 정적 합성 이미지 경로를 반환한다", () => {
     for (let page = 1; page <= 5; page++) {
       expect(getDemoStoryImageUrl("red-riding-hood", "male", page, "https://orig.png")).toBe(
-        `/demo/stories/red-riding-hood/male/page-${page}.jpg`,
+        `/demo/stories/red-riding-hood/male/page-${page}.webp`,
       );
       expect(getDemoStoryImageUrl("red-riding-hood", "female", page, "https://orig.png")).toBe(
-        `/demo/stories/red-riding-hood/female/page-${page}.jpg`,
+        `/demo/stories/red-riding-hood/female/page-${page}.webp`,
       );
     }
   });

@@ -57,7 +57,7 @@ export function CaptureStudio({
   onSubmit,
 }: CaptureStudioProps) {
   const hasPhoto = Boolean(previewUrl) || isDemoMode;
-  const demoPreviewUrl = `/demo/avatars/${selectedPreset}.jpg`;
+  const demoPreviewUrl = `/demo/avatars/${selectedPreset}.webp`;
   const activePreviewUrl = isDemoMode ? demoPreviewUrl : previewUrl;
 
   const primaryAction = isDemoMode ? onSubmit : hasPhoto ? onSubmit : isCameraActive ? onCapture : onStartCamera;
@@ -231,7 +231,7 @@ export function CaptureStudio({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/demo/avatars/male.jpg"
+                  src="/demo/avatars/male.webp"
                   alt="성인 남성 샘플"
                   className={styles.presetThumb}
                 />
@@ -258,7 +258,7 @@ export function CaptureStudio({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/demo/avatars/female.jpg"
+                  src="/demo/avatars/female.webp"
                   alt="성인 여성 샘플"
                   className={styles.presetThumb}
                 />
