@@ -55,7 +55,15 @@ export function StoryCover({
   className = "",
 }: StoryCoverProps) {
   return (
-    <div className={`${styles.cover} ${imageFit === "contain" ? styles.originalCover : ""} ${className}`} aria-hidden="true">
+    // `data-story-cover` 는 서재 → 상세 진입 연출이 잡는 손잡이다. 두 화면이 **같은 표지**를
+    // 그리므로 여기에 `view-transition-name` 을 걸면 카드의 책이 상세의 책으로 이어진다
+    // (`app/(demo)/library/LibraryStoryList.tsx`). 🚫 클래스로 잡지 않는다 — CSS Modules 가
+    // 이름을 해싱해 다른 파일에서 선택할 수 없다.
+    <div
+      data-story-cover=""
+      className={`${styles.cover} ${imageFit === "contain" ? styles.originalCover : ""} ${className}`}
+      aria-hidden="true"
+    >
       {imageUrl ? (
         <Image
           src={imageUrl}
@@ -74,6 +82,8 @@ export function StoryCover({
           <span className={styles.coverRule} />
         </div>
       )}
+      {/* 기울기를 따라 미끄러지는 광택. 평평한 사각형을 **표면**으로 읽히게 하는 건 이 한 겹이다. */}
+      <span className={styles.coverSheen} />
     </div>
   );
 }
