@@ -559,59 +559,25 @@ export class StorySessionService implements OnModuleInit {
       throw new StoryAlreadyCompletedErrorResponseDto();
     }
 
-    // 3. 캐릭터 레퍼런스 또는 임시 실사 원본 준비
-    const isDirectFaceMode =
-      this.configService?.get<string>('DIRECT_FACE_MODE') === 'true' ||
-      process.env.DIRECT_FACE_MODE === 'true';
-
+    // 3. 임시 실사 원본 저장 (temp/source-photo/{sessionId}/{uuid}.{ext})
     const ext =
       frontFile.mimetype?.includes('jpeg') || frontFile.mimetype?.includes('jpg') ? 'jpg' : 'png';
 
-    let prevKeyToDelete: string | null = null;
-    let s3Key: string;
-    let referenceImageUrl: string | null = null;
+    this.logger.log(
+      `[uploadFace] 실제 얼굴 사진을 임시 원본으로 등록합니다: 세션 ${session.id}`,
+    );
+    const tempKey = `temp/source-photo/${session.id}/${randomUUID()}.${ext}`;
+    const s3Key = await this.storagePort.upload(
+      tempKey,
+      frontFile.buffer,
+      frontFile.mimetype || 'image/png',
+    );
 
-    if (isDirectFaceMode) {
-      this.logger.log(
-        `[DIRECT_FACE_MODE] 1차 캐릭터 생성을 건너뛰고 실제 얼굴 사진을 임시 원본으로 등록합니다: 세션 ${session.id}`,
-      );
-      // DIRECT_FACE_MODE=true: temp/source-photo/{sessionId}/{uuid}.{ext} 에 임시 보관
-      const tempKey = `temp/source-photo/${session.id}/${randomUUID()}.${ext}`;
-      s3Key = await this.storagePort.upload(
-        tempKey,
-        frontFile.buffer,
-        frontFile.mimetype || 'image/png',
-      );
-
-      prevKeyToDelete = session.sourcePhotoKey;
-      session.sourcePhotoKey = s3Key;
-      session.referenceImageKey = null;
-      // 명세 3절 5항: 임시 원본에는 어떤 API도 서명 URL 또는 직접 접근 URL을 발급하지 않는다.
-      referenceImageUrl = null;
-    } else {
-      const template = await this.templateRepo.findOne({ where: { id: session.templateId } });
-      const referenceCostume = this.getCostumePrompt(template?.slug);
-
-      const referenceBuffer = await this.imagePort.generateReference({
-        front: frontFile.buffer,
-        left: leftFile?.buffer,
-        right: rightFile?.buffer,
-        characterPrompt: referenceCostume,
-      });
-
-      // DIRECT_FACE_MODE=false: references/{sessionId}/{uuid}.{ext} 에 저장
-      const key = `references/${session.id}/${randomUUID()}.${ext}`;
-      s3Key = await this.storagePort.upload(
-        key,
-        referenceBuffer,
-        frontFile.mimetype || 'image/png',
-      );
-
-      prevKeyToDelete = session.referenceImageKey;
-      session.referenceImageKey = s3Key;
-      session.sourcePhotoKey = null;
-      referenceImageUrl = await this.storagePort.getPresignedUrl(s3Key);
-    }
+    const prevKeyToDelete = session.sourcePhotoKey;
+    session.sourcePhotoKey = s3Key;
+    session.referenceImageKey = null;
+    // 명세 3절 5항: 임시 원본에는 어떤 API도 서명 URL 또는 직접 접근 URL을 발급하지 않는다.
+    const referenceImageUrl = null;
 
     // 6. 세션 상태 갱신
     session.status = 'face_ready';
@@ -859,11 +825,8 @@ export class StorySessionService implements OnModuleInit {
         return;
       }
 
-      const isDirectFaceMode =
-        this.configService?.get<string>('DIRECT_FACE_MODE') === 'true' ||
-        process.env.DIRECT_FACE_MODE === 'true';
-
-      const faceKey = isDirectFaceMode ? session.sourcePhotoKey : session.referenceImageKey;
+      // 명세 확정: 실사 단일 모드(sourcePhotoKey) 우선 적용, 레거시 세션은 referenceImageKey 폴백
+      const faceKey = session.sourcePhotoKey || session.referenceImageKey;
       if (!faceKey) {
         this.logger.error(`파이프라인 중단: 세션(${sessionId}) 레퍼런스/실사 이미지 부재`);
         return;
@@ -1004,11 +967,8 @@ export class StorySessionService implements OnModuleInit {
       });
       if (!pageImg) return;
 
-      const isDirectFaceMode =
-        this.configService?.get<string>('DIRECT_FACE_MODE') === 'true' ||
-        process.env.DIRECT_FACE_MODE === 'true';
-
-      const faceKey = isDirectFaceMode ? session.sourcePhotoKey : session.referenceImageKey;
+      // 명세 확정: 실사 단일 모드(sourcePhotoKey) 우선 적용, 레거시 세션은 referenceImageKey 폴백
+      const faceKey = session.sourcePhotoKey || session.referenceImageKey;
       if (!faceKey) {
         this.logger.error(`단일 페이지 재시도 중단: 세션(${sessionId}) 레퍼런스/실사 이미지 부재`);
         return;

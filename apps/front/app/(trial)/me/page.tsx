@@ -222,14 +222,16 @@ export default function MyPage() {
               const isDeleting = deletingSessionId === s.id;
               const badge = SESSION_STAGE_BADGE[stage];
 
+              const coverUrl = s.thumbnailImageUrl ?? s.referenceImageUrl;
+
               return (
                 <Card key={s.id} className={`flex flex-col justify-between gap-4 ${room.sessionCard}`}>
                   <div className="flex gap-4">
-                    {s.referenceImageUrl ? (
+                    {coverUrl ? (
                       <div className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-line bg-surface ${room.sessionCover}`}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={s.referenceImageUrl}
+                          src={coverUrl}
                           alt={s.templateTitle}
                           loading="lazy"
                           decoding="async"

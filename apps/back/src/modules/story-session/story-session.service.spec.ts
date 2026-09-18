@@ -547,87 +547,53 @@ describe('StorySessionService', () => {
       ).rejects.toThrow(SessionNotFoundErrorResponseDto);
     });
 
-    it('정상 얼굴 사진 업로드 시 레퍼런스를 생성하고 S3에 저장 후 presigned URL을 반환한다', async () => {
-      const validFile = { buffer: VALID_JPEG } as unknown as Express.Multer.File;
+    it('기본 동작: 정상 얼굴 사진 업로드 시 실사 원본을 temp/source-photo/에 임시 저장하고 서명 URL을 발급하지 않는다 ⭐', async () => {
+      const validFile = { buffer: VALID_JPEG, mimetype: 'image/jpeg' } as unknown as Express.Multer.File;
       const session = {
         id: 'session-123',
         userId: 1,
         status: 'draft',
+        sourcePhotoKey: null,
         referenceImageKey: null,
       } as unknown as StorySession;
       sessionRepo.findOne.mockResolvedValue(session);
       sessionRepo.save.mockResolvedValue(session);
+      mockStoragePort.upload.mockResolvedValueOnce('temp/source-photo/session-123/photo.jpg');
 
       const result = await service.uploadFace(1, 'session-123', { front: [validFile] });
 
-      expect(mockImagePort.generateReference).toHaveBeenCalledWith({
-        front: VALID_JPEG,
-        left: undefined,
-        right: undefined,
-        characterPrompt: 'the charming protagonist storybook outfit',
-      });
-      expect(mockStoragePort.upload).toHaveBeenCalled();
-      expect(mockStoragePort.getPresignedUrl).toHaveBeenCalled();
+      expect(mockImagePort.generateReference).not.toHaveBeenCalled();
+      expect(mockStoragePort.upload).toHaveBeenCalledWith(
+        expect.stringMatching(/^temp\/source-photo\/session-123\/.+\.jpg$/),
+        VALID_JPEG,
+        'image/jpeg',
+      );
+      expect(session.sourcePhotoKey).toBe('temp/source-photo/session-123/photo.jpg');
+      expect(session.referenceImageKey).toBeNull();
       expect(result.status).toBe('face_ready');
-      expect(result.referenceImageUrl).toBe('https://storage.local/references/session-1/ref.png');
+      expect(result.referenceImageUrl).toBeNull();
       expect(session.status).toBe('face_ready');
     });
 
-    it('DIRECT_FACE_MODE=true 일 때 원본을 temp/source-photo/에 업로드하고 서명 URL을 발급하지 않는다 ⭐', async () => {
-      process.env.DIRECT_FACE_MODE = 'true';
-      try {
-        const validFile = { buffer: VALID_JPEG, mimetype: 'image/jpeg' } as unknown as Express.Multer.File;
-        const session = {
-          id: 'session-direct',
-          userId: 1,
-          status: 'draft',
-          sourcePhotoKey: null,
-          referenceImageKey: null,
-        } as unknown as StorySession;
-        sessionRepo.findOne.mockResolvedValue(session);
-        sessionRepo.save.mockResolvedValue(session);
-        mockStoragePort.upload.mockResolvedValueOnce('temp/source-photo/session-direct/photo.jpg');
-
-        const result = await service.uploadFace(1, 'session-direct', { front: [validFile] });
-
-        expect(mockImagePort.generateReference).not.toHaveBeenCalled();
-        expect(mockStoragePort.upload).toHaveBeenCalledWith(
-          expect.stringMatching(/^temp\/source-photo\/session-direct\/.+\.jpg$/),
-          VALID_JPEG,
-          'image/jpeg',
-        );
-        expect(session.sourcePhotoKey).toBe('temp/source-photo/session-direct/photo.jpg');
-        expect(session.referenceImageKey).toBeNull();
-        expect(result.referenceImageUrl).toBeNull();
-      } finally {
-        delete process.env.DIRECT_FACE_MODE;
-      }
-    });
-
     it('사진 교체 시 이전 sourcePhotoKey를 정리한다', async () => {
-      process.env.DIRECT_FACE_MODE = 'true';
-      try {
-        const validFile = { buffer: VALID_JPEG } as unknown as Express.Multer.File;
-        const session = {
-          id: 'session-direct',
-          userId: 1,
-          status: 'draft',
-          sourcePhotoKey: 'temp/source-photo/session-direct/old.jpg',
-          referenceImageKey: null,
-        } as unknown as StorySession;
-        sessionRepo.findOne.mockResolvedValue(session);
-        sessionRepo.save.mockResolvedValue(session);
-        mockStoragePort.upload.mockResolvedValueOnce('temp/source-photo/session-direct/new.jpg');
+      const validFile = { buffer: VALID_JPEG } as unknown as Express.Multer.File;
+      const session = {
+        id: 'session-direct',
+        userId: 1,
+        status: 'draft',
+        sourcePhotoKey: 'temp/source-photo/session-direct/old.jpg',
+        referenceImageKey: null,
+      } as unknown as StorySession;
+      sessionRepo.findOne.mockResolvedValue(session);
+      sessionRepo.save.mockResolvedValue(session);
+      mockStoragePort.upload.mockResolvedValueOnce('temp/source-photo/session-direct/new.jpg');
 
-        await service.uploadFace(1, 'session-direct', { front: [validFile] });
+      await service.uploadFace(1, 'session-direct', { front: [validFile] });
 
-        expect(mockCleanupService.cleanupKey).toHaveBeenCalledWith(
-          'temp/source-photo/session-direct/old.jpg',
-        );
-        expect(session.sourcePhotoKey).toBe('temp/source-photo/session-direct/new.jpg');
-      } finally {
-        delete process.env.DIRECT_FACE_MODE;
-      }
+      expect(mockCleanupService.cleanupKey).toHaveBeenCalledWith(
+        'temp/source-photo/session-direct/old.jpg',
+      );
+      expect(session.sourcePhotoKey).toBe('temp/source-photo/session-direct/new.jpg');
     });
   });
 

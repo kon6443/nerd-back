@@ -39,7 +39,7 @@ export class StorySession {
   status: StorySessionStatus;
 
   /**
-   * 임시 실사 원본 사진의 S3 객체 키 (`DIRECT_FACE_MODE=true` 시 사용).
+   * 임시 실사 원본 사진의 S3 객체 키.
    * 페이지 생성 완료 시 즉시 삭제되고 NULL로 비워지며, 24시간 TTL을 안전망으로 둔다.
    */
   @Column({ name: 'source_photo_key', type: 'varchar', length: 512, nullable: true })

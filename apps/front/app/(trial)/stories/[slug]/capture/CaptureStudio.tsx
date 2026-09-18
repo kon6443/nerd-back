@@ -120,19 +120,32 @@ export function CaptureStudio({
                 <p>여기에 나의 웃는 얼굴이 쏙!</p>
               </div>
             )}
+            {isSubmitting && (
+              <div className={styles.submittingOverlay} role="status" aria-live="polite">
+                <div className={styles.submittingSpinner} aria-hidden="true" />
+                <p className={styles.submittingText}>사진을 안전하게 준비하고 있어요</p>
+                <p className={styles.submittingSubtext}>동화나라 주인공으로 등록 중 ✨</p>
+              </div>
+            )}
           </div>
           <span className={styles.photoSignature} aria-hidden="true"><StudioIcon name="sparkle" />오늘의 주인공</span>
         </div>
 
         <p className={styles.helper} role="status" aria-live="polite">
-          {isSubmitting ? "사진 속 나를 동화 주인공으로 바꾸고 있어요." : hasPhoto ? "다른 사진으로 바꿔도 괜찮아요." : isStartingCamera ? "카메라 접근을 허용해 주세요." : isCameraActive ? "준비가 되면 아래 버튼을 눌러요." : "카메라는 버튼을 눌렀을 때만 켜져요."}
+          {isSubmitting ? "사진을 동화나라로 안전하게 전달하고 있어요. 잠시만 기다려 주세요!" : hasPhoto ? "다른 사진으로 바꿔도 괜찮아요." : isStartingCamera ? "카메라 접근을 허용해 주세요." : isCameraActive ? "준비가 되면 아래 버튼을 눌러요." : "카메라는 버튼을 눌렀을 때만 켜져요."}
         </p>
 
         {errorMessage && <p role="alert" className={styles.error}>{errorMessage}</p>}
 
         <div className={styles.actions}>
           <button type="button" onClick={primaryAction} disabled={isSubmitting || isStartingCamera} className={actionClass("primary", styles.mainAction)}>
-            <span className={isSubmitting ? styles.busySpark : undefined}><StudioIcon name={hasPhoto ? "sparkle" : "camera"} /></span>
+            <span className={isSubmitting ? styles.busySpark : undefined}>
+              {isSubmitting ? (
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <StudioIcon name={hasPhoto ? "sparkle" : "camera"} />
+              )}
+            </span>
             {primaryLabel}
           </button>
           <div className={styles.alternatives}>

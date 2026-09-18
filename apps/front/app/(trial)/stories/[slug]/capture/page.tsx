@@ -35,6 +35,7 @@ export default function CapturePage({ params }: PageProps) {
   const [result, setResult] = useState<UploadFaceResponse | null>(null);
   const [existingSession, setExistingSession] = useState<MyStorySessionItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isStartingStory, setIsStartingStory] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -396,12 +397,24 @@ export default function CapturePage({ params }: PageProps) {
           </p>
 
           <div className="flex w-full flex-col gap-3">
-            <Link
-              href={`/stories/${slug}/read?sessionId=${result.id}&autoStart=true`}
-              className={actionClass("primary", "w-full")}
+            <button
+              type="button"
+              disabled={isStartingStory}
+              onClick={() => {
+                setIsStartingStory(true);
+                router.push(`/stories/${slug}/read?sessionId=${result.id}&autoStart=true`);
+              }}
+              className={actionClass("primary", "w-full flex items-center justify-center gap-2")}
             >
-              나의 동화 만들기
-            </Link>
+              {isStartingStory ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  동화책을 펼치는 중...
+                </>
+              ) : (
+                "나의 동화 만들기"
+              )}
+            </button>
             <button
               type="button"
               onClick={() => {

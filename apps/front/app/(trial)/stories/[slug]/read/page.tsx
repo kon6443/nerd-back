@@ -551,7 +551,13 @@ function StoryReadContent({ params }: PageProps) {
 
   if (viewState === "loading" || !story) {
     return (
-      <LoadingView message="동화 정보를 준비하고 있어요..." />
+      <LoadingView
+        message={
+          autoStart
+            ? "동화나라에 주인공 마법을 준비하고 있어요..."
+            : "동화 정보를 준비하고 있어요..."
+        }
+      />
     );
   }
 
