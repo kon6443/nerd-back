@@ -1,19 +1,43 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { isReaderPath } from "@/components/story/readerNav";
+import { isLibraryCreateMode } from "@/lib/libraryMode";
 import { AUTH_LINK } from "./authLinks";
 import { AuthCta } from "./AuthCta";
 
-const COMMON_LINKS = [
+export const COMMON_LINKS = [
   { href: "/", label: "홈" },
-  { href: "/library", label: "서재" },
+  { href: "/library?mode=create", label: "서재" },
+  { href: "/library", label: "서재 둘러보기" },
 ] as const;
 
-function isActive(pathname: string, href: string): boolean {
+export function isActive(
+  pathname: string,
+  href: string,
+  searchParams?: { get(key: string): string | null } | null,
+): boolean {
   if (href === "/") return pathname === "/";
-  if (href === "/library" && pathname.startsWith("/stories/")) return true;
+
+  const isCreateMode = isLibraryCreateMode(searchParams?.get("mode"));
+
+  if (href === "/library?mode=create") {
+    if (pathname.startsWith("/stories/")) return true;
+    if (pathname === "/library" || pathname.startsWith("/library/")) {
+      return isCreateMode;
+    }
+    return false;
+  }
+
+  if (href === "/library") {
+    if (pathname === "/library" || pathname.startsWith("/library/")) {
+      return !isCreateMode;
+    }
+    return false;
+  }
+
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -23,9 +47,51 @@ const AUTH_NAV_SLOTS = [
 ] as const;
 
 function navLinkClass(active: boolean): string {
-  return `flex min-h-touch min-w-touch items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold transition-colors motion-reduce:transition-none sm:px-6 sm:text-base ${
+  return `flex min-h-touch min-w-touch items-center justify-center gap-1.5 rounded-xl px-3.5 text-sm font-bold transition-colors motion-reduce:transition-none sm:gap-2 sm:px-6 sm:text-base ${
     active ? "bg-primary-tint text-primary-strong" : "text-ink-muted hover:bg-surface hover:text-ink"
   }`;
+}
+
+function CommonNavLinksItems({
+  pathname,
+  searchParams,
+}: {
+  pathname: string;
+  searchParams?: { get(key: string): string | null } | null;
+}) {
+  return (
+    <>
+      {COMMON_LINKS.map((link) => {
+        const active = isActive(pathname, link.href, searchParams);
+        return (
+          <li key={link.href}>
+            <Link
+              href={link.href}
+              prefetch={link.href.startsWith("/library") ? true : undefined}
+              aria-current={active ? "page" : undefined}
+              className={navLinkClass(active)}
+            >
+              {active && <span aria-hidden="true" className="size-1.5 rounded-full bg-primary-strong" />}
+              {link.label}
+            </Link>
+          </li>
+        );
+      })}
+    </>
+  );
+}
+
+function CommonNavLinksWithParams({ pathname }: { pathname: string }) {
+  const searchParams = useSearchParams();
+  return <CommonNavLinksItems pathname={pathname} searchParams={searchParams} />;
+}
+
+function CommonNavLinks({ pathname }: { pathname: string }) {
+  return (
+    <Suspense fallback={<CommonNavLinksItems pathname={pathname} />}>
+      <CommonNavLinksWithParams pathname={pathname} />
+    </Suspense>
+  );
 }
 
 /** 세션은 SessionSync가 확인한다. 두 인증 슬롯은 첫 페인트부터 CSS로 선택한다. */
@@ -45,17 +111,7 @@ export function AppHeader() {
           <span className="truncate">동화나라</span>
         </Link>
         <ul className="order-3 flex w-full items-center gap-1 sm:order-none sm:w-auto">
-          {COMMON_LINKS.map((link) => {
-            const active = isActive(pathname, link.href);
-            return (
-              <li key={link.href}>
-                <Link href={link.href} prefetch={link.href === "/library" ? true : undefined} aria-current={active ? "page" : undefined} className={navLinkClass(active)}>
-                  {active && <span aria-hidden="true" className="size-1.5 rounded-full bg-primary-strong" />}
-                  {link.label}
-                </Link>
-              </li>
-            );
-          })}
+          <CommonNavLinks pathname={pathname} />
           <li className="lg:hidden">
             {AUTH_NAV_SLOTS.map(({ status, className }) => {
               const link = AUTH_LINK[status];

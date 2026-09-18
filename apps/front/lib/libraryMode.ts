@@ -1,4 +1,4 @@
-export type LibraryModeValue = string | string[] | undefined;
+export type LibraryModeValue = string | string[] | null | undefined;
 
 /** URL의 mode 값이 정확히 하나의 `create`일 때만 제작 흐름이다. */
 export function isLibraryCreateMode(mode: LibraryModeValue): boolean {
