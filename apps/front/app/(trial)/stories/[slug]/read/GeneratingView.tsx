@@ -16,6 +16,12 @@ const MAGIC_MESSAGES = [
   "거의 다 그려졌어요! 조금만 기다려 주시면 마법이 펼쳐져요 🌟",
 ];
 
+const DEMO_MAGIC_MESSAGES = [
+  "동화나라의 문을 똑똑 두드리고 있어요... ✨",
+  "주인공 마법을 가루처럼 뿌리는 중... 🪄",
+  "세상에 단 하나뿐인 이야기가 펼쳐집니다! 🌟",
+];
+
 /**
  * 개인화 제작 현황 — 쪽마다 진행 상태와 단독 재시도를 보여 준다.
  *
@@ -25,42 +31,61 @@ const MAGIC_MESSAGES = [
 export function GeneratingView({
   slug,
   sessionPages,
-  pagesPollDegraded,
-  retryingPageNo,
-  isSelectingBranch,
-  handleRetry,
-  handleAfterStoryRetry,
-  canOpenReader,
-  onOpenReader,
+  pagesPollDegraded = false,
+  retryingPageNo = null,
+  isSelectingBranch = null,
+  handleRetry = () => {},
+  handleAfterStoryRetry = () => {},
+  canOpenReader = false,
+  onOpenReader = () => {},
+  isDemo = false,
 }: {
   slug: string;
   sessionPages: SessionPagesResponse | null;
   /** 폴링이 연속 실패하는 중. "멈춘 것" 과 "느린 것" 을 사용자가 구분할 수 있어야 한다. */
-  pagesPollDegraded: boolean;
-  retryingPageNo: number | null;
-  isSelectingBranch: StoryBranchKey | null;
-  handleRetry: (pageNo: number) => void;
-  handleAfterStoryRetry: (branchKey: StoryBranchKey) => void;
+  pagesPollDegraded?: boolean;
+  retryingPageNo?: number | null;
+  isSelectingBranch?: StoryBranchKey | null;
+  handleRetry?: (pageNo: number) => void;
+  handleAfterStoryRetry?: (branchKey: StoryBranchKey) => void;
   /** 본편이 준비돼 지금 읽으러 갈 수 있는가. */
-  canOpenReader: boolean;
-  onOpenReader: () => void;
+  canOpenReader?: boolean;
+  onOpenReader?: () => void;
+  isDemo?: boolean;
 }) {
   const [magicMsgIndex, setMagicMsgIndex] = useState(0);
+  const [demoProgress, setDemoProgress] = useState(15);
+
+  const activeMessages = isDemo ? DEMO_MAGIC_MESSAGES : MAGIC_MESSAGES;
 
   useEffect(() => {
+    const interval = isDemo ? 1200 : 3800;
     const timer = setInterval(() => {
-      setMagicMsgIndex((prev) => (prev + 1) % MAGIC_MESSAGES.length);
-    }, 3800);
+      setMagicMsgIndex((prev) => (prev + 1) % activeMessages.length);
+    }, interval);
     return () => clearInterval(timer);
-  }, []);
+  }, [isDemo, activeMessages.length]);
+
+  useEffect(() => {
+    if (!isDemo) return;
+    const progressTimer = setInterval(() => {
+      setDemoProgress((prev) => {
+        if (prev >= 95) return 98;
+        return prev + 25;
+      });
+    }, 600);
+    return () => clearInterval(progressTimer);
+  }, [isDemo]);
 
   const total = sessionPages?.totalPages || 7;
   const completed = sessionPages?.completedPages || 0;
-  const progressPercent = Math.min(100, Math.round((completed / total) * 100));
+  const progressPercent = isDemo
+    ? demoProgress
+    : Math.min(100, Math.round((completed / total) * 100));
   const generationPages = sessionPages?.pages ?? [];
   // 세션 전체가 실패로 판정된 상태. 이걸 보지 않으면 제목이 계속 "만들고 있어요" 라
   // **끝난 실패를 진행 중으로 읽게 된다.**
-  const hasFailed = sessionPages?.status === "failed";
+  const hasFailed = !isDemo && sessionPages?.status === "failed";
   const failedCount = generationPages.filter((item) => item.status === "failed").length;
 
   return (
@@ -69,20 +94,26 @@ export function GeneratingView({
 
       <div>
         <h1 className="text-2xl font-bold text-ink md:text-3xl">
-          {hasFailed ? "만들다가 멈췄어요" : "나만의 동화책을 만들고 있어요"}
+          {isDemo
+            ? "동화 속 세상으로 떠나고 있어요!"
+            : hasFailed
+              ? "만들다가 멈췄어요"
+              : "나만의 동화책을 만들고 있어요"}
         </h1>
         <p className="mt-2 text-sm text-ink-muted">
-          {hasFailed
-            ? "아래에서 멈춘 장을 다시 만들 수 있어요."
-            : "AI가 동화 속 장면에 아이의 얼굴과 표정을 마법처럼 합성하고 있어요."}
+          {isDemo
+            ? "잠시 후 멋진 주인공이 된 내 모습이 나타나요 ✨"
+            : hasFailed
+              ? "아래에서 멈춘 장을 다시 만들 수 있어요."
+              : "AI가 동화 속 장면에 아이의 얼굴과 표정을 마법처럼 합성하고 있어요."}
         </p>
       </div>
 
-      {/* 실시간 마법 진행 메시지 롤링 (멍하니 기다리지 않도록 단계별 피드백) */}
+      {/* 실시간 마법 진행 메시지 롤링 */}
       {!hasFailed && (
         <div className="flex min-h-[46px] w-full max-w-md items-center justify-center rounded-card border border-primary/30 bg-primary-soft/50 px-4 py-2.5 text-center text-sm font-semibold text-primary-strong shadow-xs">
           <span key={magicMsgIndex} className="animate-fade-in transition-all duration-300">
-            {MAGIC_MESSAGES[magicMsgIndex]}
+            {activeMessages[magicMsgIndex]}
           </span>
         </div>
       )}
@@ -145,101 +176,107 @@ export function GeneratingView({
             style={{ transform: `scaleX(${Math.max(0.04, progressPercent / 100)})` }}
           />
         </div>
-        {!hasFailed && completed < total && (
+        {!hasFailed && !isDemo && completed < total && (
           <p className="mt-2 text-right text-[11px] font-medium text-ink-muted">
             ⏳ 한 권 제작에 약 30초~1분이 걸려요. 잠시만 기다려 주세요!
           </p>
         )}
+        {isDemo && (
+          <p className="mt-2 text-center text-xs font-medium text-primary-strong animate-pulse">
+            🪄 마법을 부리는 중... 곧 동화가 시작돼요!
+          </p>
+        )}
       </div>
 
-      {/* 페이지별 진행 단계 카드 리스트 */}
-      <div className="w-full max-w-md rounded-card border-2 border-line bg-surface-raised p-4 shadow-sm">
-        <h2 className="mb-3 text-left text-xs font-bold text-ink-muted uppercase tracking-wider">
-          페이지별 제작 현황
-        </h2>
-        <div className="flex flex-col gap-2">
-          {generationPages.map((item) => {
-            const isBehind = item.branchKey !== "common";
-            const pageLabel = isBehind
-              ? `6쪽 비하인드 ${item.branchKey.toUpperCase()}`
-              : `${item.pageNo}쪽`;
-            const status = item?.status || "pending";
-            const isRunning = status === "running";
+      {/* 페이지별 진행 단계 카드 리스트 (정식 제작 모드 전용) */}
+      {!isDemo && (
+        <div className="w-full max-w-md rounded-card border-2 border-line bg-surface-raised p-4 shadow-sm">
+          <h2 className="mb-3 text-left text-xs font-bold text-ink-muted uppercase tracking-wider">
+            페이지별 제작 현황
+          </h2>
+          <div className="flex flex-col gap-2">
+            {generationPages.map((item) => {
+              const isBehind = item.branchKey !== "common";
+              const pageLabel = isBehind
+                ? `6쪽 비하인드 ${item.branchKey.toUpperCase()}`
+                : `${item.pageNo}쪽`;
+              const status = item?.status || "pending";
+              const isRunning = status === "running";
 
-            return (
-              <div
-                key={`${item.branchKey}-${item.pageNo}`}
-                className={`rounded-lg border px-3 py-2.5 text-sm transition-colors ${
-                  isRunning
-                    ? "border-primary/40 bg-primary-soft/20 shadow-xs"
-                    : "border-line bg-surface-raised"
-                }`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-bold text-ink">
-                    {pageLabel}
-                  </span>
-                  {item?.imageUrl && (
-                    <span className="rounded-full bg-primary-tint px-2 py-0.5 text-xs font-semibold text-primary-strong">
-                      삽화 준비 완료
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {status === "succeeded" && (
-                    <span className="flex items-center gap-1 font-bold text-primary-strong">
-                      <span className="inline-block">✓</span> 완성
-                    </span>
-                  )}
-                  {isRunning && (
-                    <span className="flex items-center gap-1.5 font-bold text-primary-strong">
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              return (
+                <div
+                  key={`${item.branchKey}-${item.pageNo}`}
+                  className={`rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                    isRunning
+                      ? "border-primary/40 bg-primary-soft/20 shadow-xs"
+                      : "border-line bg-surface-raised"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-ink">
+                        {pageLabel}
                       </span>
-                      그리는 중...
-                    </span>
-                  )}
-                  {status === "pending" && (
-                    <span className="text-xs text-ink-muted">대기 중</span>
-                  )}
-                  {status === "failed" && (
-                    <button
-                      onClick={() =>
-                        void (isBehind
-                          ? handleAfterStoryRetry(item.branchKey as StoryBranchKey)
-                          : handleRetry(item.pageNo))
-                      }
-                      disabled={retryingPageNo === item.pageNo || isSelectingBranch !== null}
-                      className={`min-h-touch rounded-btn bg-danger-soft px-3 text-sm font-bold text-danger-strong hover:bg-danger-soft disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`}
-                    >
-                      {retryingPageNo === item.pageNo || isSelectingBranch === item.branchKey
-                        ? "재시도 중..."
-                        : "다시 만들기"}
-                    </button>
-                  )}
-                </div>
-                </div>
+                      {item?.imageUrl && (
+                        <span className="rounded-full bg-primary-tint px-2 py-0.5 text-xs font-semibold text-primary-strong">
+                          삽화 준비 완료
+                        </span>
+                      )}
+                    </div>
 
-                {/* 백엔드가 사유를 주는데 화면에 안 그리면 사용자는 "왜" 를 알 수 없다.
-                    ⚠️ 이 값은 사용자용 문구다 — 내부 예외 원문이 들어오지 않도록
-                    백엔드에서 고정 문구로 걸러진다(`openrouter-image.adapter.ts`). */}
-                {status === "failed" && item.errorMessage && (
-                  <p className="mt-1 text-left text-xs text-danger-strong">{item.errorMessage}</p>
-                )}
-              </div>
-            );
-          })}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {status === "succeeded" && (
+                        <span className="flex items-center gap-1 font-bold text-primary-strong">
+                          <span className="inline-block">✓</span> 완성
+                        </span>
+                      )}
+                      {isRunning && (
+                        <span className="flex items-center gap-1.5 font-bold text-primary-strong">
+                          <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                          </span>
+                          그리는 중...
+                        </span>
+                      )}
+                      {status === "pending" && (
+                        <span className="text-xs text-ink-muted">대기 중</span>
+                      )}
+                      {status === "failed" && (
+                        <button
+                          onClick={() =>
+                            void (isBehind
+                              ? handleAfterStoryRetry(item.branchKey as StoryBranchKey)
+                              : handleRetry(item.pageNo))
+                          }
+                          disabled={retryingPageNo === item.pageNo || isSelectingBranch !== null}
+                          className={`min-h-touch rounded-btn bg-danger-soft px-3 text-sm font-bold text-danger-strong hover:bg-danger-soft disabled:pointer-events-none disabled:opacity-50 ${FOCUS_RING}`}
+                        >
+                          {retryingPageNo === item.pageNo || isSelectingBranch === item.branchKey
+                            ? "재시도 중..."
+                            : "다시 만들기"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {status === "failed" && item.errorMessage && (
+                    <p className="mt-1 text-left text-xs text-danger-strong">{item.errorMessage}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 완료 액션 버튼 */}
       <div className="flex w-full max-w-md flex-col gap-3">
-        <p className="text-xs text-ink-muted">
-          본편 5장이 준비되면 바로 읽을 수 있어요. 한 장이 실패하더라도 해당 페이지만 다시 만들 수 있습니다.
-        </p>
+        {!isDemo && (
+          <p className="text-xs text-ink-muted">
+            본편 5장이 준비되면 바로 읽을 수 있어요. 한 장이 실패하더라도 해당 페이지만 다시 만들 수 있습니다.
+          </p>
+        )}
 
         {/* 폴링의 자동 복귀를 막았으므로(리더 `statusPinned`) 돌아갈 길을 여기서 준다. */}
         {canOpenReader && (
@@ -249,10 +286,10 @@ export function GeneratingView({
         )}
 
         <Link
-          href={`/library/${slug}`}
+          href={isDemo ? "/library" : `/library/${slug}`}
           className={actionClass("secondary", "w-full")}
         >
-          동화 소개로 돌아가기
+          {isDemo ? "서재로 돌아가기" : "동화 소개로 돌아가기"}
         </Link>
       </div>
     </StoryRoom>

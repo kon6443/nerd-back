@@ -1,17 +1,18 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { Suspense, use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { StoryRoom } from "@/components/layout/StoryRoom";
 import { StoryBookScene } from "@/components/story/StoryBookScene";
 import { Card } from "@/components/ui/Card";
 import { actionClass } from "@/components/ui/actionStyles";
+import { LoadingView } from "@/components/ui/LoadingView";
 import { ApiError, createSession, deleteSession, findMySessionBySlug, uploadFace } from "@/lib/api";
 import type { MyStorySessionItem, UploadFaceResponse } from "@nerd/contracts";
 import { errorMessage } from "@/lib/api/errorPresentation";
 import { getLibraryStoryHref } from "@/lib/libraryMode";
-import { CaptureStudio, StudioIcon } from "./CaptureStudio";
+import { CaptureStudio, StudioIcon, type DemoPreset } from "./CaptureStudio";
 import styles from "./CaptureStudio.module.css";
 
 interface PageProps {
@@ -23,10 +24,13 @@ interface FacePhoto {
   previewUrl: string;
 }
 
-export default function CapturePage({ params }: PageProps) {
+function CapturePageContent({ params }: PageProps) {
   const { slug } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isDemoMode = searchParams.get("demo") === "true";
 
+  const [selectedPreset, setSelectedPreset] = useState<DemoPreset>("male");
   const [photo, setPhoto] = useState<FacePhoto | null>(null);
   const [isWebcamActive, setIsWebcamActive] = useState(false);
   const [isStartingCamera, setIsStartingCamera] = useState(false);
@@ -119,6 +123,7 @@ export default function CapturePage({ params }: PageProps) {
 
   // 기존 세션 복원 또는 완성된 세션 확인
   useEffect(() => {
+    if (isDemoMode) return;
     let active = true;
     async function checkExistingSession() {
       try {
@@ -148,7 +153,7 @@ export default function CapturePage({ params }: PageProps) {
     return () => {
       active = false;
     };
-  }, [slug]);
+  }, [slug, isDemoMode]);
 
   // 기존 완성 세션 삭제 및 새로 만들기
   async function handleDeleteAndReset() {
@@ -271,6 +276,11 @@ export default function CapturePage({ params }: PageProps) {
 
   // 얼굴 사진 제출
   async function handleSubmit() {
+    if (isDemoMode) {
+      router.push(`/stories/${slug}/read?demo=${selectedPreset}&loading=true`);
+      return;
+    }
+
     if (!photo) {
       setErrorMsg("정면 얼굴 사진은 필수입니다.");
       return;
@@ -324,16 +334,16 @@ export default function CapturePage({ params }: PageProps) {
   return (
     <StoryRoom storySlug={slug} className={styles.page}>
       <div className={styles.pageHeader}>
-        {/* 🚫 `/library/${slug}` 로 돌아가지 않는다 — `mode=create` 가 빠지면 소개 화면이
-            시연 모드로 바뀌어 「📷 내 얼굴로 만들기」가 사라진다. 이 화면에 오는 경로는
-            전부 제작 흐름이므로(소개 CTA·마이페이지·리더 에러·시연 리더) 항상 제작 모드다. */}
         <Link
-          href={getLibraryStoryHref(slug, true)}
+          href={isDemoMode ? "/library" : getLibraryStoryHref(slug, true)}
           className={actionClass("tertiary", styles.backLink, "compact")}
         >
-          <StudioIcon name="back" />동화로 돌아가기
+          <StudioIcon name="back" />
+          {isDemoMode ? "서재로 돌아가기" : "동화로 돌아가기"}
         </Link>
-        <span className={styles.pageLabel}>주인공 준비하기</span>
+        <span className={styles.pageLabel}>
+          {isDemoMode ? "샘플 주인공 체험" : "주인공 준비하기"}
+        </span>
       </div>
 
       {existingSession ? (
@@ -435,6 +445,9 @@ export default function CapturePage({ params }: PageProps) {
             isStartingCamera={isStartingCamera}
             isSubmitting={isSubmitting}
             errorMessage={errorMsg}
+            isDemoMode={isDemoMode}
+            selectedPreset={selectedPreset}
+            onSelectPreset={setSelectedPreset}
             onVideoRef={setVideoRef}
             onStartCamera={startWebcam}
             onCapture={handleCapture}
@@ -456,5 +469,13 @@ export default function CapturePage({ params }: PageProps) {
         <p role="alert" className={`${styles.error} ${styles.resultError}`}>{errorMsg}</p>
       )}
     </StoryRoom>
+  );
+}
+
+export default function CapturePage(props: PageProps) {
+  return (
+    <Suspense fallback={<LoadingView message="주인공 스튜디오를 준비하고 있어요..." />}>
+      <CapturePageContent {...props} />
+    </Suspense>
   );
 }

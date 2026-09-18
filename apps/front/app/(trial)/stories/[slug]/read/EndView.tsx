@@ -13,20 +13,30 @@ import { actionClass } from "@/components/ui/actionStyles";
 export function EndView({
   sessionPages,
   onRestart,
+  isDemo = false,
+  storySlug,
 }: {
   sessionPages: SessionPagesResponse | null;
   onRestart: () => void;
+  isDemo?: boolean;
+  storySlug?: string;
 }) {
   const coverImage = sessionPages?.pages.find((p) => p.pageNo === 1)?.imageUrl;
 
   return (
     <StoryRoom className={room.readingState}>
-      <span className="rounded-full border border-paper-edge bg-paper p-4 text-gold-strong"><StoryIcon name="star" className="size-9" /></span>
+      <span className="rounded-full border border-paper-edge bg-paper p-4 text-gold-strong">
+        <StoryIcon name="star" className="size-9" />
+      </span>
 
       <div>
-        <h1 className="text-3xl font-bold text-ink">동화책을 모두 읽었어요!</h1>
+        <h1 className="text-3xl font-bold text-ink">
+          {isDemo ? "동화 속 주인공이 되어보러 갈까요? ✨" : "동화책을 모두 읽었어요!"}
+        </h1>
         <p className="mt-2 text-sm text-ink-muted">
-          내가 주인공이 된 세상에 단 하나뿐인 특별한 모험이었습니다.
+          {isDemo
+            ? "단 한 장의 사진으로 세상에 하나뿐인 나만의 이야기를 만들어 보세요."
+            : "내가 주인공이 된 세상에 단 하나뿐인 특별한 모험이었습니다."}
         </p>
       </div>
 
@@ -41,17 +51,35 @@ export function EndView({
             unoptimized
           />
         </div>
-      ) : <StoryBookScene />}
+      ) : (
+        <StoryBookScene />
+      )}
 
-      {/* 다 읽은 뒤의 주 동작은 **다른 동화로 가기**다 — 서재가 위(primary), 다시 읽기가 아래(secondary). */}
-      <div className="flex w-full flex-col gap-3">
-        <Link href="/library" className={actionClass("primary", "w-full")}>
-          서재로 돌아가기
-        </Link>
-        <button onClick={onRestart} className={actionClass("secondary", "w-full")}>
-          처음부터 다시 읽기
-        </button>
-      </div>
+      {isDemo ? (
+        <div className="flex w-full flex-col gap-3">
+          <Link
+            href={`/stories/${storySlug || ""}/capture`}
+            className={actionClass("primary", "w-full text-base font-bold")}
+          >
+            지금 내 사진으로 진짜 동화 만들기
+          </Link>
+          <button onClick={onRestart} className={actionClass("secondary", "w-full")}>
+            처음부터 다시 읽기
+          </button>
+          <Link href="/library" className={actionClass("tertiary", "w-full text-center")}>
+            서재로 돌아가기
+          </Link>
+        </div>
+      ) : (
+        <div className="flex w-full flex-col gap-3">
+          <Link href="/library" className={actionClass("primary", "w-full")}>
+            서재로 돌아가기
+          </Link>
+          <button onClick={onRestart} className={actionClass("secondary", "w-full")}>
+            처음부터 다시 읽기
+          </button>
+        </div>
+      )}
     </StoryRoom>
   );
 }

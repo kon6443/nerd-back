@@ -75,6 +75,9 @@ function StoryReadContent({ params }: PageProps) {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
   const autoStart = searchParams.get("autoStart") === "true";
+  const demoParam = searchParams.get("demo");
+  const isDemoMode = demoParam === "male" || demoParam === "female";
+  const isLoadingParam = searchParams.get("loading") === "true";
 
   const [chatDrafts] = useState(createChatDraftStore);
   useEffect(() => {
@@ -183,12 +186,23 @@ function StoryReadContent({ params }: PageProps) {
   const chatBranchKey: StoryChatBranchKey =
     currentPageNo === 6 && activeBranchKey ? activeBranchKey : "common";
 
+  const currentDemoCharacters = useMemo(() => {
+    if (!isDemoMode) return [];
+    const chars = storyPages.find((page) => page.pageNo === currentPageNo)?.characters ?? [];
+    return chars.map((c) => ({
+      role: c.role,
+      displayName: c.displayName,
+    }));
+  }, [isDemoMode, storyPages, currentPageNo]);
+
   // ⭐ **리더가 대화 상태를 소유한다.** 표면을 닫아도 답변 폴링이 살아 있어야 한다.
   const chat = useCharacterChat({
     sessionId,
     pageNo: currentPageNo,
     branchKey: chatBranchKey,
     drafts: chatDrafts,
+    isDemo: isDemoMode,
+    demoCharacters: currentDemoCharacters,
   });
 
   const narrationAudioUrl =
@@ -276,14 +290,15 @@ function StoryReadContent({ params }: PageProps) {
     setCurrentPageNo(pageNo);
   }, []);
 
-  const noSessionError = !sessionId ? "세션 정보가 없습니다. 얼굴 사진을 먼저 등록해 주세요." : "";
+  const noSessionError =
+    !sessionId && !isDemoMode ? "세션 정보가 없습니다. 얼굴 사진을 먼저 등록해 주세요." : "";
   const activeError = errorMsg || noSessionError;
   // 세션 정보 자체가 없으면 재시도할 요청이 없다 — 얼굴 등록이 유일한 길이다.
   const errorRecoveryAction: ErrorRecovery = errorMsg ? recovery : "register-face";
 
   // 초기 데이터 로드 및 파이프라인 기동
   useEffect(() => {
-    if (!sessionId) {
+    if (!sessionId && !isDemoMode) {
       return;
     }
 
@@ -297,27 +312,50 @@ function StoryReadContent({ params }: PageProps) {
         setStory(detail);
 
         // 2. 본편 전 쪽 본문을 **한 번에** 받는다.
-        //    ⭐ 이후 쪽을 오가도 추가 요청이 없다 — 넘김 뒷면에 도착 쪽 본문이 항상 준비돼 있다.
-        //    🚫 쪽마다 부르지 않는다. 그러면 어느 쪽을 먼저 받을지 정하는 로직이 화면에 생기고,
-        //       동시 호출을 피하려는 순차 루프까지 따라온다 — 둘 다 API 모양 때문에 생긴 코드였다.
-        // 🚫 실패를 삼키지 않는다. `storyPages` 에는 본문·캐릭터·낭독 URL 이 모두 실려 있어
-        //    (`bodyTextAt` · `charactersAt` · `narrationAudioUrl`) 이게 비면 화면은 영영
-        //    "본문을 불러오는 중입니다..." 로 남고 대화도 낭독도 죽는다. 재시도 경로를 준다.
         const pages = await fetchStoryPages(slug);
         if (!active) return;
         setStoryPages(pages);
 
-        // 3. autoStart 플래그가 있으면 개인화 생성 시작 호출 (API 10, 멱등성 보장)
+        // 3. 시연 모드일 때: Stateless 정적 렌더링 및 3초 마법 연출
+        if (isDemoMode) {
+          const demoSessionData: SessionPagesResponse = {
+            sessionId: "00000000-0000-0000-0000-000000000001",
+            status: "completed",
+            isMainStoryReady: true,
+            isAllCompleted: true,
+            totalPages: pages.length,
+            completedPages: pages.length,
+            pages: pages.map((p) => ({
+              pageNo: p.pageNo,
+              branchKey: "common",
+              imageUrl: p.baseImageUrl,
+              status: "succeeded",
+              updatedAt: new Date().toISOString(),
+            })),
+          };
+          setSessionPages(demoSessionData);
+          await preloadImages(pages.map((p) => p.baseImageUrl));
+          if (!active) return;
+
+          if (isLoadingParam) {
+            setViewState("generating");
+            const timer = setTimeout(() => {
+              if (!active) return;
+              setViewState("reader");
+              router.replace(`/stories/${slug}/read?demo=${demoParam}`);
+            }, 3000);
+            return () => clearTimeout(timer);
+          } else {
+            setViewState("reader");
+            return;
+          }
+        }
+
+        // 4. autoStart 플래그가 있으면 개인화 생성 시작 호출 (API 10, 멱등성 보장)
         if (autoStart) {
           try {
             await personalizeSession(sessionId!);
           } catch (err: unknown) {
-            // 🚫 삼키지 않는다. 예전에는 `console.warn` 만 해서, 얼굴 미등록(`FACE_NOT_READY`)으로
-            //    시작이 거절돼도 화면은 진행률 0% 인 "만들고 있어요" 를 **영원히** 돌렸다.
-            //    백엔드가 여기서 던지는 경우는 「세션 없음」과 「얼굴 미등록」 둘뿐이다 —
-            //    진행 중·완료는 멱등하게 성공을 돌려주므로(`story-session.service.ts:504`)
-            //    이 catch 에 오는 것은 전부 사용자가 알아야 할 실패다.
-            //    아래 에러 화면의 「얼굴 다시 등록하기」가 그대로 복구 경로가 된다.
             if (!active) return;
             setErrorMsg(errorMessage(err, "동화 만들기를 시작하지 못했어요."));
             setRecovery(errorRecovery(err));
@@ -325,7 +363,7 @@ function StoryReadContent({ params }: PageProps) {
           }
         }
 
-        // 4. 세션 페이지 진행 상태 조회 (API 11)
+        // 5. 세션 페이지 진행 상태 조회 (API 11)
         const sessionData = await fetchSessionPages(sessionId!);
         if (!active) return;
         setSessionPages(sessionData);
@@ -334,9 +372,6 @@ function StoryReadContent({ params }: PageProps) {
           await preloadImages([getFirstPageImageUrl(sessionData)]);
           if (!active) return;
           setViewState("reader");
-          // ⭐ 나머지 삽화는 **기다리지 않고 바로** 받기 시작한다. 화면에 그려진 첫 삽화의
-          //    `onLoad` 를 기다리면 배포처럼 이미지가 느린 곳에서 프리로드가 몇 초씩 늦어지고,
-          //    그 사이에 넘기면 밑면 삽화가 빈 채로 스친다(2026-09-14 재현).
           void preloadImages(sessionData.pages.map((page) => page.imageUrl));
         } else {
           setViewState("generating");
@@ -357,22 +392,27 @@ function StoryReadContent({ params }: PageProps) {
     return () => {
       active = false;
     };
-  }, [slug, sessionId, autoStart, router, retryTrigger, preloadImages]);
+  }, [
+    slug,
+    sessionId,
+    autoStart,
+    isDemoMode,
+    demoParam,
+    isLoadingParam,
+    router,
+    retryTrigger,
+    preloadImages,
+  ]);
 
   // 진행 상태 폴링 (generating 상태일 때).
   // 완료를 받으면 viewState 가 바뀌어 enabled 가 false 가 되므로 폴링은 스스로 멈춘다.
   const { degraded: pagesPollDegraded } = usePolling({
-    enabled: sessionId !== null && viewState === "generating",
-    // `enabled` 가 sessionId 존재를 보장한다 — 타입 좁히기가 콜백 안까지 전파되지 않아
-    // 이 파일의 다른 호출부와 같은 방식(`!`)으로 맞춘다.
+    enabled: !isDemoMode && sessionId !== null && viewState === "generating",
     fetcher: () => fetchSessionPages(sessionId!),
     onData: (data) => {
       setSessionPages(data);
-      // 사용자가 직접 연 현황 화면은 자동으로 닫지 않는다 — 위 `statusPinned` 주석 참조.
       if (!statusPinned && isReaderReady(data)) {
         void preloadImages([getFirstPageImageUrl(data)]).then(() => {
-          // 폴링으로 본편 완료를 처음 받는 경로도 초기 조회와 똑같이 독서 화면으로 전환한다.
-          // 이 전환이 없으면 5/7 상태에서 폴링만 멈춰 생성 화면이 그대로 남는다.
           setViewState("reader");
           void preloadImages(data.pages.map((page) => page.imageUrl));
         });
@@ -382,7 +422,11 @@ function StoryReadContent({ params }: PageProps) {
 
   // 비하인드 선택 화면에서는 A/B 결과의 생성 상태만 가볍게 갱신한다.
   const { degraded: afterStoryPollDegraded } = usePolling({
-    enabled: sessionId !== null && viewState === "branch" && isAfterStoryGenerating(afterStory),
+    enabled:
+      !isDemoMode &&
+      sessionId !== null &&
+      viewState === "branch" &&
+      isAfterStoryGenerating(afterStory),
     fetcher: () => fetchAfterStory(sessionId!),
     onData: setAfterStory,
   });
@@ -580,6 +624,7 @@ function StoryReadContent({ params }: PageProps) {
           setStatusPinned(false);
           setViewState("reader");
         }}
+        isDemo={isDemoMode}
       />
     );
   }
@@ -617,6 +662,8 @@ function StoryReadContent({ params }: PageProps) {
           setCurrentPageNo(1);
           setViewState("reader");
         }}
+        isDemo={isDemoMode}
+        storySlug={slug}
       />
     );
   }
@@ -673,7 +720,7 @@ function StoryReadContent({ params }: PageProps) {
       <main className={mainClass}>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
         <header className={READER_BAR}>
-          {!sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
+          {!isDemoMode && !sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
             <button
               onClick={() => {
                 // 자동 복귀를 막는다 — 안 그러면 3초 뒤 폴링이 도로 리더로 돌려보낸다.

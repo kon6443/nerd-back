@@ -21,12 +21,17 @@ export function StudioIcon({ name }: { name: IconName }) {
   );
 }
 
+export type DemoPreset = "male" | "female";
+
 interface CaptureStudioProps {
   previewUrl?: string;
   isCameraActive: boolean;
   isStartingCamera: boolean;
   isSubmitting: boolean;
   errorMessage: string;
+  isDemoMode?: boolean;
+  selectedPreset?: DemoPreset;
+  onSelectPreset?: (preset: DemoPreset) => void;
   onVideoRef: (node: HTMLVideoElement | null) => void;
   onStartCamera: () => void;
   onCapture: () => void;
@@ -41,6 +46,9 @@ export function CaptureStudio({
   isStartingCamera,
   isSubmitting,
   errorMessage,
+  isDemoMode = false,
+  selectedPreset = "male",
+  onSelectPreset,
   onVideoRef,
   onStartCamera,
   onCapture,
@@ -48,58 +56,113 @@ export function CaptureStudio({
   onChoosePhoto,
   onSubmit,
 }: CaptureStudioProps) {
-  const hasPhoto = Boolean(previewUrl);
-  const primaryAction = hasPhoto ? onSubmit : isCameraActive ? onCapture : onStartCamera;
-  const primaryLabel = isSubmitting
-    ? "주인공 만드는 중"
-    : hasPhoto
-      ? "이 얼굴로 만들기"
-      : isStartingCamera
-        ? "카메라 준비 중"
-        : isCameraActive
-          ? "찰칵! 사진 찍기"
-          : "카메라 켜기";
+  const hasPhoto = Boolean(previewUrl) || isDemoMode;
+  const demoPreviewUrl = `/demo/avatars/${selectedPreset}.jpg`;
+  const activePreviewUrl = isDemoMode ? demoPreviewUrl : previewUrl;
+
+  const primaryAction = isDemoMode ? onSubmit : hasPhoto ? onSubmit : isCameraActive ? onCapture : onStartCamera;
+  const primaryLabel = isDemoMode
+    ? "이 얼굴로 동화 만들기"
+    : isSubmitting
+      ? "주인공 만드는 중"
+      : hasPhoto
+        ? "이 얼굴로 만들기"
+        : isStartingCamera
+          ? "카메라 준비 중"
+          : isCameraActive
+            ? "찰칵! 사진 찍기"
+            : "카메라 켜기";
 
   return (
     <section className={styles.studio} aria-labelledby="capture-title">
       <div className={styles.welcome}>
         <h1 id="capture-title" className={styles.title}>
-          {hasPhoto ? <>멋진 주인공이<br /><em>여기 있네요!</em></> : <>동화 속 주인공,<br /><em>바로 나!</em></>}
+          {isDemoMode ? (
+            <>
+              동화 속 주인공이<br />
+              <em>되어보세요!</em>
+            </>
+          ) : hasPhoto ? (
+            <>
+              멋진 주인공이<br />
+              <em>여기 있네요!</em>
+            </>
+          ) : (
+            <>
+              동화 속 주인공,<br />
+              <em>바로 나!</em>
+            </>
+          )}
         </h1>
         <p className={styles.description}>
-          {hasPhoto ? "이제 나만의 동화 속으로 떠나봐요." : "정면 사진 한 장으로 나만의 동화를 만들어요."}
+          {isDemoMode
+            ? "샘플 얼굴을 선택해 3초 만에 나만의 동화를 체험해요."
+            : hasPhoto
+              ? "이제 나만의 동화 속으로 떠나봐요."
+              : "정면 사진 한 장으로 나만의 동화를 만들어요."}
         </p>
 
         <div className={styles.companion}>
           <StoryBookOrnament />
         </div>
 
-        <aside className={styles.privacy} aria-label="사진 이용 안내">
-          <StudioIcon name="shield" />
-          <div>
-            <p className={styles.privacyTitle}>사진은 24시간 안에 폐기돼요.</p>
-            <p>사진은 AI로 동화 속 주인공을 만드는 데 사용해요.</p>
-          </div>
-        </aside>
+        {isDemoMode ? (
+          <aside className={styles.demoBanner} aria-label="시연 안내">
+            <StudioIcon name="sparkle" />
+            <span>시연용 샘플 주인공으로 3초 만에 나만의 동화를 체험해 보세요! ✨</span>
+          </aside>
+        ) : (
+          <aside className={styles.privacy} aria-label="사진 이용 안내">
+            <StudioIcon name="shield" />
+            <div>
+              <p className={styles.privacyTitle}>사진은 24시간 안에 폐기돼요.</p>
+              <p>사진은 AI로 동화 속 주인공을 만드는 데 사용해요.</p>
+            </div>
+          </aside>
+        )}
       </div>
 
-      <div className={styles.capturePanel} data-state={hasPhoto ? "ready" : isCameraActive ? "camera" : "idle"} aria-busy={isSubmitting}>
+      <div
+        className={styles.capturePanel}
+        data-state={hasPhoto ? "ready" : isCameraActive ? "camera" : "idle"}
+        aria-busy={isSubmitting}
+      >
         <div className={styles.panelHeader}>
-          <h2><StudioIcon name="camera" />{hasPhoto ? "내 사진을 확인해요" : "주인공 사진관"}</h2>
-          <span className={styles.photoCount}>{hasPhoto ? "준비 완료" : "정면 1장"}</span>
+          <h2>
+            <StudioIcon name={isDemoMode ? "sparkle" : "camera"} />
+            {isDemoMode ? "샘플 주인공 선택" : hasPhoto ? "내 사진을 확인해요" : "주인공 사진관"}
+          </h2>
+          <span className={styles.photoCount}>
+            {isDemoMode ? "체험 모드" : hasPhoto ? "준비 완료" : "정면 1장"}
+          </span>
         </div>
 
         <div className={styles.photoMat}>
           <div className={styles.viewfinder}>
-            {previewUrl ? (
+            {activePreviewUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewUrl} alt="정면 얼굴 사진 미리보기" decoding="async" className={styles.photo} />
-                <span className={styles.readyFlag}><StudioIcon name="check" />사진 선택 완료</span>
+                <img
+                  src={activePreviewUrl}
+                  alt={isDemoMode ? "샘플 주인공 미리보기" : "정면 얼굴 사진 미리보기"}
+                  decoding="async"
+                  className={styles.photo}
+                />
+                <span className={styles.readyFlag}>
+                  <StudioIcon name="check" />
+                  {isDemoMode ? "주인공 선택" : "사진 선택 완료"}
+                </span>
               </>
             ) : isCameraActive ? (
               <>
-                <video ref={onVideoRef} autoPlay playsInline muted className={styles.video} aria-label="카메라 미리보기" />
+                <video
+                  ref={onVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={styles.video}
+                  aria-label="카메라 미리보기"
+                />
                 <div className={styles.faceGuide} aria-hidden="true" />
                 <span className={styles.cameraCaption}>동그라미 안에 얼굴을 맞춰요</span>
               </>
@@ -107,12 +170,34 @@ export function CaptureStudio({
               <div className={styles.emptyCamera}>
                 <svg aria-hidden="true" viewBox="0 0 180 180" className={styles.portraitGuide}>
                   <circle cx="90" cy="82" r="72" fill="white" opacity=".7" />
-                  <path d="M36 159c3-30 23-44 54-44s51 14 54 44" fill="var(--color-accent-a)" opacity=".24" />
-                  <ellipse cx="90" cy="77" rx="38" ry="44" fill="var(--color-paper)" stroke="var(--color-accent-a-strong)" strokeWidth="3" strokeDasharray="6 6" />
-                  <path d="M54 66q0-47 39-39 38-4 35 39-19-4-25-21-15 19-49 21" fill="var(--color-book-cover)" />
+                  <path
+                    d="M36 159c3-30 23-44 54-44s51 14 54 44"
+                    fill="var(--color-accent-a)"
+                    opacity=".24"
+                  />
+                  <ellipse
+                    cx="90"
+                    cy="77"
+                    rx="38"
+                    ry="44"
+                    fill="var(--color-paper)"
+                    stroke="var(--color-accent-a-strong)"
+                    strokeWidth="3"
+                    strokeDasharray="6 6"
+                  />
+                  <path
+                    d="M54 66q0-47 39-39 38-4 35 39-19-4-25-21-15 19-49 21"
+                    fill="var(--color-book-cover)"
+                  />
                   <circle cx="76" cy="78" r="3.5" fill="var(--color-book-cover)" />
                   <circle cx="103" cy="78" r="3.5" fill="var(--color-book-cover)" />
-                  <path d="M81 94q9 9 18 0" fill="none" stroke="var(--color-book-cover)" strokeWidth="3" strokeLinecap="round" />
+                  <path
+                    d="M81 94q9 9 18 0"
+                    fill="none"
+                    stroke="var(--color-book-cover)"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
                   <ellipse cx="66" cy="90" rx="7" ry="4" fill="#ffc1bc" />
                   <ellipse cx="114" cy="90" rx="7" ry="4" fill="#ffc1bc" />
                   <path d="m143 26 3 10 10 3-10 3-3 10-3-10-10-3 10-3Z" fill="var(--color-gold)" />
@@ -128,32 +213,125 @@ export function CaptureStudio({
               </div>
             )}
           </div>
-          <span className={styles.photoSignature} aria-hidden="true"><StudioIcon name="sparkle" />오늘의 주인공</span>
+          <span className={styles.photoSignature} aria-hidden="true">
+            <StudioIcon name="sparkle" />오늘의 주인공
+          </span>
         </div>
 
+        {isDemoMode && (
+          <div className={styles.presetSection}>
+            <div className={styles.presetList} role="radiogroup" aria-label="샘플 주인공 선택">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={selectedPreset === "male"}
+                data-selected={selectedPreset === "male"}
+                className={styles.presetCard}
+                onClick={() => onSelectPreset?.("male")}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/demo/avatars/male.jpg"
+                  alt="성인 남성 샘플"
+                  className={styles.presetThumb}
+                />
+                <div className={styles.presetInfo}>
+                  <span className={styles.presetName}>
+                    성인 남성
+                  </span>
+                  <span className={styles.presetDesc}>호감형 인상</span>
+                </div>
+                {selectedPreset === "male" && (
+                  <span className={styles.presetCheck} aria-hidden="true">
+                    <StudioIcon name="check" />
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                role="radio"
+                aria-checked={selectedPreset === "female"}
+                data-selected={selectedPreset === "female"}
+                className={styles.presetCard}
+                onClick={() => onSelectPreset?.("female")}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/demo/avatars/female.jpg"
+                  alt="성인 여성 샘플"
+                  className={styles.presetThumb}
+                />
+                <div className={styles.presetInfo}>
+                  <span className={styles.presetName}>
+                    성인 여성
+                  </span>
+                  <span className={styles.presetDesc}>단발머리</span>
+                </div>
+                {selectedPreset === "female" && (
+                  <span className={styles.presetCheck} aria-hidden="true">
+                    <StudioIcon name="check" />
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         <p className={styles.helper} role="status" aria-live="polite">
-          {isSubmitting ? "사진을 동화나라로 안전하게 전달하고 있어요. 잠시만 기다려 주세요!" : hasPhoto ? "다른 사진으로 바꿔도 괜찮아요." : isStartingCamera ? "카메라 접근을 허용해 주세요." : isCameraActive ? "준비가 되면 아래 버튼을 눌러요." : "카메라는 버튼을 눌렀을 때만 켜져요."}
+          {isDemoMode
+            ? "원하는 주인공을 고르고 아래 버튼을 누르면 동화가 시작돼요."
+            : isSubmitting
+              ? "사진을 동화나라로 안전하게 전달하고 있어요. 잠시만 기다려 주세요!"
+              : hasPhoto
+                ? "다른 사진으로 바꿔도 괜찮아요."
+                : isStartingCamera
+                  ? "카메라 접근을 허용해 주세요."
+                  : isCameraActive
+                    ? "준비가 되면 아래 버튼을 눌러요."
+                    : "카메라는 버튼을 눌렀을 때만 켜져요."}
         </p>
 
         {errorMessage && <p role="alert" className={styles.error}>{errorMessage}</p>}
 
         <div className={styles.actions}>
-          <button type="button" onClick={primaryAction} disabled={isSubmitting || isStartingCamera} className={actionClass("primary", styles.mainAction)}>
+          <button
+            type="button"
+            onClick={primaryAction}
+            disabled={isSubmitting || isStartingCamera}
+            className={actionClass("primary", styles.mainAction)}
+          >
             <span className={isSubmitting ? styles.busySpark : undefined}>
               {isSubmitting ? (
                 <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               ) : (
-                <StudioIcon name={hasPhoto ? "sparkle" : "camera"} />
+                <StudioIcon name={isDemoMode || hasPhoto ? "sparkle" : "camera"} />
               )}
             </span>
             {primaryLabel}
           </button>
-          <div className={styles.alternatives}>
-            {hasPhoto && <button type="button" onClick={onRetake} disabled={isSubmitting} className={actionClass("secondary", "flex-1", "compact")}>다시 찍기</button>}
-            <button type="button" onClick={onChoosePhoto} disabled={isSubmitting} className={actionClass("secondary", styles.choosePhoto, "compact")}>
-              {!hasPhoto && <StudioIcon name="photo" />}사진 고르기
-            </button>
-          </div>
+          {!isDemoMode && (
+            <div className={styles.alternatives}>
+              {hasPhoto && (
+                <button
+                  type="button"
+                  onClick={onRetake}
+                  disabled={isSubmitting}
+                  className={actionClass("secondary", "flex-1", "compact")}
+                >
+                  다시 찍기
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onChoosePhoto}
+                disabled={isSubmitting}
+                className={actionClass("secondary", styles.choosePhoto, "compact")}
+              >
+                {!hasPhoto && <StudioIcon name="photo" />}사진 고르기
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </section>

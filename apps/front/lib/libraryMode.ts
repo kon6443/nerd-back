@@ -13,7 +13,7 @@ export function getLibraryHref(isCreateMode: boolean): string {
  * 서재 카드 액션 버튼의 목적지 URL을 결정한다.
  *
  * - 시연 모드 (!isCreateMode):
- *   내 얼굴 동화 존재 여부와 무관하게 무조건 템플릿 본동화 1쪽(`/library/{slug}/1`)으로 이동한다.
+ *   내 얼굴 동화 존재 여부와 무관하게 시연 스튜디오(`/stories/{slug}/capture?demo=true`)로 이동한다.
  * - 제작 모드 (isCreateMode):
  *   - 이미 얼굴로 만든 동화가 있는 경우: `/library/{slug}?mode=create` (동화 상세에서 이어보기/다시 만들기 선택)
  *   - 아직 얼굴로 만들지 않은 경우: `/stories/{slug}/capture` (얼굴 촬영 화면으로 직행)
@@ -26,9 +26,9 @@ export function getLibraryStoryHref(
 ): string {
   const encodedSlug = encodeURIComponent(slug);
 
-  // 시연 모드: 내 얼굴 동화가 있더라도 무조건 템플릿 본 동화 1쪽으로 바로 이동
+  // 시연 모드: 내 얼굴 동화가 있더라도 시연 스튜디오로 이동하여 샘플 주인공 체험 제공
   if (!isCreateMode) {
-    return `/library/${encodedSlug}/1`;
+    return `/stories/${encodedSlug}/capture?demo=true`;
   }
 
   // 제작 모드 (isCreateMode === true)
