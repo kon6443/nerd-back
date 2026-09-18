@@ -121,8 +121,15 @@ describe('HttpExceptionFilter', () => {
       filter.catch(new Error('boom'), withoutMonitor.host);
 
       expect(withMonitor.status.mock.calls).toEqual(withoutMonitor.status.mock.calls);
-      expect(withMonitor.json.mock.calls[0][0]).toMatchObject(
-        withoutMonitor.json.mock.calls[0][0] as Record<string, unknown>,
+      // ⚠️ `timestamp` 는 호출 시각이라 두 번의 값이 다르다. 이걸 비교에 넣으면
+      //    밀리초 경계에서만 깨지는 flaky 테스트가 된다 — 실제로 그랬다.
+      const withoutTimestamp = (body: unknown) => {
+        const rest = { ...(body as Record<string, unknown>) };
+        delete rest.timestamp;
+        return rest;
+      };
+      expect(withoutTimestamp(withMonitor.json.mock.calls[0][0])).toEqual(
+        withoutTimestamp(withoutMonitor.json.mock.calls[0][0]),
       );
     });
   });

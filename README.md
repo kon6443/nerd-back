@@ -58,10 +58,12 @@ pnpm db:migrate:generate src/migrations/<PascalName>   # 엔티티 diff 로 파�
 pnpm db:migrate:up                   # 적용
 pnpm db:migrate:revert               # 마지막 1개 되돌림
 pnpm db:seed:dev [--publish]         # 개발용 더미 동화 투입
+pnpm db:sql docs/sql/<파일>.sql       # 저장소에 둔 .sql 한 개를 실행
 ```
 
-⚠️ **전 환경이 같은 DB 를 쓴다. 실행이 곧 상용 적용이다** — 위 5개는 **사람이** 실행한다. AI 는 파일 작성까지만 한다 ([`CLAUDE.md`](CLAUDE.md) Ask).
+⚠️ **전 환경이 같은 DB 를 쓴다. 실행이 곧 상용 적용이다** — 위 6개는 **사람이** 실행한다. AI 는 파일 작성까지만 한다 ([`CLAUDE.md`](CLAUDE.md) Ask).
 
+- `db:sql` 은 **파일만** 받는다. 인라인 SQL 을 받지 않는 이유는 실행한 문장이 [`docs/sql/`](docs/sql/) 에 남아 **리뷰·롤백 대상**이 되어야 하기 때문이다. 데이터 교정처럼 마이그레이션이 아닌 1회성 쓰기가 대상이고, 스키마 변경(DDL)은 계정이 다르므로 `db:migrate:up` 이 맡는다
 - 환경변수는 앱과 **같은 `apps/back/.env`** 다. 계정만 갈린다 — 마이그레이션은 `DB_MIGRATION_USER`/`DB_MIGRATION_PASSWORD`(DDL 권한), 시드는 앱 계정(`DB_USER`). 🚫 앱 계정에 DDL 을 주지 않는다
 - ⚠️ **`db:migrate:list` 도 "조회" 가 아니다.** TypeORM 의 `migration:show` 는 `migrations` 테이블이 없으면 `CREATE TABLE` 을 먼저 던진다 (2026-09-04 실측)
 - 처음 세팅하는 순서: `pnpm db:migrate:up` → `pnpm db:seed:dev --publish` → `pnpm front dev`

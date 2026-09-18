@@ -56,3 +56,26 @@ export function stackWidths(pageNo: number, pageCount: number): { left: number; 
   const left = Math.round(STACK_MIN_PX + span * progress);
   return { left, right: STACK_MIN_PX + STACK_MAX_PX - left };
 }
+
+/**
+ * 지금 쪽 기준으로 **미리 받아 둘 삽화 URL** 을 고른다.
+ *
+ * ⭐ 넘김이 시작되는 순간 도착 쪽 삽화가 이미 있어야 한다. 없으면 넘어가는 종이 뒷면이
+ * 비어 보인다(`front-code-patterns.md` 리더 절).
+ *
+ * 🚫 전 쪽을 한꺼번에 고르지 않는다 — 첫 화면 대역폭을 늘려 **정작 지금 볼 쪽이 늦어진다.**
+ * 다음 쪽을 가장 먼저 두는 이유는 대부분의 사람이 앞으로 넘기기 때문이다.
+ */
+export function adjacentArtUrls(
+  artUrls: ReadonlyArray<string | null | undefined>,
+  currentPageNo: number,
+): string[] {
+  const offsets = [1, -1, 2];
+  const picked: string[] = [];
+  for (const offset of offsets) {
+    const url = artUrls[currentPageNo - 1 + offset];
+    // 같은 URL 이 두 번 들어가지 않게 한다 — 쪽 수가 적으면 인덱스가 겹칠 수 있다.
+    if (url && !picked.includes(url)) picked.push(url);
+  }
+  return picked;
+}

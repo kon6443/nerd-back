@@ -91,7 +91,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
   slug: 'jack-and-beanstalk',
   title: '잭과 콩나무',
   summary: '마법의 콩을 심고 구름 위 거인의 성으로 떠나는 잭의 용감한 모험 이야기',
-  coverImageKey: 'templates/jack-and-beanstalk/page-1.png',
+  coverImageKey: 'templates/jack-and-beanstalk/page-1.webp',
   characters: [
     {
       role: 'jack',
@@ -145,7 +145,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       illustrationPrompt: buildJackPrompt(
         "Preserve Jack's curious, hopeful expression and his original gaze toward the magical beans. Keep the beans, both characters' hands, and the cow unchanged. Do not modify the old man's face or hair.",
       ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-1.png',
+      baseImageKey: 'templates/jack-and-beanstalk/page-1.webp',
       narrationAudioKey: 'narration/jack-and-beanstalk/page-1.mp3',
       personaTargetRole: 'jack',
       characters: [{ role: 'jack', hitbox: { x: 0.29, y: 0.31, width: 0.31, height: 0.6 } }],
@@ -159,7 +159,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       illustrationPrompt: buildJackPrompt(
         "Preserve Jack's joyful sense of wonder and his original upward-right gaze toward the cloud-top castle. Keep his climbing pose, hands, head angle, and open-mouth smile unchanged. Do not turn his face toward the viewer.",
       ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-2.png',
+      baseImageKey: 'templates/jack-and-beanstalk/page-2.webp',
       narrationAudioKey: 'narration/jack-and-beanstalk/page-2.mp3',
       personaTargetRole: 'jack',
       characters: [{ role: 'jack', hitbox: { x: 0.12, y: 0.18, width: 0.42, height: 0.62 } }],
@@ -174,7 +174,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       illustrationPrompt: buildJackPrompt(
         "Preserve Jack's alarm and urgency, original open mouth, head angle, and backward gaze. Render his eyes with the identity-defining shape from <protagonist_identity> while preserving the alarmed expression. Keep his running pose and the goose unchanged. Do not modify the giant's face or hair, the magical harp, or the golden egg.",
       ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-3.png',
+      baseImageKey: 'templates/jack-and-beanstalk/page-3.webp',
       narrationAudioKey: 'narration/jack-and-beanstalk/page-3.mp3',
       personaTargetRole: 'jack',
       characters: [
@@ -192,7 +192,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       illustrationPrompt: buildJackPrompt(
         "Preserve Jack's determined expression and visible effort, including his exact brow tension, focused gaze, and closed mouth shape. Keep his head angle, axe, hands, stance, and chopping action unchanged. Do not exaggerate the expression or add injuries.",
       ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-4.png',
+      baseImageKey: 'templates/jack-and-beanstalk/page-4.webp',
       narrationAudioKey: 'narration/jack-and-beanstalk/page-4.mp3',
       personaTargetRole: 'jack',
       characters: [
@@ -209,7 +209,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       illustrationPrompt: buildJackPrompt(
         "Preserve Jack's warm, relieved smile and his original gaze toward the elderly woman receiving the golden egg. Keep the golden egg in both hands and preserve his mother's hands resting on his shoulders. Do not modify his mother's face or hair, the elderly woman, any villager, the goose, the basket, or the golden eggs.",
       ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-5.png',
+      baseImageKey: 'templates/jack-and-beanstalk/page-5.webp',
       narrationAudioKey: 'narration/jack-and-beanstalk/page-5.mp3',
       personaTargetRole: 'jack',
       characters: [
@@ -222,11 +222,11 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
     choices: [
       {
         branchKey: 'a', title: '별빛 씨앗을 하늘로 돌려보내요', description: '거위의 둥지에서 발견한 반짝이는 씨앗을 밤하늘에 띄워 보내요.',
-        page: { pageNo: 6, bodyText: '그날 밤, 요술 거위의 둥지에서 별빛 씨앗 하나가 반짝였어요.\n잭은 씨앗을 두 손에 올리고 하늘을 향해 살며시 불었지요.\n씨앗은 별이 되어 마을 위에 머물렀어요.\n늦은 밤 길을 걷는 사람들은 그 별을 보며 집으로 돌아갈 수 있었답니다.', illustrationPrompt: buildJackPrompt("Preserve Jack's gentle wonder, upward gaze, and exact mouth shape, including his softly pursed lips as he blows the glowing seed upward. Keep the seed's glow on his transferred face and hair. Do not move, duplicate, or alter the seed, glowing particles, stars, goose, nest, or nighttime village."), baseImageKey: 'templates/jack-and-beanstalk/page-6-a.png', narrationAudioKey: 'narration/jack-and-beanstalk/page-6-a.mp3', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.2, y: 0.3, width: 0.3, height: 0.54 } }, { role: 'magical-goose', hitbox: { x: 0.42, y: 0.53, width: 0.2, height: 0.31 } }] },
+        page: { pageNo: 6, bodyText: '그날 밤, 요술 거위의 둥지에서 별빛 씨앗 하나가 반짝였어요.\n잭은 씨앗을 두 손에 올리고 하늘을 향해 살며시 불었지요.\n씨앗은 별이 되어 마을 위에 머물렀어요.\n늦은 밤 길을 걷는 사람들은 그 별을 보며 집으로 돌아갈 수 있었답니다.', illustrationPrompt: buildJackPrompt("Preserve Jack's gentle wonder, upward gaze, and exact mouth shape, including his softly pursed lips as he blows the glowing seed upward. Keep the seed's glow on his transferred face and hair. Do not move, duplicate, or alter the seed, glowing particles, stars, goose, nest, or nighttime village."), baseImageKey: 'templates/jack-and-beanstalk/page-6-a.webp', narrationAudioKey: 'narration/jack-and-beanstalk/page-6-a.mp3', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.2, y: 0.3, width: 0.3, height: 0.54 } }, { role: 'magical-goose', hitbox: { x: 0.42, y: 0.53, width: 0.2, height: 0.31 } }] },
       },
       {
         branchKey: 'b', title: '별빛 씨앗을 마을에 심어요', description: '마을 사람들이 함께 볼 수 있는 작은 빛을 키워요.',
-        page: { pageNo: 6, bodyText: '잭은 별빛 씨앗을 마을 한가운데에 심었어요.\n다음 날, 작은 싹이 돋더니 밤마다 은은한 빛을 내기 시작했지요.\n사람들은 그 나무 아래에 모여 이야기를 나눴어요.\n요술 거위는 날개를 퍼덕이며, 환한 마을을 바라보았답니다.', illustrationPrompt: buildJackPrompt("Preserve Jack's seated pose, peaceful proud smile, and original upward gaze toward the glowing star tree. Match the tree's warm golden light on his transferred face and hair. Keep his mother, every villager and child, the goose, lanterns, glowing tree, and nighttime village unchanged. Do not modify any other person's face or hair."), baseImageKey: 'templates/jack-and-beanstalk/page-6-b.png', narrationAudioKey: 'narration/jack-and-beanstalk/page-6-b.mp3', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.35, y: 0.42, width: 0.2, height: 0.27 } }, { role: 'magical-goose', hitbox: { x: 0.05, y: 0.61, width: 0.29, height: 0.3 } }] },
+        page: { pageNo: 6, bodyText: '잭은 별빛 씨앗을 마을 한가운데에 심었어요.\n다음 날, 작은 싹이 돋더니 밤마다 은은한 빛을 내기 시작했지요.\n사람들은 그 나무 아래에 모여 이야기를 나눴어요.\n요술 거위는 날개를 퍼덕이며, 환한 마을을 바라보았답니다.', illustrationPrompt: buildJackPrompt("Preserve Jack's seated pose, peaceful proud smile, and original upward gaze toward the glowing star tree. Match the tree's warm golden light on his transferred face and hair. Keep his mother, every villager and child, the goose, lanterns, glowing tree, and nighttime village unchanged. Do not modify any other person's face or hair."), baseImageKey: 'templates/jack-and-beanstalk/page-6-b.webp', narrationAudioKey: 'narration/jack-and-beanstalk/page-6-b.mp3', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.35, y: 0.42, width: 0.2, height: 0.27 } }, { role: 'magical-goose', hitbox: { x: 0.05, y: 0.61, width: 0.29, height: 0.3 } }] },
       },
     ],
   },
@@ -236,7 +236,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
   slug: 'red-riding-hood',
   title: '빨간 모자',
   summary: '착하고 순수한 빨간 모자가 깊은 숲속 할머니 댁을 찾아가며 겪는 아슬아슬한 모험 이야기',
-  coverImageKey: 'templates/red-riding-hood/page-1.png',
+  coverImageKey: 'templates/red-riding-hood/page-1.webp',
   characters: [
     {
       role: 'red-hood',
@@ -290,7 +290,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
         '빨간 모자가 할머니에게 드릴 달콤한 빵과 버터가 든 바구니를 들고 씩씩하게 꽃길을 걸어가는 장면',
         '[정면 뷰]: 정면을 바라보는 밝고 씩씩한 미소. <protagonist_identity> 인물의 고유 눈매와 입매를 그대로 살려 기대감으로 눈이 반짝이고, 눈썹과 입가가 자연스럽게 올라간 표정.',
       ),
-      baseImageKey: 'templates/red-riding-hood/page-1.png',
+      baseImageKey: 'templates/red-riding-hood/page-1.webp',
       narrationAudioKey: 'narration/red-riding-hood/page-1.mp3',
       personaTargetRole: 'red-hood',
       characters: [{ role: 'red-hood', hitbox: { x: 0.21, y: 0.2, width: 0.36, height: 0.61 } }],
@@ -306,7 +306,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
         '들꽃에 마음을 빼앗긴 빨간 모자 앞에 나타난 상냥한 척하는 늑대에게 순진하게 할머니 댁을 말해주는 장면',
         '[오른쪽 위 시선]: 커다란 늑대를 올려다보며 순진하게 말을 건네는 천진난만한 미소. 원본의 왼쪽 배치와 바구니 든 손을 유지.',
       ),
-      baseImageKey: 'templates/red-riding-hood/page-2.png',
+      baseImageKey: 'templates/red-riding-hood/page-2.webp',
       narrationAudioKey: 'narration/red-riding-hood/page-2.mp3',
       personaTargetRole: 'red-hood',
       characters: [
@@ -327,7 +327,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
         '할머니 오두막 침대에서 이불을 걷어차며 달려드는 늑대를 보고 깜짝 놀라는 장면',
         '[오른쪽 위 시선]: 침대에서 몸을 일으킨 늑대를 올려다보며 눈을 크게 뜨고 입을 벌린 깜짝 놀란 표정. 원본의 침대 왼쪽에 서 있는 자세, 가슴 앞으로 모은 손과 바구니 위치를 유지.',
       ),
-      baseImageKey: 'templates/red-riding-hood/page-3.png',
+      baseImageKey: 'templates/red-riding-hood/page-3.webp',
       narrationAudioKey: 'narration/red-riding-hood/page-3.mp3',
       personaTargetRole: 'red-hood',
       characters: [
@@ -346,7 +346,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
         '용감한 사냥꾼이 늑대를 제압한 뒤, 빨간 모자가 안전하게 구출된 할머니 품에 안겨 안도하는 장면',
         '[왼쪽을 향한 안도]: 할머니와 꼭 안겨 눈을 감고 환하게 웃는 안도한 표정. 원본의 포옹 자세와 열린 문 쪽으로 나가는 사냥꾼·늑대를 유지.',
       ),
-      baseImageKey: 'templates/red-riding-hood/page-4.png',
+      baseImageKey: 'templates/red-riding-hood/page-4.webp',
       narrationAudioKey: 'narration/red-riding-hood/page-4.mp3',
       personaTargetRole: 'red-hood',
       characters: [
@@ -367,7 +367,7 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
         '평화를 되찾은 오두막에서 빨간 모자가 할머니와 함께 창가를 찾아온 다람쥐와 새들에게 고마워하는 장면',
         '[왼쪽을 향한 다정한 미소]: 할머니와 함께 창가 동물 친구들을 보며 따뜻하게 웃는 표정. 원본의 창가 구도와 두 인물의 포옹 자세를 유지.',
       ),
-      baseImageKey: 'templates/red-riding-hood/page-5.png',
+      baseImageKey: 'templates/red-riding-hood/page-5.webp',
       narrationAudioKey: 'narration/red-riding-hood/page-5.mp3',
       personaTargetRole: 'red-hood',
       characters: [
@@ -380,11 +380,11 @@ export const RED_RIDING_HOOD_STORY: OfficialStoryData = {
     choices: [
       {
         branchKey: 'a', title: '아기 다람쥐를 집으로 데려다줘요', description: '길을 잃고 울고 있는 아기 다람쥐를 만났어요.',
-        page: { pageNo: 6, bodyText: '다음 날, 빨간 모자는 풀숲에서 훌쩍이는 아기 다람쥐를 만났어요.\n아기 다람쥐는 집으로 가는 길을 잊어버렸다고 했지요.\n빨간 모자는 천천히 주변을 살피며 다람쥐와 함께 걸었어요.\n커다란 참나무 아래에서 엄마 다람쥐를 찾자, 숲에는 기쁜 인사가 가득 울려 퍼졌답니다.', illustrationPrompt: buildRedRidingHoodPrompt('따뜻한 햇살이 드는 커다란 참나무 굴 앞에서 아기 다람쥐와 엄마 다람쥐가 다시 만나 코를 맞대는 모습을, 빨간 모자가 가까이 앉아 다정하게 바라보는 장면', '[오른쪽 아래 시선]: 다시 만난 다람쥐 가족을 바라보며 눈을 감고 환하게 웃는 따뜻한 표정. 원본의 나무 왼쪽에 무릎을 굽혀 앉은 자세, 무릎 위에 모은 두 손과 빨간 두건 위치를 유지.'), baseImageKey: 'templates/red-riding-hood/page-6-a.png', narrationAudioKey: 'narration/red-riding-hood/page-6-a.mp3', personaTargetRole: 'red-hood', characters: [{ role: 'red-hood', hitbox: { x: 0.09, y: 0.27, width: 0.37, height: 0.42 } }] },
+        page: { pageNo: 6, bodyText: '다음 날, 빨간 모자는 풀숲에서 훌쩍이는 아기 다람쥐를 만났어요.\n아기 다람쥐는 집으로 가는 길을 잊어버렸다고 했지요.\n빨간 모자는 천천히 주변을 살피며 다람쥐와 함께 걸었어요.\n커다란 참나무 아래에서 엄마 다람쥐를 찾자, 숲에는 기쁜 인사가 가득 울려 퍼졌답니다.', illustrationPrompt: buildRedRidingHoodPrompt('따뜻한 햇살이 드는 커다란 참나무 굴 앞에서 아기 다람쥐와 엄마 다람쥐가 다시 만나 코를 맞대는 모습을, 빨간 모자가 가까이 앉아 다정하게 바라보는 장면', '[오른쪽 아래 시선]: 다시 만난 다람쥐 가족을 바라보며 눈을 감고 환하게 웃는 따뜻한 표정. 원본의 나무 왼쪽에 무릎을 굽혀 앉은 자세, 무릎 위에 모은 두 손과 빨간 두건 위치를 유지.'), baseImageKey: 'templates/red-riding-hood/page-6-a.webp', narrationAudioKey: 'narration/red-riding-hood/page-6-a.mp3', personaTargetRole: 'red-hood', characters: [{ role: 'red-hood', hitbox: { x: 0.09, y: 0.27, width: 0.37, height: 0.42 } }] },
       },
       {
         branchKey: 'b', title: '숲길에 빨간 리본을 달아요', description: '누구나 길을 잃지 않도록 숲길 표지를 만들어요.',
-        page: { pageNo: 6, bodyText: '빨간 모자는 할머니와 함께 숲길의 갈림길마다 빨간 리본을 달았어요.\n동물 친구들도 솔방울과 나뭇잎으로 작은 표지를 만들었지요.\n이제 숲에 오는 누구나 길을 쉽게 찾을 수 있었어요.\n빨간 모자는 바람에 흔들리는 리본을 보며 환하게 웃었답니다.', illustrationPrompt: buildRedRidingHoodPrompt('햇살이 드는 숲길에서 빨간 모자와 할머니가 큰 참나무에 길을 알리는 빨간 리본을 함께 묶고, 다람쥐와 새들이 솔방울과 나뭇잎으로 숲길 표지를 만드는 장면', '[위쪽 시선]: 할머니와 함께 나무의 리본을 묶으며 눈을 감고 환하게 웃는 뿌듯한 표정. 원본의 나무 앞에 서서 두 팔을 위로 든 자세, 리본과 할머니의 손 위치를 유지.'), baseImageKey: 'templates/red-riding-hood/page-6-b.png', narrationAudioKey: 'narration/red-riding-hood/page-6-b.mp3', personaTargetRole: 'red-hood', characters: [{ role: 'red-hood', hitbox: { x: 0.17, y: 0.17, width: 0.28, height: 0.49 } }, { role: 'grandmother', hitbox: { x: 0.31, y: 0.07, width: 0.3, height: 0.56 } }] },
+        page: { pageNo: 6, bodyText: '빨간 모자는 할머니와 함께 숲길의 갈림길마다 빨간 리본을 달았어요.\n동물 친구들도 솔방울과 나뭇잎으로 작은 표지를 만들었지요.\n이제 숲에 오는 누구나 길을 쉽게 찾을 수 있었어요.\n빨간 모자는 바람에 흔들리는 리본을 보며 환하게 웃었답니다.', illustrationPrompt: buildRedRidingHoodPrompt('햇살이 드는 숲길에서 빨간 모자와 할머니가 큰 참나무에 길을 알리는 빨간 리본을 함께 묶고, 다람쥐와 새들이 솔방울과 나뭇잎으로 숲길 표지를 만드는 장면', '[위쪽 시선]: 할머니와 함께 나무의 리본을 묶으며 눈을 감고 환하게 웃는 뿌듯한 표정. 원본의 나무 앞에 서서 두 팔을 위로 든 자세, 리본과 할머니의 손 위치를 유지.'), baseImageKey: 'templates/red-riding-hood/page-6-b.webp', narrationAudioKey: 'narration/red-riding-hood/page-6-b.mp3', personaTargetRole: 'red-hood', characters: [{ role: 'red-hood', hitbox: { x: 0.17, y: 0.17, width: 0.28, height: 0.49 } }, { role: 'grandmother', hitbox: { x: 0.31, y: 0.07, width: 0.3, height: 0.56 } }] },
       },
     ],
   },

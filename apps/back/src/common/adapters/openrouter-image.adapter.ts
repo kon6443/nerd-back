@@ -28,6 +28,83 @@ export const IMAGE_GENERATION_TIMEOUT_MS = 120_000;
  *    필터 4단의 "내부 정보를 덮는" 방어가 닿지 않는다(`docs/lessons.md` 2026-09-04).
  */
 const IMAGE_FAILURE_MESSAGE = '그림을 만들지 못했어요. 잠시 후 다시 시도해 주세요.';
+
+/**
+ * 버퍼 앞머리(매직바이트)로 실제 포맷을 판별한다.
+ *
+ * ⚠️ **확장자나 DB 값이 아니라 바이트를 본다.** 스토리지에 `.png` 로 저장된 것이 실제로는
+ * 다른 포맷일 수 있고(변환 폴백·수동 교체), 그때 선언 MIME 이 틀리면 모델이 디코딩에 실패한다.
+ *
+ * 🚫 `image/jpeg` 로 하드코딩하지 않는다 — 예전에는 그랬고, PNG 를 JPEG 라고 말하며 보내면서도
+ *    동작한 것은 **업스트림이 관대했기 때문**이지 보장이 아니었다.
+ */
+function detectImageMime(buffer: Buffer): string {
+  // JPEG: FF D8
+  if (buffer[0] === 0xff && buffer[1] === 0xd8) return 'image/jpeg';
+  // WebP: 'RIFF' .... 'WEBP'
+  if (
+    buffer.length >= 12 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    return 'image/webp';
+  }
+  return 'image/png';
+}
+
+/**
+ * 이미지 헤더에서 픽셀 크기를 읽는다. 지원하지 않는 포맷이면 `null`.
+ *
+ * 🚫 `sharp` 를 부르지 않는다 — 이 경로는 요청마다 도는 동기 계산이고, 크기만 필요하다.
+ *    헤더 몇 바이트면 되는 일에 디코더를 띄우지 않는다.
+ */
+function readImageSize(buffer: Buffer): { width: number; height: number } | null {
+  // PNG: 8바이트 시그니처 + IHDR 의 width/height (오프셋 16, 20)
+  if (
+    buffer.length >= 24 &&
+    buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+  ) {
+    const width = buffer.readUInt32BE(16);
+    const height = buffer.readUInt32BE(20);
+    return width > 0 && height > 0 ? { width, height } : null;
+  }
+
+  // WebP: 'RIFF' .... 'WEBP' + 청크. 세 변종의 크기 위치가 다르다.
+  if (
+    buffer.length >= 30 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    const chunk = buffer.toString('ascii', 12, 16);
+    // 무손실(VP8L): 1비트 시그니처 뒤에 14비트씩 (width-1), (height-1)
+    if (chunk === 'VP8L') {
+      const bits = buffer.readUInt32LE(21);
+      const width = (bits & 0x3fff) + 1;
+      const height = ((bits >> 14) & 0x3fff) + 1;
+      return { width, height };
+    }
+    // 확장(VP8X): 24비트씩 (width-1), (height-1)
+    if (chunk === 'VP8X') {
+      const width = buffer.readUIntLE(24, 3) + 1;
+      const height = buffer.readUIntLE(27, 3) + 1;
+      return { width, height };
+    }
+    // 손실(VP8 ): 키프레임 헤더 뒤 14비트씩
+    if (chunk === 'VP8 ') {
+      const width = buffer.readUInt16LE(26) & 0x3fff;
+      const height = buffer.readUInt16LE(28) & 0x3fff;
+      return width > 0 && height > 0 ? { width, height } : null;
+    }
+    return null;
+  }
+
+  return null;
+}
+
+/** data URL 로 감싼다. 모델 입력은 전부 이 형태다. */
+function toDataUrl(buffer: Buffer): string {
+  return `data:${detectImageMime(buffer)};base64,${buffer.toString('base64')}`;
+}
 const IMAGE_TIMEOUT_MESSAGE = '그림 만들기가 오래 걸려 중단했어요. 다시 시도해 주세요.';
 
 interface OpenRouterImageResponse {
@@ -72,21 +149,21 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
     const inputReferences: Array<{ type: string; image_url: { url: string } }> = [
       {
         type: 'image_url',
-        image_url: { url: `data:image/jpeg;base64,${input.front.toString('base64')}` },
+        image_url: { url: toDataUrl(input.front) },
       },
     ];
 
     if (input.left) {
       inputReferences.push({
         type: 'image_url',
-        image_url: { url: `data:image/jpeg;base64,${input.left.toString('base64')}` },
+        image_url: { url: toDataUrl(input.left) },
       });
     }
 
     if (input.right) {
       inputReferences.push({
         type: 'image_url',
-        image_url: { url: `data:image/jpeg;base64,${input.right.toString('base64')}` },
+        image_url: { url: toDataUrl(input.right) },
       });
     }
 
@@ -113,21 +190,18 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
   async generatePageIllustration(input: GeneratePageIllustrationInput): Promise<Buffer> {
     const inputReferences: Array<{ type: string; image_url: { url: string } }> = [];
 
-    const getMime = (buf: Buffer) =>
-      buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : 'image/png';
-
     // 첫 번째 첨부 파일은 프롬프트에서 <base_scene_template> 역할로 명명한다.
     if (input.baseImage) {
       inputReferences.push({
         type: 'image_url',
-        image_url: { url: `data:${getMime(input.baseImage)};base64,${input.baseImage.toString('base64')}` },
+        image_url: { url: toDataUrl(input.baseImage) },
       });
     }
 
     // 두 번째 첨부 파일은 프롬프트에서 <protagonist_identity> 역할로 명명한다.
     inputReferences.push({
       type: 'image_url',
-      image_url: { url: `data:${getMime(input.referenceImage)};base64,${input.referenceImage.toString('base64')}` },
+      image_url: { url: toDataUrl(input.referenceImage) },
     });
 
     const hasNamedInputRoles =
@@ -203,19 +277,21 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
     });
   }
 
-  /** 명시값이 없으면 PNG 템플릿의 실제 비율과 가장 가까운 지원 비율을 사용한다. */
+  /**
+   * 명시값이 없으면 템플릿의 실제 비율과 가장 가까운 지원 비율을 사용한다.
+   *
+   * ⚠️ **포맷 판별이 곧 비율 판별이다.** 예전에는 PNG 헤더만 읽고 그 외에는 `'4:3'` 을
+   * 돌려줬다. 템플릿을 WebP 로 바꾸자 세로 템플릿(1024x1536 = 2:3)이 **가로 4:3 으로
+   * 요청되는** 상태가 됐다 — 픽셀은 같아도 **결과 삽화의 비율이 달라진다.**
+   * 포맷을 넓힐 때는 이 함수를 반드시 함께 본다.
+   */
   private resolveAspectRatio(explicitRatio?: string, baseImage?: Buffer): string {
     if (explicitRatio) return explicitRatio;
+    if (!baseImage) return '4:3';
 
-    const isPng =
-      baseImage !== undefined &&
-      baseImage.length >= 24 &&
-      baseImage.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-    if (!isPng) return '4:3';
-
-    const width = baseImage.readUInt32BE(16);
-    const height = baseImage.readUInt32BE(20);
-    if (width === 0 || height === 0) return '4:3';
+    const size = readImageSize(baseImage);
+    if (!size) return '4:3';
+    const { width, height } = size;
 
     const supportedRatios = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9'];
     const imageRatio = width / height;
