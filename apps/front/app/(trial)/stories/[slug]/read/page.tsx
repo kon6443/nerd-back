@@ -742,7 +742,7 @@ function StoryReadContent({ params }: PageProps) {
   // 🚫 클래스를 JSX 안에서 조립하지 않는다 — 후보를 지울 때 조건을 하나씩 찾아다니게 된다.
   //    아래 여백(`pb-28`)은 화면 하단에 붙은 조작 바의 자리다. 없으면 바가 책 아래를 덮는다.
   const mainClass = [
-    "mx-auto flex w-full flex-1 gap-4 px-4 pt-5 pb-28 md:px-8 md:pt-6",
+    "mx-auto flex w-full min-h-0 flex-1 gap-4 px-4 pt-5 pb-28 md:px-8 md:pt-5 md:pb-24",
     readerOptions.immersive ? "max-w-7xl md:h-dvh" : "max-w-5xl",
     dockOpen ? "flex-col md:flex-row" : "flex-col",
   ].join(" ");
@@ -751,11 +751,44 @@ function StoryReadContent({ params }: PageProps) {
     <>
       <main className={mainClass}>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-        <header className={READER_BAR}>
-          {!isDemoMode && !sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
+        {/* 몰입 끔이면 전역 네비게이션(AppHeader)이 보이고 쪽번호는 하단바에 있으므로
+             제목·쪽번호를 다시 보여 줄 필요가 없다. 제작 현황 버튼만 조건부로 남긴다. */}
+        {readerOptions.immersive ? (
+          <header className={READER_BAR}>
+            {!isDemoMode && !sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
+              <button
+                onClick={() => {
+                  setStatusPinned(true);
+                  setViewState("generating");
+                }}
+                className={actionClass("secondary", "text-sm")}
+              >
+                ← 제작 현황 보기
+              </button>
+            ) : null}
+
+            <h1 className="order-first w-full text-xl font-bold text-balance break-keep wrap-anywhere text-ink md:order-none md:w-auto md:flex-1 md:text-center">
+              {story.title}
+              {isBehindPage && (
+                <span className="ml-2 rounded-pill bg-magic-strong/10 px-2 py-0.5 text-xs text-magic-strong">
+                  비하인드
+                </span>
+              )}
+            </h1>
+
+            {/* 넓은 화면에서는 하단바 가운데가 진행을 보여 준다 — 여기는 좁은 화면(바 가운데가 접힘) 전용.
+                `aria-live` 는 이 한 곳에만 둔다. 바의 숫자까지 읽히면 쪽마다 두 번 읽힌다. */}
+            <p
+              className="rounded-pill bg-surface-raised px-4 py-2 text-sm font-bold text-ink-muted shadow-sm sm:sr-only"
+              aria-live="polite"
+            >
+              {currentPageNo} / {totalPages}
+            </p>
+          </header>
+        ) : !isDemoMode && !sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
+          <div>
             <button
               onClick={() => {
-                // 자동 복귀를 막는다 — 안 그러면 3초 뒤 폴링이 도로 리더로 돌려보낸다.
                 setStatusPinned(true);
                 setViewState("generating");
               }}
@@ -763,32 +796,14 @@ function StoryReadContent({ params }: PageProps) {
             >
               ← 제작 현황 보기
             </button>
-          ) : null}
-
-          <h1 className="order-first w-full text-xl font-bold text-balance break-keep wrap-anywhere text-ink md:order-none md:w-auto md:flex-1 md:text-center">
-            {story.title}
-            {isBehindPage && (
-              <span className="ml-2 rounded-pill bg-magic-strong/10 px-2 py-0.5 text-xs text-magic-strong">
-                비하인드
-              </span>
-            )}
-          </h1>
-
-          {/* 넓은 화면에서는 하단바 가운데가 진행을 보여 준다 — 여기는 좁은 화면(바 가운데가 접힘) 전용.
-              `aria-live` 는 이 한 곳에만 둔다. 바의 숫자까지 읽히면 쪽마다 두 번 읽힌다. */}
-          <p
-            className="rounded-pill bg-surface-raised px-4 py-2 text-sm font-bold text-ink-muted shadow-sm sm:sr-only"
-            aria-live="polite"
-          >
-            {currentPageNo} / {totalPages}
-          </p>
-        </header>
+          </div>
+        ) : null}
 
         {/* 펼친 책 — 시연 리더와 **같은** 넘김 엔진을 쓴다. 하드커버 표지·종이 단면은 `BookVolume` 이 그린다. */}
         <BookPager
           pageNo={currentPageNo}
           pageCount={totalPages}
-          fill={readerOptions.immersive}
+          fill
           onRequestPage={requestPage}
           onTurningChange={setTurning}
           renderArt={(pageNo) => <BookArtContent pageNo={pageNo} imageUrl={imageUrlAt(pageNo)} />}

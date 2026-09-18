@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { actionClass } from "@/components/ui/actionStyles";
 import {
   CHAT_SURFACES,
@@ -50,6 +50,20 @@ function OptionRow({
 
 export function ReaderPreviewSettings({ options }: { options: ReaderOptions }) {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 🚫 `click` 이 아니라 `mousedown` 을 듣는다 — 라디오를 누른 뒤 **mouseup** 이 밖에서 일어나도
+  //    패널이 닫히지 않게 한다(드래그 중 손이 빠지는 사고).
+  useEffect(() => {
+    if (!open) return;
+    function handleMouseDown(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [open]);
 
   function apply(patch: Partial<ReaderOptions>) {
     const query = withReaderOptions(window.location.search, patch);
@@ -59,7 +73,7 @@ export function ReaderPreviewSettings({ options }: { options: ReaderOptions }) {
   return (
     // 🚫 자기 좌표를 갖지 않는다 — 리더의 하단 바가 위치를 소유한다(`ChatLauncher` 와 같은 이유).
     //    패널은 버튼 **위로** 뜬다(`bottom-full`). 흐름 안에 두면 열 때마다 하단바 높이가 커진다.
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       {open ? (
         <div
           aria-labelledby={SETTINGS_TITLE_ID}
