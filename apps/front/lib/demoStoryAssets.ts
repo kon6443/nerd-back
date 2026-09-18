@@ -17,5 +17,10 @@ export function getDemoStoryImageUrl(
     return `/demo/stories/jack-and-beanstalk/${demoParam}/page-${pageNo}.jpg`;
   }
 
+  // 빨간 모자 1~5쪽 사전 합성 에셋
+  if (slug === "red-riding-hood" && pageNo >= 1 && pageNo <= 5) {
+    return `/demo/stories/red-riding-hood/${demoParam}/page-${pageNo}.jpg`;
+  }
+
   return fallbackUrl;
 }
