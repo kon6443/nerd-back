@@ -2,12 +2,13 @@
 
 import type { StoryPageView } from "@nerd/contracts";
 import { usePathname } from "next/navigation";
-import { useCallback, useMemo, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from "react";
+import { preloadThumbnailImage } from "@/lib/preloadThumbnailImage";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { actionClass } from "@/components/ui/actionStyles";
 import { BookArtContent, BookTextContent } from "./BookFrame";
 import { BookPager, READER_BAR } from "./BookPager";
-import { readerHref, readerPageNo } from "./readerNav";
+import { adjacentArtUrls, readerHref, readerPageNo } from "./readerNav";
 import { NarrationPlayer } from "./NarrationPlayer";
 import { ReaderAudioProvider } from "./ReaderAudioProvider";
 import { useNarration } from "./useNarration";
@@ -46,6 +47,20 @@ function BookReaderContent({
   if (parsedPageNo !== null && parsedPageNo !== lastValidPageNo) {
     setLastValidPageNo(parsedPageNo);
   }
+
+  // ⭐ **인접 쪽 삽화를 미리 받는다.** 서버가 모든 쪽을 한 번에 넘기므로 URL 은 이미 알고 있는데,
+  //    예전에는 넘긴 뒤에야 브라우저가 이미지를 요청해 **넘김 중 빈 칸이 스쳤다.**
+  //    체험 리더는 진작 전 쪽을 미리 받고 있었다(`read/page.tsx`) — 시연 쪽만 빠져 있었다.
+  //    🚫 전 쪽을 한꺼번에 받지 않는다. 첫 화면 대역폭을 늘려 정작 지금 볼 쪽이 늦어진다.
+  //    `preloadThumbnailImage` 는 LRU 로 중복을 걸러 주므로 쪽마다 불러도 재요청이 없다.
+  useEffect(() => {
+    for (const url of adjacentArtUrls(
+      pages.map((page) => page.baseImageUrl),
+      targetPageNo,
+    )) {
+      preloadThumbnailImage(url);
+    }
+  }, [pages, targetPageNo]);
 
   const requestPage = useCallback(
     (pageNo: number) => {

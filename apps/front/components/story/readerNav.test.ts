@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STACK_MAX_PX, STACK_MIN_PX, isReaderPath, readerHref, readerPageNo, stackWidths, turnDirection } from "./readerNav";
+import { STACK_MAX_PX, STACK_MIN_PX, isReaderPath, readerHref, readerPageNo, stackWidths, turnDirection, adjacentArtUrls } from "./readerNav";
 
 describe("isReaderPath", () => {
   it("쪽 번호까지 있는 경로만 리더다", () => {
@@ -51,5 +51,42 @@ describe("stackWidths", () => {
   it("한 쪽짜리·범위 밖 입력에도 한도 안에 머문다", () => {
     expect(stackWidths(1, 1)).toEqual({ left: STACK_MIN_PX, right: STACK_MAX_PX });
     expect(stackWidths(99, 5)).toEqual({ left: STACK_MAX_PX, right: STACK_MIN_PX });
+  });
+});
+
+describe("미리 받을 인접 삽화", () => {
+  const urls = ["/p1.webp", "/p2.webp", "/p3.webp", "/p4.webp", "/p5.webp"];
+
+  // ⭐ 대부분 앞으로 넘긴다. 다음 쪽이 가장 먼저여야 한다.
+  it("다음 쪽을 가장 먼저 고른다 ⭐", () => {
+    expect(adjacentArtUrls(urls, 2)[0]).toBe("/p3.webp");
+  });
+
+  it("다음·이전·다다음을 고른다", () => {
+    expect(adjacentArtUrls(urls, 2)).toEqual(["/p3.webp", "/p1.webp", "/p4.webp"]);
+  });
+
+  // 🚫 전 쪽을 받으면 첫 화면 대역폭을 뺏겨 지금 볼 쪽이 늦어진다.
+  it("전 쪽을 다 고르지 않는다", () => {
+    expect(adjacentArtUrls(urls, 1).length).toBeLessThan(urls.length);
+  });
+
+  it("범위를 벗어난 쪽은 건너뛴다", () => {
+    expect(adjacentArtUrls(urls, 1)).toEqual(["/p2.webp", "/p3.webp"]);
+    expect(adjacentArtUrls(urls, 5)).toEqual(["/p4.webp"]);
+  });
+
+  it("삽화가 없는 쪽(null)은 건너뛴다", () => {
+    expect(adjacentArtUrls(["/p1.webp", null, "/p3.webp"], 1)).toEqual(["/p3.webp"]);
+  });
+
+  // 쪽이 적으면 오프셋이 같은 URL 을 가리킬 수 있다.
+  it("같은 URL 을 두 번 고르지 않는다", () => {
+    const two = ["/a.webp", "/b.webp"];
+    expect(adjacentArtUrls(two, 1)).toEqual(["/b.webp"]);
+  });
+
+  it("빈 목록에도 견딘다", () => {
+    expect(adjacentArtUrls([], 1)).toEqual([]);
   });
 });
