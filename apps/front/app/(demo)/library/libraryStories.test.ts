@@ -1,6 +1,11 @@
 import type { MyStorySessionItem } from "@nerd/contracts";
 import { describe, expect, it } from "vitest";
-import { getCompletedThumbnailUrls, getOwnedThumbnailUrl } from "./libraryStories";
+import {
+  getCachedThumbnailUrls,
+  getCompletedThumbnailUrls,
+  getOwnedThumbnailUrl,
+  setCachedThumbnailUrls,
+} from "./libraryStories";
 
 function session(
   overrides: Partial<MyStorySessionItem> & Pick<MyStorySessionItem, "id" | "templateSlug">,
@@ -42,7 +47,7 @@ describe("getCompletedThumbnailUrls", () => {
       session({ id: "missing", templateSlug: "hood", thumbnailImageUrl: null }),
     ]);
 
-    expect(thumbnails.get("jack")).toBe("https://storage.local/page-1.png");
+    expect(thumbnails.get("jack")).toBeUndefined();
     expect(thumbnails.get("hood")).toBeUndefined();
   });
 });
@@ -62,5 +67,18 @@ describe("getOwnedThumbnailUrl", () => {
   it("로그아웃하거나 사용자가 바뀌면 이전 썸네일을 노출하지 않는다", () => {
     expect(getOwnedThumbnailUrl(ownedThumbnails, null, "jack")).toBeUndefined();
     expect(getOwnedThumbnailUrl(ownedThumbnails, "next_user", "jack")).toBeUndefined();
+  });
+});
+
+describe("getCachedThumbnailUrls", () => {
+  it("현재 로그인 사용자 캐시만 반환한다", () => {
+    const cache = {
+      ownerLoginId: "first_user",
+      urls: new Map([["jack", "https://storage.local/first-user-page-1.png"]]),
+    };
+    setCachedThumbnailUrls(cache);
+
+    expect(getCachedThumbnailUrls("first_user")).toBe(cache);
+    expect(getCachedThumbnailUrls("next_user")).toBeNull();
   });
 });

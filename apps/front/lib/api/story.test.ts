@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchStories, fetchStoryDetail, fetchStoryPage } from "./story";
+import { fetchStories, fetchStoryDetail, fetchStoryPage, fetchStoryPages } from "./story";
 
 /** 서버 컨텍스트로 돌리기 위해 baseURL 을 준다 (vitest environment 는 node 라 window 가 없다). */
 process.env.BACKEND_INTERNAL_URL = "http://backend:5501";
@@ -38,12 +38,35 @@ describe("동화 조회 경로", () => {
     expect(calledUrl(spy)).toBe("http://backend:5501/api/v2/stories/dev-cloud-village");
   });
 
+  it("홈을 떠날 때 공개 목록의 미리 받기를 취소할 수 있다", async () => {
+    const controller = new AbortController();
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation((_input, options) =>
+      new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => reject(options.signal?.reason), { once: true });
+      }),
+    );
+    const request = fetchStories(controller.signal);
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetch.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+  });
+
   it("페이지는 slug 와 pageNo 를 경로에 넣는다", async () => {
     const spy = mockOk({ pageNo: 3 });
 
     await fetchStoryPage("dev-cloud-village", 3);
 
     expect(calledUrl(spy)).toBe("http://backend:5501/api/v2/stories/dev-cloud-village/pages/3");
+  });
+
+  it("전체 페이지 목록은 slug/pages 경로를 부른다", async () => {
+    const spy = mockOk([{ pageNo: 1, baseImageUrl: "https://storage.local/1.webp" }]);
+
+    const result = await fetchStoryPages("dev-cloud-village");
+
+    expect(calledUrl(spy)).toBe("http://backend:5501/api/v2/stories/dev-cloud-village/pages");
+    expect(result).toEqual([{ pageNo: 1, baseImageUrl: "https://storage.local/1.webp" }]);
   });
 
   it("slug 를 인코딩한다 ⭐ — 주소창에서 바꿔도 경로가 갈라지지 않는다", async () => {
@@ -56,10 +79,10 @@ describe("동화 조회 경로", () => {
   });
 
   it("봉투를 벗겨 data 만 돌려준다", async () => {
-    mockOk([{ slug: "dev-cloud-village", title: "구름 마을", summary: null, coverImageKey: null }]);
+    mockOk([{ slug: "dev-cloud-village", title: "구름 마을", summary: null, coverImageKey: null, coverImageUrl: null }]);
 
     await expect(fetchStories()).resolves.toEqual([
-      { slug: "dev-cloud-village", title: "구름 마을", summary: null, coverImageKey: null },
+      { slug: "dev-cloud-village", title: "구름 마을", summary: null, coverImageKey: null, coverImageUrl: null },
     ]);
   });
 });

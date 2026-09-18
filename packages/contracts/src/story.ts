@@ -46,6 +46,8 @@ export interface StorySummary {
   summary: string | null;
   /** 오브젝트 **키**다. URL 이 아니다 — 스토리지 공급자를 바꿔도 저장된 값이 살아남는다. */
   coverImageKey: string | null;
+  /** 표시용 서명 URL. 표지가 없거나 URL 발급에 실패하면 null. */
+  coverImageUrl: string | null;
 }
 
 export interface StoryCharacterSummary {
@@ -68,6 +70,8 @@ export interface StoryPageView {
   pageNo: number;
   bodyText: string;
   baseImageKey: string | null;
+  /** 만료되는 오브젝트 스토리지 서명 URL. 템플릿 삽화가 없거나 URL 발급에 실패하면 `null`. */
+  baseImageUrl: string | null;
   /** 만료되는 오브젝트 스토리지 서명 URL. 낭독이 없거나 URL 발급에 실패하면 `null`. */
   narrationAudioUrl: string | null;
   /** 사용자 얼굴로 개인화할 배역. `null` 이면 그 페이지는 개인화 대상이 아니다. */

@@ -510,9 +510,9 @@ function StoryReadContent({ params }: PageProps) {
     return (
       <CenteredPage>
         <Card className="flex flex-col items-center gap-4">
-          <StatusEmblem tone="danger">⚠️</StatusEmblem>
+          <StatusEmblem tone="danger" />
           <h1 className="text-xl font-bold text-ink">문제가 발생했어요</h1>
-          <p className="text-sm text-neutral-600">{activeError}</p>
+          <p className="text-sm text-ink-muted">{activeError}</p>
           <div className="flex flex-wrap justify-center gap-3 pt-2">
             {/* 🚫 실패 종류와 상관없이 「다시 시도하기」를 띄우지 않는다 — 다시 보내도 같은 답이
                 오는 실패(없는 세션·이미 완료 등)에서는 눌러 보고 또 실패하는 경험만 준다.
@@ -802,7 +802,7 @@ function StoryReadContent({ params }: PageProps) {
               className="h-2.5 w-40 overflow-hidden rounded-pill bg-line md:w-64"
             >
               <div
-                // 진행 표시는 버튼이 아니라 위치다 — 초록(GNB 전용)이 아니라 주 동작과 같은 파랑.
+                // 진행률은 공통 강조색을 사용하고 숫자와 함께 전달한다.
                 className="h-full rounded-pill bg-accent-a transition-[width] duration-500 motion-reduce:transition-none"
                 style={{ width: `${(currentPageNo / totalPages) * 100}%` }}
               />
@@ -824,7 +824,7 @@ function StoryReadContent({ params }: PageProps) {
               </button>
             ) : currentPageNo >= totalPages ? (
               <button onClick={() => setViewState("end")} className={actionClass("primary", `whitespace-nowrap ${BAR_END_BUTTON_WIDTH}`, "compact")}>
-                다 읽었어요 🎉
+                다 읽었어요
               </button>
             ) : (
               <button

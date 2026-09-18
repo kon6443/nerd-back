@@ -19,15 +19,22 @@ function server(app: INestApplication): Server {
 
 interface RepoStubs {
   templates: { find: jest.Mock; findOneBy: jest.Mock };
-  pages: { findOneBy: jest.Mock; countBy: jest.Mock };
+  pages: { find: jest.Mock; findOneBy: jest.Mock; countBy: jest.Mock };
   characters: { find: jest.Mock };
   pageCharacters: { find: jest.Mock };
 }
 
 function createRepoStubs(): RepoStubs {
   return {
-    templates: { find: jest.fn().mockResolvedValue([]), findOneBy: jest.fn().mockResolvedValue(null) },
-    pages: { findOneBy: jest.fn().mockResolvedValue(null), countBy: jest.fn().mockResolvedValue(0) },
+    templates: {
+      find: jest.fn().mockResolvedValue([]),
+      findOneBy: jest.fn().mockResolvedValue(null),
+    },
+    pages: {
+      find: jest.fn().mockResolvedValue([]),
+      findOneBy: jest.fn().mockResolvedValue(null),
+      countBy: jest.fn().mockResolvedValue(0),
+    },
     characters: { find: jest.fn().mockResolvedValue([]) },
     pageCharacters: { find: jest.fn().mockResolvedValue([]) },
   };
@@ -88,6 +95,7 @@ describe('동화 콘텐츠 조회 (E2E)', () => {
             title: '신데렐라',
             summary: '유리구두',
             coverImageKey: 'covers/cinderella.png',
+            coverImageUrl: 'https://storage.e2e.test/covers/cinderella.png',
           },
         ],
       });
@@ -135,9 +143,68 @@ describe('동화 콘텐츠 조회 (E2E)', () => {
         title: '백설공주',
         summary: null,
         coverImageKey: null,
+        coverImageUrl: null,
         pageCount: 6,
         characters: [{ role: 'queen', displayName: '왕비' }],
       });
+    });
+  });
+
+  describe('GET /stories/:slug/pages', () => {
+    beforeEach(() => {
+      stubs.templates.findOneBy.mockResolvedValue({
+        id: 4,
+        slug: 'snow-white',
+        title: '백설공주',
+        summary: null,
+        coverImageKey: null,
+        status: 'published',
+      });
+    });
+
+    it('전체 페이지 목록에 baseImageUrl이 포함되어 반환된다', async () => {
+      stubs.pages.find.mockResolvedValue([
+        {
+          id: 40,
+          pageNo: 1,
+          bodyText: '옛날 옛적에',
+          baseImageKey: 'pages/snow-white-1.png',
+          narrationAudioKey: null,
+          personaTargetRole: 'protagonist',
+        },
+        {
+          id: 41,
+          pageNo: 2,
+          bodyText: '거울아 거울아',
+          baseImageKey: null,
+          narrationAudioKey: null,
+          personaTargetRole: null,
+        },
+      ]);
+      stubs.pageCharacters.find.mockResolvedValue([]);
+
+      const res = await request(server(app)).get(`${STORIES_PATH}/snow-white/pages`).expect(200);
+
+      expect(res.body.data).toEqual([
+        {
+          pageNo: 1,
+          bodyText: '옛날 옛적에',
+          baseImageKey: 'pages/snow-white-1.png',
+          baseImageUrl: 'https://storage.e2e.test/pages/snow-white-1.png',
+          narrationAudioUrl: null,
+          personaTargetRole: 'protagonist',
+          characters: [],
+        },
+        {
+          pageNo: 2,
+          bodyText: '거울아 거울아',
+          baseImageKey: null,
+          baseImageUrl: null,
+          narrationAudioUrl: null,
+          personaTargetRole: null,
+          characters: [],
+        },
+      ]);
     });
   });
 
@@ -196,6 +263,7 @@ describe('동화 콘텐츠 조회 (E2E)', () => {
         pageNo: 2,
         bodyText: '거울아 거울아',
         baseImageKey: 'pages/snow-white-2.png',
+        baseImageUrl: 'https://storage.e2e.test/pages/snow-white-2.png',
         narrationAudioUrl: null,
         personaTargetRole: 'protagonist',
         characters: [

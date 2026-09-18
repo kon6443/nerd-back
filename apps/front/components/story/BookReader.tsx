@@ -49,7 +49,9 @@ function BookReaderContent({
 
   const requestPage = useCallback(
     (pageNo: number) => {
-      window.history.pushState(null, "", readerHref(slug, pageNo));
+      if (typeof window !== "undefined") {
+        window.history.pushState(null, "", readerHref(slug, pageNo));
+      }
     },
     [slug],
   );
@@ -63,20 +65,23 @@ function BookReaderContent({
 
   const isFirst = targetPageNo <= 1;
   const isLast = targetPageNo >= pageCount;
-  const characters = pages[targetPageNo - 1].characters;
   const activePage = pages[targetPageNo - 1];
+  const characters = activePage?.characters ?? [];
   const narrationPreloads = useMemo(
-    () => [activePage.narrationAudioUrl, pages[targetPageNo]?.narrationAudioUrl],
-    [activePage.narrationAudioUrl, pages, targetPageNo],
+    () => [activePage?.narrationAudioUrl, pages[targetPageNo]?.narrationAudioUrl],
+    [activePage?.narrationAudioUrl, pages, targetPageNo],
   );
   const narration = useNarration({
     pageKey: `demo:${slug}:${targetPageNo}`,
-    audioUrl: activePage.narrationAudioUrl,
+    audioUrl: activePage?.narrationAudioUrl ?? null,
     preloadUrls: narrationPreloads,
   });
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-3 px-4 py-3 md:h-dvh md:px-6">
+    // 아래 여백은 **고정 하단바의 자리**다(모바일 2줄 ~110px · 넓은 화면 1줄 ~82px). 없으면 바가 책·낭독 조작을 덮는다.
+    // ⚠️ `md:flex-none` — 부모가 높이 미정인 flex 라 `flex-1` 만 두면 `h-dvh` 가 무시되고 책이 본문 길이만큼
+    //    커져 고정 바 밑으로 들어간다. 높이가 확정돼야 책이 줄고 본문이 쪽 안에서 스크롤된다.
+    <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-3 px-4 pt-3 pb-32 md:h-dvh md:flex-none md:px-6 md:pb-24">
       <header className={READER_BAR}>
         {/* ⚠️ 목적지는 서재 목록이 아니라 **이 동화의 상세**다. 라벨을 「서재로」로 두면
             전역 네비의 「서재」와 같은 곳으로 가는 것처럼 보이는데 실제로는 다르다. */}
@@ -93,7 +98,7 @@ function BookReaderContent({
           {/* 시연을 읽다가 바로 개인화로 넘어가는 입구. 비로그인이면 촬영 화면이 로그인으로 보낸다
               (`stories/[slug]/capture`) — 여기서 세션을 조회하지 않는다(공개 경로에서 인증 API 금지). */}
           <ActionLink href={`/stories/${slug}/capture`} variant="primary" size="compact">
-            내 얼굴로 체험하기
+            내 얼굴로 만들기
           </ActionLink>
         </div>
       </header>
@@ -102,13 +107,15 @@ function BookReaderContent({
         pageNo={targetPageNo}
         pageCount={pageCount}
         onRequestPage={requestPage}
-        renderArt={(pageNo) => <BookArtContent pageNo={pageNo} />}
+        renderArt={(pageNo) => (
+          <BookArtContent pageNo={pageNo} imageUrl={pages[pageNo - 1]?.baseImageUrl} />
+        )}
         renderText={(pageNo) => (
-          <BookTextContent pageNo={pageNo}>{pages[pageNo - 1].bodyText}</BookTextContent>
+          <BookTextContent pageNo={pageNo}>{pages[pageNo - 1]?.bodyText ?? ""}</BookTextContent>
         )}
         renderTextControls={() => (
           <NarrationPlayer
-            audioUrl={activePage.narrationAudioUrl}
+            audioUrl={activePage?.narrationAudioUrl ?? null}
             enabled={narration.enabled}
             onPlay={narration.play}
             onPause={narration.pause}
@@ -117,41 +124,56 @@ function BookReaderContent({
         )}
       />
 
-      <footer className={READER_BAR}>
-        {isFirst ? (
-          // 🚫 링크를 숨기지 않는다 — 버튼이 사라졌다 나타나면 위치가 흔들려 오터치가 는다.
-          <span aria-disabled="true" className={actionClass("secondary", "pointer-events-none opacity-40")}>
-            이전
-          </span>
-        ) : (
-          <ActionLink
-            href={readerHref(slug, targetPageNo - 1)}
-            variant="secondary"
-            onClick={(event) => onTurnClick(event, targetPageNo - 1)}
-          >
-            이전
-          </ActionLink>
-        )}
+      {/*
+        ⭐ **흰 고정 하단바**(2026-09-18 요청) — 설명 문구가 풍경 위에 떠 있어 읽히지 않았다. 체험 리더의 하단바와 같은 모양이다.
+        이전·다음은 **같은 폭**이다: 모바일은 두 칸을 반씩, 넓은 화면은 양끝 15rem. 크기가 다르면 한쪽이 더 중요해 보인다 —
+        중요도는 크기가 아니라 색(secondary < primary)이 말한다.
+        설명 줄은 등장인물이 없는 쪽에서도 **자리를 지킨다**(`min-h`) — 쪽마다 바 높이가 바뀌면 책이 출렁인다.
+      */}
+      <footer className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-line bg-surface-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm">
+        <div className="mx-auto grid w-full max-w-7xl grid-cols-2 items-center gap-x-3 gap-y-2 px-4 py-3 md:grid-cols-[15rem_minmax(0,1fr)_15rem] md:gap-x-4 md:px-6">
+          {isFirst ? (
+            // 🚫 링크를 숨기지 않는다 — 버튼이 사라졌다 나타나면 위치가 흔들려 오터치가 는다.
+            <span
+              aria-disabled="true"
+              className={actionClass("secondary", "row-start-2 w-full pointer-events-none opacity-40 md:row-start-1", "compact")}
+            >
+              이전
+            </span>
+          ) : (
+            <ActionLink
+              href={readerHref(slug, targetPageNo - 1)}
+              variant="secondary"
+              size="compact"
+              className="row-start-2 w-full md:row-start-1"
+              onClick={(event) => onTurnClick(event, targetPageNo - 1)}
+            >
+              이전
+            </ActionLink>
+          )}
 
-        <p className="order-last w-full text-center text-ink-muted md:order-none md:w-auto md:flex-1">
-          {characters.length > 0
-            ? `이 장면에는 ${characters.map((character) => character.displayName).join(" · ")} 가 있어요.`
-            : null}
-        </p>
+          <p className="col-span-2 row-start-1 min-h-5 text-center text-sm font-medium text-ink break-keep md:col-span-1 md:col-start-2 md:text-base">
+            {characters.length > 0
+              ? `이 장면에는 ${characters.map((character) => character.displayName).join(" · ")} 가 있어요.`
+              : null}
+          </p>
 
-        {isLast ? (
-          <ActionLink href="/library" variant="primary">
-            다 읽었어요
-          </ActionLink>
-        ) : (
-          <ActionLink
-            href={readerHref(slug, targetPageNo + 1)}
-            variant="primary"
-            onClick={(event) => onTurnClick(event, targetPageNo + 1)}
-          >
-            다음 페이지
-          </ActionLink>
-        )}
+          {isLast ? (
+            <ActionLink href="/library" variant="primary" size="compact" className="row-start-2 w-full md:col-start-3 md:row-start-1">
+              다 읽었어요
+            </ActionLink>
+          ) : (
+            <ActionLink
+              href={readerHref(slug, targetPageNo + 1)}
+              variant="primary"
+              size="compact"
+              className="row-start-2 w-full md:col-start-3 md:row-start-1"
+              onClick={(event) => onTurnClick(event, targetPageNo + 1)}
+            >
+              다음 페이지
+            </ActionLink>
+          )}
+        </div>
       </footer>
     </main>
   );

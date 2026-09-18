@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { actionClass } from "@/components/ui/actionStyles";
+import { StoryIcon } from "@/components/ui/StoryIcon";
 import { deleteSession, findMySessionBySlug } from "@/lib/api";
 import { useSession } from "@/lib/api/useSession";
 import type { MyStorySessionItem } from "@nerd/contracts";
@@ -108,7 +109,7 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
           /* 0. 확인 중 — 최종 버튼과 같은 높이·폭의 투명 자리표시 */
           isCreateMode ? (
             <span aria-hidden="true" className={actionClass("primary", "invisible")}>
-              📷 내 얼굴로 만들기
+              <StoryIcon name="camera" className="mr-2" />내 얼굴로 만들기
             </span>
           ) : (
             <span aria-hidden="true" className={actionClass("primary", "invisible")}>
@@ -128,9 +129,8 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
               variant="primary"
               size="default"
-              className="font-bold shadow-md"
             >
-              📖 내 얼굴 동화 읽기
+              <StoryIcon name="book" className="mr-2" />내 얼굴 동화 읽기
             </ActionLink>
             <button
               type="button"
@@ -138,11 +138,11 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               disabled={isDeleting}
               className={actionClass(
                 "secondary",
-                "text-sm text-neutral-600 hover:text-rose-600 hover:border-rose-300 disabled:opacity-50",
+                "text-sm text-danger-strong disabled:opacity-50",
                 "compact",
               )}
             >
-              {isDeleting ? "초기화 중..." : "🔄 다른 얼굴로 다시 만들기"}
+              {isDeleting ? "초기화 중..." : "다른 얼굴로 다시 만들기"}
             </button>
           </>
         ) : currentSession && stage === "generating" ? (
@@ -152,9 +152,8 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               href={`/stories/${slug}/read?sessionId=${currentSession.id}&autoStart=true`}
               variant="primary"
               size="default"
-              className="font-bold"
             >
-              ⏳ 제작 중인 동화 이어보기
+              <StoryIcon name="clock" className="mr-2" />제작 중인 동화 이어보기
             </ActionLink>
             <button
               type="button"
@@ -162,7 +161,7 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               disabled={isDeleting}
               className={actionClass(
                 "secondary",
-                "text-sm text-neutral-600 hover:text-rose-600 disabled:opacity-50",
+                "text-sm text-danger-strong disabled:opacity-50",
                 "compact",
               )}
             >
@@ -176,9 +175,8 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
               variant="primary"
               size="default"
-              className="font-bold"
             >
-              ⚠️ 제작 재시도하기
+              <StoryIcon name="warning" className="mr-2" />제작 재시도하기
             </ActionLink>
             <button
               type="button"
@@ -186,7 +184,7 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               disabled={isDeleting}
               className={actionClass(
                 "secondary",
-                "text-sm text-neutral-600 hover:text-rose-600 disabled:opacity-50",
+                "text-sm text-danger-strong disabled:opacity-50",
                 "compact",
               )}
             >
@@ -196,7 +194,7 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
         ) : (
           /* 4. 아직 세션이 없거나(비로그인 포함) draft 상태인 경우 */
           <ActionLink href={`/stories/${slug}/capture`} variant="primary">
-            📷 내 얼굴로 만들기
+            <StoryIcon name="camera" className="mr-2" />내 얼굴로 만들기
           </ActionLink>
         )}
       </div>

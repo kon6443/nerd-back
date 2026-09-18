@@ -1,0 +1,146 @@
+.world {
+  --world-gutter: clamp(1.5rem, 6.5vw, 7.5rem);
+  flex: 1;
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+.stage {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  height: calc(100dvh - var(--app-header-height));
+  min-height: 480px;
+  padding: 2rem var(--world-gutter);
+  overflow: clip;
+}
+
+.graphics,
+.webgl,
+.fallback,
+.entryWash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.webgl { visibility: hidden; }
+.world[data-renderer="ready"] .webgl { visibility: visible; }
+.image { object-fit: cover; object-position: 65% center; }
+
+.stage::before {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, var(--color-paper), color-mix(in srgb, var(--color-paper) 86%, transparent) 24%, transparent 49%);
+  transition: opacity 220ms ease;
+}
+
+.loading {
+  position: absolute;
+  left: 68%;
+  top: 52%;
+  transform: translate(-50%, -50%);
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  animation: show-loading 200ms 500ms both;
+}
+
+.world:not([data-renderer="loading"]) .loading { display: none; }
+@keyframes show-loading { from { opacity: 0; } to { opacity: 1; } }
+
+.content {
+  position: relative;
+  z-index: 2;
+  max-width: 38rem;
+}
+
+.copy,
+.actions { transition: opacity 220ms ease; }
+.eyebrow {
+  margin-bottom: 1.5rem;
+  color: var(--color-book-cover);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.title {
+  margin: 0;
+  color: var(--color-book-cover-strong);
+  font-size: clamp(2.5rem, 4.1vw, 4.25rem);
+  font-weight: 800;
+  line-height: 1.24;
+  letter-spacing: -0.055em;
+  word-break: keep-all;
+}
+.title span { display: block; }
+.description {
+  max-width: 22rem;
+  margin-top: 1.5rem;
+  font-size: 1.0625rem;
+  line-height: 1.85;
+  word-break: keep-all;
+  text-wrap: pretty;
+}
+
+.actions { margin-top: 2rem; }
+.actionLinks { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.note { margin-top: 1rem; font-size: 0.8125rem; line-height: 1.5; }
+
+.entryWash {
+  z-index: 3;
+  background: var(--color-paper);
+  opacity: var(--entry-wash, 0);
+}
+.world[data-entering="true"] .entryWash { pointer-events: auto; }
+.world[data-entering="true"] .copy,
+.world[data-entering="true"] .actions,
+.world[data-entering="true"] .stage::before { opacity: 0; pointer-events: none; }
+
+/* 홈에서 시작한 전환에만 적용하며 새 페이지 commit 후 잠깐 유지한다. */
+.transition [data-app-header] { view-transition-name: book-header; }
+.transition::view-transition-new(root) { animation: arrive 320ms ease-out both; mix-blend-mode: normal; }
+.transition::view-transition-old(root) { animation: depart 220ms ease-out both; }
+@keyframes arrive { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: scale(1); } }
+@keyframes depart { to { opacity: 0; } }
+
+@media (min-width: 1600px) {
+  .world { --world-gutter: max(7.5rem, calc((100vw - 1440px) / 2)); }
+}
+
+@media (max-width: 767px) {
+  .world { --world-gutter: 1.5rem; }
+  .stage {
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 520px;
+    padding: 2rem var(--world-gutter) calc(1.5rem + env(safe-area-inset-bottom));
+  }
+  .stage::before {
+    background: linear-gradient(180deg, var(--color-paper), color-mix(in srgb, var(--color-paper) 92%, transparent) 22%, transparent 45%);
+  }
+  .content { display: contents; }
+  .copy,
+  .actions { position: relative; z-index: 2; }
+  .loading { left: 50%; top: 58%; }
+  .image { object-position: 68% center; }
+  .eyebrow { margin-bottom: 0.75rem; font-size: 0.8125rem; }
+  .title { font-size: clamp(1.875rem, 8.2vw, 3rem); }
+  .description { max-width: 19rem; margin-top: 0.875rem; font-size: 0.9375rem; line-height: 1.7; }
+  .actions { margin-top: auto; }
+  .actionLinks { flex-wrap: nowrap; gap: 0.5rem; }
+  .actionLinks > a { flex: 1; padding-inline: 0.5rem; font-size: 0.9375rem; white-space: nowrap; }
+  .note { margin-top: 0.75rem; text-align: center; font-size: 0.75rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .world *,
+  .stage::before { transition: none; animation: none; }
+}

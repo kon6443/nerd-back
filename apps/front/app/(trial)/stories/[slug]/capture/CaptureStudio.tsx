@@ -1,3 +1,4 @@
+import { StoryBookOrnament } from "@/components/story/StoryBookScene";
 import type { ReactNode } from "react";
 import { actionClass } from "@/components/ui/actionStyles";
 import styles from "./CaptureStudio.module.css";
@@ -16,32 +17,6 @@ export function StudioIcon({ name }: { name: IconName }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={styles.icon}>
       {paths[name]}
-    </svg>
-  );
-}
-
-/** 촬영을 함께 준비하는 동화책 친구. 장식이므로 보조기술에는 반복해서 읽히지 않는다. */
-export function BookBuddy({ className = "" }: { className?: string }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 260 210" className={`${styles.buddy} ${className}`}>
-      <ellipse cx="132" cy="190" rx="67" ry="9" fill="var(--color-accent-a-strong)" opacity=".12" />
-      <path d="m70 123-23 12-13-13m155-6 25-16 5-20" fill="none" stroke="var(--color-book-cover)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="m98 164-9 20h-17m86-20 11 20h17" fill="none" stroke="var(--color-book-cover)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M57 62q36-13 73 6 37-19 73-6v105q-35-9-73 9-38-18-73-9Z" fill="var(--color-accent-a)" stroke="var(--color-book-cover)" strokeWidth="5" strokeLinejoin="round" />
-      <path d="M65 52q31-11 65 9 34-20 65-9v104q-31-8-65 10-34-18-65-10Z" fill="var(--color-paper)" stroke="var(--color-book-cover)" strokeWidth="4" strokeLinejoin="round" />
-      <path d="M130 62v98" fill="none" stroke="var(--color-paper-edge)" strokeWidth="3" />
-      <path d="M166 49v34l8-5 8 5V48" fill="var(--color-gold)" />
-      <path d="m76 68 29 4m-29 8 19 4m55 57 30-5m-30 14 22-4" stroke="var(--color-paper-edge)" strokeWidth="4" strokeLinecap="round" />
-      <ellipse cx="96" cy="117" rx="11" ry="6" fill="#ffc1bc" />
-      <ellipse cx="164" cy="117" rx="11" ry="6" fill="#ffc1bc" />
-      <ellipse cx="107" cy="102" rx="5" ry="7" fill="var(--color-book-cover-strong)" />
-      <ellipse cx="153" cy="102" rx="5" ry="7" fill="var(--color-book-cover-strong)" />
-      <circle cx="108" cy="100" r="1.7" fill="white" />
-      <circle cx="154" cy="100" r="1.7" fill="white" />
-      <path d="M120 118q10 13 20 0" fill="none" stroke="var(--color-book-cover-strong)" strokeWidth="4" strokeLinecap="round" />
-      <path d="m47 36 4 9 10 1-8 7 2 10-9-5-9 5 2-10-7-7 10-1Z" fill="var(--color-gold)" />
-      <path d="m210 42 3 7 8 1-6 5 1 8-7-4-7 4 2-8-6-5 8-1Z" fill="var(--color-gold)" />
-      <path d="m130 18 2 8 8 2-8 2-2 8-2-8-8-2 8-2Z" fill="var(--color-accent-a)" />
     </svg>
   );
 }
@@ -96,7 +71,7 @@ export function CaptureStudio({
         </p>
 
         <div className={styles.companion}>
-          <BookBuddy />
+          <StoryBookOrnament />
         </div>
 
         <aside className={styles.privacy} aria-label="사진 이용 안내">
@@ -108,7 +83,7 @@ export function CaptureStudio({
         </aside>
       </div>
 
-      <div className={styles.capturePanel} aria-busy={isSubmitting}>
+      <div className={styles.capturePanel} data-state={hasPhoto ? "ready" : isCameraActive ? "camera" : "idle"} aria-busy={isSubmitting}>
         <div className={styles.panelHeader}>
           <h2><StudioIcon name="camera" />{hasPhoto ? "내 사진을 확인해요" : "주인공 사진관"}</h2>
           <span className={styles.photoCount}>{hasPhoto ? "준비 완료" : "정면 1장"}</span>

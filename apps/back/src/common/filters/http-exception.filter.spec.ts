@@ -112,6 +112,8 @@ describe('HttpExceptionFilter', () => {
 
     // ⭐ 모니터가 없어도(E2E·단위 spec) 응답은 정확히 같아야 한다.
     it('모니터가 없어도 응답 정규화는 같다 ⭐', () => {
+      // 서로 다른 호출의 1ms 경계가 응답 비교를 흔들지 않도록 시간을 고정한다.
+      jest.spyOn(Date.prototype, 'toISOString').mockReturnValue('2026-09-17T00:00:00.000Z');
       const withMonitor = createHost('/x');
       const withoutMonitor = createHost('/x');
 

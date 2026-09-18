@@ -32,6 +32,10 @@ describe('StoryService', () => {
   let storage: jest.Mocked<StoragePort>;
   let service: StoryService;
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
     templates = createMockRepository<StoryTemplate>();
     pages = createMockRepository<StoryPage>();
@@ -39,7 +43,9 @@ describe('StoryService', () => {
     pageCharacters = createMockRepository<StoryPageCharacter>();
     storage = {
       upload: jest.fn(),
-      getPresignedUrl: jest.fn().mockResolvedValue('https://storage.local/narration.mp3'),
+      getPresignedUrl: jest
+        .fn()
+        .mockImplementation(async (key: string) => `https://storage.local/${key}`),
       download: jest.fn(),
       delete: jest.fn(),
     };
@@ -77,7 +83,65 @@ describe('StoryService', () => {
           title: '빨간 모자',
           summary: '숲을 지나 할머니 댁으로',
           coverImageKey: 'covers/lrrh.png',
+          coverImageUrl: 'https://storage.local/covers/lrrh.png',
         },
+      ]);
+      expect(storage.getPresignedUrl).toHaveBeenCalledWith(
+        'covers/lrrh.png',
+        3600,
+        expect.any(Date),
+      );
+    });
+
+    it('공개 표지는 5분 경계에서만 서명 시각이 바뀌고 표지 교체는 즉시 반영한다', async () => {
+      jest.useFakeTimers({ now: new Date('2026-09-17T13:00:01Z') });
+      templates.find.mockResolvedValue([PUBLISHED_TEMPLATE]);
+      await service.listPublished();
+      jest.setSystemTime(new Date('2026-09-17T13:04:59Z'));
+      await service.listPublished();
+      expect(storage.getPresignedUrl.mock.calls[1]).toEqual(storage.getPresignedUrl.mock.calls[0]);
+      expect(storage.getPresignedUrl.mock.calls[0][2]).toEqual(new Date('2026-09-17T13:00:00Z'));
+
+      templates.find.mockResolvedValue([createStoryTemplate({ coverImageKey: 'covers/new.webp' })]);
+      await service.listPublished();
+      expect(storage.getPresignedUrl).toHaveBeenLastCalledWith(
+        'covers/new.webp',
+        3600,
+        new Date('2026-09-17T13:00:00Z'),
+      );
+
+      jest.setSystemTime(new Date('2026-09-17T13:05:00Z'));
+      await service.listPublished();
+      expect(storage.getPresignedUrl).toHaveBeenLastCalledWith(
+        'covers/new.webp',
+        3600,
+        new Date('2026-09-17T13:05:00Z'),
+      );
+    });
+
+    it('표지 키가 없으면 URL은 null이고 스토리지를 호출하지 않는다', async () => {
+      templates.find.mockResolvedValue([createStoryTemplate({ coverImageKey: null })]);
+
+      await expect(service.listPublished()).resolves.toEqual([
+        expect.objectContaining({ coverImageKey: null, coverImageUrl: null }),
+      ]);
+      expect(storage.getPresignedUrl).not.toHaveBeenCalled();
+    });
+
+    it('한 표지의 URL 발급 실패가 다른 표지나 목록 조회를 실패시키지 않는다', async () => {
+      templates.find.mockResolvedValue([
+        PUBLISHED_TEMPLATE,
+        createStoryTemplate({
+          id: 8,
+          slug: 'jack-and-beanstalk',
+          coverImageKey: 'covers/jack.png',
+        }),
+      ]);
+      storage.getPresignedUrl.mockRejectedValueOnce(new Error('storage unavailable'));
+
+      await expect(service.listPublished()).resolves.toEqual([
+        expect.objectContaining({ coverImageUrl: null }),
+        expect.objectContaining({ coverImageUrl: 'https://storage.local/covers/jack.png' }),
       ]);
     });
   });
@@ -97,6 +161,7 @@ describe('StoryService', () => {
         slug: 'unknown',
         status: STORY_TEMPLATE_STATUS.PUBLISHED,
       });
+      expect(storage.getPresignedUrl).not.toHaveBeenCalled();
     });
 
     it('페이지 수와 등장인물을 담되 persona 는 담지 않는다 ⭐', async () => {
@@ -110,12 +175,26 @@ describe('StoryService', () => {
       const result = await service.getPublishedDetail('little-red-riding-hood');
 
       expect(result.pageCount).toBe(12);
+      expect(result).toMatchObject({ coverImageUrl: 'https://storage.local/covers/lrrh.png' });
       expect(result.characters).toEqual([
         { role: 'wolf', displayName: '늑대' },
         { role: 'protagonist', displayName: '빨간 모자' },
       ]);
       // 프롬프트 설계가 새어나가면 본편 스포일러와 우회 질문의 재료가 된다 (NFR-002).
       expect(JSON.stringify(result)).not.toContain('persona');
+    });
+
+    it('표지 URL 발급 실패 시에도 상세 메타데이터를 반환한다', async () => {
+      templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
+      pages.countBy.mockResolvedValue(6);
+      characters.find.mockResolvedValue([]);
+      storage.getPresignedUrl.mockRejectedValueOnce(new Error('storage unavailable'));
+
+      await expect(service.getPublishedDetail(PUBLISHED_TEMPLATE.slug)).resolves.toMatchObject({
+        slug: PUBLISHED_TEMPLATE.slug,
+        coverImageUrl: null,
+        pageCount: 6,
+      });
     });
   });
 
@@ -188,15 +267,16 @@ describe('StoryService', () => {
 
       expect(result.map((page) => page.pageNo)).toEqual([1, 2]);
       expect(result[0].characters).toEqual([]);
-      expect(result[1].characters).toEqual([
-        { role: 'wolf', displayName: '늑대', hitbox: null },
-      ]);
+      expect(result[1].characters).toEqual([{ role: 'wolf', displayName: '늑대', hitbox: null }]);
     });
 
     it('단건 조회와 같은 모양을 낸다 ⭐', async () => {
       // 두 API 가 다른 모양을 내면 리더가 어느 쪽으로 받았는지에 따라 갈린다.
       const page = createStoryPage({ id: 41, pageNo: 3, baseImageKey: 'pages/lrrh-3.png' });
-      const appearance = createStoryPageCharacter({ pageId: 41, character: createStoryCharacter() });
+      const appearance = createStoryPageCharacter({
+        pageId: 41,
+        character: createStoryCharacter(),
+      });
 
       templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
       pages.find.mockResolvedValue([page]);
@@ -255,7 +335,11 @@ describe('StoryService', () => {
         createStoryPageCharacter({
           id: 102,
           hitbox: null,
-          character: createStoryCharacter({ id: 12, role: 'protagonist', displayName: '빨간 모자' }),
+          character: createStoryCharacter({
+            id: 12,
+            role: 'protagonist',
+            displayName: '빨간 모자',
+          }),
         }),
       ]);
 
@@ -265,6 +349,7 @@ describe('StoryService', () => {
         pageNo: 3,
         bodyText: '늑대가 숲에서 빨간 모자를 만났습니다.',
         baseImageKey: 'pages/lrrh-3.png',
+        baseImageUrl: 'https://storage.local/pages/lrrh-3.png',
         narrationAudioUrl: null,
         personaTargetRole: 'protagonist',
         characters: [
@@ -278,10 +363,56 @@ describe('StoryService', () => {
       });
     });
 
+    it('기본 삽화는 5분 고정 윈도우 서명 URL로 발급하고 키가 없으면 null이다', async () => {
+      jest.useFakeTimers({ now: new Date('2026-09-17T13:00:01Z') });
+      templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ pageNo: 1, baseImageKey: 'pages/red-1.webp' }),
+      );
+      pageCharacters.find.mockResolvedValue([]);
+
+      const result = await service.getPublishedPage('little-red-riding-hood', 1);
+
+      expect(result.baseImageUrl).toBe('https://storage.local/pages/red-1.webp');
+      expect(storage.getPresignedUrl).toHaveBeenCalledWith(
+        'pages/red-1.webp',
+        3600,
+        new Date('2026-09-17T13:00:00Z'),
+      );
+
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ pageNo: 1, baseImageKey: null }),
+      );
+      const nullResult = await service.getPublishedPage('little-red-riding-hood', 1);
+      expect(nullResult.baseImageUrl).toBeNull();
+
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ pageNo: 1, baseImageKey: '   ' }),
+      );
+      const spaceResult = await service.getPublishedPage('little-red-riding-hood', 1);
+      expect(spaceResult.baseImageUrl).toBeNull();
+    });
+
+    it('기본 삽화 URL 발급 실패는 본문 조회를 실패시키지 않고 null로 내린다', async () => {
+      templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({ baseImageKey: 'pages/fail.webp' }),
+      );
+      pageCharacters.find.mockResolvedValue([]);
+      storage.getPresignedUrl.mockRejectedValueOnce(new Error('storage unavailable'));
+
+      const result = await service.getPublishedPage('little-red-riding-hood', 1);
+      expect(result.baseImageUrl).toBeNull();
+      expect(result.bodyText).toBeDefined();
+    });
+
     it('낭독 키는 서명 URL로 바꾸고 오브젝트 키를 응답에 노출하지 않는다', async () => {
       templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
       pages.findOneBy.mockResolvedValue(
-        createStoryPage({ narrationAudioKey: 'prod/narration/red/page-3.mp3' }),
+        createStoryPage({
+          baseImageKey: null,
+          narrationAudioKey: 'prod/narration/red/page-3.mp3',
+        }),
       );
       pageCharacters.find.mockResolvedValue([]);
       storage.getPresignedUrl.mockResolvedValueOnce('https://storage.local/red-3.mp3?signed=1');
@@ -289,23 +420,42 @@ describe('StoryService', () => {
       const result = await service.getPublishedPage('little-red-riding-hood', 3);
 
       expect(result.narrationAudioUrl).toBe('https://storage.local/red-3.mp3?signed=1');
-      expect(storage.getPresignedUrl).toHaveBeenCalledWith(
-        'prod/narration/red/page-3.mp3',
-      );
+      expect(storage.getPresignedUrl).toHaveBeenCalledWith('prod/narration/red/page-3.mp3');
       expect(JSON.stringify(result)).not.toContain('prod/narration');
     });
 
     it('낭독 URL 발급 실패는 본문 조회를 실패시키지 않고 null로 내린다', async () => {
       templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
       pages.findOneBy.mockResolvedValue(
-        createStoryPage({ narrationAudioKey: 'prod/narration/red/page-3.mp3' }),
+        createStoryPage({
+          baseImageKey: null,
+          narrationAudioKey: 'prod/narration/red/page-3.mp3',
+        }),
       );
       pageCharacters.find.mockResolvedValue([]);
       storage.getPresignedUrl.mockRejectedValueOnce(new Error('storage unavailable'));
 
-      await expect(
-        service.getPublishedPage('little-red-riding-hood', 3),
-      ).resolves.toMatchObject({ narrationAudioUrl: null, bodyText: expect.any(String) });
+      await expect(service.getPublishedPage('little-red-riding-hood', 3)).resolves.toMatchObject({
+        narrationAudioUrl: null,
+        bodyText: expect.any(String),
+      });
+    });
+
+    it('기본 삽화와 낭독 음성이 모두 존재하면 두 서명 URL을 함께 반환한다', async () => {
+      templates.findOneBy.mockResolvedValue(PUBLISHED_TEMPLATE);
+      pages.findOneBy.mockResolvedValue(
+        createStoryPage({
+          pageNo: 1,
+          baseImageKey: 'pages/red-1.webp',
+          narrationAudioKey: 'audio/red-1.mp3',
+        }),
+      );
+      pageCharacters.find.mockResolvedValue([]);
+
+      const result = await service.getPublishedPage('little-red-riding-hood', 1);
+
+      expect(result.baseImageUrl).toBe('https://storage.local/pages/red-1.webp');
+      expect(result.narrationAudioUrl).toBe('https://storage.local/audio/red-1.mp3');
     });
   });
 });

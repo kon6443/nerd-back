@@ -1,7 +1,7 @@
 # Slice 3: 세션 관리 및 얼굴 등록 상세 설계서
 
 > 작성일: 2026-09-08  
-> 상태: **설계 확정 (Enacted via /grill-me)**  
+> 상태: **구현·검증 완료 (2026-09-08)**
 > 작업 브랜치: `feat/my-story-slice-3`  
 > 상위 문서: [`docs/tasks/tasks-my-story.md`](tasks-my-story.md)
 

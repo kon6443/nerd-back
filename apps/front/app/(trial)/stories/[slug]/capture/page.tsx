@@ -3,13 +3,15 @@
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { StoryRoom } from "@/components/layout/StoryRoom";
+import { StoryBookScene } from "@/components/story/StoryBookScene";
 import { Card } from "@/components/ui/Card";
 import { actionClass } from "@/components/ui/actionStyles";
 import { ApiError, createSession, deleteSession, findMySessionBySlug, uploadFace } from "@/lib/api";
 import type { MyStorySessionItem, UploadFaceResponse } from "@nerd/contracts";
 import { errorMessage } from "@/lib/api/errorPresentation";
 import { getLibraryStoryHref } from "@/lib/libraryMode";
-import { BookBuddy, CaptureStudio, StudioIcon } from "./CaptureStudio";
+import { CaptureStudio, StudioIcon } from "./CaptureStudio";
 import styles from "./CaptureStudio.module.css";
 
 interface PageProps {
@@ -319,7 +321,7 @@ export default function CapturePage({ params }: PageProps) {
   }
 
   return (
-    <main className={`${styles.page} flex w-full flex-1 flex-col`}>
+    <StoryRoom storySlug={slug} className={styles.page}>
       <div className={styles.pageHeader}>
         {/* 🚫 `/library/${slug}` 로 돌아가지 않는다 — `mode=create` 가 빠지면 소개 화면이
             시연 모드로 바뀌어 「📷 내 얼굴로 만들기」가 사라진다. 이 화면에 오는 경로는
@@ -335,7 +337,7 @@ export default function CapturePage({ params }: PageProps) {
 
       {existingSession ? (
         <Card className={`${styles.resultCard} flex w-full flex-col items-center gap-5 text-center`}>
-          <BookBuddy className={styles.resultBuddy} />
+          <div className={styles.resultBuddy}><StoryBookScene /></div>
           <h1 ref={resultTitleRef} tabIndex={-1} className="text-2xl font-bold text-ink">나의 동화책이 기다리고 있어요!</h1>
           <p className="break-keep text-sm leading-relaxed text-ink-muted">
             내가 주인공인 동화가 이미 완성되어 있어요.<br />
@@ -373,7 +375,7 @@ export default function CapturePage({ params }: PageProps) {
         </Card>
       ) : result ? (
         <Card className={`${styles.resultCard} flex w-full flex-col items-center gap-5 text-center`}>
-          <BookBuddy className={styles.resultBuddy} />
+          <div className={styles.resultBuddy}><StoryBookScene /></div>
           <h1 ref={resultTitleRef} tabIndex={-1} className="text-2xl font-bold text-ink">짜잔, 동화 속 나예요!</h1>
           <p className="break-keep text-sm leading-relaxed text-ink-muted">
             멋진 주인공이 준비됐어요.<br />
@@ -440,6 +442,6 @@ export default function CapturePage({ params }: PageProps) {
       {(existingSession || result) && errorMsg && (
         <p role="alert" className={`${styles.error} ${styles.resultError}`}>{errorMsg}</p>
       )}
-    </main>
+    </StoryRoom>
   );
 }

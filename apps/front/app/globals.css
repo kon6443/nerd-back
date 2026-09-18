@@ -1,50 +1,46 @@
 @import "tailwindcss";
 
-/* 디자인 토큰의 정의는 이 파일 한 곳에 둔다. */
-/* 팔레트는 듀오링고를 참조했다(abc.duolingo.com CSS 실측, 2026-09-09).
-   🚫 색 리터럴을 컴포넌트에 쓰지 않는다 — 여기 값만 바꾸면 전체가 따라온다. */
+/* 홈의 종이·숲 재질을 모든 경로가 공유한다. 의미색과 책별 표지색은 구분한다. */
 @theme {
-  --color-primary: #58cc02; /* Feather Green */
-  --color-primary-strong: #58a700; /* 버튼 립·눌린 상태 */
-  --color-primary-soft: #a5ed6e;
-  --color-primary-tint: #d7feb9;
-  --color-surface: #f7f7f7; /* Polar — 한 단계 낮은 면 */
-  --color-surface-raised: #ffffff; /* Snow */
-  --color-line: #e5e5e5; /* Swan — 모든 테두리 */
-  --color-paper-line: #ededed;
-  --color-accent-a: #1cb0f6; /* Macaw — 보조 CTA·비하인드 A */
-  --color-accent-a-strong: #1899d6;
-  --color-accent-a-soft: #ddf4ff;
-  --color-accent-b: #ce82ff; /* Beetle — 비하인드 B */
-  --color-accent-b-strong: #9069cd;
-  --color-accent-b-soft: #f3e8ff;
-  --color-ink: #4b4b4b; /* Eel — 본문. 순검정을 쓰지 않는다 */
-  --color-ink-muted: #777777; /* Wolf */
-  --color-gold: #ffc800; /* Bee — 노랑 위에는 ink 를 얹는다 */
-  --color-gold-strong: #e5a700;
-  /* secondary 검정 버튼(`dark`). 순검정이 아니라 초록빛을 섞는다 — 서비스의 초록 톤과 어울리게. */
-  --color-night: #243129;
-  --color-night-strong: #121a15;
-  --color-magic: #ce82ff;
-  --color-magic-strong: #9069cd;
-  /* 실패·오류. 의미색이라 강조색(accent)과 역할이 다르다 — 섞어 쓰지 않는다.
-     `danger` 는 면, `danger-strong` 은 글자(연한 면 위 대비 확보), `danger-soft` 는 배경. */
-  --color-danger: #ff4b4b; /* Cardinal */
-  --color-danger-strong: #c1272d;
-  --color-danger-soft: #ffdfe0;
-  --color-hill-1: #a5ed6e;
-  --color-hill-2: #58cc02;
-  /* 리더의 책 — 하드커버·크림색 종이·쌓인 종이 단면(`BookFrame.module.css` 의 `.volume`). */
-  --color-book-cover: #2f5b69;
-  --color-book-cover-strong: #22454f;
+  /* 주 색 — 비취색(2026-09-18). #62 의 짙은 올리브(#354f38)는 거의 검정으로 읽혀 주 버튼이 안 보였다.
+     같은 숲 계열이라 세이지 풍경과 어울리면서 채도로 눈에 띈다. `primary-strong` 위 흰 글자 5.24:1(AA).
+     🚫 장식(풍경·빈 삽화)에 쓰지 않는다 — 주 색은 **누를 수 있는 것**의 신호다. 장식은 `hill-*` 이다. */
+  --color-primary: #1f9a74;
+  --color-primary-strong: #0f7a57;
+  --color-primary-deep: #0a5a40; /* 주 버튼 아래 립 */
+  --color-primary-soft: #bfe5d4;
+  --color-primary-tint: #e6f4ec;
+  --color-surface: #f4efe4;
+  --color-surface-raised: #fffdf8;
+  --color-line: #ddd6c7;
+  --color-paper-line: #e9e1d3;
+  /* 진행 막대·선택 칩 — 주 동작과 같은 계열. */
+  --color-accent-a: #1f9a74;
+  --color-accent-a-strong: #0f7a57;
+  --color-accent-a-soft: #e6f4ec;
+  --color-accent-b: #b78365;
+  --color-accent-b-strong: #82563d;
+  --color-accent-b-soft: #f3e8dc;
+  --color-ink: #343d32;
+  --color-ink-muted: #66705f;
+  --color-gold: #e5c17b;
+  --color-gold-strong: #856329;
+  --color-night: #263e32;
+  --color-night-strong: #1c3024;
+  --color-magic: #bba06d;
+  --color-magic-strong: #53684a;
+  --color-danger: #c25544;
+  --color-danger-strong: #963a2e;
+  --color-danger-soft: #fae7e1;
+  --color-hill-1: #d5e2c8;
+  --color-hill-2: #9cb38c;
+  --color-book-cover: #53684a;
+  --color-book-cover-strong: #354b38;
   --color-paper: #fbf7ec;
-  --color-paper-edge: #ecd9b6;
-  --color-paper-edge-strong: #d3b68a;
-
-  /* ⭐ 버튼은 pill 이 아니라 16px 라운드 사각형이다 (듀오링고 실측: 12~16px).
-     `rounded-btn` 으로 쓴다. `--radius-pill` 은 탭·칩·배지에만 남긴다. */
-  --radius-btn: 1rem;
-  --radius-card: 1rem;
+  --color-paper-edge: #e2d5b9;
+  --color-paper-edge-strong: #bca477;
+  --radius-btn: 0.875rem;
+  --radius-card: 1.5rem;
   --radius-pill: 9999px;
 
   /* 터치 타깃 최소 크기. WCAG 권장(44px)보다 큰 이유는 **아이 손가락이 대상**이기 때문이다.
@@ -72,9 +68,7 @@ body {
 
 body {
   margin: 0;
-  /* 🚫 primary-tint 를 쓰지 않는다 — 주색이 초록이라 배경이 초록으로 깔린다.
-     배경 일러스트(StoryBackground)가 하늘을 그리므로 바탕은 중립이어야 한다. */
-  background: var(--color-surface);
+  background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
@@ -136,4 +130,35 @@ html[data-reader="immersive"] [data-app-header] {
  */
 body:has(dialog[open]) {
   overflow: hidden;
+}
+
+/* JS에서만 읽는 풍경 변수는 Tailwind의 사용량 기반 theme 생성 밖에 둔다. */
+:root {
+  --app-header-height: 77px;
+  --color-scene-sky: #72b4d8;
+  --color-scene-leaf: #d7edc2;
+}
+@media (max-width: 639px) { :root { --app-header-height: 125px; } }
+::selection { background: var(--color-primary-soft); color: var(--color-night); }
+html { scrollbar-color: var(--color-paper-edge-strong) var(--color-paper); }
+
+.story-backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: var(--color-paper); }
+.story-backdrop::before, .story-backdrop::after { content: ""; position: absolute; width: 85%; height: 22%; bottom: -15%; border-radius: 50%; background: color-mix(in srgb, var(--color-hill-1) 42%, var(--color-paper)); }
+.story-backdrop::before { left: -28%; transform: rotate(9deg); }
+.story-backdrop::after { right: -20%; bottom: -16%; transform: rotate(-8deg); background: color-mix(in srgb, var(--color-paper-edge) 45%, var(--color-paper)); }
+
+@layer components {
+.story-action { text-wrap: balance; text-align: center; line-height: 1.4; }
+.action-primary { background: var(--color-primary-strong); color: var(--color-surface-raised); --btn-lip: var(--color-primary-deep); }
+.action-secondary { border: 1px solid var(--color-line); background: var(--color-surface-raised); color: var(--color-ink); --btn-lip: var(--color-paper-edge); }
+.action-dark { background: var(--color-night); color: var(--color-surface-raised); --btn-lip: var(--color-night-strong); }
+.action-tertiary { color: var(--color-ink-muted); text-underline-offset: 5px; }
+.story-action:not(.action-tertiary) { box-shadow: 0 3px 0 var(--btn-lip), 0 6px 14px color-mix(in srgb, var(--color-night) 7%, transparent); }
+.story-action:not(.action-tertiary):active { transform: translateY(2px); box-shadow: 0 1px 0 var(--btn-lip); }
+@media (hover: hover) {
+  .action-primary:hover, .action-dark:hover { filter: brightness(1.09); }
+  .action-secondary:hover { background: var(--color-paper); }
+  .action-tertiary:hover { color: var(--color-ink); text-decoration: underline; }
+}
+@media (prefers-reduced-motion: reduce) { .story-action:not(.action-tertiary):active { transform: none; } }
 }

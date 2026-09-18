@@ -24,7 +24,7 @@ const CHAT_TITLE = "등장인물에게 물어봐요";
  * 보여야 한다. 배경은 여전히 inert 라 누르면 닫힌다(아래 `onClick`) — 딤이 없어도 닫힘 경로는 같다.
  */
 const DIALOG_BASE =
-  "m-0 border-2 border-primary bg-surface-raised p-0 text-ink shadow-xl backdrop:bg-transparent open:flex open:flex-col";
+  "m-0 border border-paper-edge bg-paper p-0 text-ink shadow-xl backdrop:bg-transparent open:flex open:flex-col";
 
 /** 🚫 클래스를 컴포넌트 안에 흩지 않는다 — 후보를 지울 때 한 줄씩 찾아다니게 된다. */
 const DIALOG_CLASS: Record<"sheet" | "modal", string> = {
@@ -132,7 +132,7 @@ export function ChatSurface({
     return (
       <aside
         aria-labelledby={titleId}
-        className="flex max-h-[calc(100dvh-2rem)] w-full min-w-0 shrink-0 flex-col rounded-card border-2 border-primary bg-surface-raised md:sticky md:top-4 md:w-[24rem]"
+        className="flex max-h-[calc(100dvh-2rem)] w-full min-w-0 shrink-0 flex-col rounded-card border border-paper-edge bg-surface-raised md:sticky md:top-4 md:w-[24rem]"
       >
         <SurfaceBody titleId={titleId} onClose={onClose} closeDisabled={closeDisabled}>
           {children}

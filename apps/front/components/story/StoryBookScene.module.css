@@ -1,0 +1,44 @@
+.ornament { display: inline-block; max-width: 100%; }
+.scene { position: relative; display: block; width: 260px; max-width: 100%; height: 194px; perspective: 750px; }
+.shadow { position: absolute; left: 22px; right: 8px; bottom: 15px; height: 34px; border-radius: 50%; background: color-mix(in srgb, var(--color-book-cover) 12%, transparent); transform: rotate(-9deg); }
+.book { position: absolute; width: 228px; height: 150px; left: 16px; bottom: 20px; transform: rotateX(51deg) rotateZ(-14deg); transform-style: preserve-3d; transition: transform 420ms cubic-bezier(.16,1,.3,1); }
+.leftPage, .rightPage { position: absolute; top: 0; width: 50%; height: 100%; border: 3px solid var(--color-book-cover); border-bottom-width: 7px; background: var(--color-paper); box-shadow: 0 3px 0 var(--color-paper-edge), 0 6px 0 var(--color-paper), 0 9px 0 var(--color-book-cover-strong); transition: transform 480ms cubic-bezier(.16,1,.3,1); transform-style: preserve-3d; }
+.leftPage { left: 0; border-radius: 9px 2px 2px 9px; transform-origin: right center; transform: rotateY(12deg); }
+.rightPage { right: 0; border-radius: 2px 9px 9px 2px; transform-origin: left center; transform: rotateY(-12deg); }
+.scene[data-open="false"] .leftPage { transform: rotateY(72deg); }
+.scene[data-open="false"] .rightPage { transform: rotateY(-72deg); }
+.lines { position: absolute; inset: 35px 19px 27px 15px; border-block: 2px solid var(--color-paper-edge); background: repeating-linear-gradient(transparent 0 12px, var(--color-paper-edge) 12px 14px); opacity: .65; }
+.path { position: absolute; inset: 30px 20px 10px 5px; border: 11px solid var(--color-paper-edge); border-left-color: transparent; border-radius: 50%; transform: rotate(-30deg); }
+.fold { position: absolute; left: calc(50% - 3px); width: 6px; height: 100%; background: var(--color-paper-edge); }
+.landscape { position: absolute; width: 170px; height: 102px; left: 30px; bottom: 30px; transform-origin: bottom center; transform: rotateX(-76deg); transform-style: preserve-3d; transition: transform 480ms cubic-bezier(.16,1,.3,1), opacity 220ms; }
+.scene[data-open="false"] .landscape { transform: rotateX(0deg) scaleY(.2); opacity: 0; }
+.castle { position: absolute; width: 64px; height: 56px; bottom: 0; left: 62px; background: var(--color-paper-edge); border: 2px solid var(--color-paper-edge-strong); box-shadow: 5px 3px 0 color-mix(in srgb, var(--color-paper-edge-strong) 55%, var(--color-paper)); }
+.castle::before { content: ""; position: absolute; width: 18px; height: 30px; left: 21px; bottom: -2px; border-radius: 12px 12px 0 0; background: var(--color-book-cover); }
+.castle span { position: absolute; width: 19px; height: 36px; top: -18px; left: -7px; border: 2px solid var(--color-paper-edge-strong); background: var(--color-paper); }
+.castle span::before { content: ""; position: absolute; inset: -25px -6px auto; height: 26px; background: var(--color-book-cover); clip-path: polygon(50% 0,100% 100%,0 100%); }
+.castle span:nth-child(2) { left: 22px; top: -36px; }
+.castle span:nth-child(3) { left: auto; right: -7px; }
+.tree { position: absolute; bottom: 0; left: 16px; width: 8px; height: 40px; border-radius: 3px; background: var(--color-paper-edge-strong); }
+.tree::before { position: absolute; content: ""; width: 41px; height: 54px; bottom: 17px; left: -17px; border-radius: 52% 48% 45% 44%; background: var(--color-hill-1); box-shadow: inset -9px -4px 0 var(--color-hill-2); }
+.smallTree { left: auto; right: 2px; transform: scale(.72); transform-origin: bottom; }
+.ribbon { position: absolute; width: 13px; height: 40px; left: 120px; bottom: -34px; background: var(--color-accent-b); clip-path: polygon(0 0,100% 0,100% 100%,50% 80%,0 100%); }
+.pageMarks { position: absolute; display: flex; gap: 6px; left: 50%; bottom: -7px; transform: translateX(-50%); }
+.pageMarks i { width: 19px; height: 7px; border-radius: 2px; background: var(--color-line); transition: background-color 250ms; }
+.pageMarks i[data-filled="true"] { background: var(--color-primary); }
+
+.scene[data-open="true"] .leftPage { animation: unfoldLeft 900ms cubic-bezier(.16,1,.3,1); }
+.scene[data-open="true"] .rightPage { animation: unfoldRight 900ms cubic-bezier(.16,1,.3,1); }
+.scene[data-open="true"] .landscape { animation: unfoldLandscape 900ms cubic-bezier(.16,1,.3,1); }
+@keyframes unfoldLeft { from { transform: rotateY(68deg); } to { transform: rotateY(12deg); } }
+@keyframes unfoldRight { from { transform: rotateY(-68deg); } to { transform: rotateY(-12deg); } }
+@keyframes unfoldLandscape { 0%, 15% { transform: rotateX(0deg) scaleY(.2); opacity: 0; } 100% { transform: rotateX(-76deg); opacity: 1; } }
+@media (hover: hover) and (pointer: fine) {
+  .ornament:hover .book { transform: rotateX(44deg) rotateZ(-10deg) translateY(-4px); }
+  .ornament:hover .landscape { transform: rotateX(-82deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .leftPage, .rightPage, .landscape, .pageMarks i, .book { transition: none; }
+  .scene[data-open="true"] .leftPage, .scene[data-open="true"] .rightPage, .scene[data-open="true"] .landscape { animation: none; }
+  .ornament:hover .book { transform: rotateX(51deg) rotateZ(-14deg); }
+  .ornament:hover .landscape { transform: rotateX(-76deg); }
+}
