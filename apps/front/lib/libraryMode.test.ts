@@ -5,6 +5,7 @@ describe("libraryMode", () => {
   it("mode 값이 정확히 create인 경우만 제작 모드로 판정한다", () => {
     expect(isLibraryCreateMode("create")).toBe(true);
     expect(isLibraryCreateMode(undefined)).toBe(false);
+    expect(isLibraryCreateMode(null)).toBe(false);
     expect(isLibraryCreateMode("trial")).toBe(false);
     expect(isLibraryCreateMode(["create"])).toBe(false);
     expect(isLibraryCreateMode(["create", "trial"])).toBe(false);
