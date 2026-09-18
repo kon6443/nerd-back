@@ -113,8 +113,6 @@ export const envSchema = dbEnvSchema.extend({
     .optional(),
   /** AI 이미지 생성 어댑터 공급자 (mock | openrouter) */
   IMAGE_PROVIDER: z.enum(['mock', 'openrouter']).default('mock'),
-  /** 실제 얼굴 직접 주입 테스트 모드 ('true' | 'false') */
-  DIRECT_FACE_MODE: z.enum(['true', 'false']).default('false'),
   /** OpenRouter API 키 */
   OPENROUTER_API_KEY: optionalText,
   /** 등장인물 대화 모델. 이미지 생성 모델과 독립적으로 설정한다. */

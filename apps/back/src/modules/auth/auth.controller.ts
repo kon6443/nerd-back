@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Post, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -125,5 +125,24 @@ export class AuthController {
     // 가드가 통과시킨 요청에서만 도달하므로 user 는 항상 있다.
     const data: Me = { loginId: user!.loginId };
     return { code: SUCCESS_CODE, data, message: '' };
+  }
+
+  @Delete('me')
+  @UseGuards(AuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: '회원 탈퇴',
+    description: '사용자의 모든 데이터(세션, 임시 실사, 레퍼런스, 개인화 삽화, 대화 음성)를 영구 삭제하고 탈퇴한다.',
+  })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: '성공' })
+  @ApiCommonUnauthorizedResponse()
+  @ApiCommonThrottledResponse()
+  @ApiCommonInternalServerErrorResponse()
+  async withdraw(
+    @CurrentUser() user: User | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    await this.auth.withdraw(user!.id);
+    res.clearCookie(SESSION_COOKIE, { httpOnly: true, sameSite: 'lax', path: '/' });
   }
 }

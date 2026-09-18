@@ -35,6 +35,7 @@ export default function CapturePage({ params }: PageProps) {
   const [result, setResult] = useState<UploadFaceResponse | null>(null);
   const [existingSession, setExistingSession] = useState<MyStorySessionItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isStartingStory, setIsStartingStory] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -385,7 +386,7 @@ export default function CapturePage({ params }: PageProps) {
           <div className="relative h-56 w-56 overflow-hidden rounded-card border-4 border-white shadow-md">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={result.referenceImageUrl}
+              src={result.referenceImageUrl ?? photo?.previewUrl ?? ""}
               alt="내 얼굴로 만든 동화 주인공"
               decoding="async"
               className="h-full w-full object-cover"
@@ -396,12 +397,24 @@ export default function CapturePage({ params }: PageProps) {
           </p>
 
           <div className="flex w-full flex-col gap-3">
-            <Link
-              href={`/stories/${slug}/read?sessionId=${result.id}&autoStart=true`}
-              className={actionClass("primary", "w-full")}
+            <button
+              type="button"
+              disabled={isStartingStory}
+              onClick={() => {
+                setIsStartingStory(true);
+                router.push(`/stories/${slug}/read?sessionId=${result.id}&autoStart=true`);
+              }}
+              className={actionClass("primary", "w-full flex items-center justify-center gap-2")}
             >
-              나의 동화 만들기
-            </Link>
+              {isStartingStory ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  동화책을 펼치는 중...
+                </>
+              ) : (
+                "나의 동화 만들기"
+              )}
+            </button>
             <button
               type="button"
               onClick={() => {

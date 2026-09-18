@@ -40,9 +40,19 @@ function createStores() {
         rows.push(row);
         return Promise.resolve(row);
       },
-      findOne: ({ where }: { where: { loginId: string } }) =>
-        Promise.resolve(rows.find((r) => r.loginId === where.loginId) ?? null),
+      findOne: ({ where }: { where: { loginId?: string; id?: number } }) =>
+        Promise.resolve(
+          rows.find((r) =>
+            where.id !== undefined ? r.id === where.id : r.loginId === where.loginId,
+          ) ?? null,
+        ),
       findOneBy: ({ id }: { id: number }) => Promise.resolve(rows.find((r) => r.id === id) ?? null),
+      delete: (criteria: { id?: number } | number) => {
+        const targetId = typeof criteria === 'number' ? criteria : criteria.id;
+        const idx = rows.findIndex((r) => r.id === targetId);
+        if (idx >= 0) rows.splice(idx, 1);
+        return Promise.resolve({ affected: 1 });
+      },
     },
     rowCount: () => rows.length,
   };
@@ -248,6 +258,27 @@ describe('인증 (E2E)', () => {
 
     it('쿠키 없이도 204 다 — 멱등이라 재시도가 안전하다', async () => {
       await request(server(app)).post(`/${API_PREFIX}/auth/logout`).expect(204);
+    });
+  });
+
+  describe('회원 탈퇴 (DELETE /auth/me)', () => {
+    it('인증된 사용자의 계정을 삭제하고 204와 쿠키 파기를 반환한다 ⭐', async () => {
+      const created = await signup();
+      const cookie = created.headers['set-cookie'];
+
+      const res = await request(server(app))
+        .delete(`/${API_PREFIX}/auth/me`)
+        .set('Cookie', cookie)
+        .expect(204);
+
+      const cleared = (res.headers['set-cookie'] as unknown as string[]).join(';');
+      expect(cleared).toContain('sid=;');
+      expect(cleared).toContain('Path=/');
+      expect(stores.rowCount()).toBe(0);
+    });
+
+    it('인증 쿠키가 없으면 401 이다', async () => {
+      await request(server(app)).delete(`/${API_PREFIX}/auth/me`).expect(401);
     });
   });
 });

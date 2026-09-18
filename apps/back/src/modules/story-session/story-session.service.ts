@@ -1,9 +1,10 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Transactional } from 'typeorm-transactional';
 import { randomUUID } from 'node:crypto';
+import { AuthService } from '@modules/auth/auth.service';
 import { StorySession } from '@entities/story-session.entity';
 import { StoryTemplate, STORY_TEMPLATE_STATUS } from '@entities/story-template.entity';
 import { StoryPage } from '@entities/story-page.entity';
@@ -31,6 +32,8 @@ import { validateImageBuffer } from '../../common/utils/image-validator';
 import { isMysqlDuplicateKey } from '@common/utils/is-mysql-duplicate-key';
 import { createLogThrottle } from '@common/utils/log-throttle';
 import { NOTIFICATION_PORT, type NotificationPort } from '@common/port/notification.port';
+import { StorageCleanupService } from '../../common/storage/storage-cleanup.service';
+import { StoryPageChat } from '@entities/story-page-chat.entity';
 import type {
   PersonalizeSessionResponse,
   RetryPageResponse,
@@ -64,7 +67,7 @@ const STALE_RUNNING_MS = 10 * 60 * 1000;
 const PIPELINE_ABORTED_MESSAGE = '만들기가 중단됐어요. 다시 시도해 주세요.';
 
 @Injectable()
-export class StorySessionService {
+export class StorySessionService implements OnModuleInit {
   private readonly logger = new Logger(StorySessionService.name);
   /** 서명 URL 실패 로그 억제기 — 폴링 경로에서 불리므로 간격 제한이 필수다. */
   private readonly presignFailLog = createLogThrottle(60_000);
@@ -100,7 +103,22 @@ export class StorySessionService {
     @Optional()
     @Inject(NOTIFICATION_PORT)
     private readonly notifications?: NotificationPort,
+    @Optional()
+    private readonly cleanupService?: StorageCleanupService,
+    @Optional()
+    @InjectRepository(StoryPageChat)
+    private readonly pageChatRepo?: Repository<StoryPageChat>,
+    @Optional()
+    private readonly authService?: AuthService,
   ) {}
+
+  onModuleInit(): void {
+    if (this.authService) {
+      this.authService.registerCleanupHandler(async (userId: number) => {
+        await this.deleteAllUserSessions(userId);
+      });
+    }
+  }
 
   /**
    * 페이지 한 장을 이 프로세스가 처리하겠다고 **원자적으로** 선언한다.
@@ -431,19 +449,32 @@ export class StorySessionService {
    * ⚠️ **스토리지 삭제는 트랜잭션 밖이다.** 안에 두면 DB 커밋 **전에** 객체가 지워져,
    * 커밋이 실패했을 때 세션 행은 살아 있는데 삽화만 사라진다 — 서재에 동화가 남고
    * 그림이 전부 깨진 상태가 된다. 스토리지는 롤백되지 않으므로 **DB 가 확정된 뒤에만** 지운다.
+   * 삭제 실패 시 영속 정리 작업(cleanupService)에 기록되어 멱등하게 재시도된다.
    */
   async deleteSession(userId: number, sessionId: string): Promise<void> {
     const storageKeys = await this.deleteSessionRows(userId, sessionId);
 
-    // 여기부터는 DB 커밋이 끝났다. 이 정리가 실패해도 되돌릴 것이 없다 —
-    // 남는 객체는 고아일 뿐이고 **지워진 것을 되살리는 쪽이 더 나쁘다.**
-    await Promise.all(
-      storageKeys.map((key) =>
-        this.storagePort.delete(key).catch((error: unknown) => {
-          this.logger.warn(`스토리지 객체 삭제 실패(고아로 남는다): ${key} — ${error}`);
-        }),
-      ),
-    );
+    if (this.cleanupService) {
+      await this.cleanupService.cleanupKeys(storageKeys);
+    } else {
+      await Promise.all(
+        storageKeys.map((key) =>
+          this.storagePort.delete(key).catch((error: unknown) => {
+            this.logger.warn(`스토리지 객체 삭제 실패(고아로 남는다): ${key} — ${error}`);
+          }),
+        ),
+      );
+    }
+  }
+
+  /**
+   * 사용자의 모든 세션과 개인 스토리지 객체를 삭제한다 (회원 탈퇴용).
+   */
+  async deleteAllUserSessions(userId: number): Promise<void> {
+    const sessions = await this.sessionRepo.find({ where: { userId } });
+    for (const session of sessions) {
+      await this.deleteSession(userId, session.id);
+    }
   }
 
   /**
@@ -459,19 +490,27 @@ export class StorySessionService {
       throw new SessionNotFoundErrorResponseDto();
     }
 
-    // 지울 스토리지 키를 **행을 지우기 전에** 모아 둔다. 지운 뒤에는 무엇을 지워야 할지
-    // 알 수 없어 객체가 고아로 남는다 — 사용자가 "다른 얼굴로 다시 만들기" 를 눌러도
-    // 이전 얼굴에서 파생된 이미지가 스토리지에 계속 보관된다.
+    // 지울 스토리지 키를 **행을 지우기 전에** 모아 둔다.
+    // 1. 실사 원본 (임시 보관 중인 경우)
+    // 2. AI 레퍼런스 이미지
+    // 3. 생성된 개인화 삽화들
+    // 4. 캐릭터 대화 음성 MP3들
     const pageImages = await this.pageImageRepo.find({ where: { sessionId } });
+    const pageChats = this.pageChatRepo
+      ? await this.pageChatRepo.find({ where: { sessionId } })
+      : [];
+
     const storageKeys = [
+      session.sourcePhotoKey,
       session.referenceImageKey,
       ...pageImages.map((img) => img.imageKey),
-    ].filter((key): key is string => typeof key === 'string' && key.length > 0);
+      ...pageChats.map((chat) => chat.replyAudioKey),
+    ].filter((key): key is string => typeof key === 'string' && key.trim().length > 0);
 
     // 1. 해당 세션의 페이지 이미지 레코드 삭제
     await this.pageImageRepo.delete({ sessionId });
 
-    // 2. 세션 레코드 삭제
+    // 2. 세션 레코드 삭제 (story_page_chats 등은 FK CASCADE 처리됨)
     await this.sessionRepo.delete({ id: sessionId });
 
     this.logger.log(`동화 세션 삭제 완료: ${sessionId} (사용자 ${userId})`);
@@ -522,47 +561,38 @@ export class StorySessionService {
       throw new StoryAlreadyCompletedErrorResponseDto();
     }
 
-    // 3. 캐릭터 레퍼런스 준비
-    // DIRECT_FACE_MODE=true 인 경우 (테스트 모드): AI 1차 캐릭터 생성을 건너뛰고 사용자의 실제 얼굴 사진을 직접 템플릿 합성에 사용
-    let referenceBuffer: Buffer;
-    const isDirectFaceMode =
-      this.configService?.get<string>('DIRECT_FACE_MODE') === 'true' ||
-      process.env.DIRECT_FACE_MODE === 'true';
-
-    if (isDirectFaceMode) {
-      this.logger.log(
-        `[DIRECT_FACE_MODE] 1차 캐릭터 생성을 건너뛰고 실제 얼굴 사진을 직접 레퍼런스로 등록합니다: 세션 ${session.id}`,
-      );
-      referenceBuffer = frontFile.buffer;
-    } else {
-      const template = await this.templateRepo.findOne({ where: { id: session.templateId } });
-      const referenceCostume = this.getCostumePrompt(template?.slug);
-
-      referenceBuffer = await this.imagePort.generateReference({
-        front: frontFile.buffer,
-        left: leftFile?.buffer,
-        right: rightFile?.buffer,
-        characterPrompt: referenceCostume,
-      });
-    }
-
-    // 4. 레퍼런스 이미지 S3/스토리지 업로드
+    // 3. 임시 실사 원본 저장 (temp/source-photo/{sessionId}/{uuid}.{ext})
     const ext =
       frontFile.mimetype?.includes('jpeg') || frontFile.mimetype?.includes('jpg') ? 'jpg' : 'png';
-    const key = `references/${session.id}/${randomUUID()}.${ext}`;
+
+    this.logger.log(
+      `[uploadFace] 실제 얼굴 사진을 임시 원본으로 등록합니다: 세션 ${session.id}`,
+    );
+    const tempKey = `temp/source-photo/${session.id}/${randomUUID()}.${ext}`;
     const s3Key = await this.storagePort.upload(
-      key,
-      referenceBuffer,
+      tempKey,
+      frontFile.buffer,
       frontFile.mimetype || 'image/png',
     );
 
-    // 5. 서명 URL 발급
-    const referenceImageUrl = await this.storagePort.getPresignedUrl(s3Key);
+    const prevKeyToDelete = session.sourcePhotoKey;
+    session.sourcePhotoKey = s3Key;
+    session.referenceImageKey = null;
+    // 명세 3절 5항: 임시 원본에는 어떤 API도 서명 URL 또는 직접 접근 URL을 발급하지 않는다.
+    const referenceImageUrl = null;
 
     // 6. 세션 상태 갱신
     session.status = 'face_ready';
-    session.referenceImageKey = s3Key;
     await this.sessionRepo.save(session);
+
+    // 사진 재업로드(교체) 시 이전 객체 정리 (명세 3절 6항)
+    if (prevKeyToDelete) {
+      if (this.cleanupService) {
+        await this.cleanupService.cleanupKey(prevKeyToDelete);
+      } else {
+        this.storagePort.delete(prevKeyToDelete).catch(() => {});
+      }
+    }
 
     this.logger.log(`얼굴 업로드 및 레퍼런스 등록 완료: 세션 ${session.id}`);
 
@@ -792,12 +822,19 @@ export class StorySessionService {
     // 두 레플리카가 함께 들어와도 유료 생성은 한 번만 일어난다.
     try {
       const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
-      if (!session || !session.referenceImageKey) {
-        this.logger.error(`파이프라인 중단: 세션(${sessionId}) 또는 레퍼런스 이미지 부재`);
+      if (!session) {
+        this.logger.error(`파이프라인 중단: 세션(${sessionId}) 부재`);
         return;
       }
 
-      const refBuffer = await this.storagePort.download(session.referenceImageKey);
+      // 명세 확정: 실사 단일 모드(sourcePhotoKey) 우선 적용, 레거시 세션은 referenceImageKey 폴백
+      const faceKey = session.sourcePhotoKey || session.referenceImageKey;
+      if (!faceKey) {
+        this.logger.error(`파이프라인 중단: 세션(${sessionId}) 레퍼런스/실사 이미지 부재`);
+        return;
+      }
+
+      const refBuffer = await this.storagePort.download(faceKey);
       const templatePages = await this.pageRepo.find({
         where: { templateId: session.templateId },
         order: { pageNo: 'ASC' },
@@ -940,7 +977,14 @@ export class StorySessionService {
       });
       if (!pageImg) return;
 
-      const refBuffer = await this.storagePort.download(session.referenceImageKey);
+      // 명세 확정: 실사 단일 모드(sourcePhotoKey) 우선 적용, 레거시 세션은 referenceImageKey 폴백
+      const faceKey = session.sourcePhotoKey || session.referenceImageKey;
+      if (!faceKey) {
+        this.logger.error(`단일 페이지 재시도 중단: 세션(${sessionId}) 레퍼런스/실사 이미지 부재`);
+        return;
+      }
+
+      const refBuffer = await this.storagePort.download(faceKey);
       try {
         let baseImageBuffer: Buffer | undefined;
         if (tplPage.baseImageKey) {
@@ -1002,8 +1046,20 @@ export class StorySessionService {
 
     if (allSucceeded) {
       session.status = 'completed';
+      const sourcePhotoToDelete = session.sourcePhotoKey;
+      if (sourcePhotoToDelete) {
+        session.sourcePhotoKey = null;
+      }
       await this.sessionRepo.save(session);
-      this.logger.log(`동화 세션 전체 완료 (completed): 세션 ${sessionId}`);
+
+      if (sourcePhotoToDelete) {
+        if (this.cleanupService) {
+          await this.cleanupService.cleanupKey(sourcePhotoToDelete);
+        } else {
+          this.storagePort.delete(sourcePhotoToDelete).catch(() => {});
+        }
+      }
+      this.logger.log(`동화 세션 전체 완료 (completed) 및 임시 실사 원본 삭제: 세션 ${sessionId}`);
     } else {
       const anyFailed = pageImages.some((img) => img.status === 'failed');
       if (anyFailed) {

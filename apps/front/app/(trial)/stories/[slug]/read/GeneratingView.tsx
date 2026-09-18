@@ -1,11 +1,20 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { StoryRoom } from "@/components/layout/StoryRoom";
 import room from "@/components/layout/StoryRoom.module.css";
 import Link from "next/link";
 import { StoryBookScene } from "@/components/story/StoryBookScene";
 import type { SessionPagesResponse, StoryBranchKey } from "@nerd/contracts";
 import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
+
+const MAGIC_MESSAGES = [
+  "아이의 사랑스러운 표정을 동화 속에 쏙 담고 있어요 ✨",
+  "마법 붓으로 동화 속 장면에 알록달록 색채를 입히고 있어요 🎨",
+  "동화나라 친구들이 새로운 주인공을 반갑게 맞이하고 있어요 📖",
+  "세상에 단 하나뿐인 특별한 이야기를 정성스레 엮는 중이에요 🪄",
+  "거의 다 그려졌어요! 조금만 기다려 주시면 마법이 펼쳐져요 🌟",
+];
 
 /**
  * 개인화 제작 현황 — 쪽마다 진행 상태와 단독 재시도를 보여 준다.
@@ -36,6 +45,15 @@ export function GeneratingView({
   canOpenReader: boolean;
   onOpenReader: () => void;
 }) {
+  const [magicMsgIndex, setMagicMsgIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setMagicMsgIndex((prev) => (prev + 1) % MAGIC_MESSAGES.length);
+    }, 3800);
+    return () => clearInterval(timer);
+  }, []);
+
   const total = sessionPages?.totalPages || 7;
   const completed = sessionPages?.completedPages || 0;
   const progressPercent = Math.min(100, Math.round((completed / total) * 100));
@@ -60,6 +78,15 @@ export function GeneratingView({
         </p>
       </div>
 
+      {/* 실시간 마법 진행 메시지 롤링 (멍하니 기다리지 않도록 단계별 피드백) */}
+      {!hasFailed && (
+        <div className="flex min-h-[46px] w-full max-w-md items-center justify-center rounded-card border border-primary/30 bg-primary-soft/50 px-4 py-2.5 text-center text-sm font-semibold text-primary-strong shadow-xs">
+          <span key={magicMsgIndex} className="animate-fade-in transition-all duration-300">
+            {MAGIC_MESSAGES[magicMsgIndex]}
+          </span>
+        </div>
+      )}
+
       {/* 세션 전체 실패는 진행률만으로는 드러나지 않는다 — 명시적으로 말한다. */}
       {hasFailed && (
         <p
@@ -79,18 +106,50 @@ export function GeneratingView({
         </p>
       )}
 
-      {/* 진행률 프로그레스 바 */}
+      {/* 첫 페이지 준비 완료 시 즉시 읽기 가능 배너 */}
+      {canOpenReader && !hasFailed && (
+        <div className="flex w-full max-w-md flex-col items-center gap-2 rounded-card border-2 border-primary bg-primary-soft/60 p-3.5 text-center shadow-sm">
+          <p className="text-sm font-bold text-primary-strong">
+            🎉 앞쪽 이야기가 먼저 준비되었어요!
+          </p>
+          <p className="text-xs text-ink-muted">
+            나머지 장면들이 그려지는 동안 먼저 읽기를 시작할 수 있어요.
+          </p>
+          <button
+            type="button"
+            onClick={onOpenReader}
+            className={actionClass("primary", "w-full py-2.5 text-sm")}
+          >
+            지금 바로 읽으러 가기
+          </button>
+        </div>
+      )}
+
+      {/* 진행률 프로그레스 바 & 예상 시간 */}
       <div className="w-full max-w-md">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-ink-muted">
-          <span>제작 진행률 ({completed}/{total}장)</span>
-          <span>{progressPercent}%</span>
+          <span className="flex items-center gap-1.5">
+            {!hasFailed && completed < total && (
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+            )}
+            제작 진행률 ({completed}/{total}장)
+          </span>
+          <span className="text-primary-strong">{progressPercent}%</span>
         </div>
-        <div role="progressbar" aria-label="동화 제작 진행률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent} className="h-3 w-full overflow-hidden rounded-pill bg-line shadow-inner">
+        <div role="progressbar" aria-label="동화 제작 진행률" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent} className="h-3.5 w-full overflow-hidden rounded-pill bg-line shadow-inner">
           <div
-            className="h-full origin-left rounded-pill bg-primary transition-transform duration-300 ease-out motion-reduce:transition-none"
-            style={{ transform: `scaleX(${progressPercent / 100})` }}
+            className={`h-full origin-left rounded-pill bg-primary transition-transform duration-500 ease-out motion-reduce:transition-none ${!hasFailed && completed < total ? "animate-pulse" : ""}`}
+            style={{ transform: `scaleX(${Math.max(0.04, progressPercent / 100)})` }}
           />
         </div>
+        {!hasFailed && completed < total && (
+          <p className="mt-2 text-right text-[11px] font-medium text-ink-muted">
+            ⏳ 한 권 제작에 약 30초~1분이 걸려요. 잠시만 기다려 주세요!
+          </p>
+        )}
       </div>
 
       {/* 페이지별 진행 단계 카드 리스트 */}
@@ -105,11 +164,16 @@ export function GeneratingView({
               ? `6쪽 비하인드 ${item.branchKey.toUpperCase()}`
               : `${item.pageNo}쪽`;
             const status = item?.status || "pending";
+            const isRunning = status === "running";
 
             return (
               <div
                 key={`${item.branchKey}-${item.pageNo}`}
-                className="rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm"
+                className={`rounded-lg border px-3 py-2.5 text-sm transition-colors ${
+                  isRunning
+                    ? "border-primary/40 bg-primary-soft/20 shadow-xs"
+                    : "border-line bg-surface-raised"
+                }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
@@ -125,11 +189,16 @@ export function GeneratingView({
 
                 <div className="flex flex-wrap items-center gap-2">
                   {status === "succeeded" && (
-                    <span className="font-bold text-primary-strong">✓ 완성</span>
-                  )}
-                  {status === "running" && (
                     <span className="flex items-center gap-1 font-bold text-primary-strong">
-                      <span className="inline-block h-2 w-2 rounded-full bg-primary" />
+                      <span className="inline-block">✓</span> 완성
+                    </span>
+                  )}
+                  {isRunning && (
+                    <span className="flex items-center gap-1.5 font-bold text-primary-strong">
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                      </span>
                       그리는 중...
                     </span>
                   )}
