@@ -33,6 +33,7 @@ import {
   errorRecovery,
   type ErrorRecovery,
 } from "@/lib/api/errorPresentation";
+import { getDemoStoryImageUrl } from "@/lib/demoStoryAssets";
 import {
   ApiError,
   fetchAfterStory,
@@ -328,13 +329,13 @@ function StoryReadContent({ params }: PageProps) {
             pages: pages.map((p) => ({
               pageNo: p.pageNo,
               branchKey: "common",
-              imageUrl: p.baseImageUrl,
+              imageUrl: getDemoStoryImageUrl(slug, demoParam, p.pageNo, p.baseImageUrl),
               status: "succeeded",
               updatedAt: new Date().toISOString(),
             })),
           };
           setSessionPages(demoSessionData);
-          await preloadImages(pages.map((p) => p.baseImageUrl));
+          await preloadImages(demoSessionData.pages.map((p) => p.imageUrl));
           if (!active) return;
 
           if (isLoadingParam) {
