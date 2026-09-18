@@ -10,6 +10,12 @@ vi.mock("@/lib/preloadThumbnailImage", () => ({
   preloadThumbnailImage: vi.fn(),
 }));
 
+// 목록이 진입 연출을 위해 라우터를 쓴다. `renderToString` 에는 App Router 컨텍스트가 없어
+// `useRouter()` 가 "invariant expected app router to be mounted" 로 던진다.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn() }),
+}));
+
 const mockStories: StorySummary[] = [
   {
     slug: "jack",

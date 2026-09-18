@@ -162,3 +162,323 @@ html { scrollbar-color: var(--color-paper-edge-strong) var(--color-paper); }
 }
 @media (prefers-reduced-motion: reduce) { .story-action:not(.action-tertiary):active { transform: none; } }
 }
+
+/*
+ * 서재에서 고른 책이 **세 바퀴 돌고, 펼쳐지고, 그 안으로 들어가는** 진입 연출.
+ *
+ * 홈의 성문 연출(`app/HomeWorld.tsx`)과 같은 3단 구조다 — 제자리에서 연출을 끝까지 돌리고,
+ * 종이색 워시로 화면을 덮은 다음, 그때 라우트를 옮긴다.
+ *
+ *   0 ─ 52%   빙그르르: 닫힌 책이 떠오르며 Y축으로 **세 바퀴**(-1080°). 끝에서 천천히 멎는다
+ *   4 ─ 66%   반짝임: 금빛 별이 책 둘레에서 차례로 터진다
+ *   0 ─ 52%   윤광: 빛줄기가 도는 표지를 **한 바퀴에 한 번씩** 훑는다
+ *  52 ─ 100%  펼침: 표지가 책등을 경첩으로 열리고 첫 쪽 삽화가 드러난다
+ *  48 ─ 100%  진입: 지면이 가속하며 화면을 채운다
+ *  84 ─ 100%  워시: 종이색으로 덮어 다음 화면과의 이음매를 가린다
+ *
+ * ⚠️ **서재 카드를 직접 키우지 않는다.** 목록을 감싼 `.room` 이 `overflow: clip` 이라 확대가
+ *    잘리고, 카드째 키우면 제목·설명·버튼 글자까지 같이 거대해진다. 그래서 JS 가 표지의 위치를
+ *    재서 **`body` 에 포털한 고정 오버레이**에 책만 다시 그린다(`LibraryStoryList.tsx`).
+ *
+ * 🚫 표지를 상세 표지로 이어 붙이는(`view-transition-name`) 방식을 쓰지 않는다. 그건 "이어짐"
+ *    이지 "돌고 펼쳐지고 들어감"이 아니다. 더해서 Turbopack 은 CSS Modules 안의
+ *    `view-transition-name` **값**까지 해싱해 모듈이 다르면 짝이 어긋난다(2026-09-18 실측).
+ */
+.book-enter {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+/* 지면이 화면을 채울 때까지 다가온다. 처음엔 천천히, 뒤로 갈수록 빨라진다 —
+   빨려 들어가는 느낌은 가속에서 온다.
+   perspective 는 카드의 `.cover` 와 **같은 900px** 이다. 다르면 오버레이가 뜨는 순간 기울기가 튄다. */
+.book-enter-stage {
+  position: absolute;
+  perspective: 900px;
+  transform-style: preserve-3d;
+  animation: book-enter-zoom 2200ms cubic-bezier(0.62, 0, 0.86, 0.3) both;
+}
+
+/* 한 바퀴 도는 책 전체. 두께가 있어야 도는 동안 입체로 읽힌다. */
+.book-enter-book {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  animation: book-enter-spin 2200ms linear both;
+}
+
+/* 책 뒤에서 번지는 마법빛. 도는 동안 부풀었다가 펼쳐지며 잦아든다. */
+.book-enter-glow {
+  position: absolute;
+  inset: -55%;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--color-gold) 55%, transparent),
+    color-mix(in srgb, var(--color-magic) 28%, transparent) 55%,
+    transparent 78%
+  );
+  opacity: 0;
+  animation: book-enter-glow 2200ms ease-out both;
+}
+
+/* ── 반짝임 ────────────────────────────────────────────────────────────── */
+
+/*
+ * ⚠️ **무대(`.book-enter-stage`) 밖에 둔다.** 안에 넣으면 확대(최대 8배)에 같이 끌려가
+ * 별이 화면만 한 덩어리가 된다. 여기는 책이 있던 자리에 그대로 머물며 반짝이고,
+ * 책이 다가오는 동안 조용히 꺼진다.
+ */
+.book-enter-sparkles { position: absolute; }
+
+.book-enter-sparkles i {
+  position: absolute;
+  left: var(--sx);
+  top: var(--sy);
+  width: var(--ss);
+  height: var(--ss);
+  margin: calc(var(--ss) / -2) 0 0 calc(var(--ss) / -2);
+  /* 4갈래 별. 동글한 점보다 "반짝"으로 읽힌다. */
+  clip-path: polygon(50% 0%, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0% 50%, 39% 39%);
+  background: radial-gradient(
+    closest-side,
+    var(--color-paper),
+    color-mix(in srgb, var(--color-gold-strong) 80%, var(--color-paper)) 45%,
+    color-mix(in srgb, var(--color-magic-strong) 70%, transparent)
+  );
+  opacity: 0;
+  animation: book-enter-sparkle 2200ms ease-out var(--sd, 0ms) both;
+}
+
+/* ── 첫 쪽 ─────────────────────────────────────────────────────────────── */
+
+/* 표지 아래에 깔린 첫 쪽. 삽화가 아직 안 왔으면 줄 쳐진 빈 종이로 보인다
+   (줄무늬는 `StoryBookScene` 의 속지와 같은 어휘다). */
+.book-enter-page {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  backface-visibility: hidden;
+  border-radius: 2px 9px 9px 2px;
+  background: repeating-linear-gradient(var(--color-paper) 0 13px, var(--color-paper-edge) 13px 15px);
+}
+
+/* 오른쪽으로 삐져나온 책장 두께. 다가오는 동안 얇아지며 시야에서 빠진다. */
+.book-enter-page::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: -3px;
+  right: -9px;
+  width: 10px;
+  border-block: 3px solid var(--color-book-cover-strong);
+  border-radius: 0 3px 3px 0;
+  background: repeating-linear-gradient(90deg, var(--color-paper) 0 2px, var(--color-paper-edge) 2px 3px);
+  transform: rotateY(35deg);
+  transform-origin: left;
+  animation: book-enter-fade-out 2200ms ease-in both;
+}
+
+.book-enter-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 320ms ease-out;
+}
+/* 🚫 삽화 도착을 기다리지 않는다. 늦게 와도 그 자리에서 조용히 떠오른다. */
+.book-enter-art[data-ready="true"] { opacity: 1; }
+
+/* 책등 쪽 접힌 자리. 평평한 사진을 펼쳐진 지면으로 읽히게 하는 건 이 그늘이다. */
+.book-enter-gutter {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 14%;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-book-cover-strong) 42%, transparent), transparent);
+  animation: book-enter-fade-out 2200ms ease-in both;
+}
+
+/* 열리는 표지가 지면에 드리우는 그림자. 표지를 따라 왼쪽으로 쓸려 나간다. */
+.book-enter-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-night) 46%, transparent), transparent 62%);
+  animation: book-enter-shade 2200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── 표지 잎과 뒤표지 ──────────────────────────────────────────────────── */
+
+/* 책등(왼쪽 모서리)을 경첩으로 열린다. 앞면은 표지 그림, 뒷면은 면지다 —
+   90도를 넘으면 앞면이 사라지고 안쪽이 드러나 **진짜 책처럼** 넘어간다. */
+.book-enter-leaf {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  animation: book-enter-open 2200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.book-enter-leaf-face,
+.book-enter-leaf-back,
+.book-enter-shell {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+}
+
+.book-enter-leaf-face {
+  overflow: hidden;
+  border-radius: 3px 8px 8px 3px;
+  border-left: 7px solid var(--color-book-cover-strong);
+  background-color: var(--color-paper);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  box-shadow: 8px 14px 18px color-mix(in srgb, var(--color-book-cover-strong) 20%, transparent);
+}
+
+/* 도는 표지 위를 훑고 지나가는 빛줄기. **한 바퀴에 한 번씩, 세 번** 지나간다
+   (380ms × 3 ≈ 회전 구간). 금박 표지에 비친 조명처럼 보이게 한다. */
+.book-enter-leaf-face::after {
+  content: "";
+  position: absolute;
+  inset: -20% -60%;
+  background: linear-gradient(
+    104deg,
+    transparent 38%,
+    color-mix(in srgb, var(--color-paper) 88%, transparent) 50%,
+    transparent 62%
+  );
+  animation: book-enter-gleam 380ms ease-in-out 3 both;
+}
+
+/* 표지 안쪽 — 색지에 가까운 면지다. */
+.book-enter-leaf-back {
+  transform: rotateY(180deg);
+  border-radius: 8px 3px 3px 8px;
+  border-right: 7px solid var(--color-book-cover-strong);
+  background:
+    linear-gradient(270deg, color-mix(in srgb, var(--color-book-cover) 30%, transparent), transparent 38%),
+    var(--color-paper-edge);
+}
+
+/*
+ * 뒤표지. **한 바퀴 도는 동안 뒤가 비어 보이지 않게 하는 면**이다.
+ * 180° 지점에서는 z 가 뒤집혀 `translateZ(-12px)` 인 이 면이 가장 앞에 온다 — 그래서
+ * 면지가 아니라 표지가 보인다. 🚫 빼면 책이 종잇장처럼 속이 비쳐 보인다.
+ */
+.book-enter-shell {
+  transform: rotateY(180deg) translateZ(12px);
+  border-radius: 8px 3px 3px 8px;
+  border-right: 7px solid var(--color-book-cover-strong);
+  background: linear-gradient(255deg, var(--color-book-cover-strong), var(--color-book-cover) 55%);
+}
+
+/* 마지막에 종이색으로 덮어 다음 화면과의 이음매를 가린다(홈의 `entryWash` 와 같은 역할). */
+.book-enter-wash {
+  position: absolute;
+  inset: 0;
+  background: var(--color-paper);
+  opacity: 0;
+  animation: book-enter-wash 2200ms linear both;
+}
+
+/*
+ * 오버레이가 책을 대신 그리므로 원래 목록은 물러난다.
+ * 🚫 `pointer-events` 를 같이 끄지 않으면 **투명해진 링크를 계속 누를 수 있다** — 보이지 않는
+ *    버튼을 누르는 셈이라 연출 도중 엉뚱한 동화로 넘어간다.
+ */
+.book-enter-source {
+  pointer-events: none;
+  animation: book-enter-dim 320ms ease-out both;
+}
+
+/*
+ * 빙그르르 — 떠오르며 **세 바퀴**(-1080°). 52% 에서 제자리로 돌아와 펼침으로 넘어간다.
+ * ⚠️ **등속으로 돌리지 않는다.** 앞은 성기게, 뒤는 촘촘하게 각도를 박아 **천천히 시작해
+ *    중간에 가장 빠르고 끝에서 스스로 멎게** 했다 — `linear` 타이밍에 키프레임으로 완급을
+ *    넣은 것이라 구간마다 속도를 따로 고를 수 있다. 세 바퀴를 등속으로 돌리면 팽이가 된다.
+ */
+@keyframes book-enter-spin {
+  0%   { transform: translateY(0) rotateY(0deg); }
+  6%   { transform: translateY(-9px) rotateY(-62deg); }
+  14%  { transform: translateY(-17px) rotateY(-246deg); }
+  22%  { transform: translateY(-19px) rotateY(-462deg); }
+  30%  { transform: translateY(-17px) rotateY(-678deg); }
+  38%  { transform: translateY(-12px) rotateY(-867deg); }
+  45%  { transform: translateY(-6px) rotateY(-1012deg); }
+  49%  { transform: translateY(-2px) rotateY(-1062deg); }
+  52%  { transform: translateY(0) rotateY(-1080deg); }
+  100% { transform: translateY(0) rotateY(-1080deg); }
+}
+
+/* 펼침 — 도는 동안은 닫혀 있다가 52% 부터 열린다. */
+@keyframes book-enter-open {
+  0%, 52% { transform: rotateY(-2deg); }
+  58%     { transform: rotateY(-14deg); }
+  100%    { transform: rotateY(-168deg); }
+}
+@keyframes book-enter-gleam {
+  0%   { transform: translateX(-70%); opacity: 0; }
+  35%  { opacity: 1; }
+  100% { transform: translateX(70%); opacity: 0; }
+}
+@keyframes book-enter-glow {
+  0%      { opacity: 0; transform: scale(0.75); }
+  20%     { opacity: 1; transform: scale(1.05); }
+  50%     { opacity: 0.8; transform: scale(1); }
+  75%,100%{ opacity: 0; transform: scale(0.9); }
+}
+/* 별 하나의 생애. 요소마다 `--sd` 로 시작 시각을 어긋내 차례로 터지게 한다. */
+@keyframes book-enter-sparkle {
+  0%, 6%  { opacity: 0; transform: scale(0.2) rotate(0deg); }
+  14%     { opacity: 1; transform: scale(1) rotate(35deg); }
+  30%     { opacity: 0.85; transform: scale(0.72) rotate(80deg); }
+  46%     { opacity: 0; transform: scale(0.25) rotate(120deg); }
+  100%    { opacity: 0; transform: scale(0.2) rotate(120deg); }
+}
+@keyframes book-enter-shade {
+  0%, 52% { opacity: 0.9; transform: translateX(0); }
+  76%     { opacity: 0.4; }
+  100%    { opacity: 0; transform: translateX(-46%); }
+}
+@keyframes book-enter-zoom {
+  0%, 38% { transform: translate3d(0, 0, 0) scale(1); }
+  48%     { transform: translate3d(0, 0, 0) scale(1.06); }
+  100%    { transform: translate3d(var(--book-x, 0), var(--book-y, 0), 0) scale(var(--book-scale, 8)); }
+}
+@keyframes book-enter-fade-out {
+  0%, 58% { opacity: 1; }
+  100%    { opacity: 0; }
+}
+@keyframes book-enter-wash {
+  0%, 84% { opacity: 0; }
+  100%    { opacity: 1; }
+}
+@keyframes book-enter-dim { to { opacity: 0; } }
+
+/*
+ * 🚫 여기서 연출을 끄는 것으로 끝내지 않는다 — `prefers-reduced-motion` 이면 JS 가 아예
+ *    시작하지 않아 링크가 평소대로 이동한다. 이 블록은 연출 도중 설정이 바뀌는 경우의 안전망이다.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .book-enter-stage,
+  .book-enter-book,
+  .book-enter-glow,
+  .book-enter-sparkles i,
+  .book-enter-page::after,
+  .book-enter-gutter,
+  .book-enter-shade,
+  .book-enter-leaf,
+  .book-enter-leaf-face::after,
+  .book-enter-wash,
+  .book-enter-source { animation: none; }
+  .book-enter-art { transition: none; }
+  .book-enter-glow,
+  .book-enter-sparkles { display: none; }
+  .book-enter-wash { opacity: 1; }
+}
