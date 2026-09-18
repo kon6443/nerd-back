@@ -63,6 +63,22 @@ describe("AppHeader 네비게이션", () => {
       expect(isActive("/stories/little-prince/capture", "/library")).toBe(false);
     });
 
+    it("시연 모드 동화 읽기 경로(/stories/[slug]/read?demo=female)는 '서재 둘러보기'로 판정된다", () => {
+      const demoParams = mockSearchParams({ demo: "female" });
+      expect(isActive("/stories/red-riding-hood/read", "/library", demoParams)).toBe(true);
+      expect(isActive("/stories/red-riding-hood/read", "/library?mode=create", demoParams)).toBe(false);
+
+      const maleParams = mockSearchParams({ demo: "male" });
+      expect(isActive("/stories/red-riding-hood/read", "/library", maleParams)).toBe(true);
+      expect(isActive("/stories/red-riding-hood/read", "/library?mode=create", maleParams)).toBe(false);
+    });
+
+    it("시연 스튜디오 경로(/stories/[slug]/capture?demo=true)도 '서재 둘러보기'로 판정된다", () => {
+      const demoParams = mockSearchParams({ demo: "true" });
+      expect(isActive("/stories/red-riding-hood/capture", "/library", demoParams)).toBe(true);
+      expect(isActive("/stories/red-riding-hood/capture", "/library?mode=create", demoParams)).toBe(false);
+    });
+
     it("인증 관련 경로(/login, /me)에서는 서재 링크들이 비활성화된다", () => {
       expect(isActive("/login", "/library?mode=create")).toBe(false);
       expect(isActive("/login", "/library")).toBe(false);

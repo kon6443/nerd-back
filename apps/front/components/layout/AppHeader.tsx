@@ -22,9 +22,12 @@ export function isActive(
   if (href === "/") return pathname === "/";
 
   const isCreateMode = isLibraryCreateMode(searchParams?.get("mode"));
+  const isDemo = Boolean(searchParams?.get("demo"));
 
   if (href === "/library?mode=create") {
-    if (pathname.startsWith("/stories/")) return true;
+    if (pathname.startsWith("/stories/")) {
+      return !isDemo;
+    }
     if (pathname === "/library" || pathname.startsWith("/library/")) {
       return isCreateMode;
     }
@@ -32,6 +35,9 @@ export function isActive(
   }
 
   if (href === "/library") {
+    if (pathname.startsWith("/stories/")) {
+      return isDemo;
+    }
     if (pathname === "/library" || pathname.startsWith("/library/")) {
       return !isCreateMode;
     }

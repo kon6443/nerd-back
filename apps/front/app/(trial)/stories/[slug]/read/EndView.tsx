@@ -8,6 +8,7 @@ import { StoryIcon } from "@/components/ui/StoryIcon";
 import NextImage from "next/image";
 import type { SessionPagesResponse } from "@nerd/contracts";
 import { actionClass } from "@/components/ui/actionStyles";
+import { useSession } from "@/lib/api/useSession";
 
 /** 완독 축하. 표지는 1쪽 삽화를 그대로 쓴다 — 별도 표지 이미지는 없다. */
 export function EndView({
@@ -21,6 +22,13 @@ export function EndView({
   isDemo?: boolean;
   storySlug?: string;
 }) {
+  const session = useSession();
+  const isAuthenticated = session.status === "authenticated";
+  const capturePath = `/stories/${storySlug || ""}/capture`;
+  const primaryActionHref = isAuthenticated
+    ? capturePath
+    : `/login?redirect=${encodeURIComponent(capturePath)}`;
+
   const coverImage = sessionPages?.pages.find((p) => p.pageNo === 1)?.imageUrl;
 
   return (
@@ -58,11 +66,16 @@ export function EndView({
       {isDemo ? (
         <div className="flex w-full flex-col gap-3">
           <Link
-            href={`/stories/${storySlug || ""}/capture`}
+            href={primaryActionHref}
             className={actionClass("primary", "w-full text-base font-bold")}
           >
             지금 내 사진으로 진짜 동화 만들기
           </Link>
+          {!isAuthenticated && (
+            <p className="-mt-1 text-center text-xs text-ink-muted">
+              로그인 후 바로 내 사진으로 세상에 하나뿐인 동화를 만들 수 있어요.
+            </p>
+          )}
           <button onClick={onRestart} className={actionClass("secondary", "w-full")}>
             처음부터 다시 읽기
           </button>

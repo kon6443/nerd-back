@@ -1,27 +1,27 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { StoryRoom } from "@/components/layout/StoryRoom";
-import room from "@/components/layout/StoryRoom.module.css";
-import { StoryBookOrnament } from "@/components/story/StoryBookScene";
-import { StoryIcon } from "@/components/ui/StoryIcon";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/Badge";
-import { Card } from "@/components/ui/Card";
-import { ActionLink } from "@/components/ui/ActionLink";
-import { actionClass } from "@/components/ui/actionStyles";
-import { SESSION_STAGE_BADGE, classifySessionStatus } from "@/components/story/sessionStatus";
-import { ApiError, deleteSession, getMySessions } from "@/lib/api";
-import { logout } from "@/lib/api/auth";
-import { useSession } from "@/lib/api/useSession";
-import type { MyStorySessionItem } from "@nerd/contracts";
+import Link from 'next/link';
+import { StoryRoom } from '@/components/layout/StoryRoom';
+import room from '@/components/layout/StoryRoom.module.css';
+import { StoryBookOrnament } from '@/components/story/StoryBookScene';
+import { StoryIcon } from '@/components/ui/StoryIcon';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/Badge';
+import { Card } from '@/components/ui/Card';
+import { ActionLink } from '@/components/ui/ActionLink';
+import { actionClass } from '@/components/ui/actionStyles';
+import { SESSION_STAGE_BADGE, classifySessionStatus } from '@/components/story/sessionStatus';
+import { ApiError, deleteSession, getMySessions } from '@/lib/api';
+import { logout } from '@/lib/api/auth';
+import { useSession } from '@/lib/api/useSession';
+import type { MyStorySessionItem } from '@nerd/contracts';
 
 /**
  * 목록 격자. ⭐ **스켈레톤과 실제 목록이 같은 값을 쓰도록 한 곳에 둔다** — 한쪽만 고치면
  * 자리가 어긋나고, 그 어긋남이 곧 깜빡임이다(서재의 `STORY_GRID` 와 같은 이유).
  */
-const SESSION_GRID = "grid grid-cols-1 gap-4 sm:grid-cols-2";
+const SESSION_GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2';
 
 /**
  * 목록이 도착하기 전 자리를 지키는 카드.
@@ -50,7 +50,7 @@ function SessionCardSkeleton() {
 }
 
 /** 제목 줄의 버튼은 좁은 화면에서도 눌릴 크기를 유지한다. */
-const HEADER_ACTION_CLASS = "shrink-0 gap-2";
+const HEADER_ACTION_CLASS = 'shrink-0 gap-2';
 
 export default function MyPage() {
   const router = useRouter();
@@ -59,11 +59,11 @@ export default function MyPage() {
   const [mySessions, setMySessions] = useState<MyStorySessionItem[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
-  const [sessionsError, setSessionsError] = useState("");
+  const [sessionsError, setSessionsError] = useState('');
 
   useEffect(() => {
     if (loggingOut) return;
-    if (session.status === "guest") router.replace("/login?redirect=/me");
+    if (session.status === 'guest') router.replace('/login?redirect=/me');
   }, [session.status, router, loggingOut]);
 
   // ⭐ **세션 확인을 기다리지 않는다.** 기다리면 `GET /auth/me` 다음에 `GET /sessions/my` 가 도는
@@ -81,7 +81,7 @@ export default function MyPage() {
         //    조회 실패를 삼키면 **이미 만든 동화가 사라진 것처럼 보인다.**
         //    401 은 위 effect 가 로그인 화면으로 보내므로 여기서 문구를 띄우지 않는다.
         if (err instanceof ApiError && err.isUnauthorized) return;
-        setSessionsError("동화 목록을 불러오지 못했어요.");
+        setSessionsError('동화 목록을 불러오지 못했어요.');
       })
       .finally(() => {
         if (active) setLoadingSessions(false);
@@ -99,7 +99,7 @@ export default function MyPage() {
       // 서버 세션 정리에 실패해도 화면에서는 로그아웃한다 — `catch` 가 없으면 예외가
       // 그대로 새어 나가 개발 환경에서 오류 오버레이가 뜬다.
     } finally {
-      router.replace("/");
+      router.replace('/');
     }
   }
 
@@ -114,7 +114,7 @@ export default function MyPage() {
       await deleteSession(id);
       setMySessions((prev) => prev.filter((s) => s.id !== id));
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "동화책 삭제에 실패했습니다.");
+      alert(err instanceof Error ? err.message : '동화책 삭제에 실패했습니다.');
     } finally {
       setDeletingSessionId(null);
     }
@@ -124,194 +124,217 @@ export default function MyPage() {
   //    확인 전에 전체 화면 로딩을 보이고 그 뒤 페이지를 통째로 갈아끼우면 새로고침마다 크게 튄다.
   //    🚫 **비어 있는 칸을 두지 않는다** — 값이 들어오는 순간 주변이 밀리면 그것이 곧 깜빡임이다.
   //    사용자 데이터가 들어갈 자리에는 **최종 모양과 같은 크기의 스켈레톤**을 둔다(2026-09-10).
-  const authenticated = session.status === "authenticated";
+  const authenticated = session.status === 'authenticated';
   const loading = !authenticated || loadingSessions;
 
   return (
     <StoryRoom className={room.account}>
       <div className={room.accountBody}>
-      <div className={room.accountHeader}>
-        <div><h1>마이페이지</h1><p>나의 모험을 한 권씩 모아 두었어요.</p></div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          // 🚫 확인 전이라고 비활성으로 두지 않는다 — 확인이 끝나는 순간 흐렸다가 진해져 깜빡인다.
-          //    이 화면은 비로그인이면 어차피 로그인으로 보내므로 누를 사람은 로그인한 사용자뿐이다.
-          disabled={loggingOut}
-          className={actionClass("secondary", `${HEADER_ACTION_CLASS} disabled:opacity-60`, "compact")}
-        >
-          {loggingOut ? "로그아웃 중…" : "로그아웃"}
-        </button>
-      </div>
-
-      <Card>
-        <dl className="flex items-center gap-4">
-          <dt className="text-ink-muted">아이디</dt>
-          <dd className="flex min-h-7 items-center text-lg font-bold text-ink">
-            {authenticated ? (
-              session.me.loginId
-            ) : (
-              <span
-                aria-hidden="true"
-                className="inline-block h-5 w-24 animate-pulse rounded bg-line motion-reduce:animate-none"
-              />
+        <div className={room.accountHeader}>
+          <div>
+            <h1>마이페이지</h1>
+            <p>나의 모험을 한 권씩 모아 두었어요.</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            // 🚫 확인 전이라고 비활성으로 두지 않는다 — 확인이 끝나는 순간 흐렸다가 진해져 깜빡인다.
+            //    이 화면은 비로그인이면 어차피 로그인으로 보내므로 누를 사람은 로그인한 사용자뿐이다.
+            disabled={loggingOut}
+            className={actionClass(
+              'secondary',
+              `${HEADER_ACTION_CLASS} disabled:opacity-60`,
+              'compact',
             )}
-          </dd>
-        </dl>
-      </Card>
-
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-2xl font-bold text-ink">내가 만든 동화책</h2>
-          <ActionLink href="/library" variant="secondary" size="compact" className={HEADER_ACTION_CLASS}>
-            <StoryIcon name="book" />서재 가기
-          </ActionLink>
+          >
+            {loggingOut ? '로그아웃 중…' : '로그아웃'}
+          </button>
         </div>
 
-        {loading ? (
-          <>
-            {/* 스켈레톤은 눈으로만 읽히는 신호다. 화면을 못 보는 사용자에게는 이 문구가 그 역할을 한다. */}
-            <p role="status" className="sr-only">
-              동화 목록을 불러오는 중입니다.
-            </p>
-            {/* ⚠️ **한 장만 그린다.** 여러 장을 그려 놓으면 동화를 아직 안 만든 사람에게 없는
+        <Card>
+          <dl className="flex items-center gap-4">
+            <dt className="text-ink-muted">아이디</dt>
+            <dd className="flex min-h-7 items-center text-lg font-bold text-ink">
+              {authenticated ? (
+                session.me.loginId
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-5 w-24 animate-pulse rounded bg-line motion-reduce:animate-none"
+                />
+              )}
+            </dd>
+          </dl>
+        </Card>
+
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl font-bold text-ink">내가 만든 동화책</h2>
+            <ActionLink
+              href="/library?mode=create"
+              variant="secondary"
+              size="compact"
+              className={HEADER_ACTION_CLASS}
+            >
+              <StoryIcon name="book" />
+              서재 가기
+            </ActionLink>
+          </div>
+
+          {loading ? (
+            <>
+              {/* 스켈레톤은 눈으로만 읽히는 신호다. 화면을 못 보는 사용자에게는 이 문구가 그 역할을 한다. */}
+              <p role="status" className="sr-only">
+                동화 목록을 불러오는 중입니다.
+              </p>
+              {/* ⚠️ **한 장만 그린다.** 여러 장을 그려 놓으면 동화를 아직 안 만든 사람에게 없는
                 내용을 약속했다가 안내 카드 하나로 줄어든다 — 그 줄어듦이 곧 깜빡임이다
                 (2026-09-10 실측: 스켈레톤 2장 → 안내 카드 1장). 늘어나는 쪽은 덜 튄다. */}
-            <div className={SESSION_GRID} aria-hidden="true">
-              <SessionCardSkeleton />
-            </div>
-          </>
-        ) : sessionsError ? (
-          // 실패를 "없음" 으로 그리지 않는다 — 만든 동화가 사라진 것처럼 보인다.
-          <Card className="flex flex-col items-center gap-4 py-8 text-center">
-            <p className="text-lg font-bold text-ink">{sessionsError}</p>
-            <p className="text-sm text-ink-muted">잠시 후 다시 시도해 주세요.</p>
-            <button
-              type="button"
-              onClick={() => {
-                setSessionsError("");
-                setLoadingSessions(true);
-                getMySessions()
-                  .then(setMySessions)
-                  .catch(() => setSessionsError("동화 목록을 불러오지 못했어요."))
-                  .finally(() => setLoadingSessions(false));
-              }}
-              className={actionClass("primary")}
-            >
-              다시 불러오기
-            </button>
-          </Card>
-        ) : mySessions.length === 0 ? (
-          <Card className="flex flex-col items-center gap-4 py-8 text-center">
-            <StoryBookOrnament />
-            <p className="text-lg font-bold text-ink">아직 만든 나만의 동화책이 없어요.</p>
-            <p className="text-sm text-ink-muted">
-              서재에서 마음에 드는 동화를 골라 아이의 얼굴로 주인공 동화를 만들어 보세요.
-            </p>
-            <ActionLink href="/library?mode=create" variant="primary" className="gap-2">
-              <StoryIcon name="camera" />첫 동화책 만들기
-            </ActionLink>
-          </Card>
-        ) : (
-          <div className={SESSION_GRID}>
-            {mySessions.map((s) => {
-              const stage = classifySessionStatus(s.status);
-              const isCompleted = stage === "completed";
-              const isGenerating = stage === "generating";
-              const isFailed = stage === "failed";
-              const isDeleting = deletingSessionId === s.id;
-              const badge = SESSION_STAGE_BADGE[stage];
+              <div className={SESSION_GRID} aria-hidden="true">
+                <SessionCardSkeleton />
+              </div>
+            </>
+          ) : sessionsError ? (
+            // 실패를 "없음" 으로 그리지 않는다 — 만든 동화가 사라진 것처럼 보인다.
+            <Card className="flex flex-col items-center gap-4 py-8 text-center">
+              <p className="text-lg font-bold text-ink">{sessionsError}</p>
+              <p className="text-sm text-ink-muted">잠시 후 다시 시도해 주세요.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSessionsError('');
+                  setLoadingSessions(true);
+                  getMySessions()
+                    .then(setMySessions)
+                    .catch(() => setSessionsError('동화 목록을 불러오지 못했어요.'))
+                    .finally(() => setLoadingSessions(false));
+                }}
+                className={actionClass('primary')}
+              >
+                다시 불러오기
+              </button>
+            </Card>
+          ) : mySessions.length === 0 ? (
+            <Card className="flex flex-col items-center gap-4 py-8 text-center">
+              <StoryBookOrnament />
+              <p className="text-lg font-bold text-ink">아직 만든 나만의 동화책이 없어요.</p>
+              <p className="text-sm text-ink-muted">
+                서재에서 마음에 드는 동화를 골라 아이의 얼굴로 주인공 동화를 만들어 보세요.
+              </p>
+              <ActionLink href="/library?mode=create" variant="primary" className="gap-2">
+                <StoryIcon name="camera" />첫 동화책 만들기
+              </ActionLink>
+            </Card>
+          ) : (
+            <div className={SESSION_GRID}>
+              {mySessions.map((s) => {
+                const stage = classifySessionStatus(s.status);
+                const isCompleted = stage === 'completed';
+                const isGenerating = stage === 'generating';
+                const isFailed = stage === 'failed';
+                const isDeleting = deletingSessionId === s.id;
+                const badge = SESSION_STAGE_BADGE[stage];
 
-              const coverUrl = s.thumbnailImageUrl ?? s.referenceImageUrl;
+                const coverUrl = s.thumbnailImageUrl ?? s.referenceImageUrl;
 
-              return (
-                <Card key={s.id} className={`flex flex-col justify-between gap-4 ${room.sessionCard}`}>
-                  <div className="flex gap-4">
-                    {coverUrl ? (
-                      <div className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-line bg-surface ${room.sessionCover}`}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={coverUrl}
-                          alt={s.templateTitle}
-                          loading="lazy"
-                          decoding="async"
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-2xl">
-                        <StoryIcon name="book" className="size-8" />
-                      </div>
-                    )}
-
-                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        {/* 색은 `Badge` 가 톤으로 소유한다. main 이 같은 자리에서 원색 유틸리티를
-                            토큰으로 바꿨고(듀오링고 톤), 그 색 선택을 톤 정의로 옮겼다. */}
-                        <Badge tone={badge.tone}>{badge.label}</Badge>
-                      </div>
-                      <h3 className="truncate text-lg font-bold text-ink">{s.templateTitle}</h3>
-                      <p className="text-xs text-ink-muted">
-                        {new Date(s.createdAt).toLocaleDateString("ko-KR", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
-                    {isCompleted ? (
-                      <Link
-                        href={`/stories/${s.templateSlug}/read?sessionId=${s.id}`}
-                        className={actionClass("primary", "gap-2", "compact")}
-                      >
-                        <StoryIcon name="book" />읽기
-                      </Link>
-                    ) : isGenerating ? (
-                      <Link
-                        href={`/stories/${s.templateSlug}/read?sessionId=${s.id}&autoStart=true`}
-                        className={actionClass("primary", "gap-2", "compact")}
-                      >
-                        <StoryIcon name="clock" />이어보기
-                      </Link>
-                    ) : isFailed ? (
-                      <Link
-                        href={`/stories/${s.templateSlug}/read?sessionId=${s.id}`}
-                        className={actionClass("primary", "gap-2", "compact")}
-                      >
-                        <StoryIcon name="warning" />재시도
-                      </Link>
-                    ) : (
-                      <Link
-                        href={`/stories/${s.templateSlug}/capture`}
-                        className={actionClass("primary", "gap-2", "compact")}
-                      >
-                        <StoryIcon name="camera" />계속 만들기
-                      </Link>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteSession(s.id, s.templateTitle)}
-                      disabled={isDeleting}
-                      className={actionClass(
-                        "secondary",
-                        "gap-2 text-danger-strong disabled:opacity-50",
-                        "compact",
+                return (
+                  <Card
+                    key={s.id}
+                    className={`flex flex-col justify-between gap-4 ${room.sessionCard}`}
+                  >
+                    <div className="flex gap-4">
+                      {coverUrl ? (
+                        <div
+                          className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-line bg-surface ${room.sessionCover}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={coverUrl}
+                            alt={s.templateTitle}
+                            loading="lazy"
+                            decoding="async"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-2xl">
+                          <StoryIcon name="book" className="size-8" />
+                        </div>
                       )}
-                    >
-                      <StoryIcon name="trash" />{isDeleting ? "삭제 중…" : "삭제"}
-                    </button>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </section>
-          </div>
+
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          {/* 색은 `Badge` 가 톤으로 소유한다. main 이 같은 자리에서 원색 유틸리티를
+                            토큰으로 바꿨고(듀오링고 톤), 그 색 선택을 톤 정의로 옮겼다. */}
+                          <Badge tone={badge.tone}>{badge.label}</Badge>
+                        </div>
+                        <h3 className="truncate text-lg font-bold text-ink">{s.templateTitle}</h3>
+                        <p className="text-xs text-ink-muted">
+                          {new Date(s.createdAt).toLocaleDateString('ko-KR', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+                      {isCompleted ? (
+                        <Link
+                          href={`/stories/${s.templateSlug}/read?sessionId=${s.id}`}
+                          className={actionClass('primary', 'gap-2', 'compact')}
+                        >
+                          <StoryIcon name="book" />
+                          읽기
+                        </Link>
+                      ) : isGenerating ? (
+                        <Link
+                          href={`/stories/${s.templateSlug}/read?sessionId=${s.id}&autoStart=true`}
+                          className={actionClass('primary', 'gap-2', 'compact')}
+                        >
+                          <StoryIcon name="clock" />
+                          이어보기
+                        </Link>
+                      ) : isFailed ? (
+                        <Link
+                          href={`/stories/${s.templateSlug}/read?sessionId=${s.id}`}
+                          className={actionClass('primary', 'gap-2', 'compact')}
+                        >
+                          <StoryIcon name="warning" />
+                          재시도
+                        </Link>
+                      ) : (
+                        <Link
+                          href={`/stories/${s.templateSlug}/capture`}
+                          className={actionClass('primary', 'gap-2', 'compact')}
+                        >
+                          <StoryIcon name="camera" />
+                          계속 만들기
+                        </Link>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSession(s.id, s.templateTitle)}
+                        disabled={isDeleting}
+                        className={actionClass(
+                          'secondary',
+                          'gap-2 text-danger-strong disabled:opacity-50',
+                          'compact',
+                        )}
+                      >
+                        <StoryIcon name="trash" />
+                        {isDeleting ? '삭제 중…' : '삭제'}
+                      </button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
     </StoryRoom>
   );
 }

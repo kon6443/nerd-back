@@ -33,6 +33,7 @@ import {
   errorRecovery,
   type ErrorRecovery,
 } from "@/lib/api/errorPresentation";
+import { getDemoStoryImageUrl } from "@/lib/demoStoryAssets";
 import {
   ApiError,
   fetchAfterStory,
@@ -283,12 +284,24 @@ function StoryReadContent({ params }: PageProps) {
    * 리더의 좌우 방향키가 부르는 쪽 이동(`BookPager`).
    * 🚫 6쪽으로 직행시키지 않는다 — A/B 를 고르기 전에는 존재하지 않는 쪽이다.
    *    비하인드는 하단 「비하인드 선택하기」가 여는 선택 화면을 거친다.
+   * 데모 모드에서는 5쪽이 끝이므로 5쪽을 넘어가면 바로 완독 화면(`end`)으로 이동한다.
    */
-  const requestPage = useCallback((pageNo: number) => {
-    if (pageNo >= 6) return;
-    setActiveBranchKey(null);
-    setCurrentPageNo(pageNo);
-  }, []);
+  const requestPage = useCallback(
+    (pageNo: number) => {
+      if (isDemoMode) {
+        if (pageNo > 5) {
+          setViewState("end");
+          return;
+        }
+        setCurrentPageNo(pageNo);
+        return;
+      }
+      if (pageNo >= 6) return;
+      setActiveBranchKey(null);
+      setCurrentPageNo(pageNo);
+    },
+    [isDemoMode],
+  );
 
   const noSessionError =
     !sessionId && !isDemoMode ? "세션 정보가 없습니다. 얼굴 사진을 먼저 등록해 주세요." : "";
@@ -328,13 +341,13 @@ function StoryReadContent({ params }: PageProps) {
             pages: pages.map((p) => ({
               pageNo: p.pageNo,
               branchKey: "common",
-              imageUrl: p.baseImageUrl,
+              imageUrl: getDemoStoryImageUrl(slug, demoParam, p.pageNo, p.baseImageUrl),
               status: "succeeded",
               updatedAt: new Date().toISOString(),
             })),
           };
           setSessionPages(demoSessionData);
-          await preloadImages(pages.map((p) => p.baseImageUrl));
+          await preloadImages(demoSessionData.pages.map((p) => p.imageUrl));
           if (!active) return;
 
           if (isLoadingParam) {
@@ -480,18 +493,23 @@ function StoryReadContent({ params }: PageProps) {
   }
 
   function openBranchScreen() {
+    if (isDemoMode) {
+      setViewState("end");
+      return;
+    }
     narration.suspend();
     setActiveBranchKey(null);
     setViewState("branch");
     void loadAfterStory();
   }
 
+
   useEffect(() => {
-    if (viewState !== "reader" || currentPageNo !== 5 || !sessionId || afterStory) return;
+    if (isDemoMode || viewState !== "reader" || currentPageNo !== 5 || !sessionId || afterStory) return;
     const controller = new AbortController();
     void fetchAfterStory(sessionId, controller.signal).then(setAfterStory, () => undefined);
     return () => controller.abort();
-  }, [afterStory, currentPageNo, sessionId, viewState]);
+  }, [afterStory, currentPageNo, isDemoMode, sessionId, viewState]);
 
   async function handleBranchChoice(branchKey: StoryBranchKey) {
     if (!afterStory) return;
@@ -633,6 +651,20 @@ function StoryReadContent({ params }: PageProps) {
   // 3. 비하인드 이야기 분기 화면 (v-branch)
   // ==========================================
   if (viewState === "branch") {
+    if (isDemoMode) {
+      return (
+        <EndView
+          sessionPages={sessionPages}
+          onRestart={() => {
+            setCurrentPageNo(1);
+            setViewState("reader");
+          }}
+          isDemo={isDemoMode}
+          storySlug={slug}
+        />
+      );
+    }
+
     return (
       <BranchView
         afterStory={afterStory}
@@ -674,7 +706,7 @@ function StoryReadContent({ params }: PageProps) {
   const activeAfterStory = activeBranchKey
     ? afterStory?.choices.find((choice) => choice.branchKey === activeBranchKey)
     : undefined;
-  const totalPages = 6;
+  const totalPages = isDemoMode ? 5 : 6;
 
   // ⭐ **쪽 하나가 아니라 쪽 번호로 조회한다.** 넘김 중에는 떠나는 쪽과 도착 쪽을 동시에 그려야 해서
   //    "현재 쪽" 변수 하나로는 부족하다(`BookPager`).
@@ -710,7 +742,7 @@ function StoryReadContent({ params }: PageProps) {
   // 🚫 클래스를 JSX 안에서 조립하지 않는다 — 후보를 지울 때 조건을 하나씩 찾아다니게 된다.
   //    아래 여백(`pb-28`)은 화면 하단에 붙은 조작 바의 자리다. 없으면 바가 책 아래를 덮는다.
   const mainClass = [
-    "mx-auto flex w-full flex-1 gap-4 px-4 pt-5 pb-28 md:px-8 md:pt-6",
+    "mx-auto flex w-full min-h-0 flex-1 gap-4 px-4 pt-5 pb-28 md:px-8 md:pt-5 md:pb-24",
     readerOptions.immersive ? "max-w-7xl md:h-dvh" : "max-w-5xl",
     dockOpen ? "flex-col md:flex-row" : "flex-col",
   ].join(" ");
@@ -719,11 +751,44 @@ function StoryReadContent({ params }: PageProps) {
     <>
       <main className={mainClass}>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
-        <header className={READER_BAR}>
-          {!isDemoMode && !sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
+        {/* 몰입 끔이면 전역 네비게이션(AppHeader)이 보이고 쪽번호는 하단바에 있으므로
+             제목·쪽번호를 다시 보여 줄 필요가 없다. 제작 현황 버튼만 조건부로 남긴다. */}
+        {readerOptions.immersive ? (
+          <header className={READER_BAR}>
+            {!isDemoMode && !sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
+              <button
+                onClick={() => {
+                  setStatusPinned(true);
+                  setViewState("generating");
+                }}
+                className={actionClass("secondary", "text-sm")}
+              >
+                ← 제작 현황 보기
+              </button>
+            ) : null}
+
+            <h1 className="order-first w-full text-xl font-bold text-balance break-keep wrap-anywhere text-ink md:order-none md:w-auto md:flex-1 md:text-center">
+              {story.title}
+              {isBehindPage && (
+                <span className="ml-2 rounded-pill bg-magic-strong/10 px-2 py-0.5 text-xs text-magic-strong">
+                  비하인드
+                </span>
+              )}
+            </h1>
+
+            {/* 넓은 화면에서는 하단바 가운데가 진행을 보여 준다 — 여기는 좁은 화면(바 가운데가 접힘) 전용.
+                `aria-live` 는 이 한 곳에만 둔다. 바의 숫자까지 읽히면 쪽마다 두 번 읽힌다. */}
+            <p
+              className="rounded-pill bg-surface-raised px-4 py-2 text-sm font-bold text-ink-muted shadow-sm sm:sr-only"
+              aria-live="polite"
+            >
+              {currentPageNo} / {totalPages}
+            </p>
+          </header>
+        ) : !isDemoMode && !sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
+          <div>
             <button
               onClick={() => {
-                // 자동 복귀를 막는다 — 안 그러면 3초 뒤 폴링이 도로 리더로 돌려보낸다.
                 setStatusPinned(true);
                 setViewState("generating");
               }}
@@ -731,32 +796,14 @@ function StoryReadContent({ params }: PageProps) {
             >
               ← 제작 현황 보기
             </button>
-          ) : null}
-
-          <h1 className="order-first w-full text-xl font-bold text-balance break-keep wrap-anywhere text-ink md:order-none md:w-auto md:flex-1 md:text-center">
-            {story.title}
-            {isBehindPage && (
-              <span className="ml-2 rounded-pill bg-magic-strong/10 px-2 py-0.5 text-xs text-magic-strong">
-                비하인드
-              </span>
-            )}
-          </h1>
-
-          {/* 넓은 화면에서는 하단바 가운데가 진행을 보여 준다 — 여기는 좁은 화면(바 가운데가 접힘) 전용.
-              `aria-live` 는 이 한 곳에만 둔다. 바의 숫자까지 읽히면 쪽마다 두 번 읽힌다. */}
-          <p
-            className="rounded-pill bg-surface-raised px-4 py-2 text-sm font-bold text-ink-muted shadow-sm sm:sr-only"
-            aria-live="polite"
-          >
-            {currentPageNo} / {totalPages}
-          </p>
-        </header>
+          </div>
+        ) : null}
 
         {/* 펼친 책 — 시연 리더와 **같은** 넘김 엔진을 쓴다. 하드커버 표지·종이 단면은 `BookVolume` 이 그린다. */}
         <BookPager
           pageNo={currentPageNo}
           pageCount={totalPages}
-          fill={readerOptions.immersive}
+          fill
           onRequestPage={requestPage}
           onTurningChange={setTurning}
           renderArt={(pageNo) => <BookArtContent pageNo={pageNo} imageUrl={imageUrlAt(pageNo)} />}
@@ -867,7 +914,7 @@ function StoryReadContent({ params }: PageProps) {
 
           {/* 오른쪽 — 도구와 앞으로. 가장 오른쪽 끝이 늘 **다음 동작(primary)** 이다. */}
           <div className="flex items-center gap-2 justify-self-end sm:col-start-3">
-            {currentPageNo === 5 ? (
+            {!isDemoMode && currentPageNo === 5 ? (
               // ⚠️ 띄어쓰기는 `gap` 이 만든다. 버튼이 inline-flex 라 글자·span 이 각각 flex 항목이 되어
               //    항목 끝의 공백 문자는 잘린다(「비하인드선택하기→」로 붙어 보였다).
               <button onClick={openBranchScreen} className={actionClass("primary", `gap-1.5 whitespace-nowrap ${BAR_END_BUTTON_WIDTH}`, "compact")}>
