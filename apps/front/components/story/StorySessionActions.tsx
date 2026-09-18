@@ -9,10 +9,13 @@ import { deleteSession, findMySessionBySlug } from "@/lib/api";
 import { useSession } from "@/lib/api/useSession";
 import type { MyStorySessionItem } from "@nerd/contracts";
 import { classifySessionStatus } from "./sessionStatus";
+import { readerHref } from "./readerNav";
 
 interface StorySessionActionsProps {
   slug: string;
   isCreateMode?: boolean;
+  initialSession?: MyStorySessionItem | null;
+  initialLoaded?: boolean;
 }
 
 /**
@@ -22,12 +25,19 @@ interface StorySessionActionsProps {
  * eslint 가 막는다(`setState synchronously within an effect`).
  */
 
-export function StorySessionActions({ slug, isCreateMode = false }: StorySessionActionsProps) {
+export function StorySessionActions({
+  slug,
+  isCreateMode = false,
+  initialSession,
+  initialLoaded,
+}: StorySessionActionsProps) {
   const router = useRouter();
   const authSession = useSession();
-  const [mySession, setMySession] = useState<MyStorySessionItem | null>(null);
+  const [mySession, setMySession] = useState<MyStorySessionItem | null>(initialSession ?? null);
   // `null` 은 "아직 모른다"와 "없다"를 구분하지 못한다. 조회가 끝났는지를 따로 든다.
-  const [sessionsLoaded, setSessionsLoaded] = useState(false);
+  const [sessionsLoaded, setSessionsLoaded] = useState(
+    initialLoaded ?? initialSession !== undefined,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -90,7 +100,7 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
 
     try {
       await deleteSession(currentSession.id);
-      router.push(`/stories/${slug}/capture`);
+      router.push(`/stories/${encodeURIComponent(slug)}/capture`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "동화책 초기화에 실패했습니다.";
       setErrorMsg(msg);
@@ -116,22 +126,21 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               시연 동화 읽기
             </span>
           )
-        ) : !isCreateMode ? (
-          /* 동화 체험하기 모드 — 내 얼굴 읽기를 노출하지 않고 시연 동화 읽기를 주 행동으로 제공 */
-          <ActionLink href={`/library/${slug}/1`} variant="primary" size="default">
-            시연 동화 읽기
-          </ActionLink>
-        ) : /* 이하 제작 모드 (isCreateMode === true) */
-        currentSession && stage === "completed" ? (
+        ) : currentSession && stage === "completed" ? (
           /* 1. 이미 완성된 동화가 있는 경우 */
           <>
             <ActionLink
-              href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
+              href={`/stories/${encodeURIComponent(slug)}/read?sessionId=${currentSession.id}`}
               variant="primary"
               size="default"
             >
               <StoryIcon name="book" className="mr-2" />내 얼굴 동화 읽기
             </ActionLink>
+            {!isCreateMode ? (
+              <ActionLink href={readerHref(slug, 1)} variant="secondary" size="default">
+                시연 동화 읽기
+              </ActionLink>
+            ) : null}
             <button
               type="button"
               onClick={handleResetAndRecreate}
@@ -149,12 +158,17 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
           /* 2. 현재 생성 중인 경우 */
           <>
             <ActionLink
-              href={`/stories/${slug}/read?sessionId=${currentSession.id}&autoStart=true`}
+              href={`/stories/${encodeURIComponent(slug)}/read?sessionId=${currentSession.id}&autoStart=true`}
               variant="primary"
               size="default"
             >
               <StoryIcon name="clock" className="mr-2" />제작 중인 동화 이어보기
             </ActionLink>
+            {!isCreateMode ? (
+              <ActionLink href={readerHref(slug, 1)} variant="secondary" size="default">
+                시연 동화 읽기
+              </ActionLink>
+            ) : null}
             <button
               type="button"
               onClick={handleResetAndRecreate}
@@ -172,12 +186,17 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
           /* 3. 생성이 실패한 경우 */
           <>
             <ActionLink
-              href={`/stories/${slug}/read?sessionId=${currentSession.id}`}
+              href={`/stories/${encodeURIComponent(slug)}/read?sessionId=${currentSession.id}`}
               variant="primary"
               size="default"
             >
               <StoryIcon name="warning" className="mr-2" />제작 재시도하기
             </ActionLink>
+            {!isCreateMode ? (
+              <ActionLink href={readerHref(slug, 1)} variant="secondary" size="default">
+                시연 동화 읽기
+              </ActionLink>
+            ) : null}
             <button
               type="button"
               onClick={handleResetAndRecreate}
@@ -191,9 +210,14 @@ export function StorySessionActions({ slug, isCreateMode = false }: StorySession
               {isDeleting ? "삭제 중..." : "삭제하고 새로 만들기"}
             </button>
           </>
+        ) : !isCreateMode ? (
+          /* 동화 체험하기 모드 — 아직 세션이 없거나 draft인 경우 */
+          <ActionLink href={readerHref(slug, 1)} variant="primary" size="default">
+            시연 동화 읽기
+          </ActionLink>
         ) : (
-          /* 4. 아직 세션이 없거나(비로그인 포함) draft 상태인 경우 */
-          <ActionLink href={`/stories/${slug}/capture`} variant="primary">
+          /* 4. 아직 세션이 없거나(비로그인 포함) draft 상태인 경우 (제작 모드) */
+          <ActionLink href={`/stories/${encodeURIComponent(slug)}/capture`} variant="primary">
             <StoryIcon name="camera" className="mr-2" />내 얼굴로 만들기
           </ActionLink>
         )}

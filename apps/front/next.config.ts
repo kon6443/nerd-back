@@ -77,6 +77,16 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  async redirects() {
+    return [
+      {
+        source: "/library/:slug/capture",
+        destination: "/stories/:slug/capture",
+        permanent: false,
+      },
+    ];
+  },
+
   /**
    * 🖼️ 외부 S3/MinIO 스토리지 도메인 허용.
    * 개인화 삽화는 서버에서 WebP로 변환되고 서명 URL을 사용하므로 <Image unoptimized>로
