@@ -25,11 +25,47 @@
   border-radius: 3px 8px 8px 3px;
   background: var(--color-book-cover);
   color: var(--color-paper);
-  transform: perspective(900px) rotateY(-9deg);
   transform-style: preserve-3d;
-  box-shadow: 8px 14px 18px color-mix(in srgb, var(--color-book-cover-strong) 20%, transparent);
+  /*
+   * ⭐ **마우스를 따라 기울어진다.** `--book-tilt-nx/ny`(-1~1)는 카드 위 포인터 위치이고
+   * `LibraryStoryList` 가 넣는다. 홈의 3D 월드가 포인터로 시점을 흔드는 것과 같은 장치를
+   * CSS 3D 로 옮긴 것이다 — 책 한 권마다 WebGL 컨텍스트를 띄울 수는 없다.
+   * 🚫 값이 없으면 0 이라 서버 렌더·터치·감속 설정에서 예전 모습 그대로다.
+   */
+  transform:
+    perspective(900px)
+    translateY(var(--cover-lift, 0px))
+    rotateY(calc(-9deg + var(--book-tilt-nx, 0) * 9deg))
+    rotateX(calc(var(--book-tilt-ny, 0) * -6deg));
+  /* 그림자도 같이 움직여야 기울기가 거짓말처럼 보이지 않는다. */
+  box-shadow:
+    calc(8px - var(--book-tilt-nx, 0) * 7px) 14px 18px
+    color-mix(in srgb, var(--color-book-cover-strong) 20%, transparent);
   transition: transform 220ms ease-out, box-shadow 220ms ease-out;
 }
+
+/* 기울기를 따라 미끄러지는 광택. */
+.coverSheen {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 85% at calc(50% + var(--book-tilt-nx, 0) * 30%) calc(18% + var(--book-tilt-ny, 0) * 14%),
+    color-mix(in srgb, var(--color-paper) 55%, transparent),
+    transparent 58%
+  );
+  opacity: 0;
+  transition: opacity 220ms ease-out;
+}
+
+/*
+ * 🚫 **동화 소개 화면에는 켜지 않는다.** 같은 `StoryCover` 를 쓰지만 그쪽에는 기울기를 넣는
+ * JS 가 없어, 광택이 움직이지 않고 **기본 위치에 밝은 얼룩으로 고정**된다.
+ * 서재 카드(`.coverStage` 안)에서만 의미가 있다.
+ */
+.coverStage .coverSheen { opacity: 0.55; }
 .originalCover { --cover-ratio: var(--story-original-ratio, 0.75); }
 .cover::before {
   content: "";
@@ -55,6 +91,9 @@
   transform-origin: left;
 }
 .coverFace {
+  /* 🚫 광택(z-index 2) 아래 두지 않는다 — 제목이 씻겨 읽히지 않는다. */
+  position: relative;
+  z-index: 3;
   min-height: 100%;
   padding: 1rem 1.25rem 0.875rem 1.75rem;
   display: flex;
@@ -70,9 +109,11 @@
 .coverRule { margin-top: 0.5rem; width: 36px; border-top: 1px solid var(--color-paper-edge); }
 .coverImage { object-fit: cover; border-radius: inherit; }
 .originalCover .coverImage { object-fit: contain; background: var(--color-paper); }
-.card:focus-within .cover { transform: perspective(900px) rotateY(-3deg) translateY(-3px); }
+/* 🚫 `transform` 을 통째로 덮지 않는다 — 덮으면 포인터 기울기가 죽는다. 들어올림만 준다. */
+.card:focus-within .cover { --cover-lift: -3px; }
 @media (hover: hover) and (pointer: fine) {
-  .card:hover .cover { transform: perspective(900px) rotateY(-3deg) translateY(-3px); box-shadow: 8px 16px 22px color-mix(in srgb, var(--color-book-cover-strong) 19%, transparent); }
+  .card:hover .cover { --cover-lift: -4px; }
+  .card:hover .coverSheen { opacity: 0.8; }
 }
 @media (max-width: 900px) {
   .coverStage { --story-book-height: 280px; }
@@ -81,7 +122,8 @@
   .coverStage { --story-book-height: 270px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cover { transition: none; }
+  .cover { transition: none; transform: perspective(900px) rotateY(-9deg); }
+  .coverSheen { transition: none; }
   .card:hover .cover,
-  .card:focus-within .cover { transform: perspective(900px) rotateY(-9deg); }
+  .card:focus-within .cover { --cover-lift: 0px; }
 }
