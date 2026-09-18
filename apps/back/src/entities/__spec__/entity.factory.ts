@@ -1,5 +1,6 @@
 import { StorySession } from '../story-session.entity';
 import { StoryPageChat } from '../story-page-chat.entity';
+import { StorageCleanupTask } from '../storage-cleanup-task.entity';
 import { StoryCharacter } from '../story-character.entity';
 import { StoryPageCharacter } from '../story-page-character.entity';
 import { StoryPage } from '../story-page.entity';
@@ -97,6 +98,7 @@ export const STORY_SESSION_ID = '11111111-1111-4111-8111-111111111111';
 
 export const createStorySession = (overrides: Partial<StorySession> = {}): StorySession => ({
   status: 'completed',
+  sourcePhotoKey: null,
   referenceImageKey: null,
   updatedAt: FIXED_DATE,
   id: STORY_SESSION_ID,
@@ -125,5 +127,18 @@ export const createStoryPageChat = (overrides: Partial<StoryPageChat> = {}): Sto
   replyAudioStatus: 'not_requested',
   replyAudioUpdatedAt: null,
   createdAt: FIXED_DATE,
+  ...overrides,
+});
+
+export const createStorageCleanupTask = (
+  overrides: Partial<StorageCleanupTask> = {},
+): StorageCleanupTask => ({
+  id: 1,
+  storageKey: 'temp/source-photo/session-1/photo.jpg',
+  status: 'pending',
+  retryCount: 0,
+  lastError: null,
+  createdAt: FIXED_DATE,
+  updatedAt: FIXED_DATE,
   ...overrides,
 });

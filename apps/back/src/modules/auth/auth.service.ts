@@ -31,14 +31,27 @@ function isDuplicateKey(error: unknown): boolean {
 const DUMMY_HASH =
   'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
+export type UserCleanupHandler = (userId: number) => Promise<void>;
+
 @Injectable()
 export class AuthService {
+  private readonly cleanupHandlers: UserCleanupHandler[] = [];
+
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly passwords: PasswordService,
     private readonly sessions: SessionService,
     private readonly config: ConfigService,
   ) {}
+
+  /**
+   * 회원 탈퇴 시 실행할 데이터 정리 핸들러를 등록한다.
+   * 도메인 모듈(StorySessionModule 등)이 AuthModule에 의존하면서 탈퇴 훅을 등록할 수 있게 하여
+   * 모듈 간 순환 참조와 불필요한 결합을 방지한다.
+   */
+  registerCleanupHandler(handler: UserCleanupHandler): void {
+    this.cleanupHandlers.push(handler);
+  }
 
   /**
    * 환경 및 설정을 바탕으로 현재 회원가입이 허용되는지 확인한다.
@@ -97,4 +110,19 @@ export class AuthService {
   }
 
   // 🚫 logout 이 없다. 서버측 세션 상태가 없어 지울 것이 없다 — 컨트롤러가 쿠키만 지운다.
+
+  /**
+   * 회원 탈퇴: 사용자가 소유한 모든 세션의 개인 자산(임시 실사, 레퍼런스, 생성 삽화, 대화 음성)을
+   * 삭제하고 계정을 삭제한다 (D10, 명세 5절).
+   */
+  async withdraw(userId: number): Promise<void> {
+    const user = await this.users.findOne({ where: { id: userId } });
+    if (!user) return;
+
+    for (const handler of this.cleanupHandlers) {
+      await handler(userId);
+    }
+
+    await this.users.delete({ id: userId });
+  }
 }

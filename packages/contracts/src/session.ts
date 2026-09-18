@@ -54,7 +54,8 @@ export interface StorySessionSummary {
 export interface UploadFaceResponse {
   id: string;
   status: 'face_ready';
-  referenceImageUrl: string;
+  /** AI 레퍼런스 이미지의 만료되는 서명 URL. 직접 얼굴 모드(DIRECT_FACE_MODE=true)에서는 임시 실사 원본에 서명 URL을 발급하지 않으므로 null. */
+  referenceImageUrl: string | null;
 }
 
 /** 페이지 개인화 생성 상태 */

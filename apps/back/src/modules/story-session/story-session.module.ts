@@ -8,6 +8,7 @@ import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
 import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
 import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
+import { StoryPageChat } from '@entities/story-page-chat.entity';
 import { User } from '@entities/user.entity';
 import { AuthModule } from '@modules/auth/auth.module';
 import { StorySessionController } from './story-session.controller';
@@ -16,6 +17,7 @@ import { IMAGE_GENERATION_PORT } from '../../common/port/image-generation.port';
 import { MockImageAdapter } from '../../common/adapters/mock-image.adapter';
 import { OpenRouterImageAdapter } from '../../common/adapters/openrouter-image.adapter';
 import { StorageModule } from '../../common/storage/storageModule';
+import { StorageCleanupModule } from '../../common/storage/storage-cleanup.module';
 import { NotificationModule } from '../../common/notification/notification.module';
 
 @Module({
@@ -28,10 +30,12 @@ import { NotificationModule } from '../../common/notification/notification.modul
       SessionPageImage,
       StoryAfterStoryChoice,
       SessionBranchChoice,
+      StoryPageChat,
       User,
     ]),
     ConfigModule,
     StorageModule,
+    StorageCleanupModule,
     NotificationModule,
     AuthModule,
   ],

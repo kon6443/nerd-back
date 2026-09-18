@@ -24,12 +24,14 @@ describe('AuthService', () => {
   let passwords: { hash: jest.Mock; verify: jest.Mock };
   let sessions: { issue: jest.Mock };
   let config: { get: jest.Mock };
+  let cleanupHandler: jest.Mock;
   let service: AuthService;
 
   beforeEach(() => {
     users = createMockRepository<User>();
     passwords = { hash: jest.fn().mockResolvedValue('scrypt$hash'), verify: jest.fn() };
     sessions = { issue: jest.fn().mockReturnValue('42:9999999999999') };
+    cleanupHandler = jest.fn().mockResolvedValue(undefined);
     config = {
       get: jest.fn().mockImplementation((key: string) => {
         if (key === 'ENV') return 'LOCAL';
@@ -183,6 +185,29 @@ describe('AuthService', () => {
       await service.login({ loginId: 'nobody', password: 'pw' }).catch(() => undefined);
 
       expect(sessions.issue).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('withdraw', () => {
+    it('사용자가 존재하면 등록된 정리 핸들러들을 호출하고 계정을 삭제한다 ⭐', async () => {
+      users.findOne.mockResolvedValue(createUser({ id: 42 }));
+      service.registerCleanupHandler(cleanupHandler);
+
+      await service.withdraw(42);
+
+      expect(users.findOne).toHaveBeenCalledWith({ where: { id: 42 } });
+      expect(cleanupHandler).toHaveBeenCalledWith(42);
+      expect(users.delete).toHaveBeenCalledWith({ id: 42 });
+    });
+
+    it('사용자가 존재하지 않으면 정리 핸들러나 계정 삭제를 수행하지 않는다', async () => {
+      users.findOne.mockResolvedValue(null);
+      service.registerCleanupHandler(cleanupHandler);
+
+      await service.withdraw(999);
+
+      expect(cleanupHandler).not.toHaveBeenCalled();
+      expect(users.delete).not.toHaveBeenCalled();
     });
   });
 

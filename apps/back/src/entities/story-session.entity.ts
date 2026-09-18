@@ -39,6 +39,13 @@ export class StorySession {
   status: StorySessionStatus;
 
   /**
+   * 임시 실사 원본 사진의 S3 객체 키 (`DIRECT_FACE_MODE=true` 시 사용).
+   * 페이지 생성 완료 시 즉시 삭제되고 NULL로 비워지며, 24시간 TTL을 안전망으로 둔다.
+   */
+  @Column({ name: 'source_photo_key', type: 'varchar', length: 512, nullable: true })
+  sourcePhotoKey: string | null;
+
+  /**
    * 주인공 캐릭터 레퍼런스 이미지의 S3 객체 키.
    * 원본 얼굴 사진은 폐기되며, 이 레퍼런스 키로 6장의 동화 삽화를 개인화한다.
    */

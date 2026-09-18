@@ -17,6 +17,6 @@ import { SessionService } from './session.service';
   imports: [TypeOrmModule.forFeature([User])],
   controllers: [AuthController],
   providers: [AuthService, PasswordService, SessionService, AuthGuard],
-  exports: [AuthGuard, SessionService],
+  exports: [AuthGuard, SessionService, AuthService],
 })
 export class AuthModule {}

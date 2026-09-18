@@ -385,7 +385,7 @@ export default function CapturePage({ params }: PageProps) {
           <div className="relative h-56 w-56 overflow-hidden rounded-card border-4 border-white shadow-md">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={result.referenceImageUrl}
+              src={result.referenceImageUrl ?? photo?.previewUrl ?? ""}
               alt="내 얼굴로 만든 동화 주인공"
               decoding="async"
               className="h-full w-full object-cover"

@@ -16,6 +16,8 @@ import { StoryPageCharacter } from '@entities/story-page-character.entity';
 import { SessionPageImage } from '@entities/session-page-image.entity';
 import { StoryAfterStoryChoice } from '@entities/story-after-story-choice.entity';
 import { SessionBranchChoice } from '@entities/session-branch-choice.entity';
+import { StoryPageChat } from '@entities/story-page-chat.entity';
+import { StorageCleanupService } from '@common/storage/storage-cleanup.service';
 import { StoryNotFoundErrorResponseDto } from '@modules/story/dto/story.error.dto';
 import {
   FaceNotReadyErrorResponseDto,
@@ -44,6 +46,13 @@ describe('StorySessionService', () => {
   let pageImageRepo: MockRepository<SessionPageImage>;
   let afterStoryChoiceRepo: MockRepository<StoryAfterStoryChoice>;
   let branchChoiceRepo: MockRepository<SessionBranchChoice>;
+  let pageChatRepo: MockRepository<StoryPageChat>;
+  let mockCleanupService: {
+    cleanupKey: jest.Mock;
+    cleanupKeys: jest.Mock;
+    recordTask: jest.Mock;
+    processPendingTasks: jest.Mock;
+  };
   let mockImagePort: jest.Mocked<ImageGenerationPort>;
   let mockStoragePort: jest.Mocked<StoragePort>;
   let service: StorySessionService;
@@ -77,7 +86,9 @@ describe('StorySessionService', () => {
     pageImageRepo = createMockRepository<SessionPageImage>();
     afterStoryChoiceRepo = createMockRepository<StoryAfterStoryChoice>();
     branchChoiceRepo = createMockRepository<SessionBranchChoice>();
+    pageChatRepo = createMockRepository<StoryPageChat>();
     pageCharacterRepo.find.mockResolvedValue([]);
+    pageChatRepo.find.mockResolvedValue([]);
 
     mockImagePort = {
       generateReference: jest.fn().mockResolvedValue(Buffer.from('mock-reference-image-bytes')),
@@ -91,6 +102,29 @@ describe('StorySessionService', () => {
       delete: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockCleanupService = {
+      cleanupKey: jest.fn().mockImplementation(async (key: string) => {
+        try {
+          await mockStoragePort.delete(key);
+        } catch {
+          // 실 서비스와 동일하게 swallow하고 영속 큐에 기록하는 동작을 모방
+        }
+      }),
+      cleanupKeys: jest.fn().mockImplementation(async (keys: string[]) => {
+        await Promise.allSettled(
+          keys.map(async (k) => {
+            try {
+              await mockStoragePort.delete(k);
+            } catch {
+              // 실 서비스와 동일하게 swallow
+            }
+          }),
+        );
+      }),
+      recordTask: jest.fn().mockResolvedValue({}),
+      processPendingTasks: jest.fn().mockResolvedValue(0),
+    };
+
     service = new StorySessionService(
       asRepository(sessionRepo),
       asRepository(templateRepo),
@@ -102,6 +136,9 @@ describe('StorySessionService', () => {
       undefined,
       asRepository(afterStoryChoiceRepo),
       asRepository(branchChoiceRepo),
+      undefined,
+      mockCleanupService as unknown as StorageCleanupService,
+      asRepository(pageChatRepo),
     );
   });
 
@@ -425,25 +462,36 @@ describe('StorySessionService', () => {
 
     // ⭐ DB 행만 지우면 레퍼런스·삽화 객체가 스토리지에 영원히 남는다. 사용자가 "다른 얼굴로
     //    다시 만들기" 를 눌러도 **이전 얼굴에서 파생된 이미지가 계속 보관된다.**
-    it('레퍼런스와 삽화 객체를 스토리지에서도 지운다 ⭐', async () => {
+    it('임시 실사·레퍼런스·삽화·대화 음성 객체를 모두 수집해 스토리지에서 삭제한다 ⭐', async () => {
       sessionRepo.findOne.mockResolvedValue({
         id: 'session-1',
         userId: 1,
+        sourcePhotoKey: 'temp/source-photo/session-1/photo.jpg',
         referenceImageKey: 'references/session-1/ref.png',
       } as unknown as StorySession);
       pageImageRepo.find.mockResolvedValue([
         { imageKey: 'personalizations/session-1/common/page-1.webp' },
         { imageKey: null },
       ] as unknown as SessionPageImage[]);
+      pageChatRepo.find.mockResolvedValue([
+        { replyAudioKey: 'chat-audio/session-1/reply-1.mp3' },
+        { replyAudioKey: null },
+      ] as unknown as StoryPageChat[]);
 
       await service.deleteSession(1, 'session-1');
 
+      expect(mockCleanupService.cleanupKeys).toHaveBeenCalledWith([
+        'temp/source-photo/session-1/photo.jpg',
+        'references/session-1/ref.png',
+        'personalizations/session-1/common/page-1.webp',
+        'chat-audio/session-1/reply-1.mp3',
+      ]);
+      expect(mockStoragePort.delete).toHaveBeenCalledWith('temp/source-photo/session-1/photo.jpg');
       expect(mockStoragePort.delete).toHaveBeenCalledWith('references/session-1/ref.png');
       expect(mockStoragePort.delete).toHaveBeenCalledWith(
         'personalizations/session-1/common/page-1.webp',
       );
-      // 키가 없는 행까지 부르지 않는다.
-      expect(mockStoragePort.delete).toHaveBeenCalledTimes(2);
+      expect(mockStoragePort.delete).toHaveBeenCalledWith('chat-audio/session-1/reply-1.mp3');
     });
 
     it('스토리지 삭제가 실패해도 DB 삭제를 되돌리지 않는다', async () => {
@@ -458,6 +506,20 @@ describe('StorySessionService', () => {
       // 스토리지는 롤백되지 않는다 — 지워진 것을 되살리는 쪽이 더 나쁘다.
       await expect(service.deleteSession(1, 'session-1')).resolves.toBeUndefined();
       expect(sessionRepo.delete).toHaveBeenCalledWith({ id: 'session-1' });
+    });
+
+    it('deleteAllUserSessions는 사용자의 모든 세션을 순회하며 삭제한다', async () => {
+      const deleteSessionSpy = jest.spyOn(service, 'deleteSession').mockResolvedValue(undefined);
+      sessionRepo.find.mockResolvedValue([
+        { id: 'session-1', userId: 1 },
+        { id: 'session-2', userId: 1 },
+      ] as StorySession[]);
+
+      await service.deleteAllUserSessions(1);
+
+      expect(deleteSessionSpy).toHaveBeenCalledWith(1, 'session-1');
+      expect(deleteSessionSpy).toHaveBeenCalledWith(1, 'session-2');
+      deleteSessionSpy.mockRestore();
     });
   });
 
@@ -509,6 +571,63 @@ describe('StorySessionService', () => {
       expect(result.status).toBe('face_ready');
       expect(result.referenceImageUrl).toBe('https://storage.local/references/session-1/ref.png');
       expect(session.status).toBe('face_ready');
+    });
+
+    it('DIRECT_FACE_MODE=true 일 때 원본을 temp/source-photo/에 업로드하고 서명 URL을 발급하지 않는다 ⭐', async () => {
+      process.env.DIRECT_FACE_MODE = 'true';
+      try {
+        const validFile = { buffer: VALID_JPEG, mimetype: 'image/jpeg' } as unknown as Express.Multer.File;
+        const session = {
+          id: 'session-direct',
+          userId: 1,
+          status: 'draft',
+          sourcePhotoKey: null,
+          referenceImageKey: null,
+        } as unknown as StorySession;
+        sessionRepo.findOne.mockResolvedValue(session);
+        sessionRepo.save.mockResolvedValue(session);
+        mockStoragePort.upload.mockResolvedValueOnce('temp/source-photo/session-direct/photo.jpg');
+
+        const result = await service.uploadFace(1, 'session-direct', { front: [validFile] });
+
+        expect(mockImagePort.generateReference).not.toHaveBeenCalled();
+        expect(mockStoragePort.upload).toHaveBeenCalledWith(
+          expect.stringMatching(/^temp\/source-photo\/session-direct\/.+\.jpg$/),
+          VALID_JPEG,
+          'image/jpeg',
+        );
+        expect(session.sourcePhotoKey).toBe('temp/source-photo/session-direct/photo.jpg');
+        expect(session.referenceImageKey).toBeNull();
+        expect(result.referenceImageUrl).toBeNull();
+      } finally {
+        delete process.env.DIRECT_FACE_MODE;
+      }
+    });
+
+    it('사진 교체 시 이전 sourcePhotoKey를 정리한다', async () => {
+      process.env.DIRECT_FACE_MODE = 'true';
+      try {
+        const validFile = { buffer: VALID_JPEG } as unknown as Express.Multer.File;
+        const session = {
+          id: 'session-direct',
+          userId: 1,
+          status: 'draft',
+          sourcePhotoKey: 'temp/source-photo/session-direct/old.jpg',
+          referenceImageKey: null,
+        } as unknown as StorySession;
+        sessionRepo.findOne.mockResolvedValue(session);
+        sessionRepo.save.mockResolvedValue(session);
+        mockStoragePort.upload.mockResolvedValueOnce('temp/source-photo/session-direct/new.jpg');
+
+        await service.uploadFace(1, 'session-direct', { front: [validFile] });
+
+        expect(mockCleanupService.cleanupKey).toHaveBeenCalledWith(
+          'temp/source-photo/session-direct/old.jpg',
+        );
+        expect(session.sourcePhotoKey).toBe('temp/source-photo/session-direct/new.jpg');
+      } finally {
+        delete process.env.DIRECT_FACE_MODE;
+      }
     });
   });
 
@@ -840,6 +959,30 @@ describe('StorySessionService', () => {
         Buffer.from('mock-page-image-bytes'),
         'image/png',
       );
+    });
+
+    it('모든 페이지 생성이 완료되면 sourcePhotoKey를 스토리지에서 삭제하고 DB를 null로 갱신한다 ⭐', async () => {
+      const sessionWithSource = {
+        id: 'session-1',
+        status: 'generating',
+        userId: 1,
+        templateId: 10,
+        referenceImageKey: 'references/session-1/ref.png',
+        sourcePhotoKey: 'temp/source-photo/session-1/photo.jpg',
+      } as StorySession;
+      sessionRepo.findOne.mockResolvedValue(sessionWithSource);
+      pageRepo.find.mockResolvedValue([{ pageNo: 1, branchKey: 'common' }] as StoryPage[]);
+      pageImageRepo.find.mockResolvedValue([
+        { sessionId: 'session-1', pageNo: 1, branchKey: 'common', status: 'succeeded' } as SessionPageImage,
+      ]);
+      pageImageRepo.createQueryBuilder.mockReturnValue(mockUpdateQueryBuilder(1));
+
+      await service.executePersonalizationPipeline('session-1');
+
+      expect(sessionWithSource.status).toBe('completed');
+      expect(sessionWithSource.sourcePhotoKey).toBeNull();
+      expect(sessionRepo.save).toHaveBeenCalledWith(sessionWithSource);
+      expect(mockCleanupService.cleanupKey).toHaveBeenCalledWith('temp/source-photo/session-1/photo.jpg');
     });
   });
 });
