@@ -27,12 +27,12 @@ const mockStories: StorySummary[] = [
 ];
 
 describe("LibraryStoryList", () => {
-  it("비로그인 시연 모드에서는 본동화 1쪽(/library/{slug}/1)으로 라우팅한다", () => {
+  it("비로그인 시연 모드에서는 시연 스튜디오(/stories/{slug}/capture?demo=true)로 라우팅한다", () => {
     vi.spyOn(useSessionModule, "useSession").mockReturnValue({ status: "guest" });
 
     const html = renderToString(<LibraryStoryList stories={mockStories} isCreateMode={false} />);
 
-    expect(html).toContain('href="/library/jack/1"');
+    expect(html).toContain('href="/stories/jack/capture?demo=true"');
     expect(html).toContain("동화 펼쳐 보기");
   });
 
@@ -45,7 +45,7 @@ describe("LibraryStoryList", () => {
     expect(html).toContain("이 동화로 만들기");
   });
 
-  it("로그인 상태에서 세션 확인 전이라도 시연 모드는 본동화 1쪽으로 즉시 라우팅한다", () => {
+  it("로그인 상태에서 세션 확인 전이라도 시연 모드는 시연 스튜디오로 즉시 라우팅한다", () => {
     vi.spyOn(useSessionModule, "useSession").mockReturnValue({
       status: "authenticated",
       me: { loginId: "tester" },
@@ -53,13 +53,13 @@ describe("LibraryStoryList", () => {
     vi.spyOn(apiModule, "getMySessions").mockResolvedValue([]);
 
     const demoHtml = renderToString(<LibraryStoryList stories={mockStories} isCreateMode={false} />);
-    expect(demoHtml).toContain('href="/library/jack/1"');
+    expect(demoHtml).toContain('href="/stories/jack/capture?demo=true"');
 
     const createHtml = renderToString(<LibraryStoryList stories={mockStories} isCreateMode={true} />);
     expect(createHtml).toContain('href="/library/jack?mode=create"');
   });
 
-  it("로그인 상태에서 이미 얼굴로 만든 동화가 있는 경우라도 시연 모드는 본동화 1쪽으로 라우팅하고 제작 모드는 동화 상세로 라우팅한다", () => {
+  it("로그인 상태에서 이미 얼굴로 만든 동화가 있는 경우라도 시연 모드는 시연 스튜디오로 라우팅하고 제작 모드는 동화 상세로 라우팅한다", () => {
     vi.spyOn(useSessionModule, "useSession").mockReturnValue({
       status: "authenticated",
       me: { loginId: "tester" },
@@ -72,7 +72,7 @@ describe("LibraryStoryList", () => {
         initialCompletedSlugs={new Set(["jack"])}
       />,
     );
-    expect(demoHtml).toContain('href="/library/jack/1"');
+    expect(demoHtml).toContain('href="/stories/jack/capture?demo=true"');
 
     const createHtml = renderToString(
       <LibraryStoryList
@@ -84,7 +84,7 @@ describe("LibraryStoryList", () => {
     expect(createHtml).toContain('href="/library/jack?mode=create"');
   });
 
-  it("로그인 상태에서 얼굴로 만든 동화가 없는 경우 시연은 본동화 1쪽, 제작은 캡처로 라우팅한다", () => {
+  it("로그인 상태에서 얼굴로 만든 동화가 없는 경우 시연은 시연 스튜디오, 제작은 캡처로 라우팅한다", () => {
     vi.spyOn(useSessionModule, "useSession").mockReturnValue({
       status: "authenticated",
       me: { loginId: "tester" },
@@ -97,7 +97,7 @@ describe("LibraryStoryList", () => {
         initialCompletedSlugs={new Set()}
       />,
     );
-    expect(demoHtml).toContain('href="/library/jack/1"');
+    expect(demoHtml).toContain('href="/stories/jack/capture?demo=true"');
 
     const createHtml = renderToString(
       <LibraryStoryList

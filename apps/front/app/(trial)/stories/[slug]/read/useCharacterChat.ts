@@ -61,6 +61,8 @@ export function useCharacterChat({
   pageNo,
   branchKey,
   drafts,
+  isDemo = false,
+  demoCharacters = [],
 }: {
   /**
    * 세션이 없으면(주소에 `sessionId` 가 없을 때) 아무것도 조회하지 않는다.
@@ -70,9 +72,20 @@ export function useCharacterChat({
   pageNo: number;
   branchKey: StoryChatBranchKey;
   drafts: ChatDraftStore;
+  isDemo?: boolean;
+  demoCharacters?: StoryCharacterSummary[];
 }): CharacterChatController {
-  const [state, setState] = useState<ChatState>("loading");
-  const [role, setRole] = useState("");
+  const [state, setState] = useState<ChatState>(
+    isDemo
+      ? {
+          status: "available",
+          characters: demoCharacters,
+          remainingMessages: 1,
+          exchange: null,
+        }
+      : "loading",
+  );
+  const [role, setRole] = useState(demoCharacters[0]?.role ?? "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
@@ -85,13 +98,23 @@ export function useCharacterChat({
 
   // 장면(세션 · 쪽 · 분기)이 바뀌면 초안을 다시 읽고 처음 상태로 돌아간다.
   // 🚫 이펙트로 옮기지 않는다 — 한 프레임 동안 옛 장면의 질문이 새 장면에 그려진다.
-  const sceneKey = `${sessionId}:${pageNo}:${branchKey}`;
+  const sceneKey = isDemo ? `demo:${pageNo}:${branchKey}` : `${sessionId}:${pageNo}:${branchKey}`;
   const [shownSceneKey, setShownSceneKey] = useState<string | null>(null);
   if (shownSceneKey !== sceneKey) {
     const draft = sessionId ? drafts.get(sessionId, pageNo, branchKey) : undefined;
     setShownSceneKey(sceneKey);
-    setState("loading");
-    setRole(draft?.role ?? "");
+    if (isDemo) {
+      setState({
+        status: "available",
+        characters: demoCharacters,
+        remainingMessages: 1,
+        exchange: null,
+      });
+      setRole(demoCharacters[0]?.role ?? "");
+    } else {
+      setState("loading");
+      setRole(draft?.role ?? "");
+    }
     setMessage(draft?.message ?? "");
     setError("");
     setAutoPlayReply(false);
@@ -99,11 +122,11 @@ export function useCharacterChat({
 
   const refresh = useCallback(
     (signal?: AbortSignal): Promise<StoryChatView | undefined> => {
-      if (submitting.current || !sessionId) return Promise.resolve(undefined);
+      if (isDemo || submitting.current || !sessionId) return Promise.resolve(undefined);
       const version = ++requestVersion.current;
       return fetchStoryChat(sessionId, pageNo, branchKey, signal).then(
         (next): StoryChatView | undefined => {
-          if (!mounted.current || signal?.aborted || version !== requestVersion.current) return;
+          if (!mounted.current || signal?.aborted || version !== requestVersion.current) return undefined;
           setState(next);
           setRole((current) =>
             next.characters.some((character) => character.role === current)
@@ -113,23 +136,26 @@ export function useCharacterChat({
           if (
             next.status === "pending" ||
             next.status === "completed" ||
-            next.status === "failed"
+            next.status === "unavailable"
           ) {
-            drafts.delete(sessionId, pageNo, branchKey);
             setMessage("");
           }
           return next;
         },
-        (cause: unknown): undefined => {
-          if (!mounted.current || signal?.aborted || version !== requestVersion.current) return;
-          setState((current) => {
-            if (cause instanceof ApiError && cause.isUnauthorized) return "login";
-            return typeof current === "object" && current.exchange?.reply ? current : "error";
-          });
+        (cause: unknown): StoryChatView | undefined => {
+          if (!mounted.current || signal?.aborted || version !== requestVersion.current) return undefined;
+          if (cause instanceof ApiError && cause.isUnauthorized) {
+            setState("login");
+            setMessage("");
+            setError("");
+            return undefined;
+          }
+          setState("error");
+          return undefined;
         },
       );
     },
-    [sessionId, pageNo, branchKey, drafts],
+    [sessionId, pageNo, branchKey, isDemo],
   );
 
   useEffect(() => {
@@ -186,6 +212,30 @@ export function useCharacterChat({
       inputRef.current?.focus();
       return;
     }
+
+    if (isDemo) {
+      setSending(true);
+      setError("");
+      setTimeout(() => {
+        setState({
+          status: "completed",
+          characters: demoCharacters,
+          remainingMessages: 0,
+          exchange: {
+            role,
+            displayName: demoCharacters.find((c) => c.role === role)?.displayName ?? role,
+            message: parsed.data.message,
+            reply: "안녕! 나는 이 이야기의 주인공이야! 나와 함께 모험을 떠나주어 정말 기뻐. 앞으로 펼쳐질 우리들의 이야기도 끝까지 함께해 줘! ✨",
+            replyAudioStatus: "not_requested",
+            replyAudioUrl: null,
+          },
+        });
+        setSending(false);
+        setMessage("");
+      }, 400);
+      return;
+    }
+
     if (!sessionId) return;
     submitting.current = true;
     const version = ++requestVersion.current;
