@@ -5,6 +5,8 @@
 > 작업 브랜치: `feat/my-story-slice-3`  
 > 상위 문서: [`docs/tasks/tasks-my-story.md`](tasks-my-story.md)
 
+> ⚠️ 이 문서의 원본 즉시 폐기 설명은 당시 기본 모드인 `DIRECT_FACE_MODE=false` 기준이다. 2026-09-18 확정 정책에서는 `DIRECT_FACE_MODE=true`일 때 원본을 `temp/source-photo/`에 생성 성공까지 임시 보관하고, 실패·중단 시에도 24시간 내 lifecycle로 폐기한다. 상세는 [`data-deletion-temporary-photo-spec.md`](data-deletion-temporary-photo-spec.md)를 따른다.
+
 ---
 
 ## 1. 개요 및 목표
@@ -20,7 +22,7 @@
 | 항목 | 결정 사항 | 근거 및 구현 원칙 |
 |---|---|---|
 | **AI 이미지 모델** | **Port & Adapter (`ImageGenerationPort`)** | • 크레딧 충전 전까지 0원/0에러 테스트를 위해 **`MockImageAdapter`** 기본 활성화<br>• 추후 크레딧 충전 시 환경변수(`IMAGE_PROVIDER=openrouter`)로 즉시 스위칭 가능한 **`OpenRouterImageAdapter`** 병행 구축 |
-| **얼굴 사진 입력 요건** | **정면 1장 필수 + 좌/우 선택 (1~3장 유연 지원)** | • 기존 3장 엄격 요건 완화 (사용자 편의성 제고 및 1장만으로도 생성 가능)<br>• 장당 최대 5MB, 매직바이트(JPEG/PNG/WEBP) 검증<br>• **개인정보 보호**: 레퍼런스 생성 즉시 원본 얼굴 사진은 메모리에서 즉시 폐기 (디스크/DB 미저장) |
+| **얼굴 사진 입력 요건** | **정면 1장 필수 + 좌/우 선택 (1~3장 유연 지원)** | • 기존 3장 엄격 요건 완화 (사용자 편의성 제고 및 1장만으로도 생성 가능)<br>• 장당 최대 5MB, 매직바이트(JPEG/PNG/WEBP) 검증<br>• **개인정보 보호**: `DIRECT_FACE_MODE=false`에서는 레퍼런스 생성 뒤 원본을 즉시 폐기한다. `true`에서는 임시 객체로만 보관해 생성 성공 시 즉시, 실패·중단 시 24시간 내 폐기한다. |
 | **프론트엔드 입력 UX** | **웹캠 실시간 촬영 + 사진 파일 첨부 동시 지원** | • 웹캠 실시간 뷰파인더(`getUserMedia` + 원형 오버레이 가이드) 제공<br>• 카메라 불가 환경 및 기존 앨범 사진을 위한 '파일 첨부' fallback 동시 제공<br>• 업로드 전 브라우저 캔버스 리사이즈 (1024x1024 이하) |
 | **스토리지 및 데이터 격리** | **S3 호환 `StoragePort` + `dev/` prefix 격리** | • 운영 환경 MinIO(S3 API)와 호환되는 `@aws-sdk/client-s3` 기반 구현<br>• 개발 데이터가 운영 데이터와 섞이지 않도록 S3 키에 `dev/` 네임스페이스 적용<br>• 클라이언트는 서명 URL(Presigned URL)로 스토리지 직접 조회 |
 | **세션 멱등성 및 1권 제한** | **`UNIQUE(user_id, template_id)` + 미완료 세션 재사용** | • 1인당 동화 템플릿 1회 생성 상한 유지<br>• 이미 완성된 세션(`completed`)은 `409 Conflict`<br>• 미완료 세션(`draft`, `failed`)은 새 세션을 만들지 않고 기존 세션을 반환해 재촬영/재시도 보장 |

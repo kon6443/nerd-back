@@ -1024,8 +1024,10 @@ QA 자료: /tmp/nerd-detail-report.json과 /tmp/nerd-detail-check.mjs. 첫 helpe
 ## 다음 작업 상태
 
 - [ ] **D10 사용자 데이터 삭제 구현**
-  - 책 삭제 시 DB의 세션·분기·대화와 스토리지의 레퍼런스 이미지·개인화 삽화·캐릭터 답변 MP3를 함께 제거한다.
-  - 계정 탈퇴 시 사용자의 모든 책에 같은 삭제를 적용한 후 계정을 제거한다. 현재는 탈퇴 API가 없고 책 삭제도 DB만 지우므로 구현·보상 삭제·재시도 테스트가 필요하다.
+  - 상세 명세: [`docs/tasks/data-deletion-temporary-photo-spec.md`](../docs/tasks/data-deletion-temporary-photo-spec.md).
+  - 직접 얼굴 모드는 실사를 `temp/source-photo/`와 `sourcePhotoKey`에만 임시 보관하고, 생성 완료 뒤 즉시 삭제한다. 24시간 TTL은 실패 안전망이며, `references/`에는 AI 레퍼런스만 둔다.
+  - 책 삭제 시 DB의 세션·분기·대화와 실사 원본·레퍼런스 이미지·개인화 삽화·캐릭터 답변 MP3를 함께 정리한다. 탈퇴는 모든 책에 적용한 뒤 계정을 제거한다.
+  - 현재는 탈퇴 API가 없고 삭제 실패가 고아를 남길 수 있으므로, 영속 정리 작업·멱등 재시도·교체/업로드 실패 보상·삭제/생성 경합 테스트가 필요하다.
 - [ ] **리더 평가용 `보기 설정` 정리**
   - `chat`/`immersive` 쿼리와 설정 UI를 정식 기능으로 채택하거나, 현재 기본값으로 고정하고 제거한다.
 - [x] **완성 동화 리더 헤더 네비게이션 문제 종료 (2026-09-16)**
@@ -1128,7 +1130,7 @@ QA 자료: /tmp/nerd-detail-report.json과 /tmp/nerd-detail-check.mjs. 첫 helpe
 
 **검증 결과:** 루트 ci:all exit 0. Frontend 79, backend unit 268, backend E2E 66 — 총 413 tests 및 lint·types·build 통과. `story-session.service.spec.ts:301`에서 정면 단독 입력으로 레퍼런스를 만들고, `openrouter-image.adapter.spec.ts:104`에서 삽화 1번·주인공 레퍼런스 2번 전달을 검증한다. Backend와 공유 계약 diff는 없다.
 
-**확인된 한계:** 실제 유료 AI 생성과 얼굴 유사도·배경 보존 품질은 미검증이다. 기존 `story-session.service.ts:674`는 템플릿 다운로드 실패를 무시하고 생성하므로 이 예외 상황에서는 기존 구도 보존을 보장할 수 없다. 일반 모드는 얼굴을 먼저 캐릭터로 변환하며, `DIRECT_FACE_MODE=true` 테스트 옵션은 원본 사진을 직접 저장·사용하므로 원본 미보관 안내는 일반 모드 기준이다. 이 PR은 기존 합성 정책을 변경하지 않는다.
+**확인된 한계 (당시 구현 기준):** 실제 유료 AI 생성과 얼굴 유사도·배경 보존 품질은 미검증이다. 기존 `story-session.service.ts:674`는 템플릿 다운로드 실패를 무시하고 생성하므로 이 예외 상황에서는 기존 구도 보존을 보장할 수 없다. 당시 `DIRECT_FACE_MODE=true` 테스트 옵션은 원본 사진을 직접 저장·사용했으므로 원본 미보관 안내는 일반 모드 기준이었다. 이후 확정한 정책은 [`실사 임시 보관 및 사용자 데이터 삭제 명세`](../docs/tasks/data-deletion-temporary-photo-spec.md)를 따른다. 이 PR은 기존 합성 정책을 변경하지 않는다.
 
 **PR:** [#53](https://github.com/kon6443/nerd-back/pull/53), `feat/front-single-photo-studio` → `main`. 관련 UI와 검증 기록만 포함하며 실제 AI 생성 품질의 미검증 범위·기존 예외 동작을 PR 본문에 명시했다.
 
