@@ -91,7 +91,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
   slug: 'jack-and-beanstalk',
   title: '잭과 콩나무',
   summary: '마법의 콩을 심고 구름 위 거인의 성으로 떠나는 잭의 용감한 모험 이야기',
-  coverImageKey: 'templates/jack-and-beanstalk/page-1.png',
+  coverImageKey: 'templates/jack-and-beanstalk/page-1.webp',
   characters: [
     {
       role: 'jack',
@@ -145,7 +145,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       illustrationPrompt: buildJackPrompt(
         "Preserve Jack's curious, hopeful expression and his original gaze toward the magical beans. Keep the beans, both characters' hands, and the cow unchanged. Do not modify the old man's face or hair.",
       ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-1.png',
+      baseImageKey: 'templates/jack-and-beanstalk/page-1.webp',
       narrationAudioKey: 'narration/jack-and-beanstalk/page-1.mp3',
       personaTargetRole: 'jack',
       characters: [{ role: 'jack', hitbox: { x: 0.29, y: 0.31, width: 0.31, height: 0.6 } }],
@@ -159,7 +159,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       illustrationPrompt: buildJackPrompt(
         "Preserve Jack's joyful sense of wonder and his original upward-right gaze toward the cloud-top castle. Keep his climbing pose, hands, head angle, and open-mouth smile unchanged. Do not turn his face toward the viewer.",
       ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-2.png',
+      baseImageKey: 'templates/jack-and-beanstalk/page-2.webp',
       narrationAudioKey: 'narration/jack-and-beanstalk/page-2.mp3',
       personaTargetRole: 'jack',
       characters: [{ role: 'jack', hitbox: { x: 0.12, y: 0.18, width: 0.42, height: 0.62 } }],
@@ -174,7 +174,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       illustrationPrompt: buildJackPrompt(
         "Preserve Jack's alarm and urgency, original open mouth, head angle, and backward gaze. Render his eyes with the identity-defining shape from <protagonist_identity> while preserving the alarmed expression. Keep his running pose and the goose unchanged. Do not modify the giant's face or hair, the magical harp, or the golden egg.",
       ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-3.png',
+      baseImageKey: 'templates/jack-and-beanstalk/page-3.webp',
       narrationAudioKey: 'narration/jack-and-beanstalk/page-3.mp3',
       personaTargetRole: 'jack',
       characters: [
@@ -192,7 +192,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       illustrationPrompt: buildJackPrompt(
         "Preserve Jack's determined expression and visible effort, including his exact brow tension, focused gaze, and closed mouth shape. Keep his head angle, axe, hands, stance, and chopping action unchanged. Do not exaggerate the expression or add injuries.",
       ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-4.png',
+      baseImageKey: 'templates/jack-and-beanstalk/page-4.webp',
       narrationAudioKey: 'narration/jack-and-beanstalk/page-4.mp3',
       personaTargetRole: 'jack',
       characters: [
@@ -209,7 +209,7 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
       illustrationPrompt: buildJackPrompt(
         "Preserve Jack's warm, relieved smile and his original gaze toward the elderly woman receiving the golden egg. Keep the golden egg in both hands and preserve his mother's hands resting on his shoulders. Do not modify his mother's face or hair, the elderly woman, any villager, the goose, the basket, or the golden eggs.",
       ),
-      baseImageKey: 'templates/jack-and-beanstalk/page-5.png',
+      baseImageKey: 'templates/jack-and-beanstalk/page-5.webp',
       narrationAudioKey: 'narration/jack-and-beanstalk/page-5.mp3',
       personaTargetRole: 'jack',
       characters: [
@@ -222,11 +222,11 @@ export const JACK_AND_BEANSTALK_STORY: OfficialStoryData = {
     choices: [
       {
         branchKey: 'a', title: '별빛 씨앗을 하늘로 돌려보내요', description: '거위의 둥지에서 발견한 반짝이는 씨앗을 밤하늘에 띄워 보내요.',
-        page: { pageNo: 6, bodyText: '그날 밤, 요술 거위의 둥지에서 별빛 씨앗 하나가 반짝였어요.\n잭은 씨앗을 두 손에 올리고 하늘을 향해 살며시 불었지요.\n씨앗은 별이 되어 마을 위에 머물렀어요.\n늦은 밤 길을 걷는 사람들은 그 별을 보며 집으로 돌아갈 수 있었답니다.', illustrationPrompt: buildJackPrompt("Preserve Jack's gentle wonder, upward gaze, and exact mouth shape, including his softly pursed lips as he blows the glowing seed upward. Keep the seed's glow on his transferred face and hair. Do not move, duplicate, or alter the seed, glowing particles, stars, goose, nest, or nighttime village."), baseImageKey: 'templates/jack-and-beanstalk/page-6-a.png', narrationAudioKey: 'narration/jack-and-beanstalk/page-6-a.mp3', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.2, y: 0.3, width: 0.3, height: 0.54 } }, { role: 'magical-goose', hitbox: { x: 0.42, y: 0.53, width: 0.2, height: 0.31 } }] },
+        page: { pageNo: 6, bodyText: '그날 밤, 요술 거위의 둥지에서 별빛 씨앗 하나가 반짝였어요.\n잭은 씨앗을 두 손에 올리고 하늘을 향해 살며시 불었지요.\n씨앗은 별이 되어 마을 위에 머물렀어요.\n늦은 밤 길을 걷는 사람들은 그 별을 보며 집으로 돌아갈 수 있었답니다.', illustrationPrompt: buildJackPrompt("Preserve Jack's gentle wonder, upward gaze, and exact mouth shape, including his softly pursed lips as he blows the glowing seed upward. Keep the seed's glow on his transferred face and hair. Do not move, duplicate, or alter the seed, glowing particles, stars, goose, nest, or nighttime village."), baseImageKey: 'templates/jack-and-beanstalk/page-6-a.webp', narrationAudioKey: 'narration/jack-and-beanstalk/page-6-a.mp3', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.2, y: 0.3, width: 0.3, height: 0.54 } }, { role: 'magical-goose', hitbox: { x: 0.42, y: 0.53, width: 0.2, height: 0.31 } }] },
       },
       {
         branchKey: 'b', title: '별빛 씨앗을 마을에 심어요', description: '마을 사람들이 함께 볼 수 있는 작은 빛을 키워요.',
-        page: { pageNo: 6, bodyText: '잭은 별빛 씨앗을 마을 한가운데에 심었어요.\n다음 날, 작은 싹이 돋더니 밤마다 은은한 빛을 내기 시작했지요.\n사람들은 그 나무 아래에 모여 이야기를 나눴어요.\n요술 거위는 날개를 퍼덕이며, 환한 마을을 바라보았답니다.', illustrationPrompt: buildJackPrompt("Preserve Jack's seated pose, peaceful proud smile, and original upward gaze toward the glowing star tree. Match the tree's warm golden light on his transferred face and hair. Keep his mother, every villager and child, the goose, lanterns, glowing tree, and nighttime village unchanged. Do not modify any other person's face or hair."), baseImageKey: 'templates/jack-and-beanstalk/page-6-b.png', narrationAudioKey: 'narration/jack-and-beanstalk/page-6-b.mp3', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.35, y: 0.42, width: 0.2, height: 0.27 } }, { role: 'magical-goose', hitbox: { x: 0.05, y: 0.61, width: 0.29, height: 0.3 } }] },
+        page: { pageNo: 6, bodyText: '잭은 별빛 씨앗을 마을 한가운데에 심었어요.\n다음 날, 작은 싹이 돋더니 밤마다 은은한 빛을 내기 시작했지요.\n사람들은 그 나무 아래에 모여 이야기를 나눴어요.\n요술 거위는 날개를 퍼덕이며, 환한 마을을 바라보았답니다.', illustrationPrompt: buildJackPrompt("Preserve Jack's seated pose, peaceful proud smile, and original upward gaze toward the glowing star tree. Match the tree's warm golden light on his transferred face and hair. Keep his mother, every villager and child, the goose, lanterns, glowing tree, and nighttime village unchanged. Do not modify any other person's face or hair."), baseImageKey: 'templates/jack-and-beanstalk/page-6-b.webp', narrationAudioKey: 'narration/jack-and-beanstalk/page-6-b.mp3', personaTargetRole: 'jack', characters: [{ role: 'jack', hitbox: { x: 0.35, y: 0.42, width: 0.2, height: 0.27 } }, { role: 'magical-goose', hitbox: { x: 0.05, y: 0.61, width: 0.29, height: 0.3 } }] },
       },
     ],
   },
