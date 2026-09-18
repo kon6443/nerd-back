@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import { ConfigService } from '@nestjs/config';
 import { OpenRouterImageAdapter } from './openrouter-image.adapter';
 import type { NotificationPort } from '../port/notification.port';
@@ -325,6 +326,143 @@ describe('OpenRouterImageAdapter', () => {
     await adapter.generateReference({ front: Buffer.from('front-bytes') });
 
     expect(notifications.notify).not.toHaveBeenCalled();
+  });
+
+  // ⭐ 선언 MIME 이 실제 바이트와 어긋나면 모델이 디코딩에 실패해 **생성이 조용히 깨진다.**
+  //    예전에는 `image/jpeg` 하드코딩이었고, PNG 를 보내면서도 동작한 것은 업스트림이
+  //    관대했기 때문이지 보장이 아니었다.
+  describe('입력 이미지 MIME 판별 ⭐', () => {
+    const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+    const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    // 'RIFF' + 크기 4바이트 + 'WEBP'
+    const WEBP = Buffer.concat([
+      Buffer.from('RIFF', 'ascii'),
+      Buffer.from([0, 0, 0, 0]),
+      Buffer.from('WEBP', 'ascii'),
+    ]);
+
+    beforeEach(() => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          data: [{ b64_json: Buffer.from('ok').toString('base64') }],
+        }),
+      });
+    });
+
+    const sentUrls = () => {
+      const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body) as {
+        input_references: Array<{ image_url: { url: string } }>;
+      };
+      return body.input_references.map((r) => r.image_url.url);
+    };
+
+    it.each([
+      ['PNG', PNG, 'data:image/png;base64,'],
+      ['JPEG', JPEG, 'data:image/jpeg;base64,'],
+      ['WebP', WEBP, 'data:image/webp;base64,'],
+    ])('%s 는 실제 바이트대로 선언한다', async (_label, buffer, expected) => {
+      await adapter.generatePageIllustration({
+        referenceImage: buffer,
+        prompt: '장면',
+      });
+
+      expect(sentUrls()[0].startsWith(expected)).toBe(true);
+    });
+
+    // 얼굴 업로드는 jpg·png 가 섞인다(실측). 예전에는 이 경로가 전부 jpeg 로 하드코딩이었다.
+    it('레퍼런스 생성 입력도 바이트대로 선언한다', async () => {
+      await adapter.generateReference({ front: PNG });
+
+      expect(sentUrls()[0].startsWith('data:image/png;base64,')).toBe(true);
+    });
+
+    it('템플릿과 얼굴이 서로 다른 포맷이어도 각각 맞게 선언한다', async () => {
+      await adapter.generatePageIllustration({
+        baseImage: WEBP,
+        referenceImage: JPEG,
+        prompt: '<base_scene_template>t</base_scene_template><protagonist_identity>p</protagonist_identity>',
+      });
+
+      const [base, ref] = sentUrls();
+      expect(base.startsWith('data:image/webp;base64,')).toBe(true);
+      expect(ref.startsWith('data:image/jpeg;base64,')).toBe(true);
+    });
+  });
+
+  // ⭐ 포맷 판별이 곧 **비율 판별**이다. 예전에는 PNG 헤더만 읽어, 템플릿을 WebP 로 바꾸면
+  //    세로 템플릿이 가로 4:3 으로 요청되는 상태가 됐다 — 픽셀이 같아도 **결과 삽화의
+  //    비율이 달라진다.** 실제 sharp 로 만든 버퍼로 고정한다(손으로 만든 헤더는 실물과 다를 수 있다).
+  describe('템플릿 비율 판별 — 포맷 무관 ⭐', () => {
+    const makeImage = async (
+      width: number,
+      height: number,
+      format: 'png' | 'webpLossless' | 'webpLossy' | 'webpAlpha',
+    ) => {
+      // 알파가 있으면 sharp 가 `VP8X` 청크를 만든다 — 크기 오프셋이 다른 변종이다.
+      const channels = format === 'webpAlpha' ? 4 : 3;
+      const background =
+        channels === 4 ? { r: 10, g: 20, b: 30, alpha: 0.5 } : { r: 10, g: 20, b: 30 };
+      const base = sharp({ create: { width, height, channels, background } });
+      if (format === 'png') return base.png().toBuffer();
+      if (format === 'webpLossless') return base.webp({ lossless: true }).toBuffer();
+      return base.webp({ quality: 85 }).toBuffer();
+    };
+
+    const sentRatio = () =>
+      (JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body) as { aspect_ratio: string })
+        .aspect_ratio;
+
+    beforeEach(() => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: jest.fn().mockResolvedValue({
+          data: [{ b64_json: Buffer.from('ok').toString('base64') }],
+        }),
+      });
+    });
+
+    // ⚠️ WebP 는 청크가 세 변종(VP8L·VP8·VP8X)이고 **크기 위치가 각각 다르다.**
+    //    RGB 손실은 `VP8 `, 무손실은 `VP8L`, 알파나 EXIF 가 붙으면 `VP8X` 가 된다(실측).
+    //    하나라도 못 읽으면 조용히 `4:3` 으로 떨어지므로 세 변종을 모두 건다.
+    it.each(['png', 'webpLossless', 'webpLossy', 'webpAlpha'] as const)(
+      '%s 세로 템플릿(1024x1536)은 2:3 으로 요청한다',
+      async (format) => {
+        const baseImage = await makeImage(1024, 1536, format);
+
+        await adapter.generatePageIllustration({
+          referenceImage: Buffer.from('face'),
+          baseImage,
+          prompt: '<base_scene_template>t</base_scene_template><protagonist_identity>p</protagonist_identity>',
+        });
+
+        expect(sentRatio()).toBe('2:3');
+      },
+    );
+
+    it('가로 템플릿은 포맷과 무관하게 3:2 로 요청한다', async () => {
+      const baseImage = await makeImage(1536, 1024, 'webpLossless');
+
+      await adapter.generatePageIllustration({
+        referenceImage: Buffer.from('face'),
+        baseImage,
+        prompt: '<base_scene_template>t</base_scene_template><protagonist_identity>p</protagonist_identity>',
+      });
+
+      expect(sentRatio()).toBe('3:2');
+    });
+
+    it('크기를 읽을 수 없는 입력은 4:3 으로 떨어진다', async () => {
+      await adapter.generatePageIllustration({
+        referenceImage: Buffer.from('face'),
+        baseImage: Buffer.from('not-an-image'),
+        prompt: '<base_scene_template>t</base_scene_template><protagonist_identity>p</protagonist_identity>',
+      });
+
+      expect(sentRatio()).toBe('4:3');
+    });
   });
 
   it('응답 본문에 b64_json 이 없으면 사용자 문구로 던진다', async () => {

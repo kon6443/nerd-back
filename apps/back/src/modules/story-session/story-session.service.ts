@@ -68,6 +68,8 @@ export class StorySessionService {
   private readonly logger = new Logger(StorySessionService.name);
   /** 서명 URL 실패 로그 억제기 — 폴링 경로에서 불리므로 간격 제한이 필수다. */
   private readonly presignFailLog = createLogThrottle(60_000);
+  /** 템플릿 삽화 누락 로그 억제기 — 키를 잘못 옮기면 페이지 수만큼 한꺼번에 찍힌다. */
+  private readonly templateMissLog = createLogThrottle(60_000);
 
   constructor(
     @InjectRepository(StorySession)
@@ -825,7 +827,15 @@ export class StorySessionService {
                 try {
                   baseImageBuffer = await this.storagePort.download(tplPage.baseImageKey);
                 } catch {
-                  // 다운로드 실패 시에도 페이지 생성은 계속 진행
+                  // 생성은 계속하되 **조용히 넘기지 않는다.** 템플릿이 없으면 어댑터가
+                  // 텍스트만으로 그려(`openrouter-image.adapter.ts` 의 baseImage 없는 분기)
+                  // **구도가 전혀 다른 그림**이 나오는데, 상태는 `succeeded` 로 남아
+                  // 아무도 알아채지 못한다. 키를 옮길 때(예: png → webp) 실수가 여기로 떨어진다.
+                  if (this.templateMissLog.consume(Date.now()).log) {
+                    this.logger.warn(
+                      `템플릿 삽화를 받지 못해 참조 없이 생성한다 — 키: ${tplPage.baseImageKey}`,
+                    );
+                  }
                 }
               }
 
@@ -937,7 +947,12 @@ export class StorySessionService {
           try {
             baseImageBuffer = await this.storagePort.download(tplPage.baseImageKey);
           } catch {
-            // 무시하고 진행
+            // 위 일괄 경로와 같은 이유로 조용히 넘기지 않는다.
+            if (this.templateMissLog.consume(Date.now()).log) {
+              this.logger.warn(
+                `템플릿 삽화를 받지 못해 참조 없이 생성한다 — 키: ${tplPage.baseImageKey}`,
+              );
+            }
           }
         }
 
