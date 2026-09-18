@@ -77,7 +77,7 @@ export function CaptureStudio({
         <aside className={styles.privacy} aria-label="사진 이용 안내">
           <StudioIcon name="shield" />
           <div>
-            <p className={styles.privacyTitle}>원본 얼굴 사진은 동화나라 서버에 보관하지 않아요.</p>
+            <p className={styles.privacyTitle}>사진은 24시간 안에 폐기돼요.</p>
             <p>사진은 AI로 동화 속 주인공을 만드는 데 사용해요.</p>
           </div>
         </aside>

@@ -393,7 +393,7 @@ export default function CapturePage({ params }: PageProps) {
             />
           </div>
           <p className="break-keep text-xs leading-relaxed text-ink-muted">
-            원본 얼굴 사진은 동화나라 서버에 보관하지 않아요.
+            사진은 24시간 안에 폐기돼요.
           </p>
 
           <div className="flex w-full flex-col gap-3">
