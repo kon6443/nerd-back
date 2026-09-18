@@ -215,7 +215,7 @@ export function HomeWorld({ children }: { children: ReactNode }) {
           </div>
           <div className={styles.actions} aria-busy={presentation.entering || undefined}>
             <div className={styles.actionLinks} onClickCapture={enterStory}>{children}</div>
-            <p className={styles.note}>시연은 로그인 없이 바로 볼 수 있어요.</p>
+            <p className={styles.note}>로그인 없이 바로 볼 수 있어요.</p>
           </div>
         </div>
         <div className={styles.entryWash} aria-hidden="true" />

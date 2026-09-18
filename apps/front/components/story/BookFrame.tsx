@@ -85,11 +85,11 @@ export function BookArtContent({
    * 삽화의 **표시용 URL**. 🚫 오브젝트 키를 그대로 넘기지 않는다 — 키 → URL 변환은
    * 호출하는 쪽의 책임이다. 없으면 삽화 준비 안내를 표시한다.
    */
-  imageUrl?: string;
+  imageUrl?: string | null;
 }) {
-  return imageUrl ? (
+  return imageUrl && imageUrl.trim() ? (
     <Image
-      src={imageUrl}
+      src={imageUrl.trim()}
       alt=""
       fill
       sizes="(max-width: 768px) 100vw, 50vw"

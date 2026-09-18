@@ -135,11 +135,19 @@ export class StoryService {
     page: StoryPage,
     appearances: StoryPageCharacter[],
   ): Promise<StoryPageView> {
+    const signingDate = new Date(
+      Math.floor(Date.now() / PUBLIC_COVER_SIGNING_WINDOW_MS) * PUBLIC_COVER_SIGNING_WINDOW_MS,
+    );
+    const [baseImageUrl, narrationAudioUrl] = await Promise.all([
+      this.getOptionalAssetUrl(page.baseImageKey, signingDate),
+      this.getOptionalAssetUrl(page.narrationAudioKey),
+    ]);
     return {
       pageNo: page.pageNo,
       bodyText: page.bodyText,
       baseImageKey: page.baseImageKey,
-      narrationAudioUrl: await this.getOptionalAssetUrl(page.narrationAudioKey),
+      baseImageUrl,
+      narrationAudioUrl,
       personaTargetRole: page.personaTargetRole,
       characters: appearances.map((appearance) => ({
         role: appearance.character.role,
@@ -153,12 +161,13 @@ export class StoryService {
     key: string | null,
     signingDate?: Date,
   ): Promise<string | null> {
-    if (!key) return null;
+    if (!key || !key.trim()) return null;
+    const trimmedKey = key.trim();
     try {
       if (signingDate) {
-        return await this.storage.getPresignedUrl(key, PUBLIC_COVER_URL_TTL_SECONDS, signingDate);
+        return await this.storage.getPresignedUrl(trimmedKey, PUBLIC_COVER_URL_TTL_SECONDS, signingDate);
       }
-      return await this.storage.getPresignedUrl(key);
+      return await this.storage.getPresignedUrl(trimmedKey);
     } catch {
       return null;
     }
