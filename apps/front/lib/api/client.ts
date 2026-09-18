@@ -128,6 +128,11 @@ export interface ApiFetchOptions extends Omit<RequestInit, "body"> {
   json?: unknown;
   /** FormData 등 원시 본문. FormData 일 경우 Content-Type 헤더를 비워두어야 boundary 가 자동 생성된다. */
   body?: BodyInit;
+  /** Next.js 캐시 옵션 (ISR revalidate, tags 등). */
+  next?: {
+    revalidate?: number | false;
+    tags?: string[];
+  };
 }
 
 /**

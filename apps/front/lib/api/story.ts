@@ -17,7 +17,11 @@ function storyPath(slug: string, suffix = ""): string {
 }
 
 export function fetchStories(signal?: AbortSignal): Promise<StorySummary[]> {
-  return apiFetch<StorySummary[]>("/stories", { signal });
+  return apiFetch<StorySummary[]>("/stories", {
+    signal,
+    // 공개 동화 목록과 표지 서명 URL은 5분 단위로 Next.js 서버 캐시를 활용해 0ms 로 즉시 응답한다.
+    next: { revalidate: 300 },
+  });
 }
 
 export function fetchStoryDetail(slug: string): Promise<StoryDetail> {
