@@ -1,6 +1,6 @@
-# 템플릿 이미지 PNG → WebP 무손실 전환
+# 이미지 PNG → WebP 전환 (템플릿 무손실 · 사용자 삽화 손실)
 
-> 상태: **코드 완료 · DB 전환 대기** (착수 2026-09-16)
+> 상태: **전환 완료** — 템플릿 14 · 사용자 삽화 41 전부 webp. 얼굴 참조는 의도적 제외 (2026-09-16 착수 · 09-18 완료)
 > 발단: 사용자 질문 「이미지가 webp 로 관리되나? 기존 png 도 바꿀 수 있나?」
 > 브랜치: `perf/template-webp` — `main`(`600838c`) 에서 분기
 > 이 문서가 이 작업의 **SSOT** 다.
@@ -45,10 +45,16 @@
 
 - [x] `convertImageToWebp` 에 `{ lossless }` 옵션 추가. 기존 호출부 4곳 무영향(옵셔널)
 - [x] 변환 스크립트 신설 — 새 키로만 업로드, **기존 PNG 보존**, DB 는 건드리지 않고 SQL 만 출력
-- [x] `jack-and-beanstalk` 7장 변환·업로드 (21MB → 14.7MB, 30% 감소). **7장 전부 원본과 픽셀 단위 일치 실측 확인**
+- [x] `jack-and-beanstalk` 7장 변환 (21MB → 14.7MB, 30% 감소). **7장 전부 원본과 픽셀 단위 일치 실측 확인**
 - [x] 시드 파일 키 갱신 (jack 만. `red-riding-hood` 는 png 유지)
-- [ ] **DB 전환** — 아래 SQL, 사람이 실행
-- [ ] 모델이 webp 를 정상 처리하는지 실제 생성 1회로 확인
+- [x] 코드 배포 (`927fce0`)
+- [x] 변환 스크립트의 **스토리지 키 접두사 결함** 수정 (아래 2026-09-18 절)
+- [x] `docs/sql/` 에 적용·롤백·확인 SQL + `pnpm db:sql` 러너
+- [x] 잭과 콩나무 — 스토리지 업로드 + DB 전환 (2026-09-18)
+- [x] **모델이 webp 를 정상 처리하는지 실제 생성 1회로 확인** — 사용자가 책을 만들어 정상 확인
+- [x] 빨간 모자 템플릿 7장 — 무손실 21.5MB → 16.4MB (24% 감소) + DB 전환
+- [x] 사용자 삽화 13장 — q85 30.0MB → 3.8MB (88% 감소) + DB 전환
+- [x] 전수 검증 — DB 이미지 키 64건 `HeadObject`, 레거시 세션 1건(8개) 외 전부 존재
 
 ---
 
@@ -79,28 +85,129 @@ const width = baseImage.readUInt32BE(16);   // PNG IHDR 직접 파싱
 
 ---
 
-## DB 전환 SQL (사람이 실행)
+## ⭐ 2026-09-18 — 전환 직전에 잡은 결함: 스토리지 키 접두사
 
-```sql
-UPDATE story_pages SET base_image_key = 'templates/jack-and-beanstalk/page-1.webp' WHERE base_image_key = 'templates/jack-and-beanstalk/page-1.png';
-UPDATE story_pages SET base_image_key = 'templates/jack-and-beanstalk/page-2.webp' WHERE base_image_key = 'templates/jack-and-beanstalk/page-2.png';
-UPDATE story_pages SET base_image_key = 'templates/jack-and-beanstalk/page-3.webp' WHERE base_image_key = 'templates/jack-and-beanstalk/page-3.png';
-UPDATE story_pages SET base_image_key = 'templates/jack-and-beanstalk/page-4.webp' WHERE base_image_key = 'templates/jack-and-beanstalk/page-4.png';
-UPDATE story_pages SET base_image_key = 'templates/jack-and-beanstalk/page-5.webp' WHERE base_image_key = 'templates/jack-and-beanstalk/page-5.png';
-UPDATE story_pages SET base_image_key = 'templates/jack-and-beanstalk/page-6-a.webp' WHERE base_image_key = 'templates/jack-and-beanstalk/page-6-a.png';
-UPDATE story_pages SET base_image_key = 'templates/jack-and-beanstalk/page-6-b.webp' WHERE base_image_key = 'templates/jack-and-beanstalk/page-6-b.png';
-UPDATE story_templates SET cover_image_key = 'templates/jack-and-beanstalk/page-1.webp' WHERE cover_image_key = 'templates/jack-and-beanstalk/page-1.png';
+**증상**: 배포 후 SQL 을 실행하기 직전 버킷을 조회했더니, SQL 이 가리키는 객체가 **없었다.**
+
+```
+templates/jack-and-beanstalk/page-1.webp        → NotFound   ← SQL·DB·시드가 가리키는 키
+prod/templates/jack-and-beanstalk/page-1.webp   → 2268128    ← 변환 스크립트가 올린 곳
 ```
 
-되돌리려면 `.webp` ↔ `.png` 를 바꿔 같은 문을 실행한다. **PNG 원본은 스토리지에 그대로 있다.**
+**원인**: `S3StorageAdapter` 는 **`upload()` 에서만** `STORAGE_KEY_PREFIX`(= `prod/`)를 붙이고,
+`download()`·`getPresignedUrl()`·`delete()` 는 키를 **그대로** 쓴다. 즉 **DB 에 적힌 키가 곧 객체 키**다.
+변환 스크립트는 접두사를 붙여 읽고 쓰면서 SQL 만 접두사 없이 출력했다.
 
-## ⚠️ 배포 순서 — 어기면 조용히 깨진다
+읽기가 통과한 이유가 함정이었다 — 버킷에 `templates/...png` 와 `prod/templates/...png` 가 **둘 다**
+있었다(과거 업로드 경로의 잔재). 그래서 읽기는 우연히 성공하고 **쓰기만 아무도 안 보는 곳으로** 갔다.
 
-1. **코드 배포 먼저** (MIME 판별 + 비율 판독). 구버전 코드는 webp 를 `image/png` 로 선언하고 비율을 `4:3` 으로 보낸다
-2. 그다음 위 SQL
-3. 🚫 **그 사이 `pnpm db:seed:stories` 를 실행하지 않는다** — 시드는 upsert 라 DB 가 webp 로 바뀌는데, 코드가 구버전이면 위 두 문제가 함께 터진다
+> 실측으로 확인하지 않았으면 그대로 실행했다. SQL 은 성공하고, 템플릿 다운로드만 조용히 실패하고,
+> 어댑터는 **템플릿 없이 T2I** 로 전혀 다른 그림을 그렸을 것이다. 「결함 3」을 고쳐 둔 덕에
+> 경고 로그는 남았겠지만, 그림은 이미 틀린 뒤다.
 
-가장 위험한 순서는 **시드만 먼저 도는 것**이다: DB 는 webp 를 가리키는데 스토리지에 객체가 없으면 다운로드가 실패하고, 예전에는 그것을 조용히 삼켜 **템플릿 없는 그림**이 `succeeded` 로 저장됐다. 결함 3을 고친 이유다.
+**조치 3건**
+
+1. 변환 스크립트에서 `STORAGE_KEY_PREFIX` 사용을 **제거**했다. 읽기·쓰기·출력 SQL 이 모두 같은 키를 쓴다
+2. 대상 키를 **PNG 로 정규화**(`toPngKey`)했다 — 시드가 이미 `.webp` 라 `.png` 필터로는 **대상 0장**이
+   되어 다시 돌릴 수 없었다. 이제 몇 번을 돌려도 같은 결과다
+3. 실행법을 `pnpm templates:webp` 로 등재했다. 주석의 `tsx` 는 **이 저장소에 없는 도구**였다
+
+## 실행 절차 (사람이 실행)
+
+**순서를 지킨다. 2 → 3 이다.**
+
+| # | 무엇 | 명령 |
+|---|---|---|
+| 1 | 코드 배포 | 완료 (`927fce0`) |
+| 2 | **스토리지에 webp 업로드** | `pnpm templates:webp -- --slug jack-and-beanstalk` |
+| 3 | 현재 상태 확인 | `pnpm db:sql docs/sql/image-format.check.sql` |
+| 4 | **DB 전환** | `pnpm db:sql docs/sql/template-webp.up.sql` |
+| 5 | 이상하면 롤백 | `pnpm db:sql docs/sql/template-webp.down.sql` |
+
+⚠️ 2번은 `pnpm build` 를 먼저 돈다 — `pnpm back dev` 가 떠 있으면 `dist` 를 서로 덮어쓴다. 먼저 끈다.
+🚫 이 사이에 `pnpm db:seed:stories` 를 실행하지 않는다 (upsert 라 DB 만 먼저 바뀐다).
+
+SQL 은 저장소에 파일로 둔다 — [`docs/sql/`](../sql/). 실행할 문장이 리뷰·롤백 대상으로 남아야 한다.
+
+### 롤백이 안전한 이유
+
+- `up.sql` 은 **키 문자열만** 바꾼다. 객체를 지우지도 덮어쓰지도 않는다
+- **PNG 원본 7장이 스토리지에 그대로 있다** (`templates/jack-and-beanstalk/page-*.png`, 실측 확인)
+- `down.sql` 을 돌리면 전환 전과 **바이트 단위로 같은 상태**가 된다. 참조되지 않는 webp 객체만 남는데 무해하다
+- 두 파일 모두 `START TRANSACTION` … `COMMIT` 으로 감싸 부분 적용이 생기지 않는다
+
+### 🚫 표지(`story_templates.cover_image_key`)는 건드리지 않는다
+
+운영 DB 의 표지는 시드가 아니라 **별도 업로드 경로**로 들어가 있고 **이미 webp** 다 (실측):
+
+```
+jack-and-beanstalk  prod/templates/jack-and-beanstalk/cover-b4748985efa68b01.webp
+red-riding-hood     prod/templates/red-riding-hood/cover-45013953ab26bba6.webp
+```
+
+앞서 「결함 2」로 추가했던 표지 UPDATE 는 시드 키를 근거로 만든 것이라 **운영 DB 에서 0건**이다.
+해롭지는 않지만 의미도 없어 `up.sql` 에서 뺐다. 변환 스크립트는 여전히 출력하며, 그 0건은 정상이다.
+
+## 2026-09-18 — 전 범위로 확대
+
+사용자 요청: 「기존에 있던 모든 사진들도 다 웹피로. 유저가 이미 만든 책과 템플릿 이미지 전부 포함」.
+
+### 무엇이 모델 입력인가 — 손실/무손실을 가르는 유일한 기준
+
+`storagePort.download()` 호출을 전수 확인했다 (`apps/back/src` 전체, spec 제외, **4곳**):
+
+| 호출 위치 | 대상 | 성격 |
+|---|---|---|
+| `story-session.service.ts:800, 943` | `session.referenceImageKey` | **모델 입력** (얼굴) |
+| `story-session.service.ts:828, 948` | `tplPage.baseImageKey` | **모델 입력** (템플릿) |
+
+`session_page_images.image_key` 는 `download()` 되지 않는다 — `getOptionalPresignedUrl` 로 **화면에
+보여줄 때만** 쓰인다. 그래서 여기는 픽셀 동일성이 아니라 **용량**이 기준이고, 손실(q85)이 정답이다.
+
+### 실측 (2026-09-18, 운영 DB·스토리지)
+
+| 대상 | 건수 | 용도 | 원본 | 무손실 | q85 | 결정 |
+|---|---|---|---|---|---|---|
+| `story_pages` 빨간 모자 | png 7 | 모델 입력 | 21MB | 30% 감소 | — | **무손실** |
+| `session_page_images` | png 13 | 표시 전용 | 30.0MB | 22.2MB (26%) | **3.8MB (88%)** | **q85** |
+| `story_sessions.reference_image_key` | jpg 5 · png 1 | 모델 입력 | 4.2MB | 3.5MB (18%) | 0.4MB (90%) | **하지 않는다** |
+| `story_templates.cover_image_key` | webp 2 | 표시 전용 | — | — | — | 이미 완료 |
+
+### 🚫 얼굴 참조 사진은 전환하지 않는다
+
+1. **모델이 얼굴을 베끼는 원본**이다. 파이프라인에서 품질에 가장 민감한 입력이다
+2. **6건 중 5건이 이미 JPEG**(손실)다. q85 로 다시 줄이면 손실 위에 손실을 덧씌운다 — 얼굴에서
+   그 열화는 정체성 재현에 직접 닿는다
+3. 무손실로 가면 **18% 밖에 안 줄어** 750KB 를 아끼자고 모델 입력을 건드리는 셈이다
+
+전환하려면 근거가 바뀌어야 한다 — 생성 지연이 참조 다운로드 때문이라는 **측정**이 나오면 재검토한다.
+
+### 실행 절차
+
+| # | 무엇 | 명령 |
+|---|---|---|
+| 1 | 빨간 모자 템플릿 업로드 | `pnpm templates:webp -- --slug red-riding-hood` |
+| 2 | 빨간 모자 DB 전환 | `pnpm db:sql docs/sql/template-webp-red-riding-hood.up.sql` |
+| 3 | 사용자 삽화 업로드 | `pnpm sessions:webp` |
+| 4 | 사용자 삽화 DB 전환 | `pnpm db:sql docs/sql/session-images-webp.up.sql` |
+
+롤백은 각각 `.down.sql`. **PNG 원본은 어느 단계에서도 지우지 않는다.**
+
+⚠️ 1·3 번은 `pnpm build` 를 먼저 돈다 — dev 서버가 떠 있으면 `dist` 를 서로 덮어쓴다. 먼저 끈다.
+
+### 🚫 `session-images-webp` SQL 은 키를 나열하지 않는다
+
+키에 세션 UUID 가 들어 있어 **공개 저장소에 남기지 않는다.** 확장자만 치환하고 대상은 행 id 로 고정한다.
+id 목록이 필요한 이유는 롤백 때문이다 — **원래부터 webp 인 행이 28건** 있어 `LIKE '%.webp'` 만으로는
+구분되지 않고, 그대로 되돌리면 멀쩡한 책 28장이 깨진다.
+
+### 별건 — 객체가 통째로 없는 세션 1건
+
+세션 `7fb4242f-…` 의 **8개 객체가 전부 없다**(삽화 7 + 얼굴 참조 1). 키에 `prod/` 접두사가 없는
+레거시 행이라 접두사 도입 이전 데이터로 보인다. 서재에서 깨져 보인다. 전수 검사 결과 **이 세션 말고는
+48건 중 없는 객체가 없다.** 처리(세션 삭제 등)는 사용자 판단 대기.
+
+---
 
 ## 남은 것
 
@@ -115,3 +222,16 @@ UPDATE story_templates SET cover_image_key = 'templates/jack-and-beanstalk/page-
 - **2026-09-16** 실측으로 현황 파악 → 개인화 PNG 는 방치, 템플릿만 전환하기로 결정
 - **2026-09-16** 손실 q85 로 5장을 먼저 올렸다가, 사용자 지적("결과물에 영향 없나")으로 재측정해 **무손실로 전환**. DB 를 안 바꾼 상태라 실사용 영향은 없었다
 - **2026-09-16** 리뷰에서 `aspect_ratio` 결함 발견 — 반증 에이전트와 독립적으로 같은 결론. 3건 수정 후 `pnpm back ci:core` 통과 (33 suites / 324 tests)
+- **2026-09-18** 코드 머지·배포 완료(PR #65 → `927fce0`, Deploy back/front 모두 success)
+- **2026-09-18** SQL 실행 직전 버킷 실측 → **접두사 불일치 발견**. 변환 스크립트 3건 수정,
+  `docs/sql/` 에 적용·롤백·확인 SQL 3종과 `pnpm db:sql` 러너 추가. 아직 **DB 는 안 바꿨다**
+- **2026-09-18** 잭과 콩나무 전환 완료. 스토리지 7/7 · DB webp 7 · 서명 URL 200 `image/webp` ·
+  실파일 `VP8L` 1024×1536 → 2:3 확인. **사용자가 실제로 책을 만들어 정상 생성 확인** — 모델의
+  webp 입력 처리가 실증됐다
+- **2026-09-18** 범위를 전체 이미지로 확대. `download()` 전수 확인으로 손실/무손실 기준을 세우고,
+  얼굴 참조는 제외 결정. 빨간 모자·사용자 삽화 스크립트와 SQL 준비 완료 (실행 대기)
+- **2026-09-18** 빨간 모자·사용자 삽화 전환 실행 완료. 합계 약 **48MB 절감**.
+  검증: 빨간모자 1쪽 서명 URL `200 image/webp`, 서재 표지 2건 URL 발급, DB 키 64건 전수 존재 확인
+- **2026-09-18** 리뷰에서 `run-sql.mjs` 결함 1건 수정 — **단일 SELECT 파일이 아무것도 출력하지
+  않았다.** mysql2 가 다중문이면 `[결과…]`, 단일 SELECT 면 `[행…]` 을 주는데 둘 다 배열이라
+  겉모습으로 구분되지 않는다. 원소의 모양으로 판별하도록 고치고 단일·다중·0행 3케이스로 확인
