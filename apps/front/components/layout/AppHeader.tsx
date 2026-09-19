@@ -118,11 +118,14 @@ export function AppHeader() {
         </Link>
         <ul className="order-3 flex w-full items-center gap-1 sm:order-none sm:w-auto">
           <CommonNavLinks pathname={pathname} />
-          <li className="lg:hidden">
+          {/* 로그인 전에는 넓은 화면에서 「로그인하기」 버튼(AuthCta)을 따로 두고, 로그인 후 「마이페이지」는
+              강조 없이 다른 메뉴와 같은 모양으로 둔다. */}
+          <li>
             {AUTH_NAV_SLOTS.map(({ status, className }) => {
               const link = AUTH_LINK[status];
               const active = isActive(pathname, link.href);
-              return <Link key={status} href={link.href} aria-current={active ? "page" : undefined} className={`${className} ${navLinkClass(active)}`}>{link.label}</Link>;
+              const hideWide = status === "guest" ? "lg:hidden" : "";
+              return <Link key={status} href={link.href} aria-current={active ? "page" : undefined} className={`${className} ${hideWide} ${navLinkClass(active)}`}>{link.label}</Link>;
             })}
           </li>
         </ul>
