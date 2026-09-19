@@ -10,8 +10,8 @@ import { AuthCta } from "./AuthCta";
 
 export const COMMON_LINKS = [
   { href: "/", label: "홈" },
-  { href: "/library?mode=create", label: "서재" },
-  { href: "/library", label: "서재 둘러보기" },
+  { href: "/stories/jack-and-beanstalk/capture?demo=true", label: "빠른 체험하기" },
+  { href: "/library?mode=create", label: "내 얼굴로 만들기" },
 ] as const;
 
 export function isActive(
@@ -34,7 +34,7 @@ export function isActive(
     return false;
   }
 
-  if (href === "/library") {
+  if (href === "/stories/jack-and-beanstalk/capture?demo=true") {
     if (pathname.startsWith("/stories/")) {
       return isDemo;
     }
@@ -73,7 +73,7 @@ function CommonNavLinksItems({
           <li key={link.href}>
             <Link
               href={link.href}
-              prefetch={link.href.startsWith("/library") ? true : undefined}
+              prefetch={link.href.startsWith("/library") || link.href.startsWith("/stories/") ? true : undefined}
               aria-current={active ? "page" : undefined}
               className={navLinkClass(active)}
             >

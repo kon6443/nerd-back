@@ -84,6 +84,26 @@ const nextConfig: NextConfig = {
         destination: "/stories/:slug/capture",
         permanent: false,
       },
+      {
+        source: "/stories/jack",
+        destination: "/stories/jack-and-beanstalk",
+        permanent: false,
+      },
+      {
+        source: "/stories/jack/:path*",
+        destination: "/stories/jack-and-beanstalk/:path*",
+        permanent: false,
+      },
+      {
+        source: "/library/jack",
+        destination: "/library/jack-and-beanstalk",
+        permanent: false,
+      },
+      {
+        source: "/library/jack/:path*",
+        destination: "/library/jack-and-beanstalk/:path*",
+        permanent: false,
+      },
     ];
   },
 
