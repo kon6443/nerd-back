@@ -6,13 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { StoryRoom } from '@/components/layout/StoryRoom';
 import { StoryBookScene } from '@/components/story/StoryBookScene';
 import { Card } from '@/components/ui/Card';
+import { ActionLink } from '@/components/ui/ActionLink';
 import { actionClass } from '@/components/ui/actionStyles';
 import { LoadingView } from '@/components/ui/LoadingView';
 import { ApiError, createSession, deleteSession, findMySessionBySlug, uploadFace } from '@/lib/api';
 import type { MyStorySessionItem, UploadFaceResponse } from '@nerd/contracts';
 import { errorMessage } from '@/lib/api/errorPresentation';
 import { getLibraryStoryHref } from '@/lib/libraryMode';
-import { CaptureStudio, StudioIcon, type DemoPreset } from './CaptureStudio';
+import { CaptureStudio, type DemoPreset } from './CaptureStudio';
 import styles from './CaptureStudio.module.css';
 
 interface PageProps {
@@ -335,16 +336,14 @@ function CapturePageContent({ params }: PageProps) {
   return (
     <StoryRoom storySlug={slug} className={styles.page}>
       <div className={styles.pageHeader}>
-        <Link
+        {/* 서재 상세의 「서재로 돌아가기」와 같은 보조 버튼 모양으로 맞춘다. */}
+        <ActionLink
           href={isDemoMode ? '/library' : getLibraryStoryHref(slug, true)}
-          className={actionClass('tertiary', styles.backLink, 'compact')}
+          variant="secondary"
+          size="compact"
         >
-          <StudioIcon name="back" />
           {isDemoMode ? '서재로 돌아가기' : '동화로 돌아가기'}
-        </Link>
-        <span className={styles.pageLabel}>
-          {isDemoMode ? '샘플 주인공 체험' : '주인공 준비하기'}
-        </span>
+        </ActionLink>
       </div>
 
       {existingSession ? (

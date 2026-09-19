@@ -1,9 +1,8 @@
-import { StoryBookOrnament } from "@/components/story/StoryBookScene";
 import type { ReactNode } from "react";
 import { actionClass } from "@/components/ui/actionStyles";
 import styles from "./CaptureStudio.module.css";
 
-type IconName = "camera" | "photo" | "shield" | "sparkle" | "check" | "back";
+type IconName = "camera" | "photo" | "shield" | "sparkle" | "check";
 
 export function StudioIcon({ name }: { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -12,7 +11,6 @@ export function StudioIcon({ name }: { name: IconName }) {
     shield: <><path d="M12 3 4 6v5c0 5 8 10 8 10s8-5 8-10V6Z" /><path d="m8.5 11.5 2.5 2.5 4.5-5" /></>,
     sparkle: <><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z" /><path d="M20 2v4m-2-2h4" /></>,
     check: <path d="m5 12 4 4L19 6" />,
-    back: <><path d="m10 5-7 7 7 7M3 12h18" /></>,
   };
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={styles.icon}>
@@ -73,14 +71,16 @@ export function CaptureStudio({
             ? "찰칵! 사진 찍기"
             : "카메라 켜기";
 
+  // 좌우로 나누지 않고 가운데 한 줄 — 제목 · (내 사진일 때) 사진 이용 안내 · 사진 패널. 시선을 한곳에 모은다.
+  // 사진 이용 안내는 첫 화면 안에서 보여야 해서 패널 아래가 아니라 제목 바로 아래에 둔다.
   return (
     <section className={styles.studio} aria-labelledby="capture-title">
       <div className={styles.welcome}>
         <h1 id="capture-title" className={styles.title}>
           {isDemoMode ? (
             <>
-              동화 속 주인공이<br />
-              <em>되어보세요!</em>
+              샘플 얼굴을 선택해 3초만에<br />
+              <em>동화 속 주인공이 되어보세요!</em>
             </>
           ) : hasPhoto ? (
             <>
@@ -94,24 +94,7 @@ export function CaptureStudio({
             </>
           )}
         </h1>
-        <p className={styles.description}>
-          {isDemoMode
-            ? "샘플 얼굴을 선택해 3초 만에 나만의 동화를 체험해요."
-            : hasPhoto
-              ? "이제 나만의 동화 속으로 떠나봐요."
-              : "정면 사진 한 장으로 나만의 동화를 만들어요."}
-        </p>
-
-        <div className={styles.companion}>
-          <StoryBookOrnament />
-        </div>
-
-        {isDemoMode ? (
-          <aside className={styles.demoBanner} aria-label="시연 안내">
-            <StudioIcon name="sparkle" />
-            <span>시연용 샘플 주인공으로 3초 만에 나만의 동화를 체험해 보세요! ✨</span>
-          </aside>
-        ) : (
+        {!isDemoMode && (
           <aside className={styles.privacy} aria-label="사진 이용 안내">
             <StudioIcon name="shield" />
             <div>
