@@ -346,36 +346,205 @@ export function createMagicLantern(palette: JourneyPalette): THREE.Group {
   return lantern;
 }
 
-/** 5. 3D 뭉게구름 덩어리 (Cloud) */
+/** 5. 3D 뭉게구름 덩어리 (Cloud) - 순백색의 뽀얗고 화사한 구름 */
 export function createCloudModel(palette: JourneyPalette, scale = 1): THREE.Group {
   const cloud = new THREE.Group();
 
+  // 그림자 속에서도 칙칙해지지 않는 눈부신 순백 머티리얼
   const cloudMat = new THREE.MeshStandardMaterial({
-    color: palette.cloud,
-    roughness: 0.9,
-    metalness: 0.05,
-    transparent: true,
-    opacity: 0.94,
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.22,
+    roughness: 0.15,
+    metalness: 0.0,
+    transparent: false,
+    opacity: 1.0,
   });
 
-  // 여러 크기의 구체를 겹쳐 볼륨감 있는 구름 형성
-  const p1 = new THREE.Mesh(new THREE.SphereGeometry(1.0, 10, 8), cloudMat);
+  // 볼륨감 넘치는 5개의 둥근 구체 클러스터
+  const p1 = new THREE.Mesh(new THREE.SphereGeometry(1.15, 12, 10), cloudMat);
   cloud.add(p1);
 
-  const p2 = new THREE.Mesh(new THREE.SphereGeometry(0.75, 8, 6), cloudMat);
-  p2.position.set(-0.85, -0.15, 0.1);
+  const p2 = new THREE.Mesh(new THREE.SphereGeometry(0.85, 10, 8), cloudMat);
+  p2.position.set(-0.95, -0.1, 0.15);
   cloud.add(p2);
 
-  const p3 = new THREE.Mesh(new THREE.SphereGeometry(0.75, 8, 6), cloudMat);
-  p3.position.set(0.85, -0.15, -0.1);
+  const p3 = new THREE.Mesh(new THREE.SphereGeometry(0.85, 10, 8), cloudMat);
+  p3.position.set(0.95, -0.1, -0.15);
   cloud.add(p3);
 
-  const p4 = new THREE.Mesh(new THREE.SphereGeometry(0.65, 8, 6), cloudMat);
-  p4.position.set(0.2, 0.45, 0.25);
+  const p4 = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 8), cloudMat);
+  p4.position.set(0.25, 0.55, 0.3);
   cloud.add(p4);
+
+  const p5 = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 8), cloudMat);
+  p5.position.set(-0.35, 0.45, -0.25);
+  cloud.add(p5);
 
   cloud.scale.setScalar(scale);
   return cloud;
+}
+
+/** 5-1. 주인공이 타고 날아가는 꼬마 마법 구름 (Magic Cloud Board) */
+export function createMagicCloudBoard(): THREE.Group {
+  const board = new THREE.Group();
+  const cloudMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.3,
+    roughness: 0.1,
+  });
+
+  // 서핑 보드처럼 유선형으로 겹친 구름들
+  const center = new THREE.Mesh(new THREE.SphereGeometry(0.65, 10, 8), cloudMat);
+  center.scale.set(1.4, 0.4, 0.85);
+  board.add(center);
+
+  const front = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 6), cloudMat);
+  front.position.set(0, 0.05, -0.7);
+  front.scale.set(1.1, 0.4, 0.9);
+  board.add(front);
+
+  const back = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 6), cloudMat);
+  back.position.set(0, 0.08, 0.65);
+  back.scale.set(1.2, 0.45, 0.9);
+  board.add(back);
+
+  return board;
+}
+
+export interface HeroModel extends THREE.Group {
+  setPose: (mode: "selfie" | "dive" | "fly", t?: number) => void;
+  setBank: (tilt: number) => void;
+  magicCloud: THREE.Group;
+}
+
+/** 5-2. 3인칭 주인공 캐릭터 모델 (Hero Avatar) */
+export function createHeroModel(): HeroModel {
+  const hero = new THREE.Group() as HeroModel;
+
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xffddb8, roughness: 0.5 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: 0x5a3825, roughness: 0.6 });
+  const clothesMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.4 }); // 파란 옷
+  const capeMat = new THREE.MeshStandardMaterial({
+    color: 0xef4444, // 빨간 망토
+    roughness: 0.3,
+    side: THREE.DoubleSide,
+  });
+  const faceMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+  const blushMat = new THREE.MeshBasicMaterial({ color: 0xf472b6 });
+
+  // 1. 머리 (Head)
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0, 1.1, 0);
+  hero.add(headGroup);
+
+  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 10), skinMat);
+  headGroup.add(headMesh);
+
+  // 헤어 (둥근 반구 + 앞머리 볼륨)
+  const hairGeo = new THREE.SphereGeometry(0.38, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55);
+  const hairMesh = new THREE.Mesh(hairGeo, hairMat);
+  hairMesh.position.y = 0.02;
+  headGroup.add(hairMesh);
+
+  // 귀여운 눈
+  [-0.12, 0.12].forEach((x) => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), faceMat);
+    eye.position.set(x, 0.02, 0.32);
+    headGroup.add(eye);
+  });
+
+  // 발그레한 볼터치
+  [-0.18, 0.18].forEach((x) => {
+    const blush = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), blushMat);
+    blush.position.set(x, -0.06, 0.3);
+    headGroup.add(blush);
+  });
+
+  // 2. 몸통 (Body)
+  const bodyMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.5, 8), clothesMat);
+  bodyMesh.position.set(0, 0.65, 0);
+  hero.add(bodyMesh);
+
+  // 3. 펄럭이는 마법 망토 (Cape)
+  const capeGeo = new THREE.PlaneGeometry(0.45, 0.6, 3, 3);
+  const cape = new THREE.Mesh(capeGeo, capeMat);
+  cape.position.set(0, 0.65, -0.22);
+  cape.rotation.x = 0.2;
+  hero.add(cape);
+
+  // 4. 좌우 팔 (Arms)
+  const leftArmPivot = new THREE.Group();
+  leftArmPivot.position.set(-0.28, 0.82, 0);
+  hero.add(leftArmPivot);
+  const leftArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.38, 6), clothesMat);
+  leftArmMesh.position.set(0, -0.18, 0);
+  leftArmPivot.add(leftArmMesh);
+
+  const rightArmPivot = new THREE.Group();
+  rightArmPivot.position.set(0.28, 0.82, 0);
+  hero.add(rightArmPivot);
+  const rightArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.38, 6), clothesMat);
+  rightArmMesh.position.set(0, -0.18, 0);
+  rightArmPivot.add(rightArmMesh);
+
+  // 5. 다리 (Legs)
+  const legsGroup = new THREE.Group();
+  legsGroup.position.set(0, 0.4, 0);
+  hero.add(legsGroup);
+  [-0.1, 0.1].forEach((x) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 0.4, 6), clothesMat);
+    leg.position.set(x, -0.2, 0);
+    legsGroup.add(leg);
+  });
+
+  // 6. 탑승형 꼬마 마법 구름 보드
+  const magicCloud = createMagicCloudBoard();
+  magicCloud.position.set(0, -0.05, 0);
+  magicCloud.visible = false;
+  hero.add(magicCloud);
+  hero.magicCloud = magicCloud;
+
+  // 포즈 제어
+  hero.setPose = (mode, t = 0) => {
+    if (mode === "selfie") {
+      magicCloud.visible = false;
+      hero.rotation.x = 0;
+      hero.rotation.y = -0.3; // 살짝 폰을 향해 몸을 틈
+      // 오른손은 폰을 들고(앞으로 뻗음), 왼손은 브이 포즈
+      rightArmPivot.rotation.x = -Math.PI / 2.5;
+      rightArmPivot.rotation.z = -0.2;
+      leftArmPivot.rotation.x = -Math.PI / 2.8;
+      leftArmPivot.rotation.z = 0.5;
+      cape.rotation.x = 0.15 + Math.sin(t * 3) * 0.05;
+    } else if (mode === "dive") {
+      magicCloud.visible = false;
+      // 다이빙: 몸을 앞으로 기울이고 양팔을 앞으로 쭉 뻗음
+      hero.rotation.x = Math.PI / 2.2;
+      hero.rotation.y = 0;
+      leftArmPivot.rotation.x = -Math.PI * 0.9;
+      leftArmPivot.rotation.z = -0.15;
+      rightArmPivot.rotation.x = -Math.PI * 0.9;
+      rightArmPivot.rotation.z = 0.15;
+      cape.rotation.x = -0.5 + Math.sin(t * 12) * 0.1; // 심하게 펄럭임
+    } else {
+      // fly (비행 & 구름 서핑)
+      magicCloud.visible = true;
+      hero.rotation.x = 0.25; // 날아가는 살짝 숙인 포즈
+      leftArmPivot.rotation.x = -0.5;
+      leftArmPivot.rotation.z = 0.8; // 양팔 시원하게 벌림
+      rightArmPivot.rotation.x = -0.5;
+      rightArmPivot.rotation.z = -0.8;
+      cape.rotation.x = 0.75 + Math.sin(t * 6) * 0.15;
+    }
+  };
+
+  hero.setBank = (tilt) => {
+    hero.rotation.z = tilt;
+  };
+
+  return hero;
 }
 
 /** 6. 귀여운 미니 열기구 (Airship) */

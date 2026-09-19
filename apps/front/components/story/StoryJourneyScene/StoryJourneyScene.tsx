@@ -44,7 +44,7 @@ export function StoryJourneyScene() {
       const initialHeight = container.clientHeight || window.innerHeight;
       world.resize(initialWidth, initialHeight);
     } catch (err) {
-      console.warn("WebGL 초기화 실패:", err);
+      console.error("WebGL 초기화 실패:", err);
       if (container.contains(canvas)) {
         container.removeChild(canvas);
       }
