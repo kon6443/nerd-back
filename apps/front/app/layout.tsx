@@ -18,7 +18,7 @@ import "./globals.css";
 const SESSION_HINT_SCRIPT = `try{var s=JSON.parse(localStorage.getItem(${JSON.stringify(SESSION_STORAGE_KEY)}));if(s&&(s.status==="guest"||s.status==="authenticated"))document.documentElement.dataset.session=s.status}catch(e){}`;
 
 export const metadata: Metadata = {
-  title: "나만의 동화 나라",
+  title: "베이비북스",
   description: "내가 주인공이 되는 동화",
 };
 

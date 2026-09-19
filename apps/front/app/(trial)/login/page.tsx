@@ -101,8 +101,8 @@ export default function LoginPage() {
             <h1>{label.title}</h1>
             <p>
               {mode === "signup"
-                ? "아이디와 비밀번호로 동화나라에 가입해요."
-                : "동화나라에 다시 오신 걸 환영해요."}
+                ? "아이디와 비밀번호로 베이비북스에 가입해요."
+                : "베이비북스에 다시 오신 걸 환영해요."}
             </p>
           </div>
 

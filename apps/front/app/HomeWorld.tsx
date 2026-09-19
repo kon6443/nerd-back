@@ -198,7 +198,7 @@ export function HomeWorld({ children }: { children: ReactNode }) {
   }
 
   return (
-    <main ref={rootRef} className={styles.world} data-renderer={presentation.renderer} data-entering={presentation.entering} aria-label="동화나라">
+    <main ref={rootRef} className={styles.world} data-renderer={presentation.renderer} data-entering={presentation.entering} aria-label="베이비북스">
       <div ref={stageRef} className={styles.stage}>
         <div ref={graphicsRef} className={styles.graphics} aria-hidden="true" />
         <p className={styles.loading} aria-hidden="true">동화책을 펼치고 있어요</p>
@@ -209,7 +209,7 @@ export function HomeWorld({ children }: { children: ReactNode }) {
         )}
         <div className={styles.content}>
           <div className={styles.copy}>
-            <p className={styles.eyebrow}>어서 와요, 동화나라에</p>
+            <p className={styles.eyebrow}>어서 와요, 베이비북스에</p>
             <h1 className={styles.title}><span>한 권의 책에서,</span><span>커다란 모험으로.</span></h1>
             <p className={styles.description}>버튼을 눌러 책 속으로 들어가 보세요. 내 사진 한 장이면 동화 속 주인공이 돼요.</p>
           </div>
