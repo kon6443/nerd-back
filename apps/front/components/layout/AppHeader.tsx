@@ -107,7 +107,7 @@ export function AppHeader() {
 
   return (
     <header data-app-header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur-sm">
-      <nav aria-label="주요 메뉴" className="mx-auto flex min-h-[76px] w-full max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-5 py-2 sm:flex-nowrap sm:px-6">
+      <nav aria-label="주요 메뉴" className="flex min-h-[76px] w-full flex-wrap items-center gap-x-3 gap-y-2 px-[var(--layout-gutter)] py-2 sm:flex-nowrap">
         <Link href="/" className="mr-auto flex min-h-11 min-w-0 items-center gap-2.5 text-lg font-extrabold tracking-tight text-book-cover-strong md:text-xl">
           <span className="grid size-9 shrink-0 -rotate-6 place-items-center rounded-[5px_10px_10px_5px] border-l-4 border-night bg-primary-strong text-paper shadow-[2px_3px_0_var(--color-paper-edge)]" aria-hidden="true">
             <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -118,11 +118,14 @@ export function AppHeader() {
         </Link>
         <ul className="order-3 flex w-full items-center gap-1 sm:order-none sm:w-auto">
           <CommonNavLinks pathname={pathname} />
-          <li className="lg:hidden">
+          {/* 로그인 전에는 넓은 화면에서 「로그인하기」 버튼(AuthCta)을 따로 두고, 로그인 후 「마이페이지」는
+              강조 없이 다른 메뉴와 같은 모양으로 둔다. */}
+          <li>
             {AUTH_NAV_SLOTS.map(({ status, className }) => {
               const link = AUTH_LINK[status];
               const active = isActive(pathname, link.href);
-              return <Link key={status} href={link.href} aria-current={active ? "page" : undefined} className={`${className} ${navLinkClass(active)}`}>{link.label}</Link>;
+              const hideWide = status === "guest" ? "lg:hidden" : "";
+              return <Link key={status} href={link.href} aria-current={active ? "page" : undefined} className={`${className} ${hideWide} ${navLinkClass(active)}`}>{link.label}</Link>;
             })}
           </li>
         </ul>
