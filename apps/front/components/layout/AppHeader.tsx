@@ -114,7 +114,7 @@ export function AppHeader() {
               <path d="M4 5.5c2.7-.7 5.3-.2 8 1.5v12c-2.7-1.7-5.3-2.2-8-1.5zM20 5.5c-2.7-.7-5.3-.2-8 1.5v12c2.7-1.7 5.3-2.2 8-1.5z" />
             </svg>
           </span>
-          <span className="truncate">동화나라</span>
+          <span className="truncate">베이비북스</span>
         </Link>
         <ul className="order-3 flex w-full items-center gap-1 sm:order-none sm:w-auto">
           <CommonNavLinks pathname={pathname} />

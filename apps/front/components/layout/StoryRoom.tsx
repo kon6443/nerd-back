@@ -30,7 +30,7 @@ export function BookStack({ className = "" }: { className?: string }) {
       <div className={styles.standingBook}>
         <div className={styles.bookFace}>
           <span className={styles.ribbon} />
-          <span className={styles.bookName}>동화나라</span>
+          <span className={styles.bookName}>베이비북스</span>
           <BookEmblem />
           <span className={styles.bookRule} />
         </div>
