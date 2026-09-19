@@ -6,6 +6,14 @@ import { actionClass } from "@/components/ui/actionStyles";
 
 import type { CharacterChatController } from "./useCharacterChat";
 import { CharacterReplyPlayer } from "./CharacterReplyPlayer";
+import { useSpeechInput } from "./useSpeechInput";
+
+const SPEECH_PHASE_LABELS = {
+  idle: { button: "마이크로 말하기", status: "" },
+  starting: { button: "마이크 연결 취소", status: "마이크 권한을 허용해 주세요." },
+  listening: { button: "말하기 끝내기", status: "듣고 있어요. 궁금한 점을 말해 주세요." },
+  stopping: { button: "음성 인식 취소", status: "말한 내용을 정리하고 있어요." },
+};
 
 /**
  * 등장인물 대화의 **내용물**. 상태는 `useCharacterChat` 이, 껍데기(시트·모달·dock)는 `ChatSurface` 가 갖는다.
@@ -20,10 +28,12 @@ export function CharacterChat({
   chat,
   loginHref,
   onInteraction,
+  active,
 }: {
   chat: CharacterChatController;
   loginHref: string;
   onInteraction: () => void;
+  active: boolean;
 }) {
   const {
     status,
@@ -45,6 +55,9 @@ export function CharacterChat({
     autoPlayReply,
     markReplyPlayed,
   } = chat;
+  const speech = useSpeechInput({ enabled: active && status === "available" && !sending, role });
+  const inputBusy = sending || speech.active;
+  const speechLabels = SPEECH_PHASE_LABELS[speech.phase];
 
   return (
     <div className="flex flex-col gap-4">
@@ -93,11 +106,18 @@ export function CharacterChat({
           {status === "available" && characters.length > 0 ? (
             <form
               method="post"
-              onSubmit={submit}
+              onSubmit={(event) => {
+                if (speech.active) {
+                  event.preventDefault();
+                  return;
+                }
+                speech.controller.cancel();
+                void submit(event);
+              }}
               className="flex flex-col gap-4"
               aria-busy={sending}
             >
-              <fieldset disabled={sending}>
+              <fieldset disabled={inputBusy}>
                 <legend className="mb-3 font-bold text-ink">누구에게 물어볼까요?</legend>
                 <div className="flex flex-wrap gap-3">
                   {characters.map((character) => (
@@ -130,7 +150,7 @@ export function CharacterChat({
                       <button
                         key={question}
                         type="button"
-                        disabled={sending}
+                        disabled={inputBusy}
                         className={actionClass("secondary", "", "compact")}
                         onClick={() => {
                           updateDraft(role, question);
@@ -155,16 +175,47 @@ export function CharacterChat({
                   onChange={(event) => {
                     updateDraft(role, event.target.value);
                   }}
-                  disabled={sending}
+                  disabled={inputBusy}
                   maxLength={STORY_CHAT_MAX_MESSAGE_LENGTH}
-                  placeholder="궁금한 점을 적어 봐."
+                  placeholder="궁금한 점을 말하거나 적어 봐."
                   aria-invalid={Boolean(error)}
-                  aria-describedby={`chat-limit chat-length chat-send-note${error ? " chat-input-error" : ""}`}
+                  aria-describedby={`chat-limit chat-length chat-send-note chat-speech-note${error ? " chat-input-error" : ""}`}
                   className="min-h-touch w-full resize-y rounded-2xl border-2 border-primary bg-white p-4 text-base text-ink placeholder:text-ink-muted focus:border-primary-strong focus:outline-none focus:ring-2 focus:ring-primary-strong disabled:opacity-60"
                 />
                 <p id="chat-length" className="mt-1 text-right text-sm text-ink-muted">
                   {message.length} / {STORY_CHAT_MAX_MESSAGE_LENGTH}자
                 </p>
+                <div className="mt-3 flex flex-col items-start gap-2">
+                  <button
+                    type="button"
+                    disabled={sending || !speech.supported}
+                    aria-pressed={speech.active}
+                    aria-describedby="chat-speech-note"
+                    onClick={() => {
+                      if (speech.active) speech.controller.stop();
+                      else {
+                        onInteraction();
+                        speech.controller.start(message, (nextMessage) => updateDraft(role, nextMessage));
+                      }
+                    }}
+                    className={actionClass(speech.active ? "primary" : "secondary", "gap-2")}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-5 shrink-0">
+                      <rect x="9" y="2" width="6" height="13" rx="3" />
+                      <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" />
+                    </svg>
+                    {speechLabels.button}
+                  </button>
+                  <p id="chat-speech-note" className="text-sm text-ink-muted">
+                    {speech.supported
+                      ? "말한 내용은 질문 칸에 담겨요. 확인하고 보내 주세요. 음성 인식을 위해 브라우저의 음성 서비스로 목소리가 전송될 수 있어요."
+                      : "이 환경에서는 마이크 입력을 지원하지 않아요. 글로 질문을 적어 주세요."}
+                  </p>
+                  <p role="status" aria-atomic="true" className="text-sm font-bold text-ink">
+                    {speechLabels.status || speech.notice}
+                  </p>
+                  {speech.interim ? <p className="w-full break-words rounded-xl bg-primary-tint p-3 text-ink-muted">듣는 중: {speech.interim}</p> : null}
+                </div>
                 {error ? (
                   <p
                     id="chat-input-error"
@@ -178,7 +229,7 @@ export function CharacterChat({
               <p id="chat-send-note" className="text-sm text-ink-muted">
                 질문을 보내면 1회가 사용돼요. 답변을 받지 못해도 다시 질문할 수 없어요.
               </p>
-              <button type="submit" disabled={sending} className={actionClass("primary", "self-start")}>
+              <button type="submit" disabled={inputBusy} className={actionClass("primary", "self-start")}>
                 {sending ? "답변을 기다리고 있어요…" : "질문 보내기"}
               </button>
             </form>
