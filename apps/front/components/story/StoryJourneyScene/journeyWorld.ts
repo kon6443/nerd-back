@@ -1,374 +1,228 @@
 import * as THREE from "three";
-import {
-  createPhoneModel,
-  type PhoneModel,
-  createCastleModel,
-  createTreeModel,
-  createMushroomModel,
-  createFlowerModel,
-  createMagicLantern,
-  createCloudModel,
-  createAirshipModel,
-  createSparkleParticles,
-  createHeroModel,
-  type HeroModel,
-  DEFAULT_PALETTE,
-  type JourneyPalette,
-} from "./journeyObjects";
+import { createJourneyCharacter, createJourneyPhone } from "./journeyCharacter";
+import { createJourneyScenery } from "./journeyObjects";
+import { createJourneyPose, sampleJourney, smooth, type JourneyPose } from "./journeyTimeline";
 
 export interface JourneyWorld {
-  render: (pointerX: number, pointerY: number) => void;
+  render: (elapsed: number, pointerX: number, pointerY: number) => JourneyPose;
   resize: (width: number, height: number) => void;
+  burst: () => void;
   dispose: () => void;
 }
 
-export function createJourneyWorld(
-  canvas: HTMLCanvasElement,
-  onFlash?: (active: boolean) => void,
-): JourneyWorld {
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    alpha: true,
-    powerPreference: "default",
+function createStars(count: number, burst: boolean) {
+  const positions = new Float32Array(count * 3);
+  const seeds = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    // Deterministic placement makes re-entry and visual testing consistent.
+    const angle = i * 2.39996;
+    const radius = burst ? 0.3 + i % 11 * 0.13 : 1.2 + i % 19 * 0.23;
+    positions[i * 3] = Math.cos(angle) * radius;
+    positions[i * 3 + 1] = burst ? Math.sin(angle) * radius : (i % 31) / 31 * 7 - 2;
+    positions[i * 3 + 2] = burst ? -i % 7 * 0.1 : -(i / count) * 38;
+    seeds[i] = i * 0.71;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute("seed", new THREE.BufferAttribute(seeds, 1));
+  const material = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { time: { value: 0 }, opacity: { value: 0 }, pixelRatio: { value: 1 }, burstAge: { value: burst ? 0 : -1 } },
+    vertexShader: `attribute float seed; uniform float time; uniform float pixelRatio; uniform float burstAge; varying float sparkle;
+      void main() {
+        vec3 p = position;
+        if (burstAge >= 0.0) { p *= 0.35 + burstAge * 2.4; p.y -= burstAge * burstAge * 0.8; }
+        else { p.x += sin(time * 0.55 + seed) * 0.18; p.y += sin(time * 0.8 + seed) * 0.16; }
+        vec4 view = modelViewMatrix * vec4(p, 1.0);
+        sparkle = 0.6 + 0.4 * sin(time * 1.8 + seed);
+        gl_PointSize = clamp(55.0 / max(1.0, -view.z), 2.0, 11.0) * pixelRatio;
+        gl_Position = projectionMatrix * view;
+      }`,
+    fragmentShader: `uniform float opacity; varying float sparkle;
+      void main() {
+        vec2 p = abs(gl_PointCoord - 0.5) * 2.0;
+        float diamond = max(0.0, 1.0 - (p.x + p.y));
+        float rays = pow(max(0.0, 1.0 - min(p.x, p.y)), 12.0) * max(0.0, 1.0 - max(p.x, p.y));
+        gl_FragColor = vec4(1.0, 0.91, 0.66, (diamond * diamond + rays * 0.55) * opacity * sparkle);
+      }`,
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
+  const points = new THREE.Points(geometry, material);
+  points.frustumCulled = false;
+  return { points, material };
+}
 
+export function createJourneyWorld(canvas: HTMLCanvasElement): JourneyWorld {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "low-power" });
   const scene = new THREE.Scene();
-  const palette: JourneyPalette = { ...DEFAULT_PALETTE };
-
-  // 하늘색 & 부드러운 안개 (구름이 묻히지 않도록 시작 45, 끝 160으로 확장)
-  scene.background = new THREE.Color(palette.sky);
-  scene.fog = new THREE.Fog(palette.sky, 45, 160);
-
-  // 카메라 설정 (FOV 50)
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 140);
-  camera.position.set(1.4, 1.35, 2.3);
-
-  // 조명 설정
-  const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
-  scene.add(ambientLight);
-
-  const sunLight = new THREE.DirectionalLight(palette.sun, 2.2);
-  sunLight.position.set(5, 12, 8);
-  scene.add(sunLight);
-
-  const fillLight = new THREE.DirectionalLight(0xbae6fd, 0.9);
-  fillLight.position.set(-5, 6, -5);
-  scene.add(fillLight);
-
-  // ========================================================
-  // 3인칭 주인공 캐릭터 (Hero Avatar)
-  // ========================================================
-  const hero: HeroModel = createHeroModel();
-  hero.position.set(0.35, 0.45, 0.4);
-  scene.add(hero);
-
-  // ========================================================
-  // 1단계: 스마트폰 (주인공 오른손 바로 앞에 꼭 맞게 배치)
-  // ========================================================
-  const phone: PhoneModel = createPhoneModel(palette);
-  phone.position.set(0.12, 1.05, 0.95);
-  phone.rotation.set(0.12, 0.42, -0.06);
-  scene.add(phone);
-
-  // ========================================================
-  // 2단계: 동화 나라 지형, 성, 나무들 (Z = -12 ~ -38)
-  // ========================================================
-  const landGroup = new THREE.Group();
-  scene.add(landGroup);
-
-  // 초록 잔디 바닥
-  const groundGeo = new THREE.PlaneGeometry(80, 80);
-  const groundMat = new THREE.MeshStandardMaterial({
-    color: 0x98d878,
-    roughness: 0.9,
-  });
-  const ground = new THREE.Mesh(groundGeo, groundMat);
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.set(0, -0.5, -28);
-  landGroup.add(ground);
-
-  // 성 (Z = -26, 정면 중앙에서 살짝 우측)
-  const castle = createCastleModel(palette);
-  castle.position.set(2.5, -0.5, -26);
-  landGroup.add(castle);
-
-  // 도열한 동화 나무들 (좌우 숲길)
-  const treePositions = [
-    [-3.5, -14], [-4.2, -18], [-3.8, -23], [-5.0, -28], [-4.2, -34],
-    [3.8, -14], [4.5, -18], [5.2, -22], [3.9, -32], [5.5, -36],
-    [-2.2, -36], [-1.0, -38], [1.5, -37],
-  ];
-  treePositions.forEach(([x, z], i) => {
-    const scale = 0.85 + (i % 3) * 0.2;
-    const tree = createTreeModel(palette, scale);
-    tree.position.set(x, -0.5, z);
-    landGroup.add(tree);
-  });
-
-  // 길가에 핀 귀여운 버섯들
-  const mushroomCoords = [
-    [-2.2, -15], [-2.8, -21], [-2.0, -29],
-    [2.4, -16], [2.1, -24], [2.8, -31],
-  ];
-  mushroomCoords.forEach(([x, z]) => {
-    const shroom = createMushroomModel(1.1);
-    shroom.position.set(x, -0.5, z);
-    landGroup.add(shroom);
-  });
-
-  // 알록달록 파스텔 들꽃들 (분홍, 노랑, 하늘빛)
-  const flowerColors = [0xf472b6, 0xfde047, 0x67e8f9, 0xc084fc];
-  const flowerCoords = [
-    [-1.6, -13], [-1.8, -17], [-2.4, -25], [-1.5, -33],
-    [1.7, -14], [1.9, -19], [1.6, -27], [2.0, -34],
-  ];
-  flowerCoords.forEach(([x, z], idx) => {
-    const col = flowerColors[idx % flowerColors.length];
-    const flower = createFlowerModel(col, 1.2);
-    flower.position.set(x, -0.5, z);
-    landGroup.add(flower);
-  });
-
-  // ========================================================
-  // 3단계: 마법 등불 & 크리스탈 젬 터널 (Z = -38 ~ -55)
-  // ========================================================
-  const lanternGroup = new THREE.Group();
-  scene.add(lanternGroup);
-
-  const lanterns: THREE.Group[] = [];
-  const lanternCoords = [
-    [-2.2, 2.0, -40], [2.2, 2.5, -42],
-    [-1.8, 3.2, -45], [1.9, 1.8, -48],
-    [-2.5, 2.8, -51], [2.0, 3.5, -53],
-  ];
-  lanternCoords.forEach(([x, y, z]) => {
-    const l = createMagicLantern(palette);
-    l.position.set(x, y, z);
-    lanternGroup.add(l);
-    lanterns.push(l);
-  });
-
-  // 별빛 파티클
-  const sparkles = createSparkleParticles(200);
-  scene.add(sparkles);
-
-  // ========================================================
-  // 4단계: 무한 구름 바다 (Z = -55 ~ -110)
-  // ========================================================
-  const cloudGroup = new THREE.Group();
-  scene.add(cloudGroup);
-
-  const clouds: { mesh: THREE.Group; baseZ: number; speed: number }[] = [];
-  const cloudCount = 26;
-  for (let i = 0; i < cloudCount; i++) {
-    const scale = 2.0 + Math.random() * 2.4; // 큼직하고 몽글몽글한 순백 구름
-    const c = createCloudModel(palette, scale);
-    const x = (Math.random() - 0.5) * 36;
-    const y = 1.0 + Math.random() * 5.5;
-    const z = -50 - Math.random() * 75;
-    c.position.set(x, y, z);
-    cloudGroup.add(c);
-    clouds.push({ mesh: c, baseZ: z, speed: 0.9 + Math.random() * 0.7 });
-  }
-
-  // 저 멀리 떠 있는 열기구
-  const airship = createAirshipModel(palette);
-  airship.position.set(-6, 7.5, -75);
-  scene.add(airship);
-
-  // ========================================================
-  // 애니메이션 & 카메라 타임라인
-  // ========================================================
-  const clock = new THREE.Clock();
-  let flashTriggered = false;
-
-  function render(pointerX: number, pointerY: number) {
-    const elapsed = clock.getElapsedTime();
-
-    // 스마트폰 화면 실시간 애니메이션 (카운트다운 3.. 2.. 1.. 찰칵! ➔ 마법 포탈)
-    if (elapsed < 6.5) {
-      phone.updateScreen(elapsed);
-    }
-
-    // 1) 3인칭 스마트폰 셀카 (0 ~ 3.5초): 주인공이 폰을 쥐고 셀카 포즈, 스마트폰 안에서 3..2..1 카운트다운!
-    if (elapsed < 3.5) {
-      phone.visible = true;
-      hero.visible = true;
-      hero.scale.set(1, 1, 1);
-      hero.setPose("selfie", elapsed);
-
-      const sway = Math.sin(elapsed * 2.8) * 0.025;
-      hero.position.set(0.35, 0.45 + sway, 0.4);
-      phone.position.set(0.12, 1.05 + sway, 0.95);
-      phone.rotation.set(0.12, 0.42 + Math.sin(elapsed * 1.5) * 0.03, -0.06);
-
-      // 캐릭터 얼굴과 폰 화면이 한눈에 보이는 황금 3인칭 셀카 앵글
-      camera.position.set(1.4, 1.35, 2.3);
-      camera.lookAt(0.18, 1.0, 0.7);
-
-      // 2.4초에 "찰칵!" 플래시 트리거
-      if (elapsed >= 2.4 && !flashTriggered) {
-        flashTriggered = true;
-        onFlash?.(true);
-        setTimeout(() => onFlash?.(false), 280);
-      }
-    }
-    // 2) 3인칭 스마트폰 화면 다이브! (3.5 ~ 6.5초): 포탈 확대, 예비 동작 ➔ 웜홀 다이빙
-    else if (elapsed < 6.5) {
-      phone.visible = true;
-      hero.visible = true;
-
-      const progress = (elapsed - 3.5) / 3.0; // 0 ~ 1
-      const ease = progress * progress * (3 - 2 * progress); // smoothstep
-      hero.setPose("dive", progress);
-
-      // 스마트폰이 중앙으로 떠오르며 거대한 마법 포탈로 확대
-      phone.position.set(
-        THREE.MathUtils.lerp(0.12, 0, ease),
-        THREE.MathUtils.lerp(1.05, 1.25, ease),
-        THREE.MathUtils.lerp(0.95, 0.1, ease)
-      );
-      phone.scale.setScalar(1 + ease * 2.6);
-      phone.rotation.set(0, 0, ease * 0.25);
-
-      // 주인공이 스마트폰 화면 속으로 쑥 다이빙
-      const heroX = THREE.MathUtils.lerp(0.35, 0, ease);
-      const heroY = THREE.MathUtils.lerp(0.45, 1.25, ease);
-      const heroZ = THREE.MathUtils.lerp(0.4, -4.0, ease);
-      hero.position.set(heroX, heroY, heroZ);
-      hero.scale.setScalar(THREE.MathUtils.lerp(1.0, 0.35, ease)); // 원근감 웜홀 수축
-
-      // 카메라가 캐릭터의 발끝을 바짝 쫓아 폰 스크린 속으로 함께 진입
-      const camX = THREE.MathUtils.lerp(1.4, 0, ease);
-      const camY = THREE.MathUtils.lerp(1.35, 1.45, ease);
-      const camZ = THREE.MathUtils.lerp(2.3, -0.6, ease);
-      camera.position.set(camX, camY, camZ);
-      camera.lookAt(0, 1.25, heroZ - 3.0);
-    }
-    // 3) 3인칭 성과 나무 숲길 플라이스루 (6.5 ~ 12.0초): 주인공이 망토를 휘날리며 활강, 체이스캠
-    else if (elapsed < 12.0) {
-      phone.visible = false;
-      hero.visible = true;
-      hero.scale.set(1, 1, 1);
-      hero.setPose("fly", elapsed);
-
-      const progress = (elapsed - 6.5) / 5.5; // 0 ~ 1
-      const ease = progress * progress * (3 - 2 * progress);
-
-      const heroZ = THREE.MathUtils.lerp(-3.5, -34.0, ease);
-      const heroY = 1.6 + Math.sin(progress * Math.PI) * 2.2;
-      const heroX = Math.sin(progress * Math.PI * 1.5) * 1.6;
-      hero.position.set(heroX, heroY, heroZ);
-      hero.setBank(-Math.cos(progress * Math.PI * 1.5) * 0.4);
-
-      // 3인칭 체이스캠 (주인공 뒤쪽 상단에서 추격)
-      const camX = heroX * 0.7;
-      const camY = heroY + 1.2;
-      const camZ = heroZ + 3.8;
-      camera.position.set(camX, camY, camZ);
-      camera.lookAt(heroX, heroY + 0.2, heroZ - 4.5);
-    }
-    // 4) 3인칭 마법 등불 & 크리스탈 터널 통과 (12.0 ~ 16.0초): 구름 위로 솟구침
-    else if (elapsed < 16.0) {
-      phone.visible = false;
-      hero.visible = true;
-      hero.setPose("fly", elapsed);
-
-      const progress = (elapsed - 12.0) / 4.0; // 0 ~ 1
-      const ease = progress * progress * (3 - 2 * progress);
-
-      const heroZ = THREE.MathUtils.lerp(-34.0, -62.0, ease);
-      const heroY = THREE.MathUtils.lerp(3.8, 6.2, ease);
-      const heroX = Math.sin(progress * Math.PI * 2) * 1.2;
-      hero.position.set(heroX, heroY, heroZ);
-      hero.setBank(-Math.cos(progress * Math.PI * 2) * 0.35);
-
-      // 3인칭 체이스캠
-      camera.position.set(heroX * 0.6, heroY + 1.2, heroZ + 3.8);
-      camera.lookAt(heroX, heroY + 0.2, heroZ - 5.0);
-    }
-    // 5) 3인칭 구름 서핑 & 무한 순항 모드 (16초 이후 ~ 무한 루프): 주인공이 꼬마 구름을 타고 비행
-    else {
-      phone.visible = false;
-      hero.visible = true;
-      const cruiseTime = elapsed - 16.0;
-      hero.setPose("fly", cruiseTime);
-
-      // 구름 위 파도타기 비행 호흡
-      const floatY = 6.0 + Math.sin(cruiseTime * 0.85) * 0.45;
-      const targetHeroX = pointerX * 2.4;
-      hero.position.x = THREE.MathUtils.lerp(hero.position.x, targetHeroX, 0.08);
-      hero.position.y = THREE.MathUtils.lerp(hero.position.y, floatY + pointerY * 0.8, 0.08);
-      hero.position.z = -65.0;
-      hero.setBank(-pointerX * 0.45 + Math.sin(cruiseTime * 0.6) * 0.05);
-
-      // 3인칭 오버더숄더 / 체이스 카메라
-      const camX = THREE.MathUtils.lerp(camera.position.x, hero.position.x * 0.6, 0.06);
-      const camY = THREE.MathUtils.lerp(camera.position.y, hero.position.y + 1.25, 0.06);
-      const camZ = -60.8; // 주인공 뒤 4.2 거리
-      camera.position.set(camX, camY, camZ);
-      camera.lookAt(hero.position.x, hero.position.y + 0.1, -85.0);
-
-      // 열기구 유유히 부유
-      airship.position.y = 7.5 + Math.sin(cruiseTime * 0.5) * 0.8;
-      airship.position.x = -6.0 + Math.cos(cruiseTime * 0.3) * 1.2;
-    }
-
-    // 마법 등불 회전 및 반짝임
-    lanterns.forEach((l, idx) => {
-      l.rotation.y = elapsed * 1.2 + idx;
-      l.rotation.x = Math.sin(elapsed * 2 + idx) * 0.2;
-    });
-
-    // 별빛 파티클 미세 유동
-    sparkles.rotation.z = elapsed * 0.04;
-
-    // 구름들 무한 이동 루프 (카메라를 향해 흘러오며 순항 느낌 연출)
-    clouds.forEach((item) => {
-      // 16초 이전에도 은은히 흐르고, 16초 순항 시 본격 비행감 제공
-      const speed = elapsed >= 16.0 ? item.speed * 3.5 : item.speed;
-      item.mesh.position.z += speed * 0.08;
-      // 카메라 뒤로 지나치면 다시 저 먼 곳(-110)으로 순환
-      if (item.mesh.position.z > -45) {
-        item.mesh.position.z = -110;
-        item.mesh.position.x = (Math.random() - 0.5) * 32;
+  let disposed = false;
+  let sun: THREE.DirectionalLight | null = null;
+  const pose = createJourneyPose();
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    const textures = new Set<THREE.Texture>();
+    scene.traverse(object => {
+      if (!(object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.Line)) return;
+      if (object instanceof THREE.InstancedMesh) object.dispose();
+      geometries.add(object.geometry);
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        materials.add(material);
+        for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value);
       }
     });
-
-    renderer.render(scene, camera);
-  }
-
-  function resize(width: number, height: number) {
-    if (!width || !height) return;
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    renderer.setSize(width, height, true);
-  }
-
-  function dispose() {
+    textures.forEach(texture => texture.dispose());
+    geometries.forEach(geometry => geometry.dispose());
+    materials.forEach(material => material.dispose());
+    sun?.shadow.dispose();
+    scene.clear();
     renderer.dispose();
-
-    // 씬 내 모든 지오메트리 & 머티리얼 정리
-    scene.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
-        obj.geometry?.dispose();
-        if (Array.isArray(obj.material)) {
-          obj.material.forEach((m) => m.dispose());
-        } else {
-          obj.material?.dispose();
-        }
-      }
-    });
-  }
-
-  return {
-    render,
-    resize,
-    dispose,
+    renderer.forceContextLoss();
   };
+  try {
+    renderer.debug.checkShaderErrors = process.env.NODE_ENV !== "production";
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.03;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
+    scene.background = new THREE.Color("#c5e4ee");
+    scene.fog = new THREE.Fog("#d5e9ed", 28, 90);
+    const camera = new THREE.PerspectiveCamera(43, 1, 0.15, 150);
+    const skyDome = new THREE.Mesh(new THREE.SphereGeometry(120, 32, 16), new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false,
+      vertexShader: `varying vec3 direction; void main(){direction=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+      fragmentShader: `varying vec3 direction; void main(){
+        vec3 d=normalize(direction);
+        vec3 sky=mix(vec3(0.80,0.90,0.95),vec3(0.40,0.71,0.89),smoothstep(-0.7,0.75,d.y));
+        float sun=max(0.0,dot(d,normalize(vec3(-0.5,0.16,-0.8))));
+        sky+=vec3(0.2,0.14,0.04)*pow(sun,12.0)+vec3(0.35,0.25,0.1)*pow(sun,200.0);
+        gl_FragColor=vec4(sky,1.0);
+      }`,
+    }));
+    scene.add(skyDome);
+    scene.add(new THREE.HemisphereLight("#fffaf0", "#a9b7c1", 1.6));
+    sun = new THREE.DirectionalLight("#fff2d9", 2.2);
+    sun.position.set(-12, 26, -8);
+    sun.target.position.set(0, 0, -28);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 38, bottom: -38, near: 1, far: 110 });
+    sun.shadow.normalBias = 0.045;
+    sun.shadow.bias = -0.00015;
+    scene.add(sun.target);
+    scene.add(sun);
+    const fill = new THREE.DirectionalLight("#d8deff", 0.7);
+    fill.position.set(10, 5, -12);
+    scene.add(fill);
+    const scenery = createJourneyScenery();
+    scene.add(scenery.group);
+    const hero = createJourneyCharacter();
+    scene.add(hero.group);
+    const phone = createJourneyPhone();
+    scene.add(phone.group);
+    const contact = new THREE.Mesh(new THREE.CircleGeometry(0.65, 32), new THREE.MeshBasicMaterial({ color: "#6e8b74", transparent: true, opacity: 0.16, depthWrite: false }));
+    contact.rotation.x = -Math.PI / 2;
+    contact.position.y = 0.04;
+    scene.add(contact);
+
+    const portal = new THREE.Group();
+    portal.position.set(0, 2.03, -4.62);
+    scene.add(portal);
+    const portalMaterial = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      uniforms: { time: { value: 0 }, opacity: { value: 0 } },
+      vertexShader: `varying vec2 uvPosition; void main(){uvPosition=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+      fragmentShader: `varying vec2 uvPosition; uniform float time; uniform float opacity;
+        void main(){
+          vec2 p=(uvPosition-0.5)*2.0; float radius=length(p); float angle=atan(p.y,p.x);
+          float swirl=0.5+0.5*sin(angle*3.0-radius*16.0+time*3.0);
+          vec3 color=mix(vec3(0.48,0.39,0.75),vec3(0.95,0.77,0.45),pow(swirl,3.0));
+          color=mix(vec3(0.84,0.84,0.98),color,smoothstep(0.0,0.8,radius));
+          gl_FragColor=vec4(color,(1.0-smoothstep(0.88,1.0,radius))*opacity);
+        }`,
+    });
+    const portalDisc = new THREE.Mesh(new THREE.PlaneGeometry(3, 5), portalMaterial);
+    portal.add(portalDisc);
+    const ringGeometry = new THREE.TorusGeometry(1, 0.032, 8, 72);
+    const ringMaterial = new THREE.MeshBasicMaterial({ color: "#ffe1a5", transparent: true, opacity: 0 });
+    for (let i = 0; i < 3; i++) {
+      const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+      ring.scale.set(1.43 + i * 0.14, 2.4 + i * 0.1, 1);
+      ring.position.z = i * 0.03;
+      portal.add(ring);
+    }
+    const stars = createStars(200, false);
+    scene.add(stars.points);
+    const burst = createStars(48, true);
+    scene.add(burst.points);
+    let lastElapsed = 0;
+    let burstStarted = -100;
+    let previousWidth = 0;
+    let previousHeight = 0;
+    let portraitDistance = 1;
+    return {
+      resize(width, height) {
+        if (disposed || width <= 0 || height <= 0 || (width === previousWidth && height === previousHeight)) return;
+        previousWidth = width;
+        previousHeight = height;
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5, 1280 / width);
+        renderer.setPixelRatio(pixelRatio);
+        renderer.setSize(width, height, false);
+        stars.material.uniforms.pixelRatio.value = pixelRatio;
+        burst.material.uniforms.pixelRatio.value = pixelRatio;
+        camera.aspect = width / height;
+        portraitDistance = Math.max(1, 1.04 / camera.aspect);
+        camera.updateProjectionMatrix();
+      },
+      render(elapsed, pointerX, pointerY) {
+        if (disposed || renderer.getContext().isContextLost()) return pose;
+        lastElapsed = elapsed;
+        sampleJourney(elapsed, pose);
+        const driftX = pointerX * pose.cruise * 1.5;
+        camera.position.set(pose.hero[0] + (pose.camera[0] - pose.hero[0]) * portraitDistance + driftX * 0.55,
+          pose.camera[1] - pointerY * pose.cruise * 0.12,
+          pose.hero[2] + (pose.camera[2] - pose.hero[2]) * portraitDistance);
+        camera.lookAt(pose.target[0] + driftX * 0.7, pose.target[1], pose.target[2]);
+        camera.rotateZ(pointerX * pose.cruise * 0.022);
+        skyDome.position.copy(camera.position);
+        hero.update(elapsed, pose, pointerX, pointerY);
+        phone.update(elapsed, pose);
+        scenery.update(elapsed, pose);
+        contact.visible = elapsed < 4.2;
+        contact.scale.setScalar(1 - smooth(4, 4.2, elapsed));
+        const portalOpacity = smooth(3.9, 4.6, elapsed) * (1 - smooth(6.4, 6.7, elapsed));
+        portal.visible = portalOpacity > 0;
+        portalMaterial.uniforms.time.value = elapsed;
+        portalMaterial.uniforms.opacity.value = portalOpacity;
+        ringMaterial.opacity = portalOpacity * 0.8;
+        portal.rotation.z = Math.sin(elapsed * 1.5) * 0.035;
+        stars.points.visible = elapsed > 10;
+        stars.points.position.set(pose.hero[0], pose.hero[1], pose.hero[2] - 1);
+        stars.material.uniforms.time.value = elapsed;
+        stars.material.uniforms.opacity.value = smooth(10, 12, elapsed) * (1 - pose.cruise * 0.65);
+        const age = elapsed - burstStarted;
+        burst.points.visible = age >= 0 && age < 1.25;
+        burst.material.uniforms.time.value = elapsed;
+        burst.material.uniforms.burstAge.value = age;
+        burst.material.uniforms.opacity.value = Math.max(0, 1 - age / 1.25);
+        renderer.render(scene, camera);
+        return pose;
+      },
+      burst() {
+        if (disposed || pose.stage !== "cruise") return;
+        burstStarted = lastElapsed;
+        burst.points.position.copy(hero.group.position);
+        burst.points.position.y += 1.3;
+        burst.points.position.z += 1;
+      },
+      dispose,
+    };
+  } catch (error) {
+    dispose();
+    throw error;
+  }
 }

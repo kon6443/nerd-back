@@ -1,207 +1,133 @@
 .journeyScreen {
   position: relative;
+  flex: 1;
   width: 100%;
-  height: calc(100dvh - 3.75rem); /* 헤더 제외 전체 높이 */
-  min-height: 520px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  background-color: #7ec8e3;
-  user-select: none;
+  min-height: calc(100dvh - var(--app-header-height, 4.5rem));
+  background: linear-gradient(#f8f5eb, #eff7f1 55%, #fbf7ec);
+  color: var(--color-ink);
 }
-
-/* 상단 즉시 읽기 가능 알림 배너 */
-.readyBanner {
-  position: relative;
-  z-index: 30;
-  margin: 1rem auto 0;
-  width: calc(100% - 2rem);
-  max-width: 28rem;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(12px);
-  border: 2px solid var(--color-primary, #6366f1);
-  border-radius: 1rem;
-  padding: 0.85rem 1.25rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+.content {
+  width: min(100%, 76rem);
+  margin: 0 auto;
+  padding: clamp(1.5rem, 3vh, 2.5rem) 1.25rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  animation: slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 하단 판타지 HUD 바 */
-.hudBar {
-  position: relative;
-  z-index: 30;
-  width: 100%;
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-  padding: 0.85rem 1.25rem;
-  color: #ffffff;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.3);
-}
-
-/* 하단 좌측: 동화 팁 롤링 */
-.tipContainer {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-  flex: 1 1 280px;
-}
-
-.tipBadge {
-  flex-shrink: 0;
-  font-size: 0.75rem;
-  font-weight: 800;
-  padding: 0.2rem 0.55rem;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.4);
-}
-
-.tipText {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #f8fafc;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 하단 우측: 마법 프로그레스 바 */
-.gaugeContainer {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  flex-shrink: 0;
-}
-
-.gaugeInfo {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  font-size: 0.75rem;
+.heading { text-align: center; width: 100%; }
+.eyebrow {
+  margin: 0 0 0.7rem;
+  font-size: 0.875rem;
   font-weight: 700;
-  color: #e2e8f0;
+  color: var(--color-book-cover);
 }
-
-.gaugePercent {
-  font-size: 1rem;
+.heading h1 {
+  margin: 0;
+  font-size: clamp(1.625rem, 3.2vw, 2.5rem);
   font-weight: 800;
-  color: #fde047;
-  text-shadow: 0 0 10px rgba(253, 224, 71, 0.5);
+  line-height: 1.4;
+  letter-spacing: -0.045em;
+  word-break: keep-all;
+  text-wrap: balance;
 }
-
-.gaugeTrack {
-  position: relative;
-  width: 140px;
-  height: 18px;
-  background: rgba(15, 23, 42, 0.8);
-  border: 2px solid #eab308;
-  border-radius: 9999px;
-  overflow: hidden;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 8px rgba(234, 179, 8, 0.3);
+.description {
+  margin: 0.85rem auto 0;
+  max-width: 34rem;
+  color: var(--color-ink-muted);
+  font-size: clamp(0.9375rem, 1.4vw, 1.0625rem);
+  line-height: 1.75;
+  word-break: keep-all;
+  text-wrap: pretty;
 }
-
-@media (min-width: 640px) {
-  .gaugeTrack {
-    width: 200px;
-    height: 20px;
-  }
+.stage { width: 100%; height: clamp(24rem, 49vh, 34rem); margin-top: 1.5rem; border-radius: 2rem; overflow: hidden; }
+.statusArea { position: relative; width: min(100%, 28rem); text-align: center; margin-top: 1.25rem; }
+.readButton { width: 100%; gap: 1.5rem; margin-top: 1rem; }
+.progressSection {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-paper-line);
+  border-radius: 1.25rem;
+  background: var(--color-surface-raised);
+  text-align: left;
 }
-
-.gaugeFill {
+.progressLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  min-height: 1.75rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-align: left;
+}
+.progressPercent { flex-shrink: 0; color: var(--color-primary-deep); font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.pageCount { margin: 0.65rem 0 0; color: var(--color-ink-muted); font-size: 0.875rem; line-height: 1.6; font-variant-numeric: tabular-nums; }
+.progressTrack { height: 0.75rem; overflow: hidden; border-radius: 1rem; background: #e3e5d7; }
+.progressFill, .progressIndeterminate {
   height: 100%;
-  border-radius: 9999px;
-  background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
-  transition: width 0.4s ease-out;
-  box-shadow: 0 0 12px rgba(129, 140, 248, 0.8);
-  position: relative;
+  border-radius: inherit;
+  background: var(--color-primary-strong);
+  transform-origin: left;
+  transition: transform 450ms ease-out;
 }
-
-.gaugeFill::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-  animation: shine 2s infinite;
+.progressIndeterminate { width: 32%; animation: progress-search 2s ease-in-out infinite; }
+.progressTrack[data-paused="true"] .progressIndeterminate { animation-play-state: paused; }
+@keyframes progress-search {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(325%); }
 }
-
-@keyframes shine {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+.connectionNotice, .error {
+  margin: 1rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-btn);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  word-break: keep-all;
 }
-
-/* 세부 진행 현황 서랍 버튼 */
-.detailToggleBtn {
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #ffffff;
-  padding: 0.35rem 0.65rem;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
+.connectionNotice { background: #f0e5cc; color: #695027; }
+.error { background: var(--color-danger-soft); color: var(--color-danger-strong); }
+.details { margin-top: 0.65rem; text-align: left; }
+.details summary {
+  padding: 1rem 0.5rem;
+  min-height: 3.5rem;
+  text-align: center;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  color: var(--color-ink-muted);
+  border-radius: 0.5rem;
 }
-
-.detailToggleBtn:hover {
-  background: rgba(255, 255, 255, 0.25);
+.details summary:hover { color: var(--color-primary-deep); }
+.pageList { margin: 0; padding: 0.25rem 1rem; list-style: none; background: var(--color-surface-raised); border: 1px solid var(--color-paper-line); border-radius: var(--radius-btn); }
+.pageList li { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 3.5rem; padding: 0.375rem 0; font-size: 0.9375rem; }
+.pageList li + li { border-top: 1px solid var(--color-paper-line); }
+.complete { color: var(--color-primary-deep); font-weight: 700; }
+.pending { color: var(--color-ink-muted); }
+.retryButton { min-height: 3.5rem; padding-inline: 0.85rem; font-size: 0.875rem; }
+.footer { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.85rem; }
+.footer a, .footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.5rem;
+  padding: 0.75rem 0.65rem;
+  font-size: 0.875rem;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  text-underline-offset: 0.25em;
+  border-radius: 0.5rem;
 }
-
-/* 세부 진행 현황 서랍 모달/패널 */
-.detailDrawer {
-  position: absolute;
-  bottom: 4.5rem;
-  right: 1.25rem;
-  width: calc(100% - 2.5rem);
-  max-width: 24rem;
-  max-height: 20rem;
-  overflow-y: auto;
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 1rem;
-  padding: 1rem;
-  color: #ffffff;
-  z-index: 35;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
-  animation: popUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.footer a:hover, .footer button:hover { color: var(--color-primary-deep); text-decoration: underline; }
+.footerDivider { width: 1px; height: 0.75rem; background: var(--color-line); }
+@media (max-width: 480px) {
+  .content { padding: 1.5rem 1rem 1rem; }
+  .stage { width: calc(100% + 2rem); height: clamp(23rem, 47vh, 29rem); margin-top: 1rem; border-radius: 0; }
+  .statusArea { margin-top: 1rem; }
+  .description { max-width: 21rem; }
+  .footer { margin-top: 0.5rem; }
 }
-
-@keyframes popUp {
-  from {
-    opacity: 0;
-    transform: translateY(15px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@media (prefers-reduced-motion: reduce) {
+  .progressFill { transition: none; }
+  .progressIndeterminate { animation: none; transform: translateX(100%); }
+  .motionControl, .footerDivider { display: none; }
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { preconnect } from "react-dom";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/Card";
@@ -22,6 +21,7 @@ import { CharacterChat } from "./CharacterChat";
 import { CharacterHotspots } from "./CharacterHotspots";
 import { EndView } from "./EndView";
 import { GeneratingView } from "./GeneratingView";
+import { createImagePreloader } from "./imagePreloader";
 import { ChatSurface } from "./ChatSurface";
 import { ReaderPreviewSettings } from "./ReaderPreviewSettings";
 import { parseReaderOptions } from "./readerOptions";
@@ -92,7 +92,8 @@ function StoryReadContent({ params }: PageProps) {
     };
   }, [chatDrafts]);
 
-  const [viewState, setViewState] = useState<ViewState>("loading");
+  const [viewState, setViewState] = useState<ViewState>(isDemoMode && isLoadingParam ? "generating" : "loading");
+  const [demoReaderReady, setDemoReaderReady] = useState(false);
   /**
    * 사용자가 **직접** 제작 현황을 열었는가.
    *
@@ -121,60 +122,10 @@ function StoryReadContent({ params }: PageProps) {
   const [retryingPageNo, setRetryingPageNo] = useState<number | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
 
-  const preloadedImagesRef = useRef(
-    new Map<string, { image: HTMLImageElement; loaded: Promise<void> }>(),
-  );
-  const preconnectedOriginsRef = useRef(new Set<string>());
+  const [imagePreloader] = useState(createImagePreloader);
+  const preloadImages = imagePreloader.preload;
+  useEffect(() => () => imagePreloader.clear(), [imagePreloader]);
 
-  const preloadImages = useCallback((imageUrls: Array<string | null | undefined>) => {
-    const loads: Promise<void>[] = [];
-
-    for (const imageUrl of imageUrls) {
-      if (!imageUrl) continue;
-
-      const existing = preloadedImagesRef.current.get(imageUrl);
-      if (existing) {
-        loads.push(existing.loaded);
-        continue;
-      }
-
-      try {
-        const url = new URL(imageUrl);
-        if (
-          (url.protocol === "http:" || url.protocol === "https:") &&
-          !preconnectedOriginsRef.current.has(url.origin)
-        ) {
-          preconnect(url.origin);
-          preconnectedOriginsRef.current.add(url.origin);
-        }
-      } catch {
-        // data URL과 상대 URL은 별도 오리진 연결이 필요하지 않다.
-      }
-
-      const image = new Image();
-      image.decoding = "async";
-      const loaded = new Promise<void>((resolve) => {
-        const timeoutId = window.setTimeout(resolve, 10_000);
-        const settle = () => {
-          window.clearTimeout(timeoutId);
-          resolve();
-        };
-
-        image.onload = () => {
-          void image.decode().catch(() => undefined).finally(settle);
-        };
-        image.onerror = () => {
-          preloadedImagesRef.current.delete(imageUrl);
-          settle();
-        };
-      });
-      preloadedImagesRef.current.set(imageUrl, { image, loaded });
-      image.src = imageUrl;
-      loads.push(loaded);
-    }
-
-    return Promise.all(loads).then(() => undefined);
-  }, []);
   // ⏳ 디자인 후보를 주소로 고른다(한시적 — `readerOptions.ts`).
   const readerOptions = parseReaderOptions(searchParams);
 
@@ -316,6 +267,7 @@ function StoryReadContent({ params }: PageProps) {
     }
 
     let active = true;
+    let demoTimer: ReturnType<typeof setTimeout> | undefined;
 
     async function init() {
       try {
@@ -329,7 +281,7 @@ function StoryReadContent({ params }: PageProps) {
         if (!active) return;
         setStoryPages(pages);
 
-        // 3. 시연 모드일 때: Stateless 정적 렌더링 및 3초 마법 연출
+        // 3. 첫 장을 우선 준비하고 나머지는 배경에서 불러온다.
         if (isDemoMode) {
           const demoSessionData: SessionPagesResponse = {
             sessionId: "00000000-0000-0000-0000-000000000001",
@@ -347,17 +299,19 @@ function StoryReadContent({ params }: PageProps) {
             })),
           };
           setSessionPages(demoSessionData);
-          await preloadImages(demoSessionData.pages.map((p) => p.imageUrl));
+          await preloadImages([getFirstPageImageUrl(demoSessionData)]);
           if (!active) return;
+          setDemoReaderReady(true);
+          void preloadImages(demoSessionData.pages.slice(1).map(p => p.imageUrl));
 
           if (isLoadingParam) {
             setViewState("generating");
-            const timer = setTimeout(() => {
+            demoTimer = setTimeout(() => {
               if (!active) return;
               setViewState("reader");
               router.replace(`/stories/${slug}/read?demo=${demoParam}`);
             }, 60000);
-            return () => clearTimeout(timer);
+            return;
           } else {
             setViewState("reader");
             return;
@@ -404,6 +358,7 @@ function StoryReadContent({ params }: PageProps) {
 
     return () => {
       active = false;
+      clearTimeout(demoTimer);
     };
   }, [
     slug,
@@ -611,18 +566,6 @@ function StoryReadContent({ params }: PageProps) {
     );
   }
 
-  if (viewState === "loading" || !story) {
-    return (
-      <LoadingView
-        message={
-          autoStart
-            ? "동화나라에 주인공 마법을 준비하고 있어요..."
-            : "동화 정보를 준비하고 있어요..."
-        }
-      />
-    );
-  }
-
   // ==========================================
   // 2. 생성 중 대기 화면 (v-generating)
   // ==========================================
@@ -636,7 +579,7 @@ function StoryReadContent({ params }: PageProps) {
         isSelectingBranch={isSelectingBranch}
         handleRetry={handleRetry}
         handleAfterStoryRetry={handleAfterStoryRetry}
-        canOpenReader={isDemoMode || (sessionPages !== null && isReaderReady(sessionPages))}
+        canOpenReader={isDemoMode ? demoReaderReady : (sessionPages !== null && isReaderReady(sessionPages))}
         onOpenReader={() => {
           setStatusPinned(false);
           setViewState("reader");
@@ -645,6 +588,18 @@ function StoryReadContent({ params }: PageProps) {
           }
         }}
         isDemo={isDemoMode}
+      />
+    );
+  }
+
+  if (viewState === "loading" || !story) {
+    return (
+      <LoadingView
+        message={
+          autoStart
+            ? "동화나라에 주인공 마법을 준비하고 있어요..."
+            : "동화 정보를 준비하고 있어요..."
+        }
       />
     );
   }
