@@ -843,6 +843,8 @@ function StoryReadContent({ params }: PageProps) {
           titleId={CHAT_TITLE_ID}
         >
           <CharacterChat
+            key={`${sessionId}:${currentPageNo}:${chatBranchKey}`}
+            active={chatOpen}
             chat={chat}
             onInteraction={narration.pause}
             loginHref={`/login?redirect=${encodeURIComponent(`/stories/${slug}/read?sessionId=${sessionId}`)}`}

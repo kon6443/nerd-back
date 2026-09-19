@@ -1,3 +1,37 @@
+# 마이크 입력 리팩토링 및 PR Implementation Plan — 2026-09-20
+
+> **For implementers:** 사용자가 마이크 입력 리팩토링 및 PR 게시를 요청했다. 원래 작업 공간의 동시 로딩 화면 변경을 보존한다.
+
+**Goal:** 브라우저 음성 입력의 상태/안내/종료 코드를 단순화하고 main 대상 PR을 게시한다.
+**Architecture:** 지원 여부를 음성 상태 snapshot에 통합해 구독을 하나로 줄인다. phase별 UI 문구와 종료 처리를 한곳에서 관리하고 기존 인식·초안·전송·취소 동작을 유지한다. origin/main 기반 별도 worktree에 마이크 변경만 담는다.
+**Tech Stack:** 기존 React 19 / Next.js 16.3.3 / Web Speech API / Vitest / pnpm 10.26.2.
+**Spec:** 현재 마이크 입력 구현 및 사용자의 리팩토링 후 PR 요청. 실제 한국어 인식 정확도 평가는 별도이며 새 STT 엔진을 추가하지 않는다.
+
+### Task 1: 변경 검토 및 상태 단순화
+**Files:** apps/front/app/(trial)/stories/[slug]/read/{speechInput.ts,useSpeechInput.ts,CharacterChat.tsx,speechInput.test.ts}. reader page.tsx의 active/key 연결 2줄 유지.
+**Interfaces:** useSpeechInput의 지원 여부와 상태를 같은 snapshot에서 반환하고 start/stop/cancel, 기존 draft/submit 계약 유지.
+- [x] 지원 여부와 인식 상태의 구독을 통합하고 종료 처리·phase별 UI 문구를 정리했다. 음성 입력 테스트 16개 통과.
+**Acceptance criteria:** 마이크 권한·지원 감지·300자·초안 보존·늦은 이벤트 차단·접근성·SSR 동작 유지.
+**Verification:** 기존 인식 15개 회귀 및 support snapshot/취소 상태 검사, 변경 전후 diff 자체 검토.
+
+### Task 2: 격리 브랜치 검증
+**Files:** 위 소스와 page.tsx의 마이크 연결, tasks/todo.md의 이번 작업 기록만 PR에 포함.
+**Interfaces:** origin/main 기반 feat/character-chat-voice-input, 현재 frontend 검사 명령과 격리 localhost 화면.
+- [x] origin/main의 23e2957 기반 worktree에서 lint/types/stubs/health-path/build, 30 files / 198 tests와 실제 reader 합성 음성 18개 항목을 검증했다.
+**Acceptance criteria:** 로딩/3D 변경·환경 파일·키/토큰·의존성 변경 미포함. 320/390/1440px, 인식 초안→전송, 닫기/장면 이동/탭 숨김 중단 확인.
+**Verification:** `npx --yes pnpm@10.26.2 --filter nerd-front ci:all`, foreground `npm run test`(apps/front), 기존 합성 음성 UI QA, `git diff --check`.
+
+### Task 3: PR 게시와 확인 (진행 중)
+**Files:** 마이크 기능의 검증된 변경 파일과 tasks/todo.md.
+**Interfaces:** origin 브랜치 push 및 gh pr create --base main --body-file.
+- [ ] 범위·검증·실음성/데모 한계를 명시한 PR을 게시하고 원격 commit/파일 목록과 URL을 확인한다.
+**Acceptance criteria:** 사용자 요청 기능만 포함, PR head와 검증 commit 일치, merge/배포 없음.
+**Verification:** staged diff, gh pr view/files, origin head SHA 확인.
+
+**검증 근거:** `/tmp/nerd-speech-pr-qa.json` 및 desktop/mobile/unsupported 캡처. production standalone 빌드의 5512 서버에서 합성 session/auth fixture로 검사했고 실제 사용자 데이터·유료 음성 API를 변경하지 않았다. 키보드/마이크 초안→명시적 전송, 권한/네트워크 오류, 닫기/탭 숨김/장면 변경 종료와 늦은 결과 무시, 320/390px overflow 0·56px 조작을 확인했다. 음성 인식의 실제 정확도·지연은 미측정이며, 기존 demo의 sessionId/초기 등장인물 문제는 범위 밖으로 유지한다. PR에는 로딩/3D 변경·환경 파일·의존성 변경을 포함하지 않는다.
+
+---
+
 # 동화나라 전체 UI 일관성 Implementation Plan — 2026-09-17
 
 > **For implementers:** 홈의 종이·숲 재질을 전체 기존 경로에 확장하고, 기능·접근성·성능을 보존한다.
