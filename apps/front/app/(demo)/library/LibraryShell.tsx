@@ -11,7 +11,7 @@ export function LibraryShell({ children, isCreateMode = false }: { children: Rea
     <StoryRoom className={room.library}>
       <header className={room.libraryHeading}>
         <div>
-          <h1>{isCreateMode ? "서재" : "서재 둘러보기"}</h1>
+          <h1>{isCreateMode ? "내 얼굴로 만들기" : "둘러보기"}</h1>
           <p>{isCreateMode ? "어떤 동화의 주인공이 되어 볼까요? 나의 얼굴로 만들 이야기를 골라 주세요." : "어떤 이야기를 읽어 볼까요? 로그인 없이 동화를 펼쳐 보세요."}</p>
         </div>
         <BookStack className={room.libraryBooks} />

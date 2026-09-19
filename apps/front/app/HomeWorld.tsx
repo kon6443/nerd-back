@@ -211,7 +211,7 @@ export function HomeWorld({ children }: { children: ReactNode }) {
           <div className={styles.copy}>
             <p className={styles.eyebrow}>어서 와요, 동화나라에</p>
             <h1 className={styles.title}><span>한 권의 책에서,</span><span>커다란 모험으로.</span></h1>
-            <p className={styles.description}>버튼을 눌러 책 속으로 들어가 보세요. 작은 세상이 여러분을 기다려요.</p>
+            <p className={styles.description}>버튼을 눌러 책 속으로 들어가 보세요. 내 사진 한 장이면 동화 속 주인공이 돼요.</p>
           </div>
           <div className={styles.actions} aria-busy={presentation.entering || undefined}>
             <div className={styles.actionLinks} onClickCapture={enterStory}>{children}</div>
