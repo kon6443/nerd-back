@@ -1,0 +1,207 @@
+.journeyScreen {
+  position: relative;
+  width: 100%;
+  height: calc(100dvh - 3.75rem); /* 헤더 제외 전체 높이 */
+  min-height: 520px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background-color: #7ec8e3;
+  user-select: none;
+}
+
+/* 상단 즉시 읽기 가능 알림 배너 */
+.readyBanner {
+  position: relative;
+  z-index: 30;
+  margin: 1rem auto 0;
+  width: calc(100% - 2rem);
+  max-width: 28rem;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  border: 2px solid var(--color-primary, #6366f1);
+  border-radius: 1rem;
+  padding: 0.85rem 1.25rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  animation: slideDown 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 하단 판타지 HUD 바 */
+.hudBar {
+  position: relative;
+  z-index: 30;
+  width: 100%;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 0.85rem 1.25rem;
+  color: #ffffff;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* 하단 좌측: 동화 팁 롤링 */
+.tipContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.tipBadge {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.4);
+}
+
+.tipText {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #f8fafc;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 하단 우측: 마법 프로그레스 바 */
+.gaugeContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-shrink: 0;
+}
+
+.gaugeInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.gaugePercent {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fde047;
+  text-shadow: 0 0 10px rgba(253, 224, 71, 0.5);
+}
+
+.gaugeTrack {
+  position: relative;
+  width: 140px;
+  height: 18px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 2px solid #eab308;
+  border-radius: 9999px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 8px rgba(234, 179, 8, 0.3);
+}
+
+@media (min-width: 640px) {
+  .gaugeTrack {
+    width: 200px;
+    height: 20px;
+  }
+}
+
+.gaugeFill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+  transition: width 0.4s ease-out;
+  box-shadow: 0 0 12px rgba(129, 140, 248, 0.8);
+  position: relative;
+}
+
+.gaugeFill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shine 2s infinite;
+}
+
+@keyframes shine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* 세부 진행 현황 서랍 버튼 */
+.detailToggleBtn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.detailToggleBtn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* 세부 진행 현황 서랍 모달/패널 */
+.detailDrawer {
+  position: absolute;
+  bottom: 4.5rem;
+  right: 1.25rem;
+  width: calc(100% - 2.5rem);
+  max-width: 24rem;
+  max-height: 20rem;
+  overflow-y: auto;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1rem;
+  padding: 1rem;
+  color: #ffffff;
+  z-index: 35;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+  animation: popUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes popUp {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

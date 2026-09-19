@@ -60,3 +60,6 @@ next-env.d.ts
 # 로컬 개발 서비스의 데이터 (docker-compose.local.yml). 🚫 커밋하지 않는다 —
 # 컨테이너가 만드는 바이너리라 diff 가 무의미하고 용량만 늘어난다.
 .local-data/
+
+# Orca local runtime & drops
+.orca/
