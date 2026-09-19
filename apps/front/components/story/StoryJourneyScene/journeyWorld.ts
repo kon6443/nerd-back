@@ -3,6 +3,8 @@ import {
   createPhoneModel,
   createCastleModel,
   createTreeModel,
+  createMushroomModel,
+  createFlowerModel,
   createMagicLantern,
   createCloudModel,
   createAirshipModel,
@@ -95,6 +97,30 @@ export function createJourneyWorld(
     const tree = createTreeModel(palette, scale);
     tree.position.set(x, -0.5, z);
     landGroup.add(tree);
+  });
+
+  // 길가에 핀 귀여운 버섯들
+  const mushroomCoords = [
+    [-2.2, -15], [-2.8, -21], [-2.0, -29],
+    [2.4, -16], [2.1, -24], [2.8, -31],
+  ];
+  mushroomCoords.forEach(([x, z]) => {
+    const shroom = createMushroomModel(1.1);
+    shroom.position.set(x, -0.5, z);
+    landGroup.add(shroom);
+  });
+
+  // 알록달록 파스텔 들꽃들 (분홍, 노랑, 하늘빛)
+  const flowerColors = [0xf472b6, 0xfde047, 0x67e8f9, 0xc084fc];
+  const flowerCoords = [
+    [-1.6, -13], [-1.8, -17], [-2.4, -25], [-1.5, -33],
+    [1.7, -14], [1.9, -19], [1.6, -27], [2.0, -34],
+  ];
+  flowerCoords.forEach(([x, z], idx) => {
+    const col = flowerColors[idx % flowerColors.length];
+    const flower = createFlowerModel(col, 1.2);
+    flower.position.set(x, -0.5, z);
+    landGroup.add(flower);
   });
 
   // ========================================================
@@ -258,12 +284,11 @@ export function createJourneyWorld(
     if (!width || !height) return;
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    renderer.setSize(width, height, false);
+    renderer.setSize(width, height, true);
   }
 
   function dispose() {
     renderer.dispose();
-    renderer.forceContextLoss();
 
     // 씬 내 모든 지오메트리 & 머티리얼 정리
     scene.traverse((obj) => {

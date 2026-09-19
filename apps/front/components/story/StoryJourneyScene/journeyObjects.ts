@@ -230,6 +230,88 @@ export function createTreeModel(palette: JourneyPalette, scale = 1): THREE.Group
   return tree;
 }
 
+/** 3-1. 아기자기한 동화 버섯 (Mushroom) */
+export function createMushroomModel(scale = 1): THREE.Group {
+  const mushroom = new THREE.Group();
+
+  const stemMat = new THREE.MeshStandardMaterial({
+    color: 0xfff7ed,
+    roughness: 0.6,
+  });
+  const capMat = new THREE.MeshStandardMaterial({
+    color: 0xef4444, // 빨간 버섯 갓
+    roughness: 0.3,
+  });
+  const dotMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, // 흰 반점
+    roughness: 0.4,
+  });
+
+  const stemGeo = new THREE.CylinderGeometry(0.12, 0.16, 0.5, 8);
+  const stem = new THREE.Mesh(stemGeo, stemMat);
+  stem.position.y = 0.25;
+  mushroom.add(stem);
+
+  const capGeo = new THREE.SphereGeometry(0.38, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+  const cap = new THREE.Mesh(capGeo, capMat);
+  cap.position.y = 0.48;
+  mushroom.add(cap);
+
+  // 귀여운 흰 반점들
+  [
+    [0, 0.85, 0],
+    [0.2, 0.72, 0.15],
+    [-0.2, 0.72, -0.15],
+    [0.15, 0.68, -0.2],
+  ].forEach(([x, y, z]) => {
+    const dotGeo = new THREE.SphereGeometry(0.06, 6, 6);
+    const dot = new THREE.Mesh(dotGeo, dotMat);
+    dot.position.set(x, y, z);
+    mushroom.add(dot);
+  });
+
+  mushroom.scale.setScalar(scale);
+  return mushroom;
+}
+
+/** 3-2. 반짝이는 파스텔 들꽃 (Flower) */
+export function createFlowerModel(colorHex: number, scale = 1): THREE.Group {
+  const flower = new THREE.Group();
+
+  const stemMat = new THREE.MeshStandardMaterial({ color: 0x65a30d, roughness: 0.7 });
+  const petalMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
+  const centerMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.3 });
+
+  const stemGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.4, 6);
+  const stem = new THREE.Mesh(stemGeo, stemMat);
+  stem.position.y = 0.2;
+  flower.add(stem);
+
+  // 꽃심
+  const centerGeo = new THREE.SphereGeometry(0.1, 8, 8);
+  const center = new THREE.Mesh(centerGeo, centerMat);
+  center.position.y = 0.42;
+  flower.add(center);
+
+  // 꽃잎 5개
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2;
+    const petalGeo = new THREE.SphereGeometry(0.09, 6, 6);
+    petalGeo.scale(1, 1.4, 0.6);
+    const petal = new THREE.Mesh(petalGeo, petalMat);
+    petal.position.set(
+      Math.cos(angle) * 0.16,
+      0.42,
+      Math.sin(angle) * 0.16
+    );
+    petal.rotation.y = angle;
+    flower.add(petal);
+  }
+
+  flower.scale.setScalar(scale);
+  return flower;
+}
+
 /** 4. 공중에 뜬 마법 등불 & 크리스탈 젬 */
 export function createMagicLantern(palette: JourneyPalette): THREE.Group {
   const lantern = new THREE.Group();

@@ -356,7 +356,7 @@ function StoryReadContent({ params }: PageProps) {
               if (!active) return;
               setViewState("reader");
               router.replace(`/stories/${slug}/read?demo=${demoParam}`);
-            }, 3000);
+            }, 60000);
             return () => clearTimeout(timer);
           } else {
             setViewState("reader");
@@ -636,11 +636,13 @@ function StoryReadContent({ params }: PageProps) {
         isSelectingBranch={isSelectingBranch}
         handleRetry={handleRetry}
         handleAfterStoryRetry={handleAfterStoryRetry}
-        // 자동 복귀를 막은 대신 **직접 돌아갈 길**을 준다. 본편이 준비됐을 때만 뜬다.
-        canOpenReader={sessionPages !== null && isReaderReady(sessionPages)}
+        canOpenReader={isDemoMode || (sessionPages !== null && isReaderReady(sessionPages))}
         onOpenReader={() => {
           setStatusPinned(false);
           setViewState("reader");
+          if (isDemoMode) {
+            router.replace(`/stories/${slug}/read?demo=${demoParam}`);
+          }
         }}
         isDemo={isDemoMode}
       />
