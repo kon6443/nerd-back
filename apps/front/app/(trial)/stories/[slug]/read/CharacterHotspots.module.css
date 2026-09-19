@@ -38,8 +38,8 @@
 
 .hotspotBubble {
   position: absolute;
-  inset-block-start: -1rem;
-  inset-inline-end: -2rem;
+  inset-block-start: 1.25rem;
+  inset-inline-end: 1.25rem;
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -123,3 +123,23 @@
     transition: none;
   }
 }
+
+/* ============================================================
+   특정 장면 전용 말풍선 위치 예외 처리 (얼굴 가림 방지)
+   ============================================================ */
+
+/* 잭과 콩나무 3쪽: 잭이 뒤돌아보고 있어 얼굴을 가리지 않도록 잭의 왼쪽 어깨 뒤 빈 공간으로 배치 */
+.hotspotLayer[data-story="jack-and-beanstalk"][data-page="3"] .hotspot[data-role="jack"] .hotspotBubble {
+  inset-inline-end: auto;
+  inset-inline-start: -1rem;
+  inset-block-start: 2rem;
+  transform-origin: left center;
+}
+
+/* 잭과 콩나무 6-b쪽: 잭이 앉아 나무를 올려다볼 때 얼굴을 가리지 않도록 우측(나무 기둥 앞)으로 배치 */
+.hotspotLayer[data-story="jack-and-beanstalk"][data-page="6"][data-branch="b"] .hotspot[data-role="jack"] .hotspotBubble,
+.hotspotLayer[data-story="jack-and-beanstalk"][data-page="6-b"] .hotspot[data-role="jack"] .hotspotBubble {
+  inset-inline-end: -2.5rem;
+  inset-block-start: 1rem;
+}
+
