@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import {
   createPhoneModel,
+  type PhoneModel,
   createCastleModel,
   createTreeModel,
   createMushroomModel,
@@ -45,7 +46,7 @@ export function createJourneyWorld(
 
   // 카메라 설정 (FOV 50)
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 140);
-  camera.position.set(1.5, 1.45, 2.7);
+  camera.position.set(1.4, 1.35, 2.3);
 
   // 조명 설정
   const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
@@ -63,15 +64,15 @@ export function createJourneyWorld(
   // 3인칭 주인공 캐릭터 (Hero Avatar)
   // ========================================================
   const hero: HeroModel = createHeroModel();
-  hero.position.set(0.4, 0.45, 0.4);
+  hero.position.set(0.35, 0.45, 0.4);
   scene.add(hero);
 
   // ========================================================
-  // 1단계: 스마트폰 (Z = 1.25 부근, 주인공을 마주보도록 배치)
+  // 1단계: 스마트폰 (주인공 오른손 바로 앞에 꼭 맞게 배치)
   // ========================================================
-  const phone = createPhoneModel(palette);
-  phone.position.set(-0.35, 1.15, 1.25);
-  phone.rotation.y = 0.35; // 주인공 쪽으로 살짝 비틈
+  const phone: PhoneModel = createPhoneModel(palette);
+  phone.position.set(0.12, 1.05, 0.95);
+  phone.rotation.set(0.12, 0.42, -0.06);
   scene.add(phone);
 
   // ========================================================
@@ -189,18 +190,26 @@ export function createJourneyWorld(
   function render(pointerX: number, pointerY: number) {
     const elapsed = clock.getElapsedTime();
 
-    // 1) 3인칭 스마트폰 셀카 (0 ~ 3.5초): 주인공이 폰을 향해 브이 포즈, 카메라는 3인칭 쿼터뷰
+    // 스마트폰 화면 실시간 애니메이션 (카운트다운 3.. 2.. 1.. 찰칵! ➔ 마법 포탈)
+    if (elapsed < 6.5) {
+      phone.updateScreen(elapsed);
+    }
+
+    // 1) 3인칭 스마트폰 셀카 (0 ~ 3.5초): 주인공이 폰을 쥐고 셀카 포즈, 스마트폰 안에서 3..2..1 카운트다운!
     if (elapsed < 3.5) {
       phone.visible = true;
       hero.visible = true;
+      hero.scale.set(1, 1, 1);
       hero.setPose("selfie", elapsed);
 
-      hero.position.set(0.4, 0.45 + Math.sin(elapsed * 2) * 0.03, 0.4);
-      phone.position.set(-0.35, 1.15 + Math.sin(elapsed * 2.5) * 0.04, 1.25);
-      phone.rotation.set(0.08, 0.35 + Math.sin(elapsed * 1.5) * 0.05, -0.05);
+      const sway = Math.sin(elapsed * 2.8) * 0.025;
+      hero.position.set(0.35, 0.45 + sway, 0.4);
+      phone.position.set(0.12, 1.05 + sway, 0.95);
+      phone.rotation.set(0.12, 0.42 + Math.sin(elapsed * 1.5) * 0.03, -0.06);
 
-      camera.position.set(1.5, 1.45, 2.7);
-      camera.lookAt(0.05, 1.05, 0.85);
+      // 캐릭터 얼굴과 폰 화면이 한눈에 보이는 황금 3인칭 셀카 앵글
+      camera.position.set(1.4, 1.35, 2.3);
+      camera.lookAt(0.18, 1.0, 0.7);
 
       // 2.4초에 "찰칵!" 플래시 트리거
       if (elapsed >= 2.4 && !flashTriggered) {
@@ -209,36 +218,43 @@ export function createJourneyWorld(
         setTimeout(() => onFlash?.(false), 280);
       }
     }
-    // 2) 3인칭 스마트폰 화면 다이브! (3.5 ~ 6.5초): 주인공이 폰 화면 속으로 슝 다이빙, 카메라가 추격
+    // 2) 3인칭 스마트폰 화면 다이브! (3.5 ~ 6.5초): 포탈 확대, 예비 동작 ➔ 웜홀 다이빙
     else if (elapsed < 6.5) {
       phone.visible = true;
       hero.visible = true;
-      hero.setPose("dive", elapsed);
 
       const progress = (elapsed - 3.5) / 3.0; // 0 ~ 1
       const ease = progress * progress * (3 - 2 * progress); // smoothstep
+      hero.setPose("dive", progress);
 
-      // 주인공이 스마트폰 화면 속으로 다이빙
-      const heroX = THREE.MathUtils.lerp(0.4, -0.35, ease);
-      const heroY = THREE.MathUtils.lerp(0.45, 1.15, ease);
-      const heroZ = THREE.MathUtils.lerp(0.4, -3.5, ease);
+      // 스마트폰이 중앙으로 떠오르며 거대한 마법 포탈로 확대
+      phone.position.set(
+        THREE.MathUtils.lerp(0.12, 0, ease),
+        THREE.MathUtils.lerp(1.05, 1.25, ease),
+        THREE.MathUtils.lerp(0.95, 0.1, ease)
+      );
+      phone.scale.setScalar(1 + ease * 2.6);
+      phone.rotation.set(0, 0, ease * 0.25);
+
+      // 주인공이 스마트폰 화면 속으로 쑥 다이빙
+      const heroX = THREE.MathUtils.lerp(0.35, 0, ease);
+      const heroY = THREE.MathUtils.lerp(0.45, 1.25, ease);
+      const heroZ = THREE.MathUtils.lerp(0.4, -4.0, ease);
       hero.position.set(heroX, heroY, heroZ);
+      hero.scale.setScalar(THREE.MathUtils.lerp(1.0, 0.35, ease)); // 원근감 웜홀 수축
 
-      // 스마트폰 화면 포탈 확대
-      phone.scale.setScalar(1 + ease * 2.8);
-      phone.rotation.z = ease * 0.35;
-
-      // 카메라가 주인공을 뒤쫓아 폰 스크린 속으로 진입
-      const camX = THREE.MathUtils.lerp(1.5, -0.35, ease);
-      const camY = THREE.MathUtils.lerp(1.45, 1.55, ease);
-      const camZ = THREE.MathUtils.lerp(2.7, -0.5, ease);
+      // 카메라가 캐릭터의 발끝을 바짝 쫓아 폰 스크린 속으로 함께 진입
+      const camX = THREE.MathUtils.lerp(1.4, 0, ease);
+      const camY = THREE.MathUtils.lerp(1.35, 1.45, ease);
+      const camZ = THREE.MathUtils.lerp(2.3, -0.6, ease);
       camera.position.set(camX, camY, camZ);
-      camera.lookAt(heroX, heroY, heroZ - 3);
+      camera.lookAt(0, 1.25, heroZ - 3.0);
     }
     // 3) 3인칭 성과 나무 숲길 플라이스루 (6.5 ~ 12.0초): 주인공이 망토를 휘날리며 활강, 체이스캠
     else if (elapsed < 12.0) {
       phone.visible = false;
       hero.visible = true;
+      hero.scale.set(1, 1, 1);
       hero.setPose("fly", elapsed);
 
       const progress = (elapsed - 6.5) / 5.5; // 0 ~ 1

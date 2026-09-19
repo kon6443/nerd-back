@@ -27,94 +27,60 @@ export const DEFAULT_PALETTE: JourneyPalette = {
 };
 
 /** 1. 3D 스마트폰 모델 (셀카 & 화면) */
-export function createPhoneModel(palette: JourneyPalette): THREE.Group {
-  const group = new THREE.Group();
+export interface PhoneModel extends THREE.Group {
+  updateScreen: (elapsed: number) => void;
+  portalRings: THREE.Group;
+}
 
-  // 폰 본체
+/** 1. 3D 스마트폰 모델 (셀카 카운트다운 & 마법 포탈) */
+export function createPhoneModel(palette: JourneyPalette): PhoneModel {
+  const group = new THREE.Group() as PhoneModel;
+
+  // 폰 본체 (슬림한 둥근 모서리 스마트폰)
   const bodyGeo = new THREE.BoxGeometry(1.6, 3.2, 0.12);
   const bodyMat = new THREE.MeshStandardMaterial({
     color: palette.phoneBody,
-    roughness: 0.3,
-    metalness: 0.8,
+    roughness: 0.25,
+    metalness: 0.85,
   });
   const body = new THREE.Mesh(bodyGeo, bodyMat);
   group.add(body);
 
+  // 뒷면 카메라 섬 (Triple Camera)
+  const cameraBumpGeo = new THREE.BoxGeometry(0.65, 0.65, 0.05);
+  const cameraBumpMat = new THREE.MeshStandardMaterial({
+    color: 0x1e293b,
+    roughness: 0.2,
+    metalness: 0.9,
+  });
+  const cameraBump = new THREE.Mesh(cameraBumpGeo, cameraBumpMat);
+  cameraBump.position.set(-0.35, 1.15, -0.08);
+  group.add(cameraBump);
+
+  // 3개의 카메라 렌즈
+  const lensGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.04, 12);
+  const lensMat = new THREE.MeshStandardMaterial({ color: 0x09090b, roughness: 0.1, metalness: 0.95 });
+  [
+    [-0.45, 1.25],
+    [-0.25, 1.25],
+    [-0.35, 1.05],
+  ].forEach(([lx, ly]) => {
+    const lens = new THREE.Mesh(lensGeo, lensMat);
+    lens.rotation.x = Math.PI / 2;
+    lens.position.set(lx, ly, -0.11);
+    group.add(lens);
+  });
+
   // 화면 테두리 베젤
-  const screenGeo = new THREE.PlaneGeometry(1.45, 2.95);
-  // 화면 캔버스 텍스처 (동화풍 셀카 뷰파인더)
+  const screenGeo = new THREE.PlaneGeometry(1.46, 2.96);
+  // 화면 캔버스 텍스처 (동적 뷰파인더 & 카운트다운)
   const canvas = document.createElement("canvas");
   canvas.width = 512;
   canvas.height = 1024;
   const ctx = canvas.getContext("2d")!;
-  
-  // 배경 그라데이션
-  const grad = ctx.createLinearGradient(0, 0, 0, 1024);
-  grad.addColorStop(0, "#bae6fd");
-  grad.addColorStop(1, "#fbcfe8");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 512, 1024);
-
-  // 셀카 주인공 아바타 실루엣
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(256, 420, 120, 0, Math.PI * 2); // 머리
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(256, 750, 190, 220, 0, 0, Math.PI * 2); // 어깨
-  ctx.fill();
-
-  // 귀여운 눈과 미소
-  ctx.fillStyle = "#475569";
-  ctx.beginPath();
-  ctx.arc(210, 420, 14, 0, Math.PI * 2);
-  ctx.arc(302, 420, 14, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(256, 460, 30, 0.2 * Math.PI, 0.8 * Math.PI);
-  ctx.lineWidth = 8;
-  ctx.strokeStyle = "#475569";
-  ctx.lineCap = "round";
-  ctx.stroke();
-
-  // 볼터치
-  ctx.fillStyle = "#f472b6";
-  ctx.beginPath();
-  ctx.arc(190, 455, 22, 0, Math.PI * 2);
-  ctx.arc(322, 455, 22, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 카메라 뷰파인더 모서리 가이드
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-  ctx.lineWidth = 10;
-  // 좌상
-  ctx.beginPath();
-  ctx.moveTo(60, 120); ctx.lineTo(60, 60); ctx.lineTo(120, 60);
-  ctx.stroke();
-  // 우상
-  ctx.beginPath();
-  ctx.moveTo(392, 60); ctx.lineTo(452, 60); ctx.lineTo(452, 120);
-  ctx.stroke();
-  // 좌하
-  ctx.beginPath();
-  ctx.moveTo(60, 904); ctx.lineTo(60, 964); ctx.lineTo(120, 964);
-  ctx.stroke();
-  // 우하
-  ctx.beginPath();
-  ctx.moveTo(392, 964); ctx.lineTo(452, 964); ctx.lineTo(452, 904);
-  ctx.stroke();
-
-  // 셔터 버튼
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(256, 880, 48, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#cbd5e1";
-  ctx.lineWidth = 6;
-  ctx.stroke();
-
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+
   const screenMat = new THREE.MeshBasicMaterial({ map: texture });
   const screen = new THREE.Mesh(screenGeo, screenMat);
   screen.position.z = 0.065;
@@ -122,10 +88,167 @@ export function createPhoneModel(palette: JourneyPalette): THREE.Group {
 
   // 상단 수화부 스피커
   const notchGeo = new THREE.BoxGeometry(0.3, 0.04, 0.02);
-  const notchMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const notchMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
   const notch = new THREE.Mesh(notchGeo, notchMat);
   notch.position.set(0, 1.4, 0.07);
   group.add(notch);
+
+  // 스마트폰 주변에 펼쳐지는 마법 포탈 링들
+  const portalRings = new THREE.Group();
+  portalRings.visible = false;
+  group.add(portalRings);
+  group.portalRings = portalRings;
+
+  const ring1Geo = new THREE.TorusGeometry(1.8, 0.05, 12, 32);
+  const ring1Mat = new THREE.MeshStandardMaterial({
+    color: 0xfde047, // 황금빛
+    emissive: 0xfde047,
+    emissiveIntensity: 0.8,
+    roughness: 0.2,
+  });
+  const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+  portalRings.add(ring1);
+
+  const ring2Geo = new THREE.TorusGeometry(2.1, 0.04, 12, 32);
+  const ring2Mat = new THREE.MeshStandardMaterial({
+    color: 0xc084fc, // 보랏빛
+    emissive: 0xc084fc,
+    emissiveIntensity: 0.7,
+    roughness: 0.2,
+  });
+  const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+  portalRings.add(ring2);
+
+  // 화면 실시간 드로잉
+  group.updateScreen = (elapsed: number) => {
+    ctx.clearRect(0, 0, 512, 1024);
+
+    if (elapsed < 3.5) {
+      portalRings.visible = false;
+      // 1) 셀카 뷰파인더 모드 (화사한 파스텔 배경 + 아바타 + 카운트다운)
+      const grad = ctx.createLinearGradient(0, 0, 0, 1024);
+      grad.addColorStop(0, "#bae6fd");
+      grad.addColorStop(1, "#fbcfe8");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 1024);
+
+      // 주인공 실루엣 호흡
+      const breathe = Math.sin(elapsed * 3) * 8;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(256, 420 + breathe, 120, 0, Math.PI * 2); // 머리
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(256, 750 + breathe, 190, 220, 0, 0, Math.PI * 2); // 어깨
+      ctx.fill();
+
+      // 귀여운 눈 (2.0초에 윙크!)
+      ctx.fillStyle = "#475569";
+      if (elapsed >= 1.8 && elapsed < 2.3) {
+        // 윙크 (왼눈 감음, 오른눈 뜸)
+        ctx.beginPath();
+        ctx.arc(210, 420 + breathe, 14, 0.1 * Math.PI, 0.9 * Math.PI);
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "#475569";
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(302, 420 + breathe, 14, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(210, 420 + breathe, 14, 0, Math.PI * 2);
+        ctx.arc(302, 420 + breathe, 14, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 미소 & 볼터치
+      ctx.beginPath();
+      ctx.arc(256, 460 + breathe, 30, 0.2 * Math.PI, 0.8 * Math.PI);
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = "#475569";
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      ctx.fillStyle = "#f472b6";
+      ctx.beginPath();
+      ctx.arc(190, 455 + breathe, 22, 0, Math.PI * 2);
+      ctx.arc(322, 455 + breathe, 22, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 카메라 뷰파인더 코너 라인
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(50, 100); ctx.lineTo(50, 50); ctx.lineTo(100, 50);
+      ctx.moveTo(412, 50); ctx.lineTo(462, 50); ctx.lineTo(462, 100);
+      ctx.moveTo(50, 924); ctx.lineTo(50, 974); ctx.lineTo(100, 974);
+      ctx.moveTo(412, 974); ctx.lineTo(462, 974); ctx.lineTo(462, 924);
+      ctx.stroke();
+
+      // 상단 카운트다운 타이머 배지 (3.. 2.. 1.. 찰칵!)
+      let countText = "3 찰칵 준비!";
+      let badgeColor = "#3b82f6";
+      if (elapsed >= 1.0 && elapsed < 1.8) {
+        countText = "2 쁘이~ ✌️";
+        badgeColor = "#8b5cf6";
+      } else if (elapsed >= 1.8 && elapsed < 2.4) {
+        countText = "1 치즈! 🧀";
+        badgeColor = "#ec4899";
+      } else if (elapsed >= 2.4) {
+        countText = "✨ 찰칵! ✨";
+        badgeColor = "#f59e0b";
+      }
+
+      ctx.fillStyle = badgeColor;
+      ctx.beginPath();
+      ctx.roundRect(146, 75, 220, 56, 28);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 26px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(countText, 256, 113);
+    } else {
+      // 2) 마법 포탈 워프 모드 (3.5 ~ 6.5초): 황금빛 & 보랏빛 소용돌이
+      portalRings.visible = true;
+      const portalTime = elapsed - 3.5;
+      ring1.rotation.z = portalTime * 2.5;
+      ring2.rotation.z = -portalTime * 2.0;
+
+      // 포탈 소용돌이 그라데이션
+      const cx = 256;
+      const cy = 512;
+      const radial = ctx.createRadialGradient(cx, cy, 30, cx, cy, 500);
+      radial.addColorStop(0, "#ffffff");
+      radial.addColorStop(0.25, "#fde047");
+      radial.addColorStop(0.55, "#a855f7");
+      radial.addColorStop(0.85, "#3b82f6");
+      radial.addColorStop(1, "#1e1b4b");
+      ctx.fillStyle = radial;
+      ctx.fillRect(0, 0, 512, 1024);
+
+      // 소용돌이 스파이럴 라인
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(portalTime * 4.0);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.lineWidth = 12;
+      for (let i = 0; i < 4; i++) {
+        ctx.rotate((Math.PI / 2));
+        ctx.beginPath();
+        ctx.arc(0, 0, 160 + i * 40, 0, Math.PI * 0.85);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 36px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("✨ 동화 속으로 다이브! ✨", 256, 525);
+    }
+
+    texture.needsUpdate = true;
+  };
 
   return group;
 }
@@ -506,36 +629,73 @@ export function createHeroModel(): HeroModel {
   hero.add(magicCloud);
   hero.magicCloud = magicCloud;
 
+  // 머리 그룹 노출
+  (hero as unknown as { headGroup: THREE.Group }).headGroup = headGroup;
+
   // 포즈 제어
   hero.setPose = (mode, t = 0) => {
     if (mode === "selfie") {
       magicCloud.visible = false;
+      hero.scale.set(1, 1, 1);
       hero.rotation.x = 0;
-      hero.rotation.y = -0.3; // 살짝 폰을 향해 몸을 틈
-      // 오른손은 폰을 들고(앞으로 뻗음), 왼손은 브이 포즈
-      rightArmPivot.rotation.x = -Math.PI / 2.5;
-      rightArmPivot.rotation.z = -0.2;
-      leftArmPivot.rotation.x = -Math.PI / 2.8;
-      leftArmPivot.rotation.z = 0.5;
-      cape.rotation.x = 0.15 + Math.sin(t * 3) * 0.05;
+      hero.rotation.y = -0.28; // 폰을 향해 몸을 틈
+      hero.rotation.z = Math.sin(t * 2.5) * 0.04;
+
+      // 머리 귀엽게 갸우뚱
+      headGroup.rotation.z = Math.sin(t * 3.0) * 0.12;
+      headGroup.rotation.y = -0.15 + Math.sin(t * 1.8) * 0.06;
+
+      // 오른손은 폰 모서리를 잡고, 왼손은 신나는 브이 포즈
+      rightArmPivot.rotation.x = -Math.PI / 2.3;
+      rightArmPivot.rotation.y = -0.2;
+      rightArmPivot.rotation.z = -0.15;
+
+      leftArmPivot.rotation.x = -Math.PI / 2.4;
+      leftArmPivot.rotation.y = 0.2;
+      leftArmPivot.rotation.z = 0.5 + Math.sin(t * 4) * 0.08;
+
+      cape.rotation.x = 0.15 + Math.sin(t * 3) * 0.06;
     } else if (mode === "dive") {
       magicCloud.visible = false;
-      // 다이빙: 몸을 앞으로 기울이고 양팔을 앞으로 쭉 뻗음
-      hero.rotation.x = Math.PI / 2.2;
-      hero.rotation.y = 0;
-      leftArmPivot.rotation.x = -Math.PI * 0.9;
-      leftArmPivot.rotation.z = -0.15;
-      rightArmPivot.rotation.x = -Math.PI * 0.9;
-      rightArmPivot.rotation.z = 0.15;
-      cape.rotation.x = -0.5 + Math.sin(t * 12) * 0.1; // 심하게 펄럭임
+      // t는 0 ~ 1 사이의 다이빙 진행률
+      if (t < 0.22) {
+        // [예비 동작 Anticipation] 화면이 열리며 뒤로 살짝 젖혀짐
+        hero.rotation.x = -0.25;
+        hero.rotation.y = 0;
+        hero.scale.set(1.1, 0.9, 1.1); // 살짝 웅크림
+        leftArmPivot.rotation.x = -0.3;
+        leftArmPivot.rotation.z = 0.6;
+        rightArmPivot.rotation.x = -0.3;
+        rightArmPivot.rotation.z = -0.6;
+        headGroup.rotation.z = 0;
+      } else {
+        // [본격 다이빙 Elastic Stretch] 머리부터 화면 속으로 쑥 다이빙
+        const diveEase = (t - 0.22) / 0.78;
+        hero.rotation.x = Math.PI / 2.15;
+        hero.rotation.y = 0;
+        // 회전 스핀하며 웜홀 통과
+        hero.rotation.z = diveEase * Math.PI * 2.0;
+        // 속도감 있는 스트레치
+        hero.scale.set(0.85, 1.3, 0.85);
+
+        // 양팔을 앞으로 모으고 다이빙
+        leftArmPivot.rotation.x = -Math.PI * 0.95;
+        leftArmPivot.rotation.z = -0.1;
+        rightArmPivot.rotation.x = -Math.PI * 0.95;
+        rightArmPivot.rotation.z = 0.1;
+        cape.rotation.x = -0.6 + Math.sin(t * 20) * 0.15; // 거센 바람에 펄럭임
+      }
     } else {
       // fly (비행 & 구름 서핑)
       magicCloud.visible = true;
-      hero.rotation.x = 0.25; // 날아가는 살짝 숙인 포즈
+      hero.scale.set(1, 1, 1);
+      headGroup.rotation.set(0, 0, 0);
+      hero.rotation.x = 0.22; // 날아가는 살짝 숙인 포즈
+      hero.rotation.y = 0;
       leftArmPivot.rotation.x = -0.5;
-      leftArmPivot.rotation.z = 0.8; // 양팔 시원하게 벌림
+      leftArmPivot.rotation.z = 0.82; // 양팔 시원하게 벌림
       rightArmPivot.rotation.x = -0.5;
-      rightArmPivot.rotation.z = -0.8;
+      rightArmPivot.rotation.z = -0.82;
       cape.rotation.x = 0.75 + Math.sin(t * 6) * 0.15;
     }
   };
