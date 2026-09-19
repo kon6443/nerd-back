@@ -105,7 +105,8 @@
   line-height: 1.2;
 }
 .libraryHeading h1 { font-size: clamp(2.5rem, 4vw, 3.75rem); }
-.libraryHeading p { margin-top: 1rem; max-width: 28rem; color: var(--room-muted); line-height: 1.8; word-break: keep-all; }
+/* 두 문장짜리 설명이라 두 줄의 길이를 맞춘다 — 마지막 줄에 「주세요.」만 남지 않게. */
+.libraryHeading p { margin-top: 1rem; max-width: 28rem; color: var(--room-muted); line-height: 1.8; text-wrap: balance; }
 .libraryBooks { flex: 0 0 280px; }
 .library .libraryHeading { min-height: 175px; margin-bottom: 2rem; }
 .library .libraryBooks { zoom: 0.78; }

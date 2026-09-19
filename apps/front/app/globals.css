@@ -71,7 +71,15 @@ body {
   background: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  /* 서비스 전체 한국어 줄바꿈은 **단어 단위**로 한다 — 「골라/주세요」처럼 어절 중간에서 끊지 않는다.
+     한 단어가 줄보다 길 때(긴 아이디·URL)만 넘치지 않게 그 안에서 끊는다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
+
+/* 제목은 줄 길이를 고르게, 본문은 마지막 줄에 한 단어만 남지 않게 한다. */
+:where(h1, h2, h3, h4, h5, h6) { text-wrap: balance; }
+:where(p, li, dd, dt, label, figcaption, blockquote, legend) { text-wrap: pretty; }
 
 :focus-visible {
   outline: 3px solid var(--color-magic-strong);
@@ -139,6 +147,10 @@ body:has(dialog[open]) {
   --color-scene-leaf: #d7edc2;
 }
 @media (max-width: 639px) { :root { --app-header-height: 125px; } }
+/* 상단 메뉴와 홈 콘텐츠가 같은 양 끝선을 쓰도록 하는 좌우 여백. 넓은 화면에서는 가운데 1440px 안에 둔다. */
+:root { --layout-gutter: clamp(1.5rem, 6.5vw, 7.5rem); }
+@media (max-width: 767px) { :root { --layout-gutter: 1.5rem; } }
+@media (min-width: 1600px) { :root { --layout-gutter: max(7.5rem, calc((100vw - 1440px) / 2)); } }
 ::selection { background: var(--color-primary-soft); color: var(--color-night); }
 html { scrollbar-color: var(--color-paper-edge-strong) var(--color-paper); }
 
@@ -147,10 +159,6 @@ html { scrollbar-color: var(--color-paper-edge-strong) var(--color-paper); }
 .story-backdrop::before { left: -28%; transform: rotate(9deg); }
 .story-backdrop::after { right: -20%; bottom: -16%; transform: rotate(-8deg); background: color-mix(in srgb, var(--color-paper-edge) 45%, var(--color-paper)); }
 
-/* 상단 메뉴와 홈 콘텐츠가 같은 양 끝선을 쓰도록 하는 좌우 여백. 넓은 화면에서는 가운데 1440px 안에 둔다. */
-:root { --layout-gutter: clamp(1.5rem, 6.5vw, 7.5rem); }
-@media (max-width: 767px) { :root { --layout-gutter: 1.5rem; } }
-@media (min-width: 1600px) { :root { --layout-gutter: max(7.5rem, calc((100vw - 1440px) / 2)); } }
 @layer components {
 .story-action { text-wrap: balance; text-align: center; line-height: 1.4; }
 .action-primary { background: var(--color-primary-strong); color: var(--color-surface-raised); --btn-lip: var(--color-primary-deep); }
