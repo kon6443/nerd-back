@@ -10,6 +10,7 @@ import { LoadingView } from "@/components/ui/LoadingView";
 import { actionClass } from "@/components/ui/actionStyles";
 import { BookArtContent, BookTextContent } from "@/components/story/BookFrame";
 import { BookPager, READER_BAR } from "@/components/story/BookPager";
+import { ActionLink } from "@/components/ui/ActionLink";
 import { NarrationPlayer } from "@/components/story/NarrationPlayer";
 import { ReaderAudioProvider } from "@/components/story/ReaderAudioProvider";
 import { useNarration } from "@/components/story/useNarration";
@@ -724,6 +725,12 @@ function StoryReadContent({ params }: PageProps) {
               </button>
             ) : null}
 
+            {/* 오른쪽 「내 얼굴로 만들기」와 같은 폭의 빈 자리 — 제목이 가운데에 오게 한다. */}
+            {isDemoMode && (
+              <span aria-hidden="true" className="invisible hidden md:block">
+                <DemoCreateLink slug={slug} placeholder />
+              </span>
+            )}
             <h1 className="order-first w-full text-xl font-bold text-balance break-keep wrap-anywhere text-ink md:order-none md:w-auto md:flex-1 md:text-center">
               {story.title}
               {isBehindPage && (
@@ -741,7 +748,12 @@ function StoryReadContent({ params }: PageProps) {
             >
               {currentPageNo} / {totalPages}
             </p>
+            {isDemoMode && <DemoCreateLink slug={slug} />}
           </header>
+        ) : isDemoMode ? (
+          <div className="flex justify-end">
+            <DemoCreateLink slug={slug} />
+          </div>
         ) : !isDemoMode && !sessionPages?.isAllCompleted && sessionPages?.status !== "completed" ? (
           <div>
             <button
@@ -922,5 +934,18 @@ export default function StoryReadPage({ params }: PageProps) {
         <StoryReadContent params={params} />
       </ReaderAudioProvider>
     </Suspense>
+  );
+}
+
+/**
+ * 샘플 얼굴 체험을 읽다가 바로 내 사진으로 만들기로 넘어가는 입구. 시연 리더(`BookReader`)의 같은 버튼과 목적지를 맞춘다.
+ * 비로그인이면 촬영 화면이 로그인으로 보낸다 — 여기서 세션을 조회하지 않는다.
+ */
+function DemoCreateLink({ slug, placeholder = false }: { slug: string; placeholder?: boolean }) {
+  if (placeholder) return <span className={actionClass("primary", "", "compact")}>내 얼굴로 만들기</span>;
+  return (
+    <ActionLink href={`/stories/${slug}/capture`} variant="primary" size="compact">
+      내 얼굴로 만들기
+    </ActionLink>
   );
 }
