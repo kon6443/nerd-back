@@ -56,6 +56,9 @@
 @keyframes show-loading { from { opacity: 0; } to { opacity: 1; } }
 
 .content {
+  /* 세로 가운데에서 200px 위로 올린다. 낮은 화면에서는 머리 문구가 헤더에 잘리지 않게
+     윗여백 2rem 을 남기는 만큼만 올린다(26.5rem ≈ 이 블록의 높이). 모바일은 display: contents 라 무시된다. */
+  top: max(-200px, calc(2rem - (100dvh - var(--app-header-height) - 26.5rem) / 2));
   position: relative;
   z-index: 2;
   max-width: 38rem;
@@ -63,13 +66,6 @@
 
 .copy,
 .actions { transition: opacity 220ms ease; }
-.eyebrow {
-  margin-bottom: 1.5rem;
-  color: var(--color-book-cover);
-  font-size: 0.9375rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
 
 .title {
   margin: 0;
@@ -80,9 +76,9 @@
   letter-spacing: -0.055em;
   word-break: keep-all;
 }
-.title span { display: block; }
+.title span,
+.description span { display: block; }
 .description {
-  max-width: 22rem;
   margin-top: 1.5rem;
   font-size: 1.0625rem;
   line-height: 1.85;
@@ -92,7 +88,6 @@
 
 .actions { margin-top: 2rem; }
 .actionLinks { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.note { margin-top: 1rem; font-size: 0.8125rem; line-height: 1.5; }
 
 .entryWash {
   z-index: 3;
@@ -131,13 +126,11 @@
   .actions { position: relative; z-index: 2; }
   .loading { left: 50%; top: 58%; }
   .image { object-position: 68% center; }
-  .eyebrow { margin-bottom: 0.75rem; font-size: 0.8125rem; }
   .title { font-size: clamp(1.875rem, 8.2vw, 3rem); }
-  .description { max-width: 19rem; margin-top: 0.875rem; font-size: 0.9375rem; line-height: 1.7; }
+  .description { margin-top: 0.875rem; font-size: 0.9375rem; line-height: 1.7; }
   .actions { margin-top: auto; }
   .actionLinks { flex-wrap: nowrap; gap: 0.5rem; }
   .actionLinks > a { flex: 1; padding-inline: 0.5rem; font-size: 0.9375rem; white-space: nowrap; }
-  .note { margin-top: 0.75rem; text-align: center; font-size: 0.75rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
