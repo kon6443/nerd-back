@@ -300,7 +300,6 @@ function CapturePageContent({ params }: PageProps) {
       // 3. 얼굴 업로드 & 캐릭터 레퍼런스 생성
       const res = await uploadFace(session.id, formData);
       setResult(res);
-      setPhoto(null);
       stopWebcam();
     } catch (err: unknown) {
       if (err instanceof ApiError) {
@@ -393,15 +392,17 @@ function CapturePageContent({ params }: PageProps) {
             이제 나만의 동화를 만들어 볼까요?
           </p>
 
-          <div className="relative h-56 w-56 overflow-hidden rounded-card border-4 border-white shadow-md">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={result.referenceImageUrl ?? photo?.previewUrl ?? ""}
-              alt="내 얼굴로 만든 동화 주인공"
-              decoding="async"
-              className="h-full w-full object-cover"
-            />
-          </div>
+          {(result.referenceImageUrl || photo?.previewUrl) && (
+            <div className="relative h-56 w-56 overflow-hidden rounded-card border-4 border-white shadow-md">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={result.referenceImageUrl || photo?.previewUrl || undefined}
+                alt="내 얼굴로 만든 동화 주인공"
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )}
           <p className="break-keep text-xs leading-relaxed text-ink-muted">
             사진은 24시간 안에 폐기돼요.
           </p>
@@ -429,6 +430,7 @@ function CapturePageContent({ params }: PageProps) {
               type="button"
               onClick={() => {
                 setResult(null);
+                setPhoto(null);
                 startWebcam();
               }}
               className={actionClass("secondary", "w-full", "compact")}
