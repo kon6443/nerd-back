@@ -147,6 +147,10 @@ html { scrollbar-color: var(--color-paper-edge-strong) var(--color-paper); }
 .story-backdrop::before { left: -28%; transform: rotate(9deg); }
 .story-backdrop::after { right: -20%; bottom: -16%; transform: rotate(-8deg); background: color-mix(in srgb, var(--color-paper-edge) 45%, var(--color-paper)); }
 
+/* 상단 메뉴와 홈 콘텐츠가 같은 양 끝선을 쓰도록 하는 좌우 여백. 넓은 화면에서는 가운데 1440px 안에 둔다. */
+:root { --layout-gutter: clamp(1.5rem, 6.5vw, 7.5rem); }
+@media (max-width: 767px) { :root { --layout-gutter: 1.5rem; } }
+@media (min-width: 1600px) { :root { --layout-gutter: max(7.5rem, calc((100vw - 1440px) / 2)); } }
 @layer components {
 .story-action { text-wrap: balance; text-align: center; line-height: 1.4; }
 .action-primary { background: var(--color-primary-strong); color: var(--color-surface-raised); --btn-lip: var(--color-primary-deep); }

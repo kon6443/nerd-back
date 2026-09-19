@@ -1,5 +1,4 @@
 .world {
-  --world-gutter: clamp(1.5rem, 6.5vw, 7.5rem);
   flex: 1;
   background: var(--color-paper);
   color: var(--color-ink);
@@ -12,7 +11,7 @@
   align-items: center;
   height: calc(100dvh - var(--app-header-height));
   min-height: 480px;
-  padding: 2rem var(--world-gutter);
+  padding: 2rem var(--layout-gutter);
   overflow: clip;
 }
 
@@ -56,10 +55,10 @@
 @keyframes show-loading { from { opacity: 0; } to { opacity: 1; } }
 
 .content {
+  position: relative;
   /* 세로 가운데에서 200px 위로 올린다. 낮은 화면에서는 머리 문구가 헤더에 잘리지 않게
      윗여백 2rem 을 남기는 만큼만 올린다(26.5rem ≈ 이 블록의 높이). 모바일은 display: contents 라 무시된다. */
   top: max(-200px, calc(2rem - (100dvh - var(--app-header-height) - 26.5rem) / 2));
-  position: relative;
   z-index: 2;
   max-width: 38rem;
 }
@@ -106,17 +105,12 @@
 @keyframes arrive { from { opacity: 0; transform: scale(0.985); } to { opacity: 1; transform: scale(1); } }
 @keyframes depart { to { opacity: 0; } }
 
-@media (min-width: 1600px) {
-  .world { --world-gutter: max(7.5rem, calc((100vw - 1440px) / 2)); }
-}
-
 @media (max-width: 767px) {
-  .world { --world-gutter: 1.5rem; }
   .stage {
     flex-direction: column;
     align-items: stretch;
     min-height: 520px;
-    padding: 2rem var(--world-gutter) calc(1.5rem + env(safe-area-inset-bottom));
+    padding: 2rem var(--layout-gutter) calc(1.5rem + env(safe-area-inset-bottom));
   }
   .stage::before {
     background: linear-gradient(180deg, var(--color-paper), color-mix(in srgb, var(--color-paper) 92%, transparent) 22%, transparent 45%);

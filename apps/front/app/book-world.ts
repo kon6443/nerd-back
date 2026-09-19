@@ -9,6 +9,11 @@ export type BookWorldFrame = {
   height: number;
   pointerX: number;
   pointerY: number;
+  /**
+   * 쉬는 상태의 책이 들어가야 할 가로 구간(캔버스 px). 주면 책 모서리가 이 안에 들도록 줄이고
+   * 오른쪽 끝을 `right` 에 맞춘다. 진입 연출이 진행될수록 원래 화면 전체 구도로 돌아간다.
+   */
+  bounds?: { left: number; right: number };
 };
 
 export function createBookWorld(canvas: HTMLCanvasElement) {
@@ -45,6 +50,9 @@ function initializeBookWorld(canvas: HTMLCanvasElement, renderer: THREE.WebGLRen
   scene.fog = new THREE.Fog(palette.paper, 22, 65);
   const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
   const book = createBookModel(palette);
+  // 구름·반짝이는 책 밖으로 흩어져 있어 끝선 맞춤에서 뺀다 — 책 본체의 실제 점만 잰다.
+  // 책 전체의 경계 상자를 쓰면 성 꼭대기 높이의 빈 공간까지 재서 책이 선보다 안쪽에 멈춘다.
+  const bookCorners = samplePoints(book);
   const atmosphere = createBookAtmosphere(palette);
   book.add(atmosphere.group);
   scene.add(book);
@@ -94,6 +102,10 @@ function initializeBookWorld(canvas: HTMLCanvasElement, renderer: THREE.WebGLRen
   let height = 0;
   let offsetX = Number.NaN;
   let offsetY = Number.NaN;
+  let appliedZoom = Number.NaN;
+  let appliedShift = Number.NaN;
+  let fitKey = "";
+  let fit = { zoom: 1, shift: 0 };
   let disposed = false;
   canvas.dataset.scene = "three-pop-up-book";
   const restoreShadows = () => { renderer.shadowMap.needsUpdate = true; };
@@ -109,13 +121,24 @@ function initializeBookWorld(canvas: HTMLCanvasElement, renderer: THREE.WebGLRen
         camera.aspect = width / height;
         offsetX = Number.NaN;
       }
+      const key = frame.bounds ? `${width}x${height}:${frame.bounds.left}-${frame.bounds.right}` : "";
+      if (key !== fitKey) {
+        fitKey = key;
+        fit = frame.bounds ? fitToBounds(camera, bookCorners, width, height, frame.bounds) : { zoom: 1, shift: 0 };
+        appliedZoom = Number.NaN; // 측정하느라 카메라를 건드렸으니 아래에서 다시 적용한다.
+      }
       const pose = bookCamera(frame.entry, width / height);
       atmosphere.update(frame.entry);
       const pointerWeight = 1 - frame.entry;
-      if (offsetX !== pose.offset.x || offsetY !== pose.offset.y) {
+      // 맞춤은 쉬는 구도에만 쓴다. 진입할수록 1·0 으로 풀어 문 안으로 들어가는 연출은 그대로 둔다.
+      const zoom = 1 + (fit.zoom - 1) * pointerWeight;
+      const shift = fit.shift * pointerWeight;
+      if (offsetX !== pose.offset.x || offsetY !== pose.offset.y || appliedZoom !== zoom || appliedShift !== shift) {
         offsetX = pose.offset.x;
         offsetY = pose.offset.y;
-        camera.setViewOffset(width, height, width * offsetX, height * offsetY, width, height);
+        appliedZoom = camera.zoom = zoom;
+        appliedShift = shift;
+        camera.setViewOffset(width, height, width * offsetX + shift, height * offsetY, width, height);
       }
       camera.position.set(pose.position[0] + frame.pointerX * 0.65 * pointerWeight, pose.position[1] - frame.pointerY * 0.32 * pointerWeight, pose.position[2] - frame.pointerX * 0.2 * pointerWeight);
       camera.lookAt(...pose.target);
@@ -154,3 +177,39 @@ function initializeBookWorld(canvas: HTMLCanvasElement, renderer: THREE.WebGLRen
 }
 
 export type BookWorld = ReturnType<typeof createBookWorld>;
+
+/** 책 모델의 부품마다 경계 상자 모서리를 월드 좌표로 모은다. 부품 단위라 모서리가 실제 모양에 붙는다. */
+function samplePoints(root: THREE.Object3D) {
+  root.updateMatrixWorld(true);
+  const points: THREE.Vector3[] = [];
+  root.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || object instanceof THREE.InstancedMesh) return;
+    object.geometry.computeBoundingBox();
+    const box = object.geometry.boundingBox;
+    if (!box) return;
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) {
+      points.push(new THREE.Vector3(x, y, z).applyMatrix4(object.matrixWorld));
+    }
+  });
+  return points;
+}
+
+/** 쉬는 구도(진입 0, 포인터 0)에서 책 모서리를 화면에 투영해 `bounds` 에 들어갈 배율과 가로 이동량(px)을 구한다. */
+function fitToBounds(camera: THREE.PerspectiveCamera, corners: THREE.Vector3[], width: number, height: number, bounds: { left: number; right: number }) {
+  const pose = bookCamera(0, width / height);
+  const baseShift = width * pose.offset.x;
+  camera.position.set(...pose.position);
+  camera.lookAt(...pose.target);
+  camera.updateMatrixWorld();
+  const project = (zoom: number) => {
+    camera.zoom = zoom;
+    camera.setViewOffset(width, height, baseShift, height * pose.offset.y, width, height);
+    const xs = corners.map((corner) => (corner.clone().project(camera).x + 1) / 2 * width);
+    return { left: Math.min(...xs), right: Math.max(...xs) };
+  };
+  const natural = project(1);
+  const zoom = Math.min(1, Math.max(0.5, (bounds.right - bounds.left) / (natural.right - natural.left)));
+  const fitted = project(zoom);
+  // setViewOffset 의 offsetX 는 화면 px 단위라, 늘리는 만큼 장면이 왼쪽으로 움직인다.
+  return { zoom, shift: fitted.right - bounds.right };
+}
