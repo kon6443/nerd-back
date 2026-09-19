@@ -21,10 +21,10 @@
 **Acceptance criteria:** 로딩/3D 변경·환경 파일·키/토큰·의존성 변경 미포함. 320/390/1440px, 인식 초안→전송, 닫기/장면 이동/탭 숨김 중단 확인.
 **Verification:** `npx --yes pnpm@10.26.2 --filter nerd-front ci:all`, foreground `npm run test`(apps/front), 기존 합성 음성 UI QA, `git diff --check`.
 
-### Task 3: PR 게시와 확인 (진행 중)
+### Task 3: PR 게시와 확인
 **Files:** 마이크 기능의 검증된 변경 파일과 tasks/todo.md.
 **Interfaces:** origin 브랜치 push 및 gh pr create --base main --body-file.
-- [ ] 범위·검증·실음성/데모 한계를 명시한 PR을 게시하고 원격 commit/파일 목록과 URL을 확인한다.
+- [x] PR #77(https://github.com/kon6443/nerd-back/pull/77)을 게시했다. main 대상, 소스 commit 07d4b7d와 마이크 관련 6개 파일 범위를 원격에서 확인했다. GitHub CI는 생성 시 실행 중이었다.
 **Acceptance criteria:** 사용자 요청 기능만 포함, PR head와 검증 commit 일치, merge/배포 없음.
 **Verification:** staged diff, gh pr view/files, origin head SHA 확인.
 
