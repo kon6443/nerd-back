@@ -1,26 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import type { SessionPagesResponse, StoryBranchKey } from "@nerd/contracts";
-import { actionClass, FOCUS_RING } from "@/components/ui/actionStyles";
+import { actionClass } from "@/components/ui/actionStyles";
 import { StoryJourneyScene } from "@/components/story/StoryJourneyScene/StoryJourneyScene";
 import styles from "./GeneratingView.module.css";
-
-const FAIRY_TALE_TIPS = [
-  "작은 늑대는 사실 새콤달콤한 사과를 가장 좋아한대요! 🍎",
-  "마법의 콩은 밤새 구름 위 거인의 성까지 쑥쑥 자라나요! 🌱",
-  "빨간 모자의 바구니에는 할머니께 드릴 딸기 파이가 들어있어요 🥧",
-  "마법 지팡이는 소중한 마음을 담아 휘두를 때 빛이 난대요 ✨",
-  "동화나라의 새들은 신나는 모험 소식을 가장 먼저 전해준답니다 🕊️",
-  "구름을 타고 높이 날아오르면 소원 별을 만날 수 있어요 🌟",
-];
-
-const DEMO_TIPS = [
-  "스마트폰 렌즈를 통과해 마법의 동화나라로 떠나요! 🚀",
-  "구름 위를 둥실둥실 날아가는 중이에요... ☁️",
-  "세상에 단 하나뿐인 특별한 이야기가 곧 시작돼요! ✨",
-];
 
 export function GeneratingView({
   slug,
@@ -45,207 +30,109 @@ export function GeneratingView({
   onOpenReader?: () => void;
   isDemo?: boolean;
 }) {
-  const [tipIndex, setTipIndex] = useState(0);
-  const [demoProgress, setDemoProgress] = useState(15);
-  const [showDetails, setShowDetails] = useState(false);
-
-  const tips = isDemo ? DEMO_TIPS : FAIRY_TALE_TIPS;
-
-  // 팁 롤링 (4초마다 변경)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTipIndex((prev) => (prev + 1) % tips.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [tips.length]);
-
-  // 시연 모드 가상 프로그레스 진행
-  useEffect(() => {
-    if (!isDemo) return;
-    const progressTimer = setInterval(() => {
-      setDemoProgress((prev) => (prev >= 95 ? 98 : prev + 20));
-    }, 600);
-    return () => clearInterval(progressTimer);
-  }, [isDemo]);
-
-  const total = sessionPages?.totalPages || 7;
-  const completed = sessionPages?.completedPages || 0;
-  const progressPercent = isDemo
-    ? demoProgress
-    : Math.min(100, Math.round((completed / total) * 100));
+  const [motionPaused, setMotionPaused] = useState(false);
+  const titleId = useId();
+  const total = sessionPages?.totalPages ?? 0;
+  const completed = Math.min(total, Math.max(0, sessionPages?.completedPages ?? 0));
   const generationPages = sessionPages?.pages ?? [];
   const hasFailed = !isDemo && sessionPages?.status === "failed";
-  const failedCount = generationPages.filter((item) => item.status === "failed").length;
+  const ready = canOpenReader && !hasFailed;
+  const allCompleted = sessionPages?.isAllCompleted || sessionPages?.status === "completed";
+  const progressPercent = total > 0 && (!isDemo || ready) ? Math.round(completed / total * 100) : undefined;
+  const progressLabel = hasFailed ? "만들기가 잠시 멈췄어요"
+    : progressPercent === 100 ? "동화 준비 완료" : isDemo ? "체험 동화 준비 중" : "동화를 만들고 있어요";
+  const progressDescription = isDemo && !ready ? "첫 장을 불러오고 있어요"
+    : progressPercent === undefined ? "진행 상황 확인 중" : `${total}장 중 ${completed}장 완성`;
+  const failedCount = generationPages.filter(item => item.status === "failed").length;
+  const title = hasFailed ? "이야기를 만들다 잠깐 멈췄어요" : ready ? "이야기 속으로 떠나볼까요?" : "동화나라로 떠나는 중이에요";
+  const description = hasFailed
+    ? failedCount > 0 ? "괜찮아요. 아래에서 멈춘 장면을 다시 만들 수 있어요." : "잠시 후 다시 확인하거나 동화 소개로 돌아가 주세요."
+    : ready
+      ? allCompleted ? "준비가 끝났어요. 이제 책을 펼쳐 보세요." : "앞쪽 이야기가 완성됐어요. 먼저 읽어볼 수 있어요."
+      : isDemo ? "동화를 준비하는 동안, 작은 모험을 함께 떠나요." : "한 장, 한 장. 동화 속에 너의 자리를 만들고 있어요.";
 
   return (
-    <div className={styles.journeyScreen}>
-      {/* 3D 동화 여행 시네마틱 씬 (셀카 ➔ 폰 화면 다이브 ➔ 성/나무 ➔ 마법 불빛 ➔ 무한 구름 비행) */}
-      <StoryJourneyScene />
+    <main className={styles.journeyScreen} aria-labelledby={titleId}>
+      <div className={styles.content}>
+        <header className={styles.heading}>
+          <p className={styles.eyebrow}>{isDemo ? "동화 미리 만나기" : "나만의 동화 만들기"}</p>
+          <h1 id={titleId}>{title}</h1>
+          <p className={styles.description} role="status">{description}</p>
+        </header>
 
-      {/* 상단 알림 영역: 5쪽 본편 준비 완료 시 즉시 읽기 진입 배너 */}
-      <div className="w-full">
-        {canOpenReader && !hasFailed && (
-          <div className={styles.readyBanner}>
-            <div className="text-center">
-              <p className="text-sm font-bold text-ink">
-                🎉 앞쪽 이야기가 먼저 완성되었어요!
-              </p>
-              <p className="text-xs text-ink-muted">
-                나머지 장면들이 그려지는 동안 먼저 읽으러 가볼까요?
-              </p>
+        <div className={styles.stage}>
+          <StoryJourneyScene paused={motionPaused || hasFailed} />
+        </div>
+
+        <div className={styles.statusArea}>
+          <div className={styles.progressSection}>
+            <div className={styles.progressLabel}>
+              <span>{progressLabel}</span>
+              {progressPercent !== undefined && <strong className={styles.progressPercent}>{progressPercent}%</strong>}
             </div>
-            <button
-              type="button"
-              onClick={onOpenReader}
-              className={actionClass("primary", "w-full py-2.5 text-sm shadow-md font-bold")}
-            >
-              지금 바로 읽으러 가기
-            </button>
-          </div>
-        )}
-
-        {/* 세션 전체 실패 알림 */}
-        {hasFailed && (
-          <div className={`${styles.readyBanner} border-danger bg-danger-soft`}>
-            <p className="text-sm font-bold text-danger-strong" role="alert">
-              {failedCount > 0
-                ? `${failedCount}장을 만들지 못했어요. 아래에서 다시 만들어 주세요.`
-                : "만들기가 중단됐어요. 잠시 후 다시 시도해 주세요."}
-            </p>
-          </div>
-        )}
-
-        {/* 연결 지연 알림 */}
-        {pagesPollDegraded && (
-          <div className="mx-auto mt-2 max-w-sm rounded-md bg-black/50 px-3 py-1.5 text-center text-xs text-amber-200 backdrop-blur-sm">
-            연결이 불안정해요. 진행 상황을 계속 다시 확인하고 있어요.
-          </div>
-        )}
-      </div>
-
-      {/* 세부 진행 현황 서랍 (정식 모드에서 토글 시 노출) */}
-      {!isDemo && showDetails && (
-        <div className={styles.detailDrawer}>
-          <div className="mb-3 flex items-center justify-between border-b border-white/20 pb-2">
-            <h2 className="text-xs font-bold text-white uppercase tracking-wider">
-              페이지별 상세 현황
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowDetails(false)}
-              className="text-xs text-slate-300 hover:text-white"
-            >
-              닫기 ✕
-            </button>
-          </div>
-          <div className="flex flex-col gap-2">
-            {generationPages.map((item) => {
-              const isBehind = item.branchKey !== "common";
-              const pageLabel = isBehind
-                ? `6쪽 비하인드 ${item.branchKey.toUpperCase()}`
-                : `${item.pageNo}쪽`;
-              const status = item?.status || "pending";
-              const isRunning = status === "running";
-
-              return (
-                <div
-                  key={`${item.branchKey}-${item.pageNo}`}
-                  className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-200">{pageLabel}</span>
-                    {item?.imageUrl && (
-                      <span className="rounded bg-indigo-500/30 px-1.5 py-0.5 text-[10px] text-indigo-200">
-                        삽화 완료
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {status === "succeeded" && (
-                      <span className="font-bold text-emerald-400">✓ 완성</span>
-                    )}
-                    {isRunning && (
-                      <span className="font-bold text-amber-300 animate-pulse">그리는 중...</span>
-                    )}
-                    {status === "pending" && (
-                      <span className="text-slate-400">대기 중</span>
-                    )}
-                    {status === "failed" && (
-                      <button
-                        onClick={() =>
-                          void (isBehind
-                            ? handleAfterStoryRetry(item.branchKey as StoryBranchKey)
-                            : handleRetry(item.pageNo))
-                        }
-                        disabled={retryingPageNo === item.pageNo || isSelectingBranch !== null}
-                        className={`rounded bg-red-600 px-2 py-1 font-bold text-white hover:bg-red-500 ${FOCUS_RING}`}
-                      >
-                        다시 만들기
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 하단 판타지 HUD 바 */}
-      <footer className={styles.hudBar}>
-        {/* 좌측: 동화 팁 롤링 */}
-        <div className={styles.tipContainer}>
-          <span className={styles.tipBadge}>TIP</span>
-          <p key={tipIndex} className={`${styles.tipText} animate-fade-in`}>
-            {tips[tipIndex]}
-          </p>
-        </div>
-
-        {/* 우측: 마법 프로그레스 바 & 세부 버튼 */}
-        <div className={styles.gaugeContainer}>
-          <div className={styles.gaugeInfo}>
-            <span>
-              {!hasFailed && completed < total && (
-                <span className="mr-1.5 inline-block h-1.5 w-1.5 animate-ping rounded-full bg-amber-400" />
+            <div className={styles.progressTrack} role="progressbar"
+              aria-label={isDemo ? "체험 동화 준비 상태" : "동화 제작 진행률"}
+              aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent}
+              aria-valuetext={progressDescription} data-paused={motionPaused || hasFailed}>
+              {progressPercent === undefined ? (
+                <div className={styles.progressIndeterminate} />
+              ) : (
+                <div className={styles.progressFill} style={{ transform: `scaleX(${progressPercent / 100})` }} />
               )}
-              {isDemo ? "마법 시연 중" : `제작 중 (${completed}/${total}장)`}
-            </span>
-            <span className={styles.gaugePercent}>{progressPercent}%</span>
+            </div>
+            <p className={styles.pageCount}>{progressDescription}</p>
           </div>
-
-          <div
-            role="progressbar"
-            aria-label="동화 제작 진행률"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={progressPercent}
-            className={styles.gaugeTrack}
-          >
-            <div
-              className={styles.gaugeFill}
-              style={{ width: `${Math.max(5, progressPercent)}%` }}
-            />
-          </div>
-
-          {!isDemo && (
-            <button
-              type="button"
-              onClick={() => setShowDetails((prev) => !prev)}
-              className={styles.detailToggleBtn}
-              title="페이지별 세부 진행 현황"
-            >
-              {showDetails ? "현황 닫기" : "상세 현황"}
+          {hasFailed ? (
+            <p className={styles.error} role="alert">
+              {failedCount > 0 ? `${failedCount}장을 다시 만들어야 해요.` : "만들기를 이어갈 수 없어요. 잠시 후 다시 확인해 주세요."}
+            </p>
+          ) : ready ? (
+            <button type="button" onClick={onOpenReader} className={actionClass("primary", styles.readButton)}>
+              동화 읽으러 가기 <span aria-hidden="true">→</span>
             </button>
+          ) : null}
+          {pagesPollDegraded && (
+            <p className={styles.connectionNotice} role="status">연결이 잠깐 느려요. 진행 상황을 다시 확인하고 있어요.</p>
           )}
-
-          <Link
-            href={isDemo ? "/library" : `/library/${slug}`}
-            className="text-xs text-slate-300 underline hover:text-white"
-          >
-            {isDemo ? "서재로" : "소개로"}
-          </Link>
+          {!isDemo && generationPages.length > 0 && (
+            <details className={styles.details} key={hasFailed ? "failed" : "progress"} open={hasFailed || undefined}>
+              <summary>만들기 현황 보기{failedCount > 0 && ` · 다시 만들기 ${failedCount}장`}</summary>
+              <ul className={styles.pageList}>
+                {generationPages.map(item => {
+                  const isBehind = item.branchKey !== "common";
+                  const retrying = retryingPageNo === item.pageNo || (isBehind && isSelectingBranch === item.branchKey);
+                  return (
+                    <li key={`${item.branchKey}-${item.pageNo}`}>
+                      <span>{isBehind ? `비하인드 ${item.branchKey.toUpperCase()}` : `${item.pageNo}쪽`}</span>
+                      {item.status === "failed" ? (
+                        <button type="button" disabled={retryingPageNo !== null || isSelectingBranch !== null}
+                          aria-label={`${isBehind ? `비하인드 ${item.branchKey.toUpperCase()}` : `${item.pageNo}쪽`} 다시 만들기`}
+                          className={actionClass("secondary", styles.retryButton, "compact")}
+                          onClick={() => void (isBehind ? handleAfterStoryRetry(item.branchKey as StoryBranchKey) : handleRetry(item.pageNo))}>
+                          {retrying ? "다시 만드는 중" : "다시 만들기"}
+                        </button>
+                      ) : (
+                        <span className={item.status === "succeeded" ? styles.complete : styles.pending}>
+                          {item.status === "succeeded" ? "완성" : item.status === "running" ? "그리는 중" : "차례를 기다려요"}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </details>
+          )}
         </div>
-      </footer>
-    </div>
+        <footer className={styles.footer}>
+          <Link href={isDemo ? "/library" : `/library/${slug}`}>{isDemo ? "서재로 돌아가기" : "동화 소개로"}</Link>
+          {!hasFailed && <>
+            <span className={styles.footerDivider} aria-hidden="true" />
+            <button className={styles.motionControl} type="button" onClick={() => setMotionPaused(value => !value)} aria-pressed={motionPaused}>
+              {motionPaused ? "풍경 움직이기" : "풍경 잠시 멈추기"}
+            </button>
+          </>}
+        </footer>
+      </div>
+    </main>
   );
 }
