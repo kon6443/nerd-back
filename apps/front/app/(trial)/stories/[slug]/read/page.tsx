@@ -816,6 +816,9 @@ function StoryReadContent({ params }: PageProps) {
               selectedRole={chat.role}
               chatOpen={chatOpen}
               onSelect={openChatForCharacter}
+              storySlug={slug}
+              pageNo={pageNo}
+              branchKey={pageNo === 6 ? activeBranchKey : undefined}
             />
           )}
           renderText={(pageNo) => (

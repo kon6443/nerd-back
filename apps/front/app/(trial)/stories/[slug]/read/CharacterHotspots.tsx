@@ -31,12 +31,18 @@ export function CharacterHotspots({
   selectedRole,
   chatOpen,
   onSelect,
+  storySlug,
+  pageNo,
+  branchKey,
 }: {
   imageUrl?: string;
   characters: StoryPageCharacter[];
   selectedRole: string;
   chatOpen: boolean;
   onSelect: (role: string, trigger: HTMLButtonElement) => void;
+  storySlug?: string;
+  pageNo?: number;
+  branchKey?: string | null;
 }) {
   const layerRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<HotspotLayout | null>(null);
@@ -106,7 +112,13 @@ export function CharacterHotspots({
   }, [characters, layout]);
 
   return (
-    <div ref={layerRef} className={styles.hotspotLayer}>
+    <div
+      ref={layerRef}
+      className={styles.hotspotLayer}
+      data-story={storySlug}
+      data-page={pageNo}
+      data-branch={branchKey || undefined}
+    >
       {hotspots.map(({ character, rect }) => (
         <HotspotPin
           key={character.role}
@@ -137,6 +149,7 @@ function HotspotPin({
   return (
     <button
       type="button"
+      data-role={character.role}
       aria-label={`${character.displayName}와 대화하기`}
       aria-pressed={isSelected}
       aria-expanded={isSelected && isChatOpen}
