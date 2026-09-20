@@ -24,8 +24,7 @@ import { EndView } from "./EndView";
 import { GeneratingView } from "./GeneratingView";
 import { createImagePreloader } from "./imagePreloader";
 import { ChatSurface } from "./ChatSurface";
-import { ReaderPreviewSettings } from "./ReaderPreviewSettings";
-import { parseReaderOptions } from "./readerOptions";
+import { FIXED_READER_OPTIONS } from "./readerOptions";
 import { useCharacterChat } from "./useCharacterChat";
 import { createChatDraftStore } from "./chat-drafts";
 import { SESSION_CHANGED_EVENT, UNAUTHORIZED_EVENT } from "@/lib/api/client";
@@ -127,8 +126,8 @@ function StoryReadContent({ params }: PageProps) {
   const preloadImages = imagePreloader.preload;
   useEffect(() => () => imagePreloader.clear(), [imagePreloader]);
 
-  // ⏳ 디자인 후보를 주소로 고른다(한시적 — `readerOptions.ts`).
-  const readerOptions = parseReaderOptions(searchParams);
+  // 2026-09-21 결정: 대화는 시트, 헤더는 그대로 둔다. 더 이상 고르지 않는다(`readerOptions.ts`).
+  const readerOptions = FIXED_READER_OPTIONS;
 
   const [chatOpen, setChatOpen] = useState(false);
   // 넘김이 도는 동안 `dock` 을 여닫으면 책 폭이 변해 넘어가던 종이가 튄다(길이는 CSS 가 소유).
@@ -700,8 +699,9 @@ function StoryReadContent({ params }: PageProps) {
   // 🚫 클래스를 JSX 안에서 조립하지 않는다 — 후보를 지울 때 조건을 하나씩 찾아다니게 된다.
   //    아래 여백(`pb-28`)은 화면 하단에 붙은 조작 바의 자리다. 없으면 바가 책 아래를 덮는다.
   const mainClass = [
-    "mx-auto flex w-full min-h-0 flex-1 gap-4 px-4 pt-5 pb-28 md:px-8 md:pt-5 md:pb-24",
-    readerOptions.immersive ? "max-w-7xl md:h-dvh md:flex-none" : "max-w-5xl",
+    // 폭은 두 경우 모두 같다 — 좁히면 삽화(object-fit: cover)의 양옆이 잘린다.
+    "mx-auto flex w-full min-h-0 max-w-7xl flex-1 gap-4 px-4 pt-5 pb-28 md:px-8 md:pt-5 md:pb-24",
+    readerOptions.immersive ? "md:h-dvh md:flex-none" : "",
     dockOpen ? "flex-col md:flex-row" : "flex-col",
   ].join(" ");
 
@@ -858,7 +858,6 @@ function StoryReadContent({ params }: PageProps) {
                 이전
               </button>
             )}
-            <ReaderPreviewSettings options={readerOptions} />
           </div>
 
           {/* 가운데 — 진행 막대. 좁은 화면에서는 상단의 쪽 표시가 대신한다.

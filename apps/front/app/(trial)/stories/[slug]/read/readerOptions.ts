@@ -1,13 +1,9 @@
 /**
- * 리더의 **보기 옵션** — 디자인 후보를 주소로 고른다 (순수 로직, 테스트 대상).
+ * 리더의 **보기 옵션** — 2026-09-21 에 조합이 확정되어 고정값이 되었다.
  *
- * ⏳ **한시적이다.** 2026-09-14 에 "여러 안을 실제로 써 보고 고르겠다"는 요청으로 들어왔다.
- * 조합이 정해지면 이 파일과 `ReaderPreviewSettings` 를 지우고 선택값을 상수로 굳힌다
- * (`docs/tasks/tasks-my-story.md` Slice 7 회수 조건).
- *
- * ⭐ **저장소가 아니라 주소에 둔다.** `localStorage` 에 두면 값을 읽는 순간 첫 렌더가 한 번 바뀌어
- * 깜빡인다 — 이 저장소가 반복해서 잡아 온 문제다(`AppHeader` 의 `data-session`). 주소는 첫 렌더부터
- * 값이 확정되고, 링크로 다른 사람에게 그대로 보여 줄 수도 있다.
+ * 대화는 **시트**(모바일 아래 · 넓은 화면 오른쪽), 화면은 **몰입 끔**(전역 헤더를 그대로 둔다).
+ * 원래는 여러 안을 주소(`?chat=`·`?immersive=`)로 바꿔 보는 한시적 장치였고, 고르는 화면
+ * (`ReaderPreviewSettings`)과 주소 해석은 선택이 끝나면서 화면에서 내렸다.
  */
 
 /** 대화를 담는 껍데기. 내용(`CharacterChat`)은 셋이 공유한다. */
@@ -27,6 +23,9 @@ export interface ReaderOptions {
 }
 
 export const DEFAULT_READER_OPTIONS: ReaderOptions = { chat: "sheet", immersive: true };
+
+/** 리더가 실제로 쓰는 값. 주소로도 바꾸지 않는다. */
+export const FIXED_READER_OPTIONS: ReaderOptions = { chat: "sheet", immersive: false };
 
 export const CHAT_PARAM = "chat";
 export const IMMERSIVE_PARAM = "immersive";
