@@ -334,17 +334,14 @@ function CapturePageContent({ params }: PageProps) {
   }
 
   return (
-    <StoryRoom storySlug={slug} className={styles.page}>
-      <div className={styles.pageHeader}>
-        {/* 서재 상세의 「서재로 돌아가기」와 같은 보조 버튼 모양으로 맞춘다. */}
-        <ActionLink
-          href={isDemoMode ? '/library' : getLibraryStoryHref(slug, true)}
-          variant="secondary"
-          size="compact"
-        >
-          {isDemoMode ? '서재로 돌아가기' : '동화로 돌아가기'}
-        </ActionLink>
-      </div>
+    <StoryRoom storySlug={slug} className={`${styles.page} ${isDemoMode ? styles.demoPage : ''}`}>
+      {!isDemoMode && (
+        <div className={styles.pageHeader}>
+          <ActionLink href={getLibraryStoryHref(slug, true)} variant="secondary" size="compact">
+            동화로 돌아가기
+          </ActionLink>
+        </div>
+      )}
 
       {existingSession ? (
         <Card

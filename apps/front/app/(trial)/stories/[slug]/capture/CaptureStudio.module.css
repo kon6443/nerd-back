@@ -233,3 +233,58 @@
   height: 11px;
 }
 
+/* 빠른 체험은 미리보기 옆에서 주인공을 골라 한 화면 안에서 시작한다. */
+.page.demoPage { display: flex; align-items: center; }
+.demoPage > div:last-child { padding: 12px 16px; }
+.demoPage .studio { width: min(100%, 720px); gap: 16px; padding: 24px; }
+.demoPage .welcome { padding: 0; }
+.demoPage .title { font-size: clamp(20px, 2.3vw, 30px); }
+.demoPage .capturePanel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 12px;
+}
+.demoPage .panelHeader,
+.demoPage .helper,
+.demoPage .error,
+.demoPage .actions { grid-column: 1 / -1; margin: 0; }
+.demoPage .photoMat { grid-column: 1; grid-row: 2; width: 100%; max-width: 200px; }
+.demoPage .readyFlag { display: none; }
+.demoPage .presetSection { grid-column: 2; grid-row: 2; margin: 0; }
+.demoPage .presetList { grid-template-columns: minmax(0, 1fr); margin: 0; }
+.demoPage .presetCard { min-height: 72px; flex-direction: row; gap: 12px; padding: 12px; text-align: left; }
+.demoPage .presetInfo { align-items: flex-start; }
+.demoPage .presetThumb { width: 48px; height: 48px; flex-shrink: 0; }
+.demoPage .actions { padding: 0; }
+
+@media (max-width: 767px) {
+  .demoPage > div:last-child { padding-inline: 12px; }
+  .demoPage .studio { gap: 12px; padding: 16px; }
+  .demoPage .capturePanel { gap: 10px; padding: 12px; }
+  .demoPage .photoMat { padding: 6px 6px 0; }
+  .demoPage .photoSignature { height: 24px; gap: 4px; font-size: 10px; }
+  .demoPage .photoSignature > .icon { width: 12px; height: 12px; }
+  .demoPage .presetList { gap: 8px; }
+  .demoPage .presetCard { min-height: 64px; gap: 6px; padding: 8px 6px; }
+  .demoPage .presetThumb { width: 32px; height: 32px; }
+  .demoPage .presetName { font-size: 12px; }
+  .demoPage .presetCheck { top: 4px; right: 4px; width: 14px; height: 14px; }
+}
+
+/* 낮은 가로 화면에서는 선택·설명·시작 버튼을 사진 오른쪽에 함께 둔다. */
+@media (min-width: 600px) and (max-height: 700px) {
+  .demoPage > div:last-child { padding-block: 6px; }
+  .demoPage .studio { gap: 6px; padding: 10px; }
+  .demoPage .title { font-size: 18px; }
+  .demoPage .capturePanel { grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr); gap: 6px; padding: 8px; }
+  .demoPage .panelHeader { margin: 0; }
+  .demoPage .photoMat { grid-row: 2 / 5; max-width: 150px; padding: 6px; }
+  .demoPage .photoSignature { display: none; }
+  .demoPage .presetList { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .demoPage .presetCard { min-height: 64px; gap: 6px; padding: 8px 6px; }
+  .demoPage .presetThumb { width: 32px; height: 32px; }
+  .demoPage .presetName { font-size: 12px; }
+  .demoPage .helper { grid-column: 2; grid-row: 3; font-size: 11px; line-height: 1.5; }
+  .demoPage .actions { grid-column: 2; grid-row: 4; }
+}
