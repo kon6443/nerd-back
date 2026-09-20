@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { STORY_CHAT_MAX_MESSAGE_LENGTH } from "@nerd/contracts";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { actionClass } from "@/components/ui/actionStyles";
@@ -58,6 +59,18 @@ export function CharacterChat({
   const speech = useSpeechInput({ enabled: active && status === "available" && !sending, role });
   const inputBusy = sending || speech.active;
   const speechLabels = SPEECH_PHASE_LABELS[speech.phase];
+
+  const liveMessage = speech.active && speech.interim
+    ? `${message}${message && !/\s$/.test(message) ? " " : ""}${speech.interim}`
+        .slice(0, STORY_CHAT_MAX_MESSAGE_LENGTH)
+        .replace(/[\uD800-\uDBFF]$/, "")
+    : message;
+
+  useEffect(() => {
+    if (speech.active && inputRef.current) {
+      inputRef.current.scrollTop = inputRef.current.scrollHeight;
+    }
+  }, [speech.active, liveMessage, inputRef]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -171,19 +184,26 @@ export function CharacterChat({
                   ref={inputRef}
                   id="character-question"
                   rows={3}
-                  value={message}
+                  value={liveMessage}
                   onChange={(event) => {
                     updateDraft(role, event.target.value);
                   }}
-                  disabled={inputBusy}
+                  readOnly={speech.active}
+                  disabled={sending}
                   maxLength={STORY_CHAT_MAX_MESSAGE_LENGTH}
-                  placeholder="궁금한 점을 말하거나 적어 봐."
+                  placeholder={
+                    speech.active && !liveMessage
+                      ? "듣고 있어요. 궁금한 점을 말해 보세요…"
+                      : "궁금한 점을 말하거나 적어 봐."
+                  }
                   aria-invalid={Boolean(error)}
                   aria-describedby={`chat-limit chat-length chat-send-note chat-speech-note${error ? " chat-input-error" : ""}`}
-                  className="min-h-touch w-full resize-y rounded-2xl border-2 border-primary bg-white p-4 text-base text-ink placeholder:text-ink-muted focus:border-primary-strong focus:outline-none focus:ring-2 focus:ring-primary-strong disabled:opacity-60"
+                  className={`min-h-touch w-full resize-y rounded-2xl border-2 bg-white p-4 text-base text-ink placeholder:text-ink-muted focus:border-primary-strong focus:outline-none focus:ring-2 focus:ring-primary-strong disabled:opacity-60 ${
+                    speech.active ? "border-primary-strong ring-2 ring-primary-soft" : "border-primary"
+                  }`}
                 />
                 <p id="chat-length" className="mt-1 text-right text-sm text-ink-muted">
-                  {message.length} / {STORY_CHAT_MAX_MESSAGE_LENGTH}자
+                  {liveMessage.length} / {STORY_CHAT_MAX_MESSAGE_LENGTH}자
                 </p>
                 <div className="mt-3 flex flex-col items-start gap-2">
                   <button
@@ -214,7 +234,6 @@ export function CharacterChat({
                   <p role="status" aria-atomic="true" className="text-sm font-bold text-ink">
                     {speechLabels.status || speech.notice}
                   </p>
-                  {speech.interim ? <p className="w-full break-words rounded-xl bg-primary-tint p-3 text-ink-muted">듣는 중: {speech.interim}</p> : null}
                 </div>
                 {error ? (
                   <p
