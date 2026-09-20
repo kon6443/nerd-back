@@ -6,6 +6,7 @@ import { StoryPageCharacter } from '../story-page-character.entity';
 import { StoryPage } from '../story-page.entity';
 import { STORY_TEMPLATE_STATUS, StoryTemplate } from '../story-template.entity';
 import { User } from '../user.entity';
+import { Feedback } from '../feedback.entity';
 
 /**
  * 엔티티 팩토리.
@@ -140,5 +141,18 @@ export const createStorageCleanupTask = (
   lastError: null,
   createdAt: FIXED_DATE,
   updatedAt: FIXED_DATE,
+  ...overrides,
+});
+
+export const createFeedback = (overrides: Partial<Feedback> = {}): Feedback => ({
+  id: 1,
+  userId: 1,
+  user: UNSET,
+  category: 'bug',
+  title: '로그인이 안 돼요',
+  content: '모바일 환경에서 로그인 버튼을 누르면 반응이 없습니다.',
+  pageUrl: '/login',
+  deviceInfo: { browser: 'Chrome', os: 'Mac OS' },
+  createdAt: FIXED_DATE,
   ...overrides,
 });

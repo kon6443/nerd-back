@@ -1,11 +1,14 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { isReaderPath } from "@/components/story/readerNav";
 import { isLibraryCreateMode } from "@/lib/libraryMode";
+import { useSession } from "@/lib/api/useSession";
+import { FeedbackModal } from "@/components/feedback/FeedbackModal";
+import { LoginRequiredModal } from "@/components/feedback/LoginRequiredModal";
 import { AUTH_LINK } from "./authLinks";
 import { AuthCta } from "./AuthCta";
 
@@ -104,46 +107,75 @@ function CommonNavLinks({ pathname }: { pathname: string }) {
 /** 세션은 SessionSync가 확인한다. 두 인증 슬롯은 첫 페인트부터 CSS로 선택한다. */
 export function AppHeader() {
   const pathname = usePathname();
+  const session = useSession();
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isLoginRequiredOpen, setIsLoginRequiredOpen] = useState(false);
+
   if (isReaderPath(pathname)) return null;
 
+  function handleFeedbackClick() {
+    if (session.status === "authenticated") {
+      setIsFeedbackOpen(true);
+    } else {
+      setIsLoginRequiredOpen(true);
+    }
+  }
+
   return (
-    <header data-app-header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur-sm">
-      <nav aria-label="주요 메뉴" className="flex min-h-[76px] w-full flex-wrap items-center gap-x-3 gap-y-2 px-[var(--layout-gutter)] py-2 sm:flex-nowrap">
-        <Link href="/" className="mr-auto flex min-h-11 min-w-0 items-center gap-2.5">
-          <Image
-            src="/babybooks-logo.png"
-            alt=""
-            width={1385}
-            height={1136}
-            sizes="52px"
-            loading="eager"
-            className="h-auto w-[52px] shrink-0 mix-blend-multiply"
-          />
-          <Image
-            src="/babybooks-wordmark.png"
-            alt="베이비북스"
-            width={1484}
-            height={578}
-            sizes="(min-width: 768px) 128px, 112px"
-            loading="eager"
-            className="h-auto w-28 shrink-0 mix-blend-multiply md:w-32"
-          />
-        </Link>
-        <ul className="order-3 grid w-full grid-cols-4 items-center gap-1 sm:order-none sm:flex sm:w-auto">
-          <CommonNavLinks pathname={pathname} />
-          {/* 로그인 전에는 넓은 화면에서 「로그인하기」 버튼(AuthCta)을 따로 두고, 로그인 후 「마이페이지」는
-              강조 없이 다른 메뉴와 같은 모양으로 둔다. */}
-          <li className="min-w-0">
-            {AUTH_NAV_SLOTS.map(({ status, className }) => {
-              const link = AUTH_LINK[status];
-              const active = isActive(pathname, link.href);
-              const hideWide = status === "guest" ? "lg:hidden" : "";
-              return <Link key={status} href={link.href} aria-current={active ? "page" : undefined} className={`${className} ${hideWide} ${navLinkClass(active)}`}>{link.label}</Link>;
-            })}
-          </li>
-        </ul>
-        <div className="hidden lg:block"><AuthCta size="compact" /></div>
-      </nav>
-    </header>
+    <>
+      <header data-app-header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur-sm">
+        <nav aria-label="주요 메뉴" className="flex min-h-[76px] w-full flex-wrap items-center gap-x-3 gap-y-2 px-[var(--layout-gutter)] py-2 sm:flex-nowrap">
+          <Link href="/" className="mr-auto flex min-h-11 min-w-0 items-center gap-2.5">
+            <Image
+              src="/babybooks-logo.png"
+              alt=""
+              width={1385}
+              height={1136}
+              sizes="52px"
+              loading="eager"
+              className="h-auto w-[52px] shrink-0 mix-blend-multiply"
+            />
+            <Image
+              src="/babybooks-wordmark.png"
+              alt="베이비북스"
+              width={1484}
+              height={578}
+              sizes="(min-width: 768px) 128px, 112px"
+              loading="eager"
+              className="h-auto w-28 shrink-0 mix-blend-multiply md:w-32"
+            />
+          </Link>
+          <ul className="order-3 grid w-full grid-cols-5 items-center gap-1 sm:order-none sm:flex sm:w-auto">
+            <CommonNavLinks pathname={pathname} />
+            {/* 피드백 보내기 버튼: 로그인 상태면 피드백 작성 모달, 비로그인이면 로그인 안내 모달 */}
+            <li className="min-w-0">
+              <button
+                type="button"
+                onClick={handleFeedbackClick}
+                className={`${navLinkClass(false)} cursor-pointer`}
+                aria-haspopup="dialog"
+              >
+                <span className="sm:hidden">피드백</span>
+                <span className="hidden sm:inline">피드백 보내기</span>
+              </button>
+            </li>
+            {/* 로그인 전에는 넓은 화면에서 「로그인하기」 버튼(AuthCta)을 따로 두고, 로그인 후 「마이페이지」는
+                강조 없이 다른 메뉴와 같은 모양으로 둔다. */}
+            <li className="min-w-0">
+              {AUTH_NAV_SLOTS.map(({ status, className }) => {
+                const link = AUTH_LINK[status];
+                const active = isActive(pathname, link.href);
+                const hideWide = status === "guest" ? "lg:hidden" : "";
+                return <Link key={status} href={link.href} aria-current={active ? "page" : undefined} className={`${className} ${hideWide} ${navLinkClass(active)}`}>{link.label}</Link>;
+              })}
+            </li>
+          </ul>
+          <div className="hidden lg:block"><AuthCta size="compact" /></div>
+        </nav>
+      </header>
+
+      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+      <LoginRequiredModal isOpen={isLoginRequiredOpen} onClose={() => setIsLoginRequiredOpen(false)} />
+    </>
   );
 }

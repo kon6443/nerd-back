@@ -17,6 +17,7 @@ import { AuthModule } from '@modules/auth/auth.module';
 import { HealthModule } from '@modules/health/health.module';
 import { StoryModule } from '@modules/story/story.module';
 import { StorySessionModule } from '@modules/story-session/story-session.module';
+import { FeedbackModule } from '@modules/feedback/feedback.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { StorySessionModule } from '@modules/story-session/story-session.module'
     AuthModule,
     StoryModule,
     StorySessionModule,
+    FeedbackModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: HttpExceptionFilter },

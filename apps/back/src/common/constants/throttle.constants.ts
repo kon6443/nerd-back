@@ -34,6 +34,12 @@ export const THROTTLE_EDGE = { name: 'edge', ttl: 60_000, limit: 300 } as const;
 export const THROTTLE_LOGIN = { ttl: 60_000, limit: 5 } as const;
 
 /**
+ * 피드백 전송 전용 한도 (분당 최대 5회).
+ * 도배 및 디스코드 웹훅 스팸을 방지한다.
+ */
+export const THROTTLE_FEEDBACK = { ttl: 60_000, limit: 5 } as const;
+
+/**
  * `@SkipThrottle()` 에 넘길 값.
  *
  * ⚠️ **인자 없는 `@SkipThrottle()` 은 우리 설정에서 동작하지 않는다.**
