@@ -10,6 +10,11 @@ import {
 } from "./characterHotspotGeometry";
 
 const MINIMUM_TARGET_SIZE = 56;
+/** 첫 쪽에서는 말풍선에 팝오버로 「눌러서 말 걸어 보세요」를 띄우고, 다음 쪽부터는 짧게 이름만 펴 보인다. */
+const HINT_DURATION_MS = 1500;
+const PEEK_DURATION_MS = 2600;
+
+type Nudge = "hint" | "peek" | null;
 
 interface HotspotLayout {
   image: Size;
@@ -96,6 +101,10 @@ export function CharacterHotspots({
     };
   }, [imageUrl]);
 
+  // 쪽이 바뀔 때마다 첫 말풍선이 잠깐 이름을 펴 보인다. 삽화를 가리지 않도록 잠시 뒤 다시 접는다.
+  // 처음 보는 사람에게는 한 번만 「눌러서 말 걸어 보세요」 안내를 함께 띄운다.
+  const [nudgeState, setNudgeState] = useState<{ key: string | null; nudge: Nudge }>({ key: null, nudge: null });
+
   const hotspots = useMemo(() => {
     if (!layout) return [];
     return characters.flatMap((character) => {
@@ -111,6 +120,24 @@ export function CharacterHotspots({
     });
   }, [characters, layout]);
 
+  const hasHotspots = hotspots.length > 0;
+  const pageKey = hasHotspots && !chatOpen ? `${pageNo ?? ""}:${branchKey ?? ""}` : null;
+
+  // 쪽이 바뀌는 순간 어떤 넛지를 줄지 **렌더 중에** 정한다(effect 안에서 setState 하면 렌더가 두 번 돈다).
+  if (nudgeState.key !== pageKey) {
+    setNudgeState({ key: pageKey, nudge: pageKey === null ? null : pageNo === 1 ? "hint" : "peek" });
+  }
+  const nudge = nudgeState.nudge;
+
+  useEffect(() => {
+    if (!nudge) return;
+    const timer = window.setTimeout(
+      () => setNudgeState((current) => ({ ...current, nudge: null })),
+      nudge === "hint" ? HINT_DURATION_MS : PEEK_DURATION_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [nudge, pageKey]);
+
   return (
     <div
       ref={layerRef}
@@ -119,13 +146,15 @@ export function CharacterHotspots({
       data-page={pageNo}
       data-branch={branchKey || undefined}
     >
-      {hotspots.map(({ character, rect }) => (
+      {hotspots.map(({ character, rect }, index) => (
         <HotspotPin
           key={character.role}
           character={character}
           rect={rect}
           isSelected={selectedRole === character.role}
           isChatOpen={chatOpen}
+          // 넛지는 **한 쪽에 하나만** 준다. 여러 말풍선이 동시에 펴지면 삽화를 가린다.
+          nudge={index === 0 ? nudge : null}
           onSelect={onSelect}
         />
       ))}
@@ -138,12 +167,14 @@ function HotspotPin({
   rect,
   isSelected,
   isChatOpen,
+  nudge,
   onSelect,
 }: {
   character: StoryPageCharacter;
   rect: { left: number; top: number; width: number; height: number };
   isSelected: boolean;
   isChatOpen: boolean;
+  nudge: Nudge;
   onSelect: (role: string, trigger: HTMLButtonElement) => void;
 }) {
   return (
@@ -154,6 +185,7 @@ function HotspotPin({
       aria-pressed={isSelected}
       aria-expanded={isSelected && isChatOpen}
       className={styles.hotspot}
+      data-nudge={nudge ?? undefined}
       style={
         {
           insetInlineStart: rect.left,
@@ -174,6 +206,11 @@ function HotspotPin({
           <span className={styles.hotspotName}>{character.displayName}</span>
         </span>
       </span>
+      {nudge === "hint" && (
+        <span aria-hidden="true" className={styles.hotspotHint}>
+          눌러서 말 걸어 보세요!
+        </span>
+      )}
     </button>
   );
 }

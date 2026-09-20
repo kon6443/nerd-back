@@ -59,22 +59,13 @@ export default async function StoryDetailPage({ params, searchParams }: PageProp
             이야기 속 친구들
           </h2>
           <ul className="flex flex-wrap gap-3">
-            {story.characters.map((character) => (
+            {story.characters.map((character, index) => (
               <li key={character.role}>
                 {/* 🚫 persona 는 응답에 없다 — 프롬프트 설계가 노출되면 스포일러의 재료가 된다. */}
-                <span className={styles.character}>
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    className="size-6 shrink-0"
-                    aria-hidden="true"
-                  >
-                    <circle cx="12" cy="8" r="4" />
-                    <path d="M4 21v-2a8 8 0 0 1 16 0v2" strokeLinecap="round" />
-                  </svg>
+                {/* 목록의 첫 인물이 그 동화의 주인공이다(응답 순서). 칩 하나만 도드라지게 둔다. */}
+                <span className={styles.character} data-hero={index === 0 || undefined}>
                   <span className="wrap-anywhere">{character.displayName}</span>
+                  {index === 0 && <span className={styles.heroTag}>주인공</span>}
                 </span>
               </li>
             ))}

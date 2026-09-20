@@ -275,7 +275,8 @@
 .sessionCard { border-radius: 10px 22px 22px 10px; border-left: 5px solid var(--color-book-cover); box-shadow: 3px 4px 0 var(--color-paper), 4px 5px 0 var(--color-paper-edge), 6px 12px 20px color-mix(in srgb, var(--color-book-cover) 7%, transparent); }
 .sessionCover { transform: perspective(500px) rotateY(-10deg); transform-origin: left; box-shadow: 3px 3px 0 var(--color-paper-edge); transition: transform 220ms ease-out; }
 .sessionCard:focus-within .sessionCover { transform: perspective(500px) rotateY(0deg); }
-.readingState .content { display: flex; min-height: calc(100dvh - var(--app-header-height)); max-width: 720px; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem; text-align: center; }
+/* 아래 여백만큼 가운데 기준이 올라간다 — 200px 여백 = 100px 위로. min-height 안에 들어가 스크롤은 생기지 않는다. */
+.readingState .content { display: flex; min-height: calc(100dvh - var(--app-header-height)); max-width: 720px; flex-direction: column; align-items: center; justify-content: center; padding-block-end: 200px; gap: 1.5rem; text-align: center; }
 .readingState .window { opacity: .45; }
 .readingState h1 { color: var(--color-book-cover-strong); letter-spacing: -.03em; text-wrap: balance; word-break: keep-all; }
 .completionCover { position: relative; width: min(256px, 100%); aspect-ratio: 1; border: 5px solid var(--color-book-cover); border-left-width: 12px; border-radius: 5px 14px 14px 5px; transform: perspective(800px) rotateY(-10deg); box-shadow: 5px 4px 0 var(--color-paper-edge), 7px 7px 0 var(--color-paper), 8px 8px 0 var(--color-book-cover), 12px 20px 28px color-mix(in srgb, var(--color-book-cover) 18%, transparent); overflow: hidden; }
@@ -285,7 +286,7 @@
   .accountHeader { gap: .75rem; align-items: flex-start; }
   .accountHeader h1 { font-size: 2rem; }
 
-  .readingState .content { padding-inline: 1.25rem; }
+  .readingState .content { padding-inline: 1.25rem; padding-block-end: 120px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .standingBook, .sessionCover { transition: none; }

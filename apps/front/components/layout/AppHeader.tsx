@@ -126,23 +126,23 @@ export function AppHeader() {
       <header data-app-header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur-sm">
         <nav aria-label="주요 메뉴" className="flex min-h-[76px] w-full flex-wrap items-center gap-x-3 gap-y-2 px-[var(--layout-gutter)] py-2 sm:flex-nowrap">
           <Link href="/" className="mr-auto flex min-h-11 min-w-0 items-center gap-2.5">
+            {/* PNG 원본의 모양·색을 그대로 딴 벡터다. 어떤 배율에서도 또렷하고,
+                흰 배경이 없어 `mix-blend-multiply` 로 배경을 지울 필요가 없다. */}
             <Image
-              src="/babybooks-logo.png"
+              src="/babybooks-logo.svg"
               alt=""
-              width={1385}
-              height={1136}
-              sizes="52px"
+              width={256}
+              height={170}
               loading="eager"
-              className="h-auto w-[52px] shrink-0 mix-blend-multiply"
+              className="h-auto w-[52px] shrink-0"
             />
             <Image
-              src="/babybooks-wordmark.png"
+              src="/babybooks-wordmark.svg"
               alt="베이비북스"
-              width={1484}
-              height={578}
-              sizes="(min-width: 768px) 128px, 112px"
+              width={512}
+              height={112}
               loading="eager"
-              className="h-auto w-28 shrink-0 mix-blend-multiply md:w-32"
+              className="h-auto w-28 shrink-0 md:w-32"
             />
           </Link>
           <ul className="order-3 grid w-full grid-cols-5 items-center gap-1 sm:order-none sm:flex sm:w-auto">
