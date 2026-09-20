@@ -5,7 +5,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { Me } from '@nerd/contracts';
 import type { Response } from 'express';
 import { SUCCESS_CODE } from '@common/constants/app.constants';
-import { THROTTLE_LOGIN } from '@common/constants/throttle.constants';
+import { THROTTLE_GUEST, THROTTLE_LOGIN } from '@common/constants/throttle.constants';
 import {
   ApiCommonInternalServerErrorResponse,
   ApiCommonThrottledResponse,
@@ -73,6 +73,32 @@ export class AuthController {
     this.setSessionCookie(res, sid);
 
     const data: Me = { loginId: body.loginId };
+    return { code: SUCCESS_CODE, data, message: '' };
+  }
+
+  @Post('guest')
+  @HttpCode(HttpStatus.CREATED)
+  // 자동 입장이 켜지면 **방문자 전원**이 이걸 부른다. IP 기준 한도라 CGNAT 뒤 다수를 고려해
+  // 분당 120 으로 잡았다 — 순간 폭주는 전역 `short`(1초 20회)가 따로 막는다 (THROTTLE_GUEST 주석).
+  @Throttle({ long: THROTTLE_GUEST })
+  @ApiOperation({
+    summary: '게스트 체험 입장',
+    description:
+      '입력 없이 임시 닉네임으로 계정을 만들고 바로 로그인 상태가 된다. 비밀번호는 서버가 만들어 버리므로 재로그인은 불가능하다.',
+  })
+  @ApiSuccessResponse(MeDto, { status: HttpStatus.CREATED })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: '게스트 체험 비활성화 (code: `GUEST_ACCESS_DISABLED`)',
+    type: ApiErrorBodyDto,
+  })
+  @ApiCommonThrottledResponse()
+  @ApiCommonInternalServerErrorResponse()
+  async guest(@Res({ passthrough: true }) res: Response) {
+    const { sid, loginId } = await this.auth.createGuest();
+    this.setSessionCookie(res, sid);
+
+    const data: Me = { loginId };
     return { code: SUCCESS_CODE, data, message: '' };
   }
 

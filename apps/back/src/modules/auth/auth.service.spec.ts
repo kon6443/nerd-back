@@ -1,4 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
+import { loginIdSchema } from '@nerd/contracts';
 import { expectDomainError } from '@common/__spec__/expect-domain-error';
 import {
   type MockRepository,
@@ -73,18 +74,18 @@ describe('AuthService', () => {
       );
     });
 
-    it('PROD 환경에서는 가입이 비활성화되어 403 · SIGNUP_DISABLED 이다 ⭐', async () => {
+    it('PROD 환경에서도 기본값으로 가입이 허용된다 ⭐', async () => {
+      // 2026-09-20 정책 전환 — 환경변수 누락이 곧 "가입 차단" 이 되지 않게 기본값을 열었다.
+      //    차단 경로의 커버리지는 아래 `SIGNUP_ENABLED=false` 케이스가 계속 지킨다.
       config.get.mockImplementation((key: string) => {
         if (key === 'ENV') return 'PROD';
         return undefined;
       });
+      users.save.mockResolvedValue(createUser({ id: 9 }));
 
-      await expectDomainError(
-        service.signup({ loginId: 'tester', password: 'pw12345678' }),
-        'SIGNUP_DISABLED',
-        HttpStatus.FORBIDDEN,
+      await expect(service.signup({ loginId: 'tester', password: 'pw12345678' })).resolves.toBe(
+        '42:9999999999999',
       );
-      expect(users.save).not.toHaveBeenCalled();
     });
 
     it('SIGNUP_ENABLED=false 오버라이드 시 LOCAL 환경이어도 차단된다', async () => {
@@ -122,6 +123,77 @@ describe('AuthService', () => {
       await expect(service.signup({ loginId: 'tester', password: 'pw12345678' })).rejects.toThrow(
         'ECONNREFUSED',
       );
+    });
+  });
+
+  describe('createGuest', () => {
+    /** save 에 실제로 넘어간 인자들. 닉네임이 매번 다시 뽑히는지 보려면 원본이 필요하다. */
+    function savedInputs(): Partial<User>[] {
+      return users.save.mock.calls.map(([input]) => input as Partial<User>);
+    }
+
+    it('입력 없이 계정을 만들고 세션을 발급한다 ⭐', async () => {
+      users.save.mockResolvedValue(createUser({ id: 9 }));
+
+      await expect(service.createGuest()).resolves.toEqual({
+        sid: '42:9999999999999',
+        loginId: expect.stringMatching(/^guest_[a-z0-9]{10}$/),
+      });
+      expect(sessions.issue).toHaveBeenCalledWith(9);
+    });
+
+    it('서버가 만든 닉네임도 사람이 만든 닉네임과 같은 규칙을 통과한다 ⭐', async () => {
+      // 규칙을 벗어난 값을 서버만 예외로 저장하면, 나중에 규칙이 좁아질 때 그 계정들만 조용히 깨진다.
+      users.save.mockResolvedValue(createUser({ id: 9 }));
+
+      const { loginId } = await service.createGuest();
+
+      expect(loginIdSchema.safeParse(loginId).success).toBe(true);
+    });
+
+    it('비밀번호는 해시만 저장하고 원문을 남기지 않는다 ⭐', async () => {
+      users.save.mockResolvedValue(createUser({ id: 9 }));
+
+      await service.createGuest();
+
+      const plain = passwords.hash.mock.calls[0][0] as string;
+      expect(plain.length).toBeGreaterThanOrEqual(32);
+      expect(savedInputs()[0]).toEqual({
+        loginId: expect.any(String),
+        passwordHash: 'scrypt$hash',
+      });
+      expect(JSON.stringify(savedInputs()[0])).not.toContain(plain);
+    });
+
+    it('닉네임이 충돌하면 새로 뽑아 다시 시도한다 ⭐', async () => {
+      users.save
+        .mockRejectedValueOnce(duplicateKeyError())
+        .mockResolvedValueOnce(createUser({ id: 9 }));
+
+      await expect(service.createGuest()).resolves.toMatchObject({ sid: '42:9999999999999' });
+
+      // 🚫 같은 닉네임으로 재시도하면 영원히 충돌한다 — 다시 뽑았는지가 이 재시도의 핵심이다.
+      const [first, second] = savedInputs();
+      expect(users.save).toHaveBeenCalledTimes(2);
+      expect(first.loginId).not.toBe(second.loginId);
+    });
+
+    it('GUEST_ACCESS_ENABLED=false 면 403 · GUEST_ACCESS_DISABLED 다 ⭐', async () => {
+      config.get.mockImplementation((key: string) => {
+        if (key === 'GUEST_ACCESS_ENABLED') return 'false';
+        return undefined;
+      });
+
+      await expectDomainError(service.createGuest(), 'GUEST_ACCESS_DISABLED', HttpStatus.FORBIDDEN);
+      expect(users.save).not.toHaveBeenCalled();
+    });
+
+    it('중복이 아닌 DB 오류는 재시도하지 않고 그대로 올린다 ⭐', async () => {
+      // 재시도로 감싸면 진짜 장애가 "닉네임 충돌" 로 위장되고 시도 횟수만큼 지연된다.
+      users.save.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await expect(service.createGuest()).rejects.toThrow('ECONNREFUSED');
+      expect(users.save).toHaveBeenCalledTimes(1);
     });
   });
 

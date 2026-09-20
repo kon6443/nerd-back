@@ -127,8 +127,20 @@ describe('인증 (E2E)', () => {
       expect(stores.rowCount()).toBe(1);
     });
 
-    it('PROD 환경에서는 403 · SIGNUP_DISABLED 로 가입이 차단된다 ⭐', async () => {
-      const prodApp = await createE2eApp({
+    it('게스트 접두사로는 가입할 수 없다 ⭐', async () => {
+      // 🚫 사람이 선점하면 그 계정이 화면에서 게스트로 오인된다 (signupSchema 의 refine).
+      const res = await request(server(app))
+        .post(`/${API_PREFIX}/auth/signup`)
+        .send({ loginId: 'guest_hacker', password: 'pw12345678' })
+        .expect(400);
+
+      expect(res.body.code).toBe('VALIDATION_FAILED');
+      expect(stores.rowCount()).toBe(0);
+    });
+
+    it('SIGNUP_ENABLED=false 면 403 · SIGNUP_DISABLED 로 가입이 차단된다 ⭐', async () => {
+      // 2026-09-20 부터 PROD 기본값도 가입 허용이다. 차단은 이 환경변수 킬 스위치로만 걸린다.
+      const disabledApp = await createE2eApp({
         controllers: [AuthController],
         providers: [
           AuthService,
@@ -140,6 +152,7 @@ describe('인증 (E2E)', () => {
             useValue: {
               get: (key: string) => {
                 if (key === 'ENV') return 'PROD';
+                if (key === 'SIGNUP_ENABLED') return 'false';
                 if (key === 'PORT') return 5501;
                 return undefined;
               },
@@ -148,7 +161,7 @@ describe('인증 (E2E)', () => {
         ],
       });
 
-      const res = await request(server(prodApp))
+      const res = await request(server(disabledApp))
         .post(`/${API_PREFIX}/auth/signup`)
         .send({ loginId: 'prod_user', password: 'pw12345678' })
         .expect(403);
@@ -156,7 +169,83 @@ describe('인증 (E2E)', () => {
       expect(res.body.code).toBe('SIGNUP_DISABLED');
       expect(res.body.message).toContain('회원가입이 제한');
 
-      await prodApp.close();
+      await disabledApp.close();
+    });
+  });
+
+  describe('게스트 체험 (POST /auth/guest)', () => {
+    /** ⚠️ `async` 를 붙이지 않는다 — Promise 로 감싸면 supertest 의 `.expect()` 체이닝이 끊긴다. */
+    function enterAsGuest() {
+      return request(server(app)).post(`/${API_PREFIX}/auth/guest`);
+    }
+
+    it('본문 없이 201 과 세션 쿠키를 준다 ⭐', async () => {
+      const res = await enterAsGuest().expect(201);
+
+      expect(res.body.code).toBe('SUCCESS');
+      expect(res.body.data.loginId).toMatch(/^guest_[a-z0-9]{10}$/);
+      expect(stores.rowCount()).toBe(1);
+
+      const cookie = res.headers['set-cookie'][0];
+      expect(cookie).toContain('HttpOnly');
+      expect(cookie).toContain('SameSite=Lax');
+    });
+
+    it('받은 쿠키로 곧바로 인증된 요청이 통과한다 ⭐', async () => {
+      // 이 테스트가 게스트 기능의 전부다 — 입력 없이 얻은 쿠키가 **기존 가드를 그대로 통과**해야 한다.
+      const guest = await enterAsGuest().expect(201);
+
+      const me = await request(server(app))
+        .get(`/${API_PREFIX}/auth/me`)
+        .set('Cookie', guest.headers['set-cookie'])
+        .expect(200);
+
+      expect(me.body.data.loginId).toBe(guest.body.data.loginId);
+    });
+
+    it('누를 때마다 서로 다른 계정이 생긴다', async () => {
+      const first = await enterAsGuest().expect(201);
+      const second = await enterAsGuest().expect(201);
+
+      expect(first.body.data.loginId).not.toBe(second.body.data.loginId);
+      expect(stores.rowCount()).toBe(2);
+    });
+
+    it('응답에 비밀번호 흔적이 없다 ⭐', async () => {
+      const res = await enterAsGuest().expect(201);
+
+      expect(JSON.stringify(res.body)).not.toContain('password');
+      expect(JSON.stringify(res.body)).not.toContain('scrypt');
+    });
+
+    it('GUEST_ACCESS_ENABLED=false 면 403 · GUEST_ACCESS_DISABLED 다 ⭐', async () => {
+      const disabledApp = await createE2eApp({
+        controllers: [AuthController],
+        providers: [
+          AuthService,
+          PasswordService,
+          SessionService,
+          { provide: getRepositoryToken(User), useValue: stores.users },
+          {
+            provide: ConfigService,
+            useValue: {
+              get: (key: string) => {
+                if (key === 'GUEST_ACCESS_ENABLED') return 'false';
+                if (key === 'ENV') return 'LOCAL';
+                if (key === 'PORT') return 5501;
+                return undefined;
+              },
+            },
+          },
+        ],
+      });
+
+      const res = await request(server(disabledApp)).post(`/${API_PREFIX}/auth/guest`).expect(403);
+
+      expect(res.body.code).toBe('GUEST_ACCESS_DISABLED');
+      expect(stores.rowCount()).toBe(0);
+
+      await disabledApp.close();
     });
   });
 

@@ -42,3 +42,16 @@ export const SignupDisabledErrorResponseDto = defineDomainError({
   name: 'SignupDisabledErrorResponseDto',
 });
 
+/**
+ * 게스트 체험 비활성화.
+ *
+ * 프론트 버튼은 빌드 타임 상수로 사라지므로, 이 응답에 닿는 것은 **버튼이 남아 있는 구버전
+ * 번들이거나 직접 호출한 경우**다. 그래서 사용자에게 보일 문구는 일반적인 안내로 둔다.
+ */
+export const GuestAccessDisabledErrorResponseDto = defineDomainError({
+  code: 'GUEST_ACCESS_DISABLED',
+  status: HttpStatus.FORBIDDEN,
+  message: '현재 게스트 체험을 이용할 수 없습니다. 닉네임을 만들어 시작해 주세요.',
+  name: 'GuestAccessDisabledErrorResponseDto',
+});
+
