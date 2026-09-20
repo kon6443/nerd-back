@@ -1,5 +1,6 @@
 "use client";
 
+import { useGuestAutoEnter } from "@/lib/api/useGuestAutoEnter";
 import { useSession } from "@/lib/api/useSession";
 
 /**
@@ -10,6 +11,9 @@ import { useSession } from "@/lib/api/useSession";
  * 🚫 헤더 안에서 값을 버리는 `useSession()` 호출로 대신하지 않는다 — 읽는 사람이 왜 부르는지 모른다.
  */
 export function SessionSync() {
-  useSession();
+  const session = useSession();
+  // 비로그인 방문자를 자동으로 게스트 입장시킨다 (플래그로 끈다). 여기 한 곳에서만 부른다 —
+  // 화면마다 붙이면 한 방문자에게 계정이 여러 개 생긴다.
+  useGuestAutoEnter(session);
   return null;
 }

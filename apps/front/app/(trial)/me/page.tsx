@@ -15,7 +15,8 @@ import { SESSION_STAGE_BADGE, classifySessionStatus } from '@/components/story/s
 import { ApiError, deleteSession, getMySessions } from '@/lib/api';
 import { logout } from '@/lib/api/auth';
 import { useSession } from '@/lib/api/useSession';
-import type { MyStorySessionItem } from '@nerd/contracts';
+import { GUEST_LOGIN_ID_PREFIX, type MyStorySessionItem } from '@nerd/contracts';
+import { GUEST_AUTO_ENTER_ACTIVE } from '@/lib/api/guestAutoEnter';
 
 /**
  * 목록 격자. ⭐ **스켈레톤과 실제 목록이 같은 값을 쓰도록 한 곳에 둔다** — 한쪽만 고치면
@@ -120,12 +121,17 @@ export default function MyPage() {
     }
   }
 
-  // ⭐ 골격(제목·로그아웃·아이디 카드·목록 제목)은 세션 확인 전에도 그린다.
+  // ⭐ 골격(제목·로그아웃·닉네임 카드·목록 제목)은 세션 확인 전에도 그린다.
   //    확인 전에 전체 화면 로딩을 보이고 그 뒤 페이지를 통째로 갈아끼우면 새로고침마다 크게 튄다.
   //    🚫 **비어 있는 칸을 두지 않는다** — 값이 들어오는 순간 주변이 밀리면 그것이 곧 깜빡임이다.
   //    사용자 데이터가 들어갈 자리에는 **최종 모양과 같은 크기의 스켈레톤**을 둔다(2026-09-10).
   const authenticated = session.status === 'authenticated';
   const loading = !authenticated || loadingSessions;
+  /**
+   * 게스트는 **비밀번호를 아무도 모른다**(서버가 만들어 버렸다). 로그아웃은 곧 계정 상실이라
+   * 그 사실을 이 화면에서 알려야 한다 — 로그아웃 버튼이 바로 위에 있다.
+   */
+  const isGuest = authenticated && session.me.loginId.startsWith(GUEST_LOGIN_ID_PREFIX);
 
   return (
     <StoryRoom className={room.account}>
@@ -135,25 +141,37 @@ export default function MyPage() {
             <h1>마이페이지</h1>
             <p>나의 모험을 한 권씩 모아 두었어요.</p>
           </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            // 🚫 확인 전이라고 비활성으로 두지 않는다 — 확인이 끝나는 순간 흐렸다가 진해져 깜빡인다.
-            //    이 화면은 비로그인이면 어차피 로그인으로 보내므로 누를 사람은 로그인한 사용자뿐이다.
-            disabled={loggingOut}
-            className={actionClass(
-              'secondary',
-              `${HEADER_ACTION_CLASS} disabled:opacity-60`,
-              'compact',
-            )}
-          >
-            {loggingOut ? '로그아웃 중…' : '로그아웃'}
-          </button>
+          {/*
+            ⭐ **자동 게스트 입장 중에는 로그아웃 버튼을 내린다.**
+            게스트 계정은 비밀번호를 아무도 모르므로 로그아웃이 곧 **되돌릴 수 없는 계정 상실**이고,
+            그 직후에는 억제 마크 때문에 자동 입장도 다시 돌지 않아 **체험이 통째로 끊긴다.**
+            누를 이유가 없는 버튼이 아니라, 누르면 손해만 보는 버튼이라 뺀다.
+            🚫 코드를 지우지 않는다 — 플래그를 끄면 그대로 돌아와야 한다.
+            🚫 `GUEST_AUTO_ENTER` 를 직접 보지 않는다 — 상위 스위치(`GUEST_ACCESS_ENABLED`)가 꺼진
+               조합에서 **자동 입장은 멈추는데 로그아웃 버튼만 사라지는** 상태가 된다.
+            개발자는 `/login?dev=1` 에서 자기 계정으로 로그인하면 세션이 교체된다.
+          */}
+          {GUEST_AUTO_ENTER_ACTIVE ? null : (
+            <button
+              type="button"
+              onClick={handleLogout}
+              // 🚫 확인 전이라고 비활성으로 두지 않는다 — 확인이 끝나는 순간 흐렸다가 진해져 깜빡인다.
+              //    이 화면은 비로그인이면 어차피 로그인으로 보내므로 누를 사람은 로그인한 사용자뿐이다.
+              disabled={loggingOut}
+              className={actionClass(
+                'secondary',
+                `${HEADER_ACTION_CLASS} disabled:opacity-60`,
+                'compact',
+              )}
+            >
+              {loggingOut ? '로그아웃 중…' : '로그아웃'}
+            </button>
+          )}
         </div>
 
         <Card>
           <dl className="flex items-center gap-4">
-            <dt className="text-ink-muted">아이디</dt>
+            <dt className="text-ink-muted">닉네임</dt>
             <dd className="flex min-h-7 items-center text-lg font-bold text-ink">
               {authenticated ? (
                 session.me.loginId
@@ -165,6 +183,13 @@ export default function MyPage() {
               )}
             </dd>
           </dl>
+          {isGuest ? (
+            <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+              체험용으로 만들어 드린 임시 닉네임이에요.{' '}
+              <strong className="font-bold text-ink">로그아웃하면 다시 들어올 수 없으니</strong>{' '}
+              만든 동화를 계속 보시려면 그대로 두세요.
+            </p>
+          ) : null}
         </Card>
 
         <section className="flex flex-col gap-4">

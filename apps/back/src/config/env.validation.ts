@@ -107,9 +107,18 @@ export const envSchema = dbEnvSchema.extend({
   EDGE_THROTTLE_ENABLED: z
     .enum(['true', 'false'], { error: "EDGE_THROTTLE_ENABLED 는 'true' 또는 'false' 여야 한다." })
     .default('false'),
-  /** 회원가입 허용 여부 ('true' | 'false'). 미설정 시 환경 기본값(LOCAL: true, PROD: false)을 따른다. */
+  /** 회원가입 허용 여부 ('true' | 'false'). 미설정 시 환경 기본값(LOCAL·PROD 모두 true)을 따른다. */
   SIGNUP_ENABLED: z
     .enum(['true', 'false'], { error: "SIGNUP_ENABLED 는 'true' 또는 'false' 여야 한다." })
+    .optional(),
+  /**
+   * 게스트 체험(무입력 입장) 허용 여부 ('true' | 'false').
+   * 미설정 시 `@nerd/contracts` 의 `GUEST_ACCESS_ENABLED` 를 따른다 — **프론트 버튼과 같은 값**이다.
+   * ⚠️ 이 변수로 `false` 를 주면 백엔드만 잠긴다. 프론트 버튼은 빌드 타임 상수라 남아 있어
+   *    "눌렀더니 403" 이 된다. 완전히 끄려면 contracts 상수를 고치고 두 앱을 함께 배포한다.
+   */
+  GUEST_ACCESS_ENABLED: z
+    .enum(['true', 'false'], { error: "GUEST_ACCESS_ENABLED 는 'true' 또는 'false' 여야 한다." })
     .optional(),
   /** AI 이미지 생성 어댑터 공급자 (mock | openrouter) */
   IMAGE_PROVIDER: z.enum(['mock', 'openrouter']).default('mock'),
