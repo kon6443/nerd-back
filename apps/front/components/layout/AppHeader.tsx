@@ -54,7 +54,7 @@ const AUTH_NAV_SLOTS = [
 ] as const;
 
 function navLinkClass(active: boolean): string {
-  return `flex min-h-touch min-w-touch items-center justify-center gap-1.5 rounded-xl px-3.5 text-sm font-bold transition-colors motion-reduce:transition-none sm:gap-2 sm:px-6 sm:text-base ${
+  return `flex min-h-touch min-w-touch items-center justify-center gap-1.5 rounded-xl px-1 text-[0.8125rem] font-bold transition-colors motion-reduce:transition-none sm:gap-2 sm:px-6 sm:text-base ${
     active ? "bg-primary-tint text-primary-strong" : "text-ink-muted hover:bg-surface hover:text-ink"
   }`;
 }
@@ -71,14 +71,14 @@ function CommonNavLinksItems({
       {COMMON_LINKS.map((link) => {
         const active = isActive(pathname, link.href, searchParams);
         return (
-          <li key={link.href}>
+          <li key={link.href} className="min-w-0">
             <Link
               href={link.href}
               prefetch={link.href.startsWith("/library") || link.href.startsWith("/stories/") ? true : undefined}
               aria-current={active ? "page" : undefined}
               className={navLinkClass(active)}
             >
-              {active && <span aria-hidden="true" className="size-1.5 rounded-full bg-primary-strong" />}
+              {active && <span aria-hidden="true" className="hidden size-1.5 rounded-full bg-primary-strong sm:inline-block" />}
               {link.label}
             </Link>
           </li>
@@ -129,11 +129,11 @@ export function AppHeader() {
             className="h-auto w-28 shrink-0 mix-blend-multiply md:w-32"
           />
         </Link>
-        <ul className="order-3 flex w-full items-center gap-1 sm:order-none sm:w-auto">
+        <ul className="order-3 grid w-full grid-cols-4 items-center gap-1 sm:order-none sm:flex sm:w-auto">
           <CommonNavLinks pathname={pathname} />
           {/* 로그인 전에는 넓은 화면에서 「로그인하기」 버튼(AuthCta)을 따로 두고, 로그인 후 「마이페이지」는
               강조 없이 다른 메뉴와 같은 모양으로 둔다. */}
-          <li>
+          <li className="min-w-0">
             {AUTH_NAV_SLOTS.map(({ status, className }) => {
               const link = AUTH_LINK[status];
               const active = isActive(pathname, link.href);
