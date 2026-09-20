@@ -105,7 +105,8 @@
   line-height: 1.2;
 }
 .libraryHeading h1 { font-size: clamp(2.5rem, 4vw, 3.75rem); }
-.libraryHeading p { margin-top: 1rem; max-width: 28rem; color: var(--room-muted); line-height: 1.8; word-break: keep-all; }
+/* 두 문장짜리 설명이라 두 줄의 길이를 맞춘다 — 마지막 줄에 「주세요.」만 남지 않게. */
+.libraryHeading p { margin-top: 1rem; max-width: 28rem; color: var(--room-muted); line-height: 1.8; text-wrap: balance; }
 .libraryBooks { flex: 0 0 280px; }
 .library .libraryHeading { min-height: 175px; margin-bottom: 2rem; }
 .library .libraryBooks { zoom: 0.78; }
@@ -210,10 +211,36 @@
   background: var(--color-surface-raised);
   box-shadow: 5px 5px 0 var(--color-paper), 6px 6px 0 var(--color-paper-edge), 10px 10px 0 var(--color-paper), 11px 11px 0 var(--color-paper-edge), 12px 22px 36px color-mix(in srgb, var(--color-book-cover-strong) 12%, transparent);
 }
-.formHeading { margin-bottom: 0.5rem; }
+/* 가입은 책등을 primary(초록)로 바꿔 로그인과 다른 책처럼 보이게 한다. */
+.form[data-mode="signup"] { border-left-color: var(--color-primary); }
+.modeTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-paper-edge) 55%, var(--color-paper));
+}
+.modeTab {
+  min-height: 2.75rem;
+  border-radius: var(--radius-pill);
+  color: var(--room-muted);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+.modeTab[aria-pressed="true"] {
+  background: var(--color-surface-raised);
+  color: var(--color-book-cover-strong);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-book-cover-strong) 18%, transparent);
+}
+.form[data-mode="signup"] .modeTab[aria-pressed="true"] { color: var(--color-primary-strong); }
+.modeTab:disabled { cursor: wait; }
+.modeSwitch { text-align: center; font-size: 0.875rem; color: var(--room-muted); }
+.modeSwitch button { color: var(--color-book-cover-strong); }
+.formHeading { margin-bottom: 0.25rem; }
 .formHeading h1 { font-size: 2rem; }
 .formHeading p { margin-top: 0.75rem; font-size: 0.875rem; line-height: 1.7; color: var(--room-muted); word-break: keep-all; }
-.form > button[type="button"] { color: var(--room-muted); }
 .input { border-color: color-mix(in srgb, var(--color-book-cover) 65%, var(--color-paper-edge)); background: var(--color-paper); caret-color: var(--color-book-cover); }
 .input:focus { border-color: var(--color-book-cover); outline: 2px solid var(--color-book-cover); outline-offset: 2px; }
 .input[aria-invalid="true"] { border-color: var(--color-danger-strong); }

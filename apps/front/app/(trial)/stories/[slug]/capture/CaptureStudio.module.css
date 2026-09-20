@@ -8,20 +8,14 @@
   margin-bottom: 10px;
 }
 
-.pageLabel {
-  color: var(--color-book-cover);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.backLink { gap: 8px; }
 .icon { width: 22px; height: 22px; flex-shrink: 0; }
 
 .studio {
   display: grid;
-  grid-template-columns: minmax(0, .9fr) minmax(0, 1fr);
-  align-items: center;
-  gap: 40px;
+  width: min(100%, 560px);
+  margin-inline: auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
   padding: 28px;
   border: 1px solid var(--color-paper-edge);
   border-radius: 12px 28px 28px 12px;
@@ -29,17 +23,14 @@
   box-shadow: 4px 5px 0 var(--color-paper), 5px 6px 0 var(--color-paper-edge), 12px 22px 36px color-mix(in srgb, var(--color-book-cover) 9%, transparent);
 }
 
-.welcome { min-width: 0; padding: 4px 8px; }
-.title { color: var(--color-ink); font-size: clamp(32px, 3.4vw, 44px); font-weight: 850; word-break: keep-all; line-height: 1.22; letter-spacing: -.025em; }
+.welcome { min-width: 0; padding: 4px 0 0; text-align: center; }
+.title { color: var(--color-ink); font-size: clamp(26px, 2.6vw, 34px); font-weight: 850; word-break: keep-all; line-height: 1.22; letter-spacing: -.025em; }
 .title em { color: var(--color-book-cover); font-style: normal; }
-.description { max-width: 310px; margin-top: 16px; color: var(--color-ink); font-size: 16px; line-height: 1.7; word-break: keep-all; }
 
-.companion { margin: 8px 0 4px; }
-
-
-.privacy { display: flex; align-items: flex-start; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-paper-line); color: var(--color-ink); font-size: 12px; line-height: 1.75; word-break: keep-all; }
-.privacy > .icon { margin-top: 2px; color: var(--color-book-cover); }
-.privacyTitle { margin-bottom: 4px; font-weight: 750; }
+.privacy { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; padding: 10px 16px; border: 1px solid var(--color-primary-soft); border-radius: 14px; background: var(--color-primary-tint); color: var(--color-ink); font-size: 12px; line-height: 1.6; text-align: left; word-break: keep-all; }
+/* 중요한 약속이라 primary 옅은 톤으로만 살짝 강조한다 — 아래 주 버튼보다 튀지 않게. */
+.privacy > .icon { margin-top: 2px; color: var(--color-primary-strong); }
+.privacyTitle { margin-bottom: 4px; color: var(--color-primary-strong); font-weight: 750; }
 
 .capturePanel { min-width: 0; padding: 20px; border: 1px solid var(--color-paper-edge); border-radius: 20px; background: color-mix(in srgb, var(--color-accent-a-soft) 65%, var(--color-paper)); perspective: 900px; }
 .panelHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; color: var(--color-book-cover); }
@@ -47,7 +38,8 @@
 .panelHeader h2 > .icon { width: 19px; height: 19px; }
 .photoCount { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; background: var(--color-surface-raised); color: var(--color-book-cover); font-size: 11px; font-weight: 750; }
 
-.photoMat { max-width: 284px; margin-inline: auto; padding: 10px 10px 0; border-radius: 22px; background: var(--color-surface-raised); box-shadow: 2px 3px 0 var(--color-paper-edge), 8px 15px 24px color-mix(in srgb, var(--color-book-cover) 14%, transparent); transform: rotate(-3deg) rotateY(-6deg); transition: transform 300ms ease-out; }
+/* 한 줄 배치에서 버튼까지 스크롤 없이 보이도록 240px 로 둔다. */
+.photoMat { max-width: 240px; margin-inline: auto; padding: 10px 10px 0; border-radius: 22px; background: var(--color-surface-raised); box-shadow: 2px 3px 0 var(--color-paper-edge), 8px 15px 24px color-mix(in srgb, var(--color-book-cover) 14%, transparent); transform: rotate(-3deg) rotateY(-6deg); transition: transform 300ms ease-out; }
 .capturePanel[data-state="camera"] .photoMat, .capturePanel[data-state="ready"] .photoMat { transform: none; }
 .viewfinder { position: relative; aspect-ratio: 1; width: 100%; overflow: hidden; border-radius: 15px; background: var(--color-accent-a-soft); }
 .photo, .video { width: 100%; height: 100%; object-fit: cover; }
@@ -76,19 +68,14 @@
 .resultError { max-width: 640px; margin: 16px auto 0; }
 
 @media (min-width: 1200px) {
-  .studio { gap: 48px; padding: 32px 40px; }
+  .studio { padding: 32px 40px; }
 }
 
 @media (max-width: 767px) {
   .page > div:last-child { padding: 8px 16px 32px; }
-  .pageLabel { font-size: 11px; }
-  .studio { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px 16px 16px; border-radius: 26px; }
-  .welcome { position: relative; padding: 0 4px; }
-  .title { padding-right: 112px; font-size: 28px; }
-  .description { margin-top: 8px; font-size: 14px; line-height: 1.5; }
-  .companion { position: absolute; top: -14px; right: -9px; margin: 0; }
-  .companion > div { zoom: .5; }
-  .privacy { gap: 8px; margin-top: 12px; padding-top: 10px; font-size: 11px; }
+  .studio { gap: 16px; padding: 20px 16px 16px; border-radius: 26px; }
+  .title { font-size: 22px; }
+  .privacy { gap: 8px; margin-top: 10px; padding: 8px 12px; font-size: 11px; }
   .privacy > .icon { width: 19px; height: 19px; }
   .capturePanel { padding: 14px; border-radius: 20px; }
   .panelHeader h2 { font-size: 13px; }
@@ -109,9 +96,7 @@
 }
 
 @media (max-width: 359px) {
-  .title { padding-right: 84px; font-size: 26px; }
-  .companion { top: 0; }
-  .companion > div { zoom: .36; }
+  .title { font-size: 20px; }
 }
 
 .submittingOverlay {
@@ -162,22 +147,6 @@
 }
 
 /* Demo Preset Selection Styles */
-.demoBanner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 16px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--color-gold) 15%, var(--color-surface-raised));
-  border: 1px solid color-mix(in srgb, var(--color-gold-strong) 40%, transparent);
-  color: var(--color-ink);
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1.5;
-  word-break: keep-all;
-}
-
 .presetSection {
   margin-top: 16px;
 }

@@ -15,6 +15,7 @@ export function HomeWorld({ children }: { children: ReactNode }) {
   const rootRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const graphicsRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const startEntryRef = useRef<((href: string) => boolean) | null>(null);
   const presentationRef = useRef<Presentation>({ renderer: "loading", entering: false });
   const [presentation, setPresentation] = useState<Presentation>({ renderer: "loading", entering: false });
@@ -49,6 +50,9 @@ export function HomeWorld({ children }: { children: ReactNode }) {
     let frameId = 0;
     let width = 0;
     let height = 0;
+    let bounds: { left: number; right: number } | undefined;
+    const content = contentRef.current;
+    const stacked = window.matchMedia("(max-width: 767px)");
     let pointer = { x: 0, y: 0 };
     let targetPointer = { x: 0, y: 0 };
     let finishNavigation: (() => void) | undefined;
@@ -82,7 +86,7 @@ export function HomeWorld({ children }: { children: ReactNode }) {
       let renderer: Presentation["renderer"] = "fallback";
       if (graphics) {
         try {
-          if (graphics.render({ entry: progress, width, height, pointerX: entry?.pointer.x ?? pointer.x, pointerY: entry?.pointer.y ?? pointer.y })) renderer = "ready";
+          if (graphics.render({ entry: progress, width, height, bounds, pointerX: entry?.pointer.x ?? pointer.x, pointerY: entry?.pointer.y ?? pointer.y })) renderer = "ready";
         } catch {
           graphics.dispose();
           graphics = null;
@@ -114,6 +118,12 @@ export function HomeWorld({ children }: { children: ReactNode }) {
       root.style.setProperty("--header-height", `${header?.getBoundingClientRect().height ?? 0}px`);
       width = stage.clientWidth;
       height = stage.clientHeight;
+      // 책은 문구 오른쪽부터 콘텐츠 오른쪽 끝선(=상단 메뉴 오른쪽 끝) 사이에 둔다. 세로로 쌓이는 모바일은 제외.
+      if (content && !stacked.matches) {
+        const stageBox = stage.getBoundingClientRect();
+        const gutter = parseFloat(getComputedStyle(stage).paddingRight) || 0;
+        bounds = { left: Math.round(content.getBoundingClientRect().right - stageBox.left + 48), right: Math.round(width - gutter) };
+      } else bounds = undefined;
       schedule();
     };
     const movePointer = (event: PointerEvent) => {
@@ -151,6 +161,7 @@ export function HomeWorld({ children }: { children: ReactNode }) {
     const resizeObserver = new ResizeObserver(resize);
     if (header) resizeObserver.observe(header);
     resizeObserver.observe(stage);
+    if (content) resizeObserver.observe(content); // 웹폰트가 늦게 적용되면 문구 폭이 바뀐다.
     window.addEventListener("resize", resize);
     window.addEventListener("blur", resetPointer);
     window.addEventListener("keydown", cancelEntry);
@@ -207,15 +218,13 @@ export function HomeWorld({ children }: { children: ReactNode }) {
             <Image src="/images/home-world/magic-book.webp" alt="" fill unoptimized loading="eager" sizes="100vw" className={styles.image} />
           </div>
         )}
-        <div className={styles.content}>
+        <div ref={contentRef} className={styles.content}>
           <div className={styles.copy}>
-            <p className={styles.eyebrow}>어서 와요, 베이비북스에</p>
             <h1 className={styles.title}><span>한 권의 책에서,</span><span>커다란 모험으로.</span></h1>
-            <p className={styles.description}>버튼을 눌러 책 속으로 들어가 보세요. 내 사진 한 장이면 동화 속 주인공이 돼요.</p>
+            <p className={styles.description}><span>버튼을 눌러 책 속으로 들어가 보세요.</span> <span>내 사진 한 장이면 동화 속 주인공이 돼요.</span></p>
           </div>
           <div className={styles.actions} aria-busy={presentation.entering || undefined}>
             <div className={styles.actionLinks} onClickCapture={enterStory}>{children}</div>
-            <p className={styles.note}>로그인 없이 바로 볼 수 있어요.</p>
           </div>
         </div>
         <div className={styles.entryWash} aria-hidden="true" />
