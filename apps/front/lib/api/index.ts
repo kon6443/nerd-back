@@ -22,3 +22,4 @@ export {
   uploadFace,
 } from "./session";
 export { fetchMe, login, logout, signup } from "./auth";
+export { sendFeedback } from "./feedback";

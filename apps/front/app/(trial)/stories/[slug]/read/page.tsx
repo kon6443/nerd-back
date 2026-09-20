@@ -701,7 +701,7 @@ function StoryReadContent({ params }: PageProps) {
   //    아래 여백(`pb-28`)은 화면 하단에 붙은 조작 바의 자리다. 없으면 바가 책 아래를 덮는다.
   const mainClass = [
     "mx-auto flex w-full min-h-0 flex-1 gap-4 px-4 pt-5 pb-28 md:px-8 md:pt-5 md:pb-24",
-    readerOptions.immersive ? "max-w-7xl md:h-dvh" : "max-w-5xl",
+    readerOptions.immersive ? "max-w-7xl md:h-dvh md:flex-none" : "max-w-5xl",
     dockOpen ? "flex-col md:flex-row" : "flex-col",
   ].join(" ");
 

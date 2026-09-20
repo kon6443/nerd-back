@@ -109,7 +109,7 @@ function LeafSegments({
   depth: number;
   direction: TurnDirection;
   front: ReactNode;
-  /** 넘어간 뒤 보이는 면. 1단 화면은 빈 종이다(넘어간 종이가 내려앉을 왼쪽 쪽이 없다). */
+  /** 넘어간 뒤 보이는 면. */
   back: ReactNode;
 }) {
   if (depth >= LEAF_SEGMENTS) return null;
@@ -288,7 +288,8 @@ export function BookPager({
                 <div className={styles.artControls}>{renderArtControls(artPair.over)}</div>
               ) : null}
             </div>
-            <div className={styles.page}>
+            {/* 쪽마다 스크롤 영역을 새로 만들어 다음 본문은 첫 줄에서 시작한다. */}
+            <div key={baseText} className={styles.page}>
               {renderText(baseText)}
               {renderTextControls ? (
                 <div className={styles.pageControls}>{renderTextControls(baseText)}</div>
@@ -298,51 +299,13 @@ export function BookPager({
         </div>
 
         {turn ? (
-          <div
-              // 쪽 조합이 바뀌면 새 종이로 애니메이션을 처음부터 돌린다.
-              key={`${turn.from}-${turn.to}`}
-              aria-hidden="true"
-              // 1단은 책등이 늘 왼쪽이라 두 방향 모두 왼쪽 축으로 돈다. 방향은 `data-single` 이 키프레임을 고른다.
-              data-turn={turn.layout === "single" ? "next" : turn.direction}
-              data-single={turn.layout === "single" ? turn.direction : undefined}
-              className={styles.leaf}
-              style={{ "--seg-count": LEAF_SEGMENTS } as CSSProperties}
-              onAnimationEnd={(event) => {
-                // ⚠️ 명암(`::after`) 등 자손의 것이 버블링될 수 있다. 종이 자신의 회전이 끝났을 때만 닫는다.
-                if (event.target === event.currentTarget) finishTurn();
-              }}
-            >
-              {turn.layout === "single" ? (
-                // ⭐ 1단은 **책등(왼쪽)을 축으로 180° 넘어간다.** 다음 쪽은 떠나는 쪽이 왼쪽으로 넘어가고,
-                // 이전 쪽은 앞 쪽이 왼쪽에서 넘어와 덮는다. 뒷면은 빈 종이다.
-                // 🚫 90° 에서 멈추지 않는다 — 가장 느린 순간에 모서리째 사라져 "뜯겨 나가는" 것처럼 보였다(2026-09-18).
-                <LeafSegments
-                  depth={0}
-                  direction="next"
-                  front={
-                    <div className={styles.faceStack}>
-                      <div className={styles.art}>{renderArt(turn.direction === "next" ? turn.from : turn.to)}</div>
-                      <div className={styles.page}>{renderText(turn.direction === "next" ? turn.from : turn.to)}</div>
-                    </div>
-                  }
-                  back={<div className={styles.faceBlank} />}
-                />
-              ) : turn.direction === "next" ? (
-                <LeafSegments
-                  depth={0}
-                  direction="next"
-                  front={<div className={styles.page}>{renderText(turn.from)}</div>}
-                  back={<div className={styles.art}>{renderArt(turn.to)}</div>}
-                />
-              ) : (
-                <LeafSegments
-                  depth={0}
-                  direction="prev"
-                  front={<div className={styles.art}>{renderArt(turn.from)}</div>}
-                  back={<div className={styles.page}>{renderText(turn.to)}</div>}
-                />
-              )}
-            </div>
+          <BookTurn
+            key={`${turn.from}-${turn.to}`}
+            turn={turn}
+            renderArt={renderArt}
+            renderText={renderText}
+            onFinish={finishTurn}
+          />
         ) : null}
       </div>
       {renderTextControls ? (
@@ -353,5 +316,55 @@ export function BookPager({
         <div className={styles.outsideControls}>{renderTextControls(baseText)}</div>
       ) : null}
     </BookVolume>
+  );
+}
+
+/** 넘김 중에만 존재하는 종이. 모바일은 내용 한 벌만 합성하고 펼침면은 기존 곡면을 유지한다. */
+export function BookTurn({
+  turn,
+  renderArt,
+  renderText,
+  onFinish,
+}: Pick<BookPagerProps, "renderArt" | "renderText"> & {
+  turn: Turn;
+  onFinish: () => void;
+}) {
+  const single = turn.layout === "single";
+  const singlePage = turn.direction === "next" ? turn.from : turn.to;
+  return (
+    <div
+      aria-hidden="true"
+      data-turn={single ? "next" : turn.direction}
+      data-single={single ? turn.direction : undefined}
+      className={`${styles.leaf} ${single ? styles.singleLeaf : ""}`}
+      style={single ? undefined : { "--seg-count": LEAF_SEGMENTS } as CSSProperties}
+      onAnimationEnd={(event) => {
+        if (event.target === event.currentTarget) onFinish();
+      }}
+    >
+      {single ? (
+        <>
+          <div className={`${styles.singleFace} ${styles.faceStack}`}>
+            <div className={styles.art}>{renderArt(singlePage)}</div>
+            <div className={styles.page}>{renderText(singlePage)}</div>
+          </div>
+          <div className={`${styles.singleFace} ${styles.singleBack} ${styles.faceBlank}`} />
+        </>
+      ) : turn.direction === "next" ? (
+        <LeafSegments
+          depth={0}
+          direction="next"
+          front={<div className={styles.page}>{renderText(turn.from)}</div>}
+          back={<div className={styles.art}>{renderArt(turn.to)}</div>}
+        />
+      ) : (
+        <LeafSegments
+          depth={0}
+          direction="prev"
+          front={<div className={styles.art}>{renderArt(turn.from)}</div>}
+          back={<div className={styles.page}>{renderText(turn.to)}</div>}
+        />
+      )}
+    </div>
   );
 }

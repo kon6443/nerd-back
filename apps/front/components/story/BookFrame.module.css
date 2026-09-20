@@ -595,19 +595,13 @@
 }
 
 .sliceInner > .art,
-.sliceInner > .page,
-.sliceInner > .faceStack {
+.sliceInner > .page {
   block-size: 100%;
 }
 
 /* 마디마다 따로 스크롤되면 조각난 본문이 서로 어긋난다. */
 .sliceInner > .page {
   overflow: hidden;
-}
-
-.sliceInner > .faceStack > .page {
-  flex: 1 1 auto;
-  block-size: auto;
 }
 
 /*
@@ -630,26 +624,44 @@
   flex-direction: column;
 }
 
-.sliceInner > .faceStack > .art {
+/* 모바일은 삽화·본문을 열 번 복제하지 않고 앞·뒤 한 면씩만 합성한다. */
+.leaf.singleLeaf[data-single] {
+  box-shadow: none;
+  animation-duration: 720ms;
+  /* 회전 도중 폭이 바뀌어도 시작한 단면 넘김은 끝까지 같은 축과 폭을 유지한다. */
+  inset-inline: 0;
+  transform-origin: left center;
+}
+
+.singleFace {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: var(--tip-top) var(--tip-top) var(--tip-bottom) var(--tip-bottom);
+  backface-visibility: hidden;
+}
+
+.singleFace > .art {
   flex: none;
 }
 
-.sliceInner > .faceBlank {
-  block-size: 100%;
+.singleFace > .page {
+  flex: 1 1 auto;
+  block-size: auto;
+  overflow: hidden;
 }
 
-/* 1단 종이는 **책등 쪽 모서리도** 둥글다 — 모바일 책은 네 모서리가 다 둥근 카드다. 뒷면은 좌우가 반대다. */
-.leaf[data-single] > .seg > .segFace .slice {
-  border-radius: var(--tip-top) 0 0 var(--tip-bottom);
+.singleBack {
+  transform: rotateY(180deg);
 }
 
-.leaf[data-single] > .seg > .segBack .slice {
-  border-radius: 0 var(--tip-top) var(--tip-bottom) 0;
-}
-
-/* 1단은 비치지 않는다 — 넘어가는 종이 밑으로 도착 쪽 글자가 겹쳐 보여 두 장이 뒤엉켜 보였다. */
-.leaf[data-single] .slice {
-  opacity: 1;
+/* 고정된 종이 음영도 면과 함께 합성한다. 매 프레임 그림자/상속 변수를 다시 계산하지 않는다. */
+.singleFace::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to right, color-mix(in srgb, var(--color-ink) 8%, transparent), transparent 28%);
 }
 
 /*
@@ -800,83 +812,29 @@
   }
 }
 
-/*
- * 1단(모바일) 넘김 — **책등(왼쪽)을 축으로 180° 넘어간다.** 두 방향 모두 왼쪽 축이다(`BookPager` 가 `data-turn="next"` 로 둔다).
- *   - 다음 쪽(`out`): 떠나는 쪽이 들려 왼쪽으로 넘어간다. 밑면은 처음부터 도착 쪽이다.
- *   - 이전 쪽(`in`): `out` 을 **시간만 거꾸로** — 앞 쪽이 왼쪽에서 넘어와 덮는다. 밑면은 덮일 때까지 떠나는 쪽이다.
- * ⭐ 90° 를 **속도가 붙은 채로** 지난다. 예전에는 90° 에서 감속해 멈추며 끝났다 — 가장 느린 순간에 종이가
- *    모서리째 사라져 "뜯겨 나가는" 것처럼 보였다(2026-09-18 지적).
- * ⚠️ 휨 제약은 펼침면과 같다: 58 × curl < |각도| 이고, 90° 를 넘은 뒤에는 58 × curl < 180 − |각도|.
- */
+/* 모바일도 책등을 축으로 온전히 뒤집는다. transform만 보간해 메인 스레드의 스타일 재계산을 피한다. */
 @keyframes leaf-single-out {
-  0% {
-    --turn-angle: 0deg;
-    --curl: 0;
-  }
-  12% {
-    --turn-angle: -8deg;
-    --curl: 0.12;
-  }
-  35% {
-    --turn-angle: -50deg;
-    --curl: 0.5;
-  }
-  55% {
-    --turn-angle: -98deg;
-    --curl: 0.55;
-  }
-  78% {
-    --turn-angle: -150deg;
-    --curl: 0.18;
-  }
-  100% {
-    --turn-angle: -180deg;
-    --curl: 0;
-  }
+  0% { transform: rotateY(0deg); }
+  12% { transform: rotateY(-8deg); }
+  35% { transform: rotateY(-50deg); }
+  55% { transform: rotateY(-98deg); }
+  78% { transform: rotateY(-150deg); }
+  100% { transform: rotateY(-180deg); }
 }
 
 @keyframes leaf-single-in {
-  0% {
-    --turn-angle: -180deg;
-    --curl: 0;
-  }
-  22% {
-    --turn-angle: -150deg;
-    --curl: 0.18;
-  }
-  45% {
-    --turn-angle: -98deg;
-    --curl: 0.55;
-  }
-  65% {
-    --turn-angle: -50deg;
-    --curl: 0.5;
-  }
-  88% {
-    --turn-angle: -8deg;
-    --curl: 0.12;
-  }
-  100% {
-    --turn-angle: 0deg;
-    --curl: 0;
-  }
+  0% { transform: rotateY(-180deg); }
+  22% { transform: rotateY(-150deg); }
+  45% { transform: rotateY(-98deg); }
+  65% { transform: rotateY(-50deg); }
+  88% { transform: rotateY(-8deg); }
+  100% { transform: rotateY(0deg); }
 }
 
-/*
- * 🚫 같은 이름의 `@keyframes` 를 미디어쿼리 안에서 다시 정의하지 않는다 — 재작성기가 둘을
- * 하나로 합치면 어느 쪽이 남는지 알 수 없다. **이름을 따로 주고 여기서 갈아 끼운다.**
- */
-@media (max-width: 47.99rem) {
-  .leaf[data-single] {
-    /* 반 바퀴를 온전히 도니 펼침면 반쪽보다 조금 길게 — 서두르면 다시 휙 날아가 보인다. */
-    animation-duration: 720ms;
-  }
+.leaf.singleLeaf[data-single="next"] {
+  animation-name: leaf-single-out;
+}
 
-  .leaf[data-single="next"] {
-    animation-name: leaf-single-out;
-  }
-
-  .leaf[data-single="prev"] {
-    animation-name: leaf-single-in;
-  }
+.leaf.singleLeaf[data-single="prev"] {
+  animation-name: leaf-single-in;
 }

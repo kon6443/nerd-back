@@ -85,7 +85,7 @@ export function useCharacterChat({
         }
       : "loading",
   );
-  const [role, setRole] = useState(demoCharacters[0]?.role ?? "");
+  const [chosenRole, setRole] = useState(demoCharacters[0]?.role ?? "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
@@ -95,6 +95,12 @@ export function useCharacterChat({
   const mounted = useRef(false);
   const requestVersion = useRef(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // 체험의 등장인물은 첫 렌더 이후에 도착하므로 최신 목록에서 상대를 구한다.
+  const characters = isDemo ? demoCharacters : typeof state === "object" ? state.characters : [];
+  const selected = characters.find((character) => character.role === chosenRole)
+    ?? (isDemo ? characters[0] : undefined);
+  const role = isDemo ? (selected?.role ?? "") : chosenRole;
 
   // 장면(세션 · 쪽 · 분기)이 바뀌면 초안을 다시 읽고 처음 상태로 돌아간다.
   // 🚫 이펙트로 옮기지 않는다 — 한 프레임 동안 옛 장면의 질문이 새 장면에 그려진다.
@@ -274,17 +280,15 @@ export function useCharacterChat({
   }
 
   function updateDraft(nextRole: string, nextMessage: string) {
-    if (!sessionId) return;
+    if (!sessionId && !isDemo) return;
     setRole(nextRole);
     setMessage(nextMessage);
     setError("");
-    drafts.set(sessionId, pageNo, branchKey, { role: nextRole, message: nextMessage });
+    if (sessionId) drafts.set(sessionId, pageNo, branchKey, { role: nextRole, message: nextMessage });
   }
 
   function selectRole(nextRole: string) {
-    setRole(nextRole);
-    setError("");
-    if (sessionId) drafts.set(sessionId, pageNo, branchKey, { role: nextRole, message });
+    updateDraft(nextRole, message);
   }
 
   function recheck() {
@@ -309,14 +313,13 @@ export function useCharacterChat({
     }
   }
 
-  const characters = typeof state === "object" ? state.characters : [];
   const exchange = typeof state === "object" ? state.exchange : null;
 
   return {
     status,
     characters,
     exchange,
-    selected: characters.find((character) => character.role === role),
+    selected,
     remainingMessages: sending ? 0 : typeof state === "object" ? state.remainingMessages : null,
     role,
     message,
