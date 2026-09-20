@@ -6,6 +6,7 @@ import {
   signupSchema,
 } from "@nerd/contracts";
 import { apiFetch, notifySessionChanged } from "./client";
+import { suppressGuestAutoEnter } from "./guestAutoEnter";
 
 /**
  * 인증 호출.
@@ -43,7 +44,7 @@ export function validateLogin(input: unknown): FieldErrors {
 
   // 검증 규칙은 공유 스키마를 따르고, 기본 영문 오류 문구만 화면 언어로 바꾼다.
   const errors = toFieldErrors(result.error.issues);
-  if (errors.loginId) errors.loginId = "아이디를 입력해 주세요.";
+  if (errors.loginId) errors.loginId = "닉네임을 입력해 주세요.";
   if (errors.password) errors.password = "비밀번호를 입력해 주세요.";
   return errors;
 }
@@ -58,6 +59,19 @@ export async function signup(input: SignupInput): Promise<Me> {
   return me;
 }
 
+/**
+ * 입력 없이 임시 닉네임으로 들어간다 (대회 심사·투표 대응).
+ *
+ * ⭐ 보낼 본문이 없다 — **닉네임과 비밀번호를 서버가 만든다.** 돌아오는 것은 가입·로그인과
+ * 완전히 같은 세션 쿠키라, 이후 모든 화면이 게스트를 특별 취급하지 않아도 된다.
+ * ⚠️ 그 비밀번호는 아무도 모른다. 로그아웃하면 이 계정으로 다시 들어올 수 없다.
+ */
+export async function enterAsGuest(): Promise<Me> {
+  const me = await apiFetch<Me>("/auth/guest", { method: "POST" });
+  notifySessionChanged();
+  return me;
+}
+
 export async function login(input: LoginInput): Promise<Me> {
   const me = await apiFetch<Me>("/auth/login", { method: "POST", json: input });
   notifySessionChanged();
@@ -65,6 +79,10 @@ export async function login(input: LoginInput): Promise<Me> {
 }
 
 export async function logout(): Promise<void> {
+  // ⭐ 🚫 이 줄을 빼지 말 것. 자동 게스트 입장이 켜져 있으면 로그아웃 직후 곧바로 새 임시 계정이
+  //    만들어져 **로그아웃이 안 되는 것처럼 보인다**(헤더가 다시 「마이페이지」로 돌아간다).
+  suppressGuestAutoEnter("logged-out");
+
   try {
     await apiFetch<void>("/auth/logout", { method: "POST" });
   } finally {
