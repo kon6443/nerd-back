@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { isReaderPath } from "@/components/story/readerNav";
@@ -108,13 +109,25 @@ export function AppHeader() {
   return (
     <header data-app-header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur-sm">
       <nav aria-label="주요 메뉴" className="flex min-h-[76px] w-full flex-wrap items-center gap-x-3 gap-y-2 px-[var(--layout-gutter)] py-2 sm:flex-nowrap">
-        <Link href="/" className="mr-auto flex min-h-11 min-w-0 items-center gap-2.5 text-lg font-extrabold tracking-tight text-book-cover-strong md:text-xl">
-          <span className="grid size-9 shrink-0 -rotate-6 place-items-center rounded-[5px_10px_10px_5px] border-l-4 border-night bg-primary-strong text-paper shadow-[2px_3px_0_var(--color-paper-edge)]" aria-hidden="true">
-            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M4 5.5c2.7-.7 5.3-.2 8 1.5v12c-2.7-1.7-5.3-2.2-8-1.5zM20 5.5c-2.7-.7-5.3-.2-8 1.5v12c2.7-1.7 5.3-2.2 8-1.5z" />
-            </svg>
-          </span>
-          <span className="truncate">베이비북스</span>
+        <Link href="/" className="mr-auto flex min-h-11 min-w-0 items-center gap-2.5">
+          <Image
+            src="/babybooks-logo.png"
+            alt=""
+            width={1385}
+            height={1136}
+            sizes="52px"
+            loading="eager"
+            className="h-auto w-[52px] shrink-0 mix-blend-multiply"
+          />
+          <Image
+            src="/babybooks-wordmark.png"
+            alt="베이비북스"
+            width={1484}
+            height={578}
+            sizes="(min-width: 768px) 128px, 112px"
+            loading="eager"
+            className="h-auto w-28 shrink-0 mix-blend-multiply md:w-32"
+          />
         </Link>
         <ul className="order-3 flex w-full items-center gap-1 sm:order-none sm:w-auto">
           <CommonNavLinks pathname={pathname} />
