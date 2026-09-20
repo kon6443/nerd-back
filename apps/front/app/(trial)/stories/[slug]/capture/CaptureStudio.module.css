@@ -258,6 +258,20 @@
 .demoPage .presetThumb { width: 48px; height: 48px; flex-shrink: 0; }
 .demoPage .actions { padding: 0; }
 
+/* 카드 전체를 세로 가운데에서 150px 위로 올린다. 낮은 화면에서는 머리가 상단 메뉴에 닿지 않게
+   윗여백 1.5rem 을 남기는 만큼만 올린다(41rem ≈ 카드 높이). */
+.demoPage .studio {
+  position: relative;
+  inset-block-start: max(-150px, calc(1.5rem - (100dvh - var(--app-header-height) - 41rem) / 2));
+}
+
+/* 모바일은 카드가 낮고 상단 메뉴가 두 줄이라 더 적게 올린다(30rem ≈ 카드 높이). */
+@media (max-width: 767px) {
+  .demoPage .studio {
+    inset-block-start: max(-110px, calc(1rem - (100dvh - var(--app-header-height) - 30rem) / 2));
+  }
+}
+
 @media (max-width: 767px) {
   .demoPage > div:last-child { padding-inline: 12px; }
   .demoPage .studio { gap: 12px; padding: 16px; }
