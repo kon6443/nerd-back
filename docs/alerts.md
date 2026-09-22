@@ -11,13 +11,14 @@
 | # | 알림 | 등급 | 중복 억제 | 무엇을 해야 하나 | 코드 위치 |
 |---|---|---|---|---|---|
 | 1 | **OpenRouter 크레딧 부족** | 🔴 critical | 1시간 | **결제.** 자동 복구되지 않는다 | `adapters/openrouter-image.adapter.ts` |
-| 2 | OpenRouter 요청 한도 초과 | 🟠 warning | 10분 | 반복되면 플랜·동시성 조정 | 같은 파일 |
-| 3 | 동화 제작 파이프라인 중단 | 🟠 warning | 5분 | 반복되면 이미지 API·스토리지 확인 | `story-session/story-session.service.ts › markPipelineFailed` |
-| 4 | 잡히지 않은 예외 **(→ 프로세스 종료)** | 🔴 critical | 10분(종류별) | 로그에서 스택 확인 → 코드 수정 | `notification/process-error-notifier.service.ts` |
-| 4b | 처리되지 않은 Promise 거부 (종료 안 함) | 🔴 critical | 10분(종류별) | 같음 | 같은 파일 |
-| 5 | 백엔드 기동 | 🔵 info | 1분(슬롯별) | 없음 — 배포 확인·장애 시점 대조용 | `notification/bootstrap-notifier.service.ts` |
-| 6 | **새 서버 오류** — 이 경로에서 500 이 처음 남 | 🔴 critical | 6시간(경로별) | 로그에서 스택 확인 | `notification/server-error-rate-monitor.service.ts` |
-| 7 | **서버 오류 급증** — 5분에 10건 | 🔴 critical | 창(5분)마다 1회 | 로그에서 경로·원인 확인 | 같은 파일 |
+| 2 | OpenRouter 이미지 접근 거부 | 🟠 warning | 10분 | API 키·Workspace의 모델/공급자 제한·가드레일 확인 | 같은 파일 |
+| 3 | OpenRouter 요청 한도 초과 | 🟠 warning | 10분 | 반복되면 플랜·동시성 조정 | 같은 파일 |
+| 4 | 동화 제작 파이프라인 중단 | 🟠 warning | 5분 | 반복되면 이미지 API·스토리지 확인 | `story-session/story-session.service.ts › markPipelineFailed` |
+| 5 | 잡히지 않은 예외 **(→ 프로세스 종료)** | 🔴 critical | 10분(종류별) | 로그에서 스택 확인 → 코드 수정 | `notification/process-error-notifier.service.ts` |
+| 5b | 처리되지 않은 Promise 거부 (종료 안 함) | 🔴 critical | 10분(종류별) | 같음 | 같은 파일 |
+| 6 | 백엔드 기동 | 🔵 info | 1분(슬롯별) | 없음 — 배포 확인·장애 시점 대조용 | `notification/bootstrap-notifier.service.ts` |
+| 7 | **새 서버 오류** — 이 경로에서 500 이 처음 남 | 🔴 critical | 6시간(경로별) | 로그에서 스택 확인 | `notification/server-error-rate-monitor.service.ts` |
+| 8 | **서버 오류 급증** — 5분에 10건 | 🔴 critical | 창(5분)마다 1회 | 로그에서 경로·원인 확인 | 같은 파일 |
 
 **등급이 곧 행동 시급도다.** 🔴 는 지금 봐야 하고, 🟠 는 반복되면 봐야 하고, 🔵 는 나중에 대조할 때 쓴다.
 

@@ -297,6 +297,26 @@ describe('OpenRouterImageAdapter', () => {
     );
   });
 
+  it('403 이미지 접근 거부면 설정 조치용 경고를 알린다', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: jest.fn().mockResolvedValue({ error: { message: 'Model access denied' } }),
+    });
+
+    await adapter
+      .generateReference({ front: Buffer.from('front-bytes') })
+      .catch(() => undefined);
+
+    expect(notifications.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warning',
+        dedupeKey: 'openrouter:image-access-denied',
+        context: expect.objectContaining({ 상태코드: 403 }),
+      }),
+    );
+  });
+
   // ⭐ 알림은 외부 채널로 나간다. provider 원문이 섞이면 응답 본문 유출과 같은 문제가 된다.
   it('알림 본문에 provider 오류 원문을 담지 않는다 ⭐', async () => {
     global.fetch = jest.fn().mockResolvedValue({
@@ -312,6 +332,22 @@ describe('OpenRouterImageAdapter', () => {
     const sent = JSON.stringify(notifications.notify.mock.calls[0][0]);
     expect(sent).not.toContain('Insufficient credits');
     expect(sent).not.toContain('org-xyz');
+  });
+
+  it('403 알림에도 provider 오류 원문을 담지 않는다', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: jest.fn().mockResolvedValue({ error: { message: 'workspace-secret-policy-name' } }),
+    });
+
+    await adapter
+      .generateReference({ front: Buffer.from('front-bytes') })
+      .catch(() => undefined);
+
+    expect(JSON.stringify(notifications.notify.mock.calls[0][0])).not.toContain(
+      'workspace-secret-policy-name',
+    );
   });
 
   it('성공하면 알림을 보내지 않는다', async () => {
