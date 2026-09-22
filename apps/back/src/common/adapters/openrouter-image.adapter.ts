@@ -382,6 +382,19 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
           // 1시간. 충전 전까지 계속 실패하므로 짧게 두면 채널이 같은 알림으로 덮인다.
           dedupeTtlSeconds: 3600,
         });
+      } else if (response.status === 403) {
+        // 모델·공급자 allowlist, 예산 가드레일, 콘텐츠 필터처럼 사람의 설정 변경이 필요한
+        // 차단이다. provider 본문은 민감 정보일 수 있으므로 외부 알림에 싣지 않는다.
+        this.logger.error('OpenRouter 이미지 접근 거부 (403) — 키·워크스페이스 가드레일을 확인해야 한다');
+        this.notifications.notify({
+          severity: 'warning',
+          title: 'OpenRouter 이미지 접근 거부',
+          summary:
+            '이미지 생성 요청이 403으로 거부됐습니다. API 키·워크스페이스의 모델/공급자 제한과 가드레일을 확인하세요.',
+          context: { 상태코드: response.status, 작업: params.actionName },
+          dedupeKey: 'openrouter:image-access-denied',
+          dedupeTtlSeconds: 600,
+        });
       } else if (response.status === 429) {
         this.logger.error('OpenRouter 요청 속도 한도 초과 (429)');
         this.notifications.notify({

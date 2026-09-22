@@ -823,6 +823,111 @@ describe('StorySessionService', () => {
     });
   });
 
+  describe('executeSinglePagePersonalization', () => {
+    it('referenceImageKey 없이 sourcePhotoKey만 있는 실사 세션도 재시도해 성공으로 저장한다', async () => {
+      const sourcePhotoKey = 'temp/source-photo/session-direct/photo.jpg';
+      const session = {
+        id: 'session-direct',
+        templateId: 10,
+        status: 'generating',
+        sourcePhotoKey,
+        referenceImageKey: null,
+      } as unknown as StorySession;
+      const pageImg = {
+        id: 'page-image-1',
+        sessionId: session.id,
+        pageNo: 1,
+        branchKey: 'common',
+        status: 'running',
+        imageKey: null,
+        errorMessage: 'OpenRouter 요청 실패',
+      } as unknown as SessionPageImage;
+
+      sessionRepo.findOne.mockResolvedValue(session);
+      pageRepo.findOne.mockResolvedValue({
+        templateId: 10,
+        pageNo: 1,
+        branchKey: 'common',
+        baseImageKey: null,
+        illustrationPrompt: '빨간 망토를 입은 아이',
+      } as unknown as StoryPage);
+      pageImageRepo.findOne.mockResolvedValue(pageImg);
+      pageImageRepo.save.mockImplementation(async (entity) => entity as SessionPageImage);
+      pageRepo.find.mockResolvedValue([
+        { templateId: 10, pageNo: 1, branchKey: 'common' } as StoryPage,
+      ]);
+      pageImageRepo.find.mockResolvedValue([pageImg]);
+
+      await service.executeSinglePagePersonalization(session.id, 1);
+
+      expect(mockStoragePort.download).toHaveBeenCalledWith(sourcePhotoKey);
+      expect(mockImagePort.generatePageIllustration).toHaveBeenCalledWith(
+        expect.objectContaining({ referenceImage: Buffer.from('mock-downloaded-bytes') }),
+      );
+      expect(pageImg.status).toBe('succeeded');
+      expect(pageImg.errorMessage).toBeNull();
+      expect(pageImageRepo.save).toHaveBeenCalledWith(pageImg);
+    });
+
+    it('sourcePhotoKey와 referenceImageKey가 모두 없으면 외부 호출 없이 안전하게 끝낸다', async () => {
+      sessionRepo.findOne.mockResolvedValue({
+        id: 'session-without-face',
+        templateId: 10,
+        sourcePhotoKey: null,
+        referenceImageKey: null,
+      } as unknown as StorySession);
+
+      await service.executeSinglePagePersonalization('session-without-face', 1);
+
+      expect(pageRepo.findOne).not.toHaveBeenCalled();
+      expect(pageImageRepo.createQueryBuilder).not.toHaveBeenCalled();
+      expect(mockStoragePort.download).not.toHaveBeenCalled();
+      expect(mockImagePort.generatePageIllustration).not.toHaveBeenCalled();
+      expect(pageImageRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('실사 원본 사진을 내려받지 못하면 페이지를 failed로 저장한다', async () => {
+      const session = {
+        id: 'session-source-download-failed',
+        templateId: 10,
+        sourcePhotoKey: 'temp/source-photo/session-source-download-failed/photo.jpg',
+        referenceImageKey: null,
+      } as unknown as StorySession;
+      const pageImg = {
+        id: 'page-image-source-download-failed',
+        sessionId: session.id,
+        pageNo: 1,
+        branchKey: 'common',
+        status: 'running',
+        imageKey: null,
+        errorMessage: null,
+      } as unknown as SessionPageImage;
+
+      sessionRepo.findOne.mockResolvedValue(session);
+      pageRepo.findOne.mockResolvedValue({
+        templateId: 10,
+        pageNo: 1,
+        branchKey: 'common',
+        baseImageKey: null,
+      } as unknown as StoryPage);
+      pageImageRepo.findOne.mockResolvedValue(pageImg);
+      pageImageRepo.save.mockImplementation(async (entity) => entity as SessionPageImage);
+      pageRepo.find.mockResolvedValue([
+        { templateId: 10, pageNo: 1, branchKey: 'common' } as StoryPage,
+      ]);
+      pageImageRepo.find.mockResolvedValue([pageImg]);
+      mockStoragePort.download.mockRejectedValue(new Error('source photo unavailable'));
+
+      await service.executeSinglePagePersonalization(session.id, 1);
+
+      expect(mockImagePort.generatePageIllustration).not.toHaveBeenCalled();
+      expect(pageImg.status).toBe('failed');
+      expect(pageImg.errorMessage).toBe('그림을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+      expect(pageImg.errorMessage).not.toContain('source photo unavailable');
+      expect(pageImageRepo.save).toHaveBeenCalledWith(pageImg);
+    });
+  });
+
   // E1 회귀 방지: 레플리카 3개에서 같은 페이지가 두 번 생성되면 유료 API 가 중복 호출된다.
   // 판정은 인메모리가 아니라 `claimPage` 의 조건부 UPDATE(= affected 행 수)가 한다.
   describe('executePersonalizationPipeline — 레플리카 간 중복 생성 방지', () => {

@@ -65,6 +65,8 @@ const STALE_RUNNING_MS = 10 * 60 * 1000;
  *    `errorMessage` 로 사용자 브라우저까지 나간다.
  */
 const PIPELINE_ABORTED_MESSAGE = '만들기가 중단됐어요. 다시 시도해 주세요.';
+/** 개별 페이지 실패 사유. 사용자에게 노출되므로 내부 오류 원문을 저장하지 않는다. */
+const PAGE_IMAGE_FAILURE_MESSAGE = '그림을 만들지 못했어요. 잠시 후 다시 시도해 주세요.';
 
 @Injectable()
 export class StorySessionService implements OnModuleInit {
@@ -898,7 +900,7 @@ export class StorySessionService implements OnModuleInit {
             } catch (err: unknown) {
               const msg = err instanceof Error ? err.message : String(err);
               pageImg.status = 'failed';
-              pageImg.errorMessage = msg;
+              pageImg.errorMessage = PAGE_IMAGE_FAILURE_MESSAGE;
               await this.pageImageRepo.save(pageImg);
               this.logger.error(`페이지 ${tplPage.pageNo} 삽화 개인화 실패: ${msg}`);
             }
@@ -958,7 +960,15 @@ export class StorySessionService implements OnModuleInit {
   ): Promise<void> {
     try {
       const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
-      if (!session || !session.referenceImageKey) return;
+      if (!session) return;
+
+      // 실사 단일 모드(sourcePhotoKey)를 쓰는 새 세션도 재시도할 수 있어야 한다.
+      // 얼굴 키가 전혀 없을 때는 페이지 claim이나 외부 이미지 호출 없이 안전하게 끝낸다.
+      const faceKey = session.sourcePhotoKey || session.referenceImageKey;
+      if (!faceKey) {
+        this.logger.error(`단일 페이지 재시도 중단: 세션(${sessionId}) 레퍼런스/실사 이미지 부재`);
+        return;
+      }
 
       const tplPage = await this.pageRepo.findOne({
         where: { templateId: session.templateId, pageNo, branchKey },
@@ -977,15 +987,10 @@ export class StorySessionService implements OnModuleInit {
       });
       if (!pageImg) return;
 
-      // 명세 확정: 실사 단일 모드(sourcePhotoKey) 우선 적용, 레거시 세션은 referenceImageKey 폴백
-      const faceKey = session.sourcePhotoKey || session.referenceImageKey;
-      if (!faceKey) {
-        this.logger.error(`단일 페이지 재시도 중단: 세션(${sessionId}) 레퍼런스/실사 이미지 부재`);
-        return;
-      }
-
-      const refBuffer = await this.storagePort.download(faceKey);
       try {
+        // 이 다운로드도 재시도 작업의 일부다. try 밖에 두면 실패 시 페이지가 running 에
+        // 남아 stale 회수 전까지 다시 시도할 수 없게 된다.
+        const refBuffer = await this.storagePort.download(faceKey);
         let baseImageBuffer: Buffer | undefined;
         if (tplPage.baseImageKey) {
           try {
@@ -1022,7 +1027,7 @@ export class StorySessionService implements OnModuleInit {
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         pageImg.status = 'failed';
-        pageImg.errorMessage = msg;
+        pageImg.errorMessage = PAGE_IMAGE_FAILURE_MESSAGE;
         await this.pageImageRepo.save(pageImg);
         this.logger.error(`단일 페이지 ${pageNo} 재시도 실패: ${msg}`);
       }
