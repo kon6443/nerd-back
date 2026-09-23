@@ -1055,5 +1055,36 @@ describe('StorySessionService', () => {
       expect(sessionRepo.save).toHaveBeenCalledWith(sessionWithSource);
       expect(mockCleanupService.cleanupKey).toHaveBeenCalledWith('temp/source-photo/session-1/photo.jpg');
     });
+
+    it('다수의 페이지가 주어졌을 때 슬라이딩 윈도우 풀로 동시성 한도를 넘지 않고 전체를 생성한다 ⭐', async () => {
+      const pages = [
+        createStoryPage({ templateId: 10, pageNo: 1, branchKey: 'common', baseImageKey: null }),
+        createStoryPage({ templateId: 10, pageNo: 2, branchKey: 'common', baseImageKey: null }),
+        createStoryPage({ templateId: 10, pageNo: 3, branchKey: 'common', baseImageKey: null }),
+        createStoryPage({ templateId: 10, pageNo: 4, branchKey: 'common', baseImageKey: null }),
+        createStoryPage({ templateId: 10, pageNo: 5, branchKey: 'common', baseImageKey: null }),
+      ];
+      pageRepo.find.mockResolvedValue(pages);
+      pageImageRepo.createQueryBuilder.mockReturnValue(mockUpdateQueryBuilder(1));
+
+      let activeCount = 0;
+      let maxActiveCount = 0;
+
+      mockImagePort.generatePageIllustration.mockImplementation(async () => {
+        activeCount++;
+        if (activeCount > maxActiveCount) {
+          maxActiveCount = activeCount;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 15));
+        activeCount--;
+        return Buffer.from('mock-png');
+      });
+
+      await service.executePersonalizationPipeline('session-1');
+
+      expect(mockImagePort.generatePageIllustration).toHaveBeenCalledTimes(5);
+      // PIPELINE_CONCURRENCY = 3 이하로만 동시 실행되었는지 증명
+      expect(maxActiveCount).toBeLessThanOrEqual(3);
+    });
   });
 });

@@ -60,6 +60,12 @@ import type {
 export const STALE_RUNNING_MS = 3 * 60 * 1000;
 
 /**
+ * 개인화 파이프라인 동시 생성 슬롯 수 (슬라이딩 윈도우 풀 크기).
+ * 업스트림 동시성 한도(5개)를 초과하지 않고 슬롯 유휴 시간을 최소화한다.
+ */
+export const PIPELINE_CONCURRENCY = 3;
+
+/**
  * 파이프라인이 통째로 중단됐을 때 남는 페이지 실패 사유.
  *
  * 🚫 내부 예외 메시지를 담지 않는다 — 이 값은 `GET /sessions/:id/pages` 응답의
@@ -844,70 +850,75 @@ export class StorySessionService implements OnModuleInit {
       });
 
       // Qwen Image 3 요청 하나는 템플릿+인물 레퍼런스 2장만 사용한다.
-      // 업스트림 동시성 슬롯(최대 5개)을 넘지 않도록, 최대 4개 요청만 함께 실행한다.
-      const CHUNK_SIZE = 4;
-      for (let i = 0; i < templatePages.length; i += CHUNK_SIZE) {
-        const chunk = templatePages.slice(i, i + CHUNK_SIZE);
-        await Promise.all(
-          chunk.map(async (tplPage) => {
-            // 이 페이지를 내가 처리해도 되는지 DB 에 원자적으로 묻는다.
-            // 남이 집었거나 이미 끝났으면 조용히 건너뛴다.
-            const claimed = await this.claimPage(sessionId, tplPage.pageNo, tplPage.branchKey);
-            if (!claimed) return;
+      // 배치 청크(Head-of-Line Blocking) 대신 슬라이딩 윈도우 워커 풀을 사용한다:
+      // 먼저 끝난 슬롯이 생기면 대기 중인 다음 페이지를 즉시 투입하여 전체 생성 시간을 대폭 단축한다.
+      const queue = [...templatePages];
+      const workerCount = Math.min(PIPELINE_CONCURRENCY, queue.length);
 
-            const pageImg = await this.pageImageRepo.findOne({
-              where: { sessionId, pageNo: tplPage.pageNo, branchKey: tplPage.branchKey },
-            });
-            if (!pageImg) return;
+      const workers = Array.from({ length: workerCount }, async () => {
+        while (queue.length > 0) {
+          const tplPage = queue.shift();
+          if (!tplPage) break;
 
-            try {
-              // 템플릿 기본 삽화가 등록되어 있으면 참조용으로 주입
-              let baseImageBuffer: Buffer | undefined;
-              if (tplPage.baseImageKey) {
-                try {
-                  baseImageBuffer = await this.storagePort.download(tplPage.baseImageKey);
-                } catch {
-                  // 생성은 계속하되 **조용히 넘기지 않는다.** 템플릿이 없으면 어댑터가
-                  // 텍스트만으로 그려(`openrouter-image.adapter.ts` 의 baseImage 없는 분기)
-                  // **구도가 전혀 다른 그림**이 나오는데, 상태는 `succeeded` 로 남아
-                  // 아무도 알아채지 못한다. 키를 옮길 때(예: png → webp) 실수가 여기로 떨어진다.
-                  if (this.templateMissLog.consume(Date.now()).log) {
-                    this.logger.warn(
-                      `템플릿 삽화를 받지 못해 참조 없이 생성한다 — 키: ${tplPage.baseImageKey}`,
-                    );
-                  }
+          // 이 페이지를 내가 처리해도 되는지 DB 에 원자적으로 묻는다.
+          // 남이 집었거나 이미 끝났으면 조용히 건너뛴다.
+          const claimed = await this.claimPage(sessionId, tplPage.pageNo, tplPage.branchKey);
+          if (!claimed) continue;
+
+          const pageImg = await this.pageImageRepo.findOne({
+            where: { sessionId, pageNo: tplPage.pageNo, branchKey: tplPage.branchKey },
+          });
+          if (!pageImg) continue;
+
+          try {
+            // 템플릿 기본 삽화가 등록되어 있으면 참조용으로 주입
+            let baseImageBuffer: Buffer | undefined;
+            if (tplPage.baseImageKey) {
+              try {
+                baseImageBuffer = await this.storagePort.download(tplPage.baseImageKey);
+              } catch {
+                // 생성은 계속하되 **조용히 넘기지 않는다.** 템플릿이 없으면 어댑터가
+                // 텍스트만으로 그려(`openrouter-image.adapter.ts` 의 baseImage 없는 분기)
+                // **구도가 전혀 다른 그림**이 나오는데, 상태는 `succeeded` 로 남아
+                // 아무도 알아채지 못한다. 키를 옮길 때(예: png → webp) 실수가 여기로 떨어진다.
+                if (this.templateMissLog.consume(Date.now()).log) {
+                  this.logger.warn(
+                    `템플릿 삽화를 받지 못해 참조 없이 생성한다 — 키: ${tplPage.baseImageKey}`,
+                  );
                 }
               }
-
-              const characterCostume = this.getCostumePrompt(tplPage.personaTargetRole);
-
-              const generatedBuffer = await this.imagePort.generatePageIllustration({
-                referenceImage: refBuffer,
-                baseImage: baseImageBuffer,
-                prompt: tplPage.illustrationPrompt || tplPage.bodyText,
-                characterPrompt: characterCostume,
-              });
-
-              const { buffer: uploadBuffer, mimeType: uploadMime, ext } =
-                await this.convertToWebp(generatedBuffer);
-              const key = `personalizations/${sessionId}/${tplPage.branchKey}/page-${tplPage.pageNo}-${randomUUID()}.${ext}`;
-              const s3Key = await this.storagePort.upload(key, uploadBuffer, uploadMime);
-
-              pageImg.imageKey = s3Key;
-              pageImg.status = 'succeeded';
-              pageImg.errorMessage = null;
-              await this.pageImageRepo.save(pageImg);
-              this.logger.log(`페이지 ${tplPage.pageNo} 삽화 개인화 완료: ${s3Key}`);
-            } catch (err: unknown) {
-              const msg = err instanceof Error ? err.message : String(err);
-              pageImg.status = 'failed';
-              pageImg.errorMessage = PAGE_IMAGE_FAILURE_MESSAGE;
-              await this.pageImageRepo.save(pageImg);
-              this.logger.error(`페이지 ${tplPage.pageNo} 삽화 개인화 실패: ${msg}`);
             }
-          }),
-        );
-      }
+
+            const characterCostume = this.getCostumePrompt(tplPage.personaTargetRole);
+
+            const generatedBuffer = await this.imagePort.generatePageIllustration({
+              referenceImage: refBuffer,
+              baseImage: baseImageBuffer,
+              prompt: tplPage.illustrationPrompt || tplPage.bodyText,
+              characterPrompt: characterCostume,
+            });
+
+            const { buffer: uploadBuffer, mimeType: uploadMime, ext } =
+              await this.convertToWebp(generatedBuffer);
+            const key = `personalizations/${sessionId}/${tplPage.branchKey}/page-${tplPage.pageNo}-${randomUUID()}.${ext}`;
+            const s3Key = await this.storagePort.upload(key, uploadBuffer, uploadMime);
+
+            pageImg.imageKey = s3Key;
+            pageImg.status = 'succeeded';
+            pageImg.errorMessage = null;
+            await this.pageImageRepo.save(pageImg);
+            this.logger.log(`페이지 ${tplPage.pageNo} 삽화 개인화 완료: ${s3Key}`);
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            pageImg.status = 'failed';
+            pageImg.errorMessage = PAGE_IMAGE_FAILURE_MESSAGE;
+            await this.pageImageRepo.save(pageImg);
+            this.logger.error(`페이지 ${tplPage.pageNo} 삽화 개인화 실패: ${msg}`);
+          }
+        }
+      });
+
+      await Promise.all(workers);
 
       await this.checkAndUpdateSessionCompletion(session.id);
     } catch (error: unknown) {
