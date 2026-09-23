@@ -61,9 +61,9 @@ export const STALE_RUNNING_MS = 3 * 60 * 1000;
 
 /**
  * 개인화 파이프라인 동시 생성 슬롯 수 (슬라이딩 윈도우 풀 크기).
- * 업스트림 동시성 한도(5개)를 초과하지 않고 슬롯 유휴 시간을 최소화한다.
+ * 처음에 1, 2, 3, 4쪽이 동시에 시작되고, 하나가 완료되는 즉시 대기 중인 다음 페이지가 투입된다.
  */
-export const PIPELINE_CONCURRENCY = 3;
+export const PIPELINE_CONCURRENCY = 4;
 
 /**
  * 파이프라인이 통째로 중단됐을 때 남는 페이지 실패 사유.
