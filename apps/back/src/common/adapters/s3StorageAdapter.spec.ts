@@ -56,6 +56,7 @@ describe('S3StorageAdapter', () => {
     expect(key).toBe('test/personalizations/session-1/page-1.webp');
     expect(send).toHaveBeenCalledTimes(1);
     const command = send.mock.calls[0][0];
+    const options = send.mock.calls[0][1];
     expect(command).toBeInstanceOf(PutObjectCommand);
     expect((command as PutObjectCommand).input).toEqual({
       Bucket: 'test-bucket',
@@ -64,5 +65,43 @@ describe('S3StorageAdapter', () => {
       ContentType: 'image/webp',
       CacheControl: 'private, max-age=86400, no-transform',
     });
+    expect(options).toMatchObject({
+      abortSignal: expect.any(AbortSignal),
+    });
+  });
+
+  it('다운로드 및 삭제 요청에 AbortSignal 타임아웃을 전달한다', async () => {
+    const send = jest
+      .spyOn(S3Client.prototype, 'send')
+      .mockResolvedValueOnce({
+        Body: {
+          transformToByteArray: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+        },
+      } as never)
+      .mockResolvedValueOnce({} as never);
+
+    const configService = {
+      get: jest.fn((key: string) => {
+        const values: Record<string, string> = {
+          S3_REGION: 'ap-northeast-2',
+          S3_BUCKET_NAME: 'test-bucket',
+        };
+        return values[key];
+      }),
+    } as unknown as ConfigService;
+    const adapter = new S3StorageAdapter(configService);
+
+    const downloaded = await adapter.download('test-key');
+    expect(downloaded).toEqual(Buffer.from([1, 2, 3]));
+    expect(send).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ abortSignal: expect.any(AbortSignal) }),
+    );
+
+    await adapter.delete('test-key');
+    expect(send).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ abortSignal: expect.any(AbortSignal) }),
+    );
   });
 });

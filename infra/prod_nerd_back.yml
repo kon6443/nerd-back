@@ -59,7 +59,7 @@ services:
 
       resources:
         limits:
-          memory: 640M
+          memory: 1G
         reservations:
           memory: 192M
 

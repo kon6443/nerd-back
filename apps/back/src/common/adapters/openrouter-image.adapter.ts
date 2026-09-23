@@ -13,7 +13,7 @@ import type {
  * ⚠️ 채팅·TTS(각 30초)보다 **의도적으로 길다** — 이미지 한 장에 1분 이상 걸리는 것이 정상이다
  * (`apps/front/lib/api/client.ts` 의 dev 프록시 우회 주석 참조). 30초로 맞추면 정상 요청을 죽인다.
  *
- * 🚫 `STALE_RUNNING_MS`(10분, `story-session.service.ts`) 보다 **확실히 작아야 한다** —
+ * 🚫 `STALE_RUNNING_MS`(3분, `story-session.service.ts`) 보다 **확실히 작아야 한다** —
  *    길면 claim 회수가 먼저 돌아 같은 페이지를 두 번 생성한다(유료 호출 2배).
  *    청크(최대 4장)가 순차로 도므로 최악 소요는 `청크 수 × 이 값`이다.
  */

@@ -779,8 +779,8 @@ describe('StorySessionService', () => {
         sessionId: 'session-123',
         pageNo: 1,
         status: 'running',
-        // 11분 전 — STALE_RUNNING_MS(10분)를 넘겨 고아로 판정된다.
-        updatedAt: new Date(Date.now() - 11 * 60 * 1000),
+        // 4분 전 — STALE_RUNNING_MS(3분)를 넘겨 고아로 판정된다.
+        updatedAt: new Date(Date.now() - 4 * 60 * 1000),
         errorMessage: null,
       } as SessionPageImage;
 

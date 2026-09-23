@@ -9,6 +9,9 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { StoragePort } from '../port/storage.port';
 
+/** S3 I/O 요청 타임아웃 (30초) — 소켓 행(hang)과 무한 대기를 방지한다. */
+export const S3_TIMEOUT_MS = 30_000;
+
 @Injectable()
 export class S3StorageAdapter implements StoragePort {
   private readonly logger = new Logger(S3StorageAdapter.name);
@@ -44,6 +47,7 @@ export class S3StorageAdapter implements StoragePort {
         ContentType: mimeType,
         CacheControl: 'private, max-age=86400, no-transform',
       }),
+      { abortSignal: AbortSignal.timeout(S3_TIMEOUT_MS) },
     );
 
     this.logger.log(`S3 객체 업로드 완료: ${fullKey}`);
@@ -77,7 +81,9 @@ export class S3StorageAdapter implements StoragePort {
       Bucket: this.bucketName,
       Key: key,
     });
-    const response = await this.s3Client.send(command);
+    const response = await this.s3Client.send(command, {
+      abortSignal: AbortSignal.timeout(S3_TIMEOUT_MS),
+    });
     const byteArray = await response.Body?.transformToByteArray();
     return Buffer.from(byteArray ?? []);
   }
@@ -88,6 +94,7 @@ export class S3StorageAdapter implements StoragePort {
         Bucket: this.bucketName,
         Key: key,
       }),
+      { abortSignal: AbortSignal.timeout(S3_TIMEOUT_MS) },
     );
     this.logger.log(`S3 객체 삭제 완료: ${key}`);
   }
