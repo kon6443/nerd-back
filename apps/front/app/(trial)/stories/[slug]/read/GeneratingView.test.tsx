@@ -69,4 +69,25 @@ describe("loading progress", () => {
     expect(ready).toContain('aria-valuenow="100"');
     expect(ready).toContain("동화 읽으러 가기");
   });
+
+  it("exposes retry action when a running page is stale (over 3 minutes)", () => {
+    const staleTime = new Date(Date.now() - 4 * 60 * 1000).toISOString();
+    const sessionPagesWithStale: SessionPagesResponse = {
+      ...pages,
+      pages: [
+        {
+          pageNo: 1,
+          branchKey: "common",
+          status: "running",
+          imageUrl: null,
+          errorMessage: null,
+          updatedAt: staleTime,
+        },
+      ],
+    };
+    const html = render({ sessionPages: sessionPagesWithStale });
+    expect(html).toContain("지연됨 · 다시 만들기");
+    expect(html).toContain("일부 장면이 오래 걸리고 있어요");
+    expect(html).toContain("다시 만들기 1장");
+  });
 });

@@ -1,11 +1,23 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import type { SessionPagesResponse, StoryBranchKey } from "@nerd/contracts";
 import { actionClass } from "@/components/ui/actionStyles";
 import { StoryJourneyScene } from "@/components/story/StoryJourneyScene/StoryJourneyScene";
 import styles from "./GeneratingView.module.css";
+
+export const STALE_RUNNING_THRESHOLD_MS = 180_000; // 3분
+
+export function isStaleRunning(
+  item: { status: string; updatedAt?: string },
+  now: number,
+): boolean {
+  if (item.status !== "running" || !item.updatedAt) return false;
+  const updated = new Date(item.updatedAt).getTime();
+  if (Number.isNaN(updated)) return false;
+  return now - updated >= STALE_RUNNING_THRESHOLD_MS;
+}
 
 export function GeneratingView({
   slug,
@@ -31,6 +43,13 @@ export function GeneratingView({
   isDemo?: boolean;
 }) {
   const [motionPaused, setMotionPaused] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 10_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const titleId = useId();
   const total = sessionPages?.totalPages ?? 0;
   const completed = Math.min(total, Math.max(0, sessionPages?.completedPages ?? 0));
@@ -43,13 +62,13 @@ export function GeneratingView({
     : progressPercent === 100 ? "동화 준비 완료" : isDemo ? "체험 동화 준비 중" : "동화를 만들고 있어요";
   const progressDescription = isDemo && !ready ? "첫 장을 불러오고 있어요"
     : progressPercent === undefined ? "진행 상황 확인 중" : `${total}장 중 ${completed}장 완성`;
-  const failedCount = generationPages.filter(item => item.status === "failed").length;
+  const failedCount = generationPages.filter(item => item.status === "failed" || isStaleRunning(item, now)).length;
   const title = hasFailed ? "이야기를 만들다 잠깐 멈췄어요" : ready ? "이야기 속으로 떠나볼까요?" : "동화나라로 떠나는 중이에요";
   const description = hasFailed
     ? failedCount > 0 ? "괜찮아요. 아래에서 멈춘 장면을 다시 만들 수 있어요." : "잠시 후 다시 확인하거나 동화 소개로 돌아가 주세요."
     : ready
       ? allCompleted ? "준비가 끝났어요. 이제 책을 펼쳐 보세요." : "앞쪽 이야기가 완성됐어요. 먼저 읽어볼 수 있어요."
-      : isDemo ? "동화를 준비하는 동안, 작은 모험을 함께 떠나요." : "한 장, 한 장. 동화 속에 너의 자리를 만들고 있어요.";
+      : isDemo ? "동화를 준비하는 동안, 작은 모험을 함께 떠나요." : failedCount > 0 ? "일부 장면이 오래 걸리고 있어요. 아래 현황에서 다시 만들 수 있어요." : "한 장, 한 장. 동화 속에 너의 자리를 만들고 있어요.";
 
   return (
     <main className={styles.journeyScreen} aria-labelledby={titleId}>
@@ -95,21 +114,23 @@ export function GeneratingView({
             <p className={styles.connectionNotice} role="status">연결이 잠깐 느려요. 진행 상황을 다시 확인하고 있어요.</p>
           )}
           {!isDemo && generationPages.length > 0 && (
-            <details className={styles.details} key={hasFailed ? "failed" : "progress"} open={hasFailed || undefined}>
+            <details className={styles.details} key={hasFailed ? "failed" : "progress"} open={hasFailed || failedCount > 0 || undefined}>
               <summary>만들기 현황 보기{failedCount > 0 && ` · 다시 만들기 ${failedCount}장`}</summary>
               <ul className={styles.pageList}>
                 {generationPages.map(item => {
                   const isBehind = item.branchKey !== "common";
                   const retrying = retryingPageNo === item.pageNo || (isBehind && isSelectingBranch === item.branchKey);
+                  const stale = isStaleRunning(item, now);
+                  const retryable = item.status === "failed" || stale;
                   return (
                     <li key={`${item.branchKey}-${item.pageNo}`}>
                       <span>{isBehind ? `비하인드 ${item.branchKey.toUpperCase()}` : `${item.pageNo}쪽`}</span>
-                      {item.status === "failed" ? (
+                      {retryable ? (
                         <button type="button" disabled={retryingPageNo !== null || isSelectingBranch !== null}
                           aria-label={`${isBehind ? `비하인드 ${item.branchKey.toUpperCase()}` : `${item.pageNo}쪽`} 다시 만들기`}
                           className={actionClass("secondary", styles.retryButton, "compact")}
                           onClick={() => void (isBehind ? handleAfterStoryRetry(item.branchKey as StoryBranchKey) : handleRetry(item.pageNo))}>
-                          {retrying ? "다시 만드는 중" : "다시 만들기"}
+                          {retrying ? "다시 만드는 중" : stale && item.status !== "failed" ? "지연됨 · 다시 만들기" : "다시 만들기"}
                         </button>
                       ) : (
                         <span className={item.status === "succeeded" ? styles.complete : styles.pending}>
