@@ -19,7 +19,9 @@ describe('OpenRouterImageAdapter', () => {
     } as unknown as ConfigService;
 
     notifications = { notify: jest.fn() };
-    adapter = new OpenRouterImageAdapter(configService, notifications as NotificationPort);
+    adapter = new OpenRouterImageAdapter(configService, notifications as NotificationPort, {
+      initialDelayMs: 0,
+    });
   });
 
   afterEach(() => {
@@ -541,5 +543,104 @@ describe('OpenRouterImageAdapter', () => {
     await expect(
       adapter.generateReference({ front: Buffer.from('front-bytes') }),
     ).rejects.toThrow('그림 만들기가 오래 걸려 중단했어요. 다시 시도해 주세요.');
+  });
+
+  describe('외부 API 일시적 오류 자동 재시도 ⭐', () => {
+    it('429 속도 한도 초과 발생 시 재시도하여 다음 시도에서 성공하면 정상 버퍼를 반환한다', async () => {
+      const mockSuccessBase64 = Buffer.from('retry-success-png').toString('base64');
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          headers: new Headers({ 'retry-after': '1' }),
+          json: jest.fn().mockResolvedValue({ error: { message: 'Rate limited' } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            data: [{ b64_json: mockSuccessBase64, media_type: 'image/png' }],
+            usage: { cost: 0.035 },
+          }),
+        });
+
+      const result = await adapter.generateReference({ front: Buffer.from('front-bytes') });
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(result.toString('utf-8')).toBe('retry-success-png');
+      expect(notifications.notify).not.toHaveBeenCalled();
+    });
+
+    it('502 서버 오류 발생 시 재시도하여 다음 시도에서 성공하면 정상 버퍼를 반환한다', async () => {
+      const mockSuccessBase64 = Buffer.from('server-error-recovered').toString('base64');
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 502,
+          json: jest.fn().mockResolvedValue({ error: { message: 'Bad Gateway' } }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            data: [{ b64_json: mockSuccessBase64, media_type: 'image/png' }],
+            usage: { cost: 0.035 },
+          }),
+        });
+
+      const result = await adapter.generateReference({ front: Buffer.from('front-bytes') });
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(result.toString('utf-8')).toBe('server-error-recovered');
+    });
+
+    it('네트워크 연결 실패(TypeError) 시 재시도하여 다음 시도에서 성공하면 정상 버퍼를 반환한다', async () => {
+      const mockSuccessBase64 = Buffer.from('network-recovered').toString('base64');
+      global.fetch = jest
+        .fn()
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: jest.fn().mockResolvedValue({
+            data: [{ b64_json: mockSuccessBase64, media_type: 'image/png' }],
+            usage: { cost: 0.035 },
+          }),
+        });
+
+      const result = await adapter.generateReference({ front: Buffer.from('front-bytes') });
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(result.toString('utf-8')).toBe('network-recovered');
+    });
+
+    it('402 크레딧 부족 시에는 재시도 없이 1회만에 즉시 종료한다', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 402,
+        json: jest.fn().mockResolvedValue({ error: { message: 'Insufficient credits' } }),
+      });
+
+      await expect(
+        adapter.generateReference({ front: Buffer.from('front-bytes') }),
+      ).rejects.toThrow('그림을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(notifications.notify).toHaveBeenCalledTimes(1);
+    });
+
+    it('120초 타임아웃 발생 시에는 재시도 없이 1회만에 즉시 종료한다', async () => {
+      const timeoutError = new Error('The operation was aborted due to timeout');
+      timeoutError.name = 'TimeoutError';
+      global.fetch = jest.fn().mockRejectedValue(timeoutError);
+
+      await expect(
+        adapter.generateReference({ front: Buffer.from('front-bytes') }),
+      ).rejects.toThrow('그림 만들기가 오래 걸려 중단했어요. 다시 시도해 주세요.');
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
   });
 });
