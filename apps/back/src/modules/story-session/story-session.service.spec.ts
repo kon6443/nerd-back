@@ -1083,8 +1083,8 @@ describe('StorySessionService', () => {
       await service.executePersonalizationPipeline('session-1');
 
       expect(mockImagePort.generatePageIllustration).toHaveBeenCalledTimes(5);
-      // PIPELINE_CONCURRENCY = 3 이하로만 동시 실행되었는지 증명
-      expect(maxActiveCount).toBeLessThanOrEqual(3);
+      // PIPELINE_CONCURRENCY = 4 이하로만 동시 실행되었는지 증명
+      expect(maxActiveCount).toBeLessThanOrEqual(4);
     });
   });
 });

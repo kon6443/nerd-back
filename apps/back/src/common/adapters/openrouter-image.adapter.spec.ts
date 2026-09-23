@@ -19,9 +19,8 @@ describe('OpenRouterImageAdapter', () => {
     } as unknown as ConfigService;
 
     notifications = { notify: jest.fn() };
-    adapter = new OpenRouterImageAdapter(configService, notifications as NotificationPort, {
-      initialDelayMs: 0,
-    });
+    adapter = new OpenRouterImageAdapter(configService, notifications as NotificationPort);
+    adapter.setRetryOptions({ initialDelayMs: 0 });
   });
 
   afterEach(() => {

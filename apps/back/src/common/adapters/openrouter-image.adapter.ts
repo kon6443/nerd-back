@@ -139,24 +139,28 @@ export class OpenRouterImageAdapter implements ImageGenerationPort {
   private readonly logger = new Logger(OpenRouterImageAdapter.name);
   private readonly apiKey: string | undefined;
   private readonly defaultModel: string;
-  private readonly maxRetries: number;
-  private readonly initialDelayMs: number;
-  private readonly sleepFn: (ms: number) => Promise<void>;
+  private maxRetries = MAX_RETRY_COUNT;
+  private initialDelayMs = INITIAL_RETRY_DELAY_MS;
+  private sleepFn: (ms: number) => Promise<void> = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
 
   constructor(
     private readonly configService: ConfigService,
     @Inject(NOTIFICATION_PORT) private readonly notifications: NotificationPort,
-    options?: OpenRouterRetryOptions,
   ) {
     this.apiKey = this.configService.get<string>('OPENROUTER_API_KEY');
     this.defaultModel =
       this.configService.get<string>('OPENROUTER_IMAGE_MODEL') ||
       'qwen/qwen-image-3';
-    this.maxRetries = options?.maxRetries ?? MAX_RETRY_COUNT;
-    this.initialDelayMs = options?.initialDelayMs ?? INITIAL_RETRY_DELAY_MS;
-    this.sleepFn =
-      options?.sleepFn ??
-      ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
+  }
+
+  /**
+   * 단위 테스트 등에서 재시도 파라미터를 변경하기 위한 설정 주입 메서드
+   */
+  setRetryOptions(options: OpenRouterRetryOptions): void {
+    if (options.maxRetries !== undefined) this.maxRetries = options.maxRetries;
+    if (options.initialDelayMs !== undefined) this.initialDelayMs = options.initialDelayMs;
+    if (options.sleepFn) this.sleepFn = options.sleepFn;
   }
 
   /**
