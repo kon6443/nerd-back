@@ -5,7 +5,7 @@
 #    `@nerd/contracts` 에 의존하는데 그게 앱 디렉터리 밖이라 컨텍스트를 좁힐 수 없다.
 #    그래서 이 파일의 모든 경로는 **레포 루트 기준**이다.
 #    제외 목록은 앱이 아니라 **루트 `.dockerignore`** 가 소유한다.
-FROM node:22-bookworm-slim AS builder
+FROM node:22.23.4-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -61,7 +61,7 @@ RUN pnpm --filter nerd-front... run build
 # =============================================================================
 # 실행 스테이지
 # =============================================================================
-FROM node:22-bookworm-slim
+FROM node:22.23.4-bookworm-slim
 
 # 날짜 처리 기준을 컨테이너에서 고정한다. 호스트 타임존에 따라 동작이 달라지지 않게 한다.
 ENV TZ=UTC
