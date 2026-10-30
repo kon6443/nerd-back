@@ -16,3 +16,15 @@ sharedWorkspaceLockfile: false
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+
+# 보안 패치용 하위 의존성 고정 (2026-10 감사). 상위 패키지가 취약 버전을 정확히 고정해서
+# 상위만 올려서는 해소되지 않는 것들이다 — 예: @nestjs/platform-express@11.2.8 → multer 2.4.0.
+# 각 항목은 취약 범위만 골라 **같은 메이저 안에서** 수정 버전 이상으로 올린다(메이저는 넘기지 않는다). 상위가 따라 올라오면 해당 줄을 지운다.
+overrides:
+  multer@>=2 <2.5.0: ^2.5.0
+  body-parser@>=2 <2.4.0: ^2.4.0
+  proxy-addr@>=2 <2.0.8: ^2.0.8
+  qs@>=6 <6.16.1: ^6.16.1
+  brace-expansion@>=2 <2.1.7: ^2.1.7
+  js-yaml@>=5 <5.4.1: ^5.4.1
+  source-map-js@>=1 <1.2.2: ^1.2.2

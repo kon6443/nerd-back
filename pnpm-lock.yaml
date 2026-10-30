@@ -4,6 +4,15 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  multer@>=2 <2.5.0: ^2.5.0
+  body-parser@>=2 <2.4.0: ^2.4.0
+  proxy-addr@>=2 <2.0.8: ^2.0.8
+  qs@>=6 <6.16.1: ^6.16.1
+  brace-expansion@>=2 <2.1.7: ^2.1.7
+  js-yaml@>=5 <5.4.1: ^5.4.1
+  source-map-js@>=1 <1.2.2: ^1.2.2
+
 importers:
 
   .: {}
