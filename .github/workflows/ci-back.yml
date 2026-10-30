@@ -38,7 +38,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
           cache: pnpm
           # 워크스페이스는 앱별 lockfile 을 쓴다 (sharedWorkspaceLockfile: false).
           cache-dependency-path: '**/pnpm-lock.yaml'
